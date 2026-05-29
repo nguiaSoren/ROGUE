@@ -43,10 +43,13 @@ Extracted from ROGUE_PLAN.md §3. Do not redesign during the build.
 │  LAYER 4 — REPRODUCE  (the win)                                 │
 │  For each canonical primitive × each DeploymentConfig:          │
 │    DeploymentConfig = (target_model, system_prompt, tools)      │
-│  • Render payload against the customer's system prompt          │
+│  • Render payload against the customer's system prompt —        │
+│    modality-aware: text, OR a real image / audio render for     │
+│    multimodal attacks (§10.8 renderers)                         │
 │  • N=5 trials, temperature varied                               │
 │  • Separate judge model scores: refused / evaded / partial /    │
 │    full_breach (§10.2 rubric)                                   │
+│  • Refused attacks → optional auto-escalation ladder (§10.8)    │
 │  Outputs: breach_results table, breach_matrix view              │
 └────────────────────────┬────────────────────────────────────────┘
                          ▼
@@ -103,6 +106,14 @@ The harvest layer is built around a `DiscoveryAgent` that:
 5. Updates discovery memory: which queries surfaced novel primitives, which sources are most prolific.
 
 This is a real agentic loop, not "for query in queries: requests.get(query)". The DiscoveryAgent runs an epsilon-greedy bandit over a 32-query pool, learning per-query yield-per-dollar across daily runs (per ROGUE_PLAN.md §11.6, locked-as-committed 2026-05-24 PM — replaces the earlier "LLM-planning evolves Day 2" framing). Same agentic principle in extraction: `ExtractionAgent` chooses which schema fields to populate confidently and which to defer, with rationale stored.
+
+## What the reproduce layer actually does (multimodal + escalation)
+
+Layer 4 is more than "send text, judge the reply." Two build-time extensions (§10.7–§10.10) live *inside* the §3 architecture — they enrich Layer 4, they do not redesign the five layers:
+
+- **True multimodal rendering.** `instantiator.render()` turns an attack into the modality its `vector` demands — text, a real **image** (typographic / OCR / MML / VPI / EXIF), spoken **audio** (TTS + acoustic styles), or **structured-data** (JSON/CSV/YAML/XML) injection — all deterministic renderers under `reproduce/modality_renderers/` (+ `structured_data.py`, `coj.py`). `target_panel` attaches image/audio as provider-specific content blocks, gated by per-model capability (`supports_image` / `supports_audio`). This is the real multimodal path that replaced the project's earlier text-only-pretending-to-be-multimodal stub.
+- **Auto-escalation ladder.** A refused (EVADE-band) attack can be escalated through a 5-tier ladder that **stops at the first breach**: image renderers → CoJ edit-step decomposition → structured-data → audio → planner-authored multi-turn escalation (crescendo → actor_attack → acronym). Runs standalone (`synthesize_escalations.py --ladder`) or **inline in reproduce** (`reproduce_once.py --escalate`, bounded by `--escalate-max-spend`). Tiers 1–4 are planner-free, so the ladder works even when the escalation planner refuses; the planner backbone auto-falls-back to a less-aligned model.
+- **Roadmap (§10.10).** A contextual Thompson bandit will reorder the ladder to try the likely-winning strategy first — the "how to break" counterpart to the harvest "what to harvest" bandit.
 
 ## What we deliberately do NOT do
 
