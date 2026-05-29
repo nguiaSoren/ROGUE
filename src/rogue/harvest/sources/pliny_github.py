@@ -200,15 +200,23 @@ class PlinyGithubPlugin(SourcePlugin):
         # 1337.mkd, AAA.mkd, TOKEN80M8.mkd, TOKENADE.mkd, README.md). The
         # hardcoded ORG_FILES + SPECIAL_FILES tuples remain as a safety net
         # if the API rate-limits us (60 req/hr unauthed) or returns nothing.
-        l1b_paths = await self._discover_l1b3rt4s_paths()
-        if not l1b_paths:
-            l1b_paths = list(self.l1b3rt4s_files) + list(self.l1b3rt4s_special_files)
+        l1b_entries = await self._discover_l1b3rt4s_paths()
+        if not l1b_entries:
+            l1b_entries = [
+                (f, "")
+                for f in (list(self.l1b3rt4s_files) + list(self.l1b3rt4s_special_files))
+            ]
             fetch_path_label = "l1b3rt4s_direct_fallback"
         else:
             fetch_path_label = "l1b3rt4s_tree_api"
 
-        for filename in l1b_paths:
+        for filename, blob_sha in l1b_entries:
             url = _l1b3rt4s_raw_url(filename)
+            # §11.7 Tier B — Pliny rewrites files in place, so the git blob SHA
+            # (not a timestamp) is the right freshness token: unchanged SHA ⇒
+            # skip the Web Unlocker fetch; an in-place rewrite changes the SHA.
+            if self.should_skip_fetch(url, blob_sha or None):
+                continue
             page = await self._safe_unlock(client, url, fmt="markdown")
             if page is None or not page.content or len(page.content) < 10:
                 # Empty body usually means the URL was treated as a fragment
@@ -225,6 +233,7 @@ class PlinyGithubPlugin(SourcePlugin):
                     "repo": "elder-plinius/L1B3RT4S",
                     "filename": filename,
                     "fetch_path": fetch_path_label,
+                    "version_token": blob_sha or None,
                 },
                 discovered_via=None,
             )
@@ -239,9 +248,11 @@ class PlinyGithubPlugin(SourcePlugin):
         # the repo. Verified 2026-05-26: tree API returns all 67 files;
         # filtering to {.mkd, .md, .txt} keeps 63 of them (drops LICENSE etc).
         if self.include_cl4r1t4s:
-            paths = await self._discover_cl4r1t4s_paths()
-            for raw_path in paths:
+            for raw_path, blob_sha in await self._discover_cl4r1t4s_paths():
                 url = _cl4r1t4s_raw_url(raw_path)
+                # §11.7 Tier B — skip the fetch when the blob SHA is unchanged.
+                if self.should_skip_fetch(url, blob_sha or None):
+                    continue
                 # `.md` and `.txt` formats render best as `markdown` through
                 # Web Unlocker (raw text passthrough); `.mkd` does too — it's
                 # GitHub-flavored markdown despite the unusual extension.
@@ -258,6 +269,7 @@ class PlinyGithubPlugin(SourcePlugin):
                         "repo": "elder-plinius/CL4R1T4S",
                         "path": raw_path,
                         "fetch_path": "cl4r1t4s_tree_api",
+                        "version_token": blob_sha or None,
                     },
                     discovered_via="github_tree_api:CL4R1T4S",
                 )
@@ -340,12 +352,13 @@ class PlinyGithubPlugin(SourcePlugin):
             return None
 
     @staticmethod
-    async def _discover_l1b3rt4s_paths() -> list[str]:
+    async def _discover_l1b3rt4s_paths() -> list[tuple[str, str]]:
         """Same as ``_discover_cl4r1t4s_paths`` but for L1B3RT4S, filtering on
         ``L1B3RT4S_CONTENT_EXTENSIONS`` (includes ``.json`` because L1B3RT4S
         ships jailbreak payloads like ``!SHORTCUTS.json`` /
-        ``*SPECIAL_TOKENS.json`` — CL4R1T4S doesn't). Returns [] on any
-        error so the caller can fall back to the hardcoded list."""
+        ``*SPECIAL_TOKENS.json`` — CL4R1T4S doesn't). Returns ``(path, blob_sha)``
+        pairs — the SHA is the §11.7 pre-fetch freshness token. [] on any error
+        so the caller can fall back to the hardcoded list."""
         import httpx as _httpx
 
         try:
@@ -360,7 +373,7 @@ class PlinyGithubPlugin(SourcePlugin):
         except Exception:
             return []
 
-        out: list[str] = []
+        out: list[tuple[str, str]] = []
         for entry in tree:
             if entry.get("type") != "blob":
                 continue
@@ -369,14 +382,15 @@ class PlinyGithubPlugin(SourcePlugin):
                 continue
             ext = "." + path.rsplit(".", 1)[-1].lower()
             if ext in L1B3RT4S_CONTENT_EXTENSIONS:
-                out.append(path)
+                out.append((path, str(entry.get("sha", ""))))
         return out
 
     @staticmethod
-    async def _discover_cl4r1t4s_paths() -> list[str]:
-        """Return every content-file path in elder-plinius/CL4R1T4S via the
-        GitHub Git Tree API. Public-repo endpoint, no auth needed; rate-limited
-        to 60 req/hr per IP (one harvest call/day = far below the limit).
+    async def _discover_cl4r1t4s_paths() -> list[tuple[str, str]]:
+        """Return every content-file ``(path, blob_sha)`` in elder-plinius/CL4R1T4S
+        via the GitHub Git Tree API. Public-repo endpoint, no auth needed;
+        rate-limited to 60 req/hr per IP (one harvest call/day = far below the
+        limit). The blob SHA is the §11.7 pre-fetch freshness token.
 
         Returns paths like ``"OPENAI/ChatGPT5-08-07-2025.mkd"``,
         ``"ANTHROPIC/Claude-3.5-Sonnet.txt"``, filtered to extensions in
@@ -397,7 +411,7 @@ class PlinyGithubPlugin(SourcePlugin):
         except Exception:
             return []
 
-        out: list[str] = []
+        out: list[tuple[str, str]] = []
         for entry in tree:
             if entry.get("type") != "blob":
                 continue
@@ -406,7 +420,7 @@ class PlinyGithubPlugin(SourcePlugin):
                 continue
             ext = "." + path.rsplit(".", 1)[-1].lower()
             if ext in CL4R1T4S_CONTENT_EXTENSIONS:
-                out.append(path)
+                out.append((path, str(entry.get("sha", ""))))
         return out
 
     @staticmethod

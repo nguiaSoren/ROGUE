@@ -291,8 +291,7 @@ class GithubSearchPlugin(SourcePlugin):
             # §11.7 Tier B — skip the Web Unlocker fetch when this blob's SHA is
             # unchanged since the last run (content-identical file). The SHA
             # came free with the tree call above; no extra request.
-            if blob_sha and self.version_cache.get(raw_url) == blob_sha:
-                self.skipped_unchanged += 1
+            if self.should_skip_fetch(raw_url, blob_sha):
                 continue
             try:
                 page = await client.web_unlock(raw_url, format="markdown")

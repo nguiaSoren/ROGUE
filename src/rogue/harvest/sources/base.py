@@ -58,6 +58,34 @@ class SourcePlugin(ABC):
     source_type: SourceType
     bright_data_product: BrightDataProduct
 
+    # §11.7 fetch-cache (Tier B). ``version_cache`` is a {url: version_token}
+    # snapshot of the fetch_cache ledger, injected by ``harvest_once`` before a
+    # run. Read via getattr in ``should_skip_fetch`` so a plugin that was never
+    # injected (or only ever direct-fetches) simply never skips.
+    version_cache: dict[str, str]
+    skipped_unchanged: int
+
+    def should_skip_fetch(self, url: str, version_token: str | None) -> bool:
+        """§11.7 Tier B — True iff a prior run already fetched this URL with the
+        SAME source freshness token (git blob SHA / arxiv versioned-id / ETag),
+        meaning the content is unchanged and the Bright Data fetch can be
+        skipped up front. A ``None``/empty token means the source gave no
+        freshness signal → never skip (can't prove it's unchanged). Increments
+        ``skipped_unchanged`` for per-plugin telemetry when it skips.
+
+        Only meaningful for per-URL fetch sources (Web Unlocker). Bulk-scrape
+        sources (Web Scraper API: Reddit, HuggingFace) pull all content in one
+        job, so there is no per-item fetch to skip — they rely on the Tier A
+        content-hash gate to skip re-extraction instead.
+        """
+        if not version_token:
+            return False
+        cache = getattr(self, "version_cache", None) or {}
+        if cache.get(url) == version_token:
+            self.skipped_unchanged = getattr(self, "skipped_unchanged", 0) + 1
+            return True
+        return False
+
     @abstractmethod
     async def fetch_since(
         self,

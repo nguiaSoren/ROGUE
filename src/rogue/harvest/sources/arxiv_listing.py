@@ -117,9 +117,13 @@ class ArxivListingPlugin(SourcePlugin):
             *(fetch_listing(u) for u in self.listings)
         )
 
-        # Collapse across listings + dedupe IDs.
+        # Collapse across listings + dedupe IDs. Keep the FULL (versioned) id
+        # as the §11.7 freshness token — an arXiv abstract is immutable per
+        # version, so `2605.18239v2` unchanged ⇒ skip the re-fetch; a new
+        # version (`...v3`) changes the token ⇒ re-fetch.
         seen_ids: set[str] = set()
         id_to_listing: dict[str, str] = {}
+        id_to_token: dict[str, str] = {}
         for listing_url, raw_ids in listing_results:
             for raw_id in raw_ids:
                 arxiv_id = raw_id.split("v")[0]  # strip version suffix
@@ -127,14 +131,21 @@ class ArxivListingPlugin(SourcePlugin):
                     continue
                 seen_ids.add(arxiv_id)
                 id_to_listing[arxiv_id] = listing_url
+                id_to_token[arxiv_id] = raw_id
 
         # Bounded-concurrency abstract fetches. Semaphore cap of 16 is the
         # rule-of-thumb safe number for BD Web Unlocker (no published limit;
         # 16 is well under any practical zone burst cap).
         sem = asyncio.Semaphore(16)
 
-        async def fetch_one_abstract(arxiv_id: str, listing_url: str) -> RawDocument | None:
+        async def fetch_one_abstract(
+            arxiv_id: str, listing_url: str, version_token: str
+        ) -> RawDocument | None:
             abs_url = f"https://arxiv.org/abs/{arxiv_id}"
+            # §11.7 Tier B — skip the Web Unlocker fetch when the versioned id
+            # is unchanged since the last run (abstract is immutable per version).
+            if self.should_skip_fetch(abs_url, version_token):
+                return None
             async with sem:
                 try:
                     page = await client.web_unlock(abs_url, format="html")
@@ -157,6 +168,7 @@ class ArxivListingPlugin(SourcePlugin):
                     metadata={
                         "arxiv_id": arxiv_id,
                         "listing_url": listing_url,
+                        "version_token": version_token,
                     },
                     discovered_via=None,
                 )
@@ -164,7 +176,10 @@ class ArxivListingPlugin(SourcePlugin):
                 return None
 
         abstract_results = await asyncio.gather(
-            *(fetch_one_abstract(aid, lurl) for aid, lurl in id_to_listing.items())
+            *(
+                fetch_one_abstract(aid, lurl, id_to_token[aid])
+                for aid, lurl in id_to_listing.items()
+            )
         )
         _ = since
         return [d for d in abstract_results if d is not None]

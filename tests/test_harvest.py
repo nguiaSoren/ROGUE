@@ -1305,12 +1305,14 @@ async def test_pliny_plugin_cl4r1t4s_discovery_uses_github_tree_api(monkeypatch)
     # representing what the API would return for the live repo.
     from rogue.harvest.sources import pliny_github as plg
 
-    async def fake_discover() -> list[str]:
+    async def fake_discover() -> list[tuple[str, str]]:
+        # (path, blob_sha) pairs — the real helper now returns the SHA as the
+        # §11.7 pre-fetch freshness token.
         return [
-            "OPENAI/ChatGPT5-08-07-2025.mkd",
-            "ANTHROPIC/Claude-3.5-Sonnet.md",
-            "META/Llama-3.1-405B.txt",
-            "LICENSE",  # filtered out by extension whitelist in the real helper
+            ("OPENAI/ChatGPT5-08-07-2025.mkd", "sha-openai"),
+            ("ANTHROPIC/Claude-3.5-Sonnet.md", "sha-anthropic"),
+            ("META/Llama-3.1-405B.txt", "sha-meta"),
+            ("LICENSE", "sha-license"),  # filtered out by extension whitelist in the real helper
         ]
 
     monkeypatch.setattr(plg.PlinyGithubPlugin, "_discover_cl4r1t4s_paths", staticmethod(fake_discover))

@@ -443,11 +443,11 @@ async def run_harvest(
             )
         except Exception as exc:  # noqa: BLE001 — cache miss must never block harvest
             logger.warning("fetch_cache preload skipped: %s", exc)
-        # Inject the pre-fetch token map into any plugin that supports it
-        # (duck-typed; plugins without `version_cache` are untouched).
+        # Inject the pre-fetch token map into every plugin. The base
+        # SourcePlugin.should_skip_fetch reads it, so plugins that only
+        # direct-fetch (or never call should_skip_fetch) are unaffected.
         for _plugin in agent.plugins:
-            if hasattr(_plugin, "version_cache"):
-                setattr(_plugin, "version_cache", version_cache)
+            _plugin.version_cache = version_cache
 
         raw_docs = await agent.run(since=since, prefetched_urls=prefetched_urls)
         stats.raw_docs = len(raw_docs)
