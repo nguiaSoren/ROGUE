@@ -1,50 +1,5 @@
 "use client";
 
-import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
-
-/**
- * Tiny inline area sparkline — recharts wrapped to ~24px tall with no axes,
- * no grid, no legend. Used inside augmentation widgets to give each one a
- * visual pulse of its own data shape.
- */
-export function SparkArea({
-  data,
-  color = "var(--rogue-green)",
-  height = 28,
-  fillOpacity = 0.25,
-}: {
-  data: { x: number | string; y: number }[];
-  color?: string;
-  height?: number;
-  fillOpacity?: number;
-}) {
-  if (!data || data.length === 0) return <div style={{ height }} />;
-  return (
-    <div style={{ width: "100%", height }} className="pointer-events-none">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-          <defs>
-            <linearGradient id={`spark-grad-${color}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={fillOpacity} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Tooltip content={() => null} />
-          <Area
-            type="monotone"
-            dataKey="y"
-            stroke={color}
-            strokeWidth={1.5}
-            fill={`url(#spark-grad-${color})`}
-            isAnimationActive={false}
-            dot={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 /**
  * Pure-SVG mini bar chart — used in stubbornness widget for the
  * refinement-type histogram. No recharts dependency (faster, simpler).
