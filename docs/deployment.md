@@ -6,6 +6,7 @@ ROGUE's live demo runs on three free-tier services plus a keep-warm pinger.
 - **Dashboard (frontend):** https://rogue-eosin.vercel.app
 - **API (backend):** https://rogue-api-mr5w.onrender.com — e.g. `/api/health`
 - **Repo:** https://github.com/nguiaSoren/ROGUE
+- **Replay the intro (for the demo):** **https://rogue-eosin.vercel.app/?intro** — force-plays the 16s intro overlay every time. (Normally the intro is first-visit-only, gated by `localStorage`; a hard refresh does NOT replay it because refreshes don't clear localStorage. The `?intro` query param is the escape hatch.)
 
 ## Architecture
 ```

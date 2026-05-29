@@ -413,7 +413,14 @@ def brief(
     fmt = format.lower()
     if fmt not in ("markdown", "json"):
         raise HTTPException(status_code=400, detail="format must be 'markdown' or 'json'")
-    target = _parse_date(date_str)
+    if date_str and date_str != "today":
+        target = _parse_date(date_str)
+    else:
+        # No date requested → latest day with breach data, so the brief is never
+        # empty during a gap (today may have no run yet). The diff is that day vs
+        # the prior one — the real "what changed" story.
+        latest = db.execute(text("SELECT max(run_date) FROM breach_matrix")).scalar()
+        target = latest or _parse_date(date_str)
 
     ext = "md" if fmt == "markdown" else "json"
     brief_path = THREAT_BRIEFS_DIR / f"{target.isoformat()}.{ext}"
