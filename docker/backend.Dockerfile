@@ -9,9 +9,12 @@ WORKDIR /app
 # uv handles deps; pinned to a stable minor for reproducibility.
 RUN pip install --no-cache-dir uv==0.4.20
 
-# Cache deps separately from source so iterative rebuilds skip the install step.
+# Install ONLY dependencies, not the project itself. The app runs from /app/src
+# via PYTHONPATH (set below), so the `rogue` package is never built/installed —
+# and --no-install-project avoids hatchling trying to build its wheel here, before
+# src/ has been copied (which fails: "no directory matches the project name").
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Application code + migrations + fixtures (the seed script needs the goldens).
 COPY src/ ./src/
