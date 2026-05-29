@@ -1,0 +1,569 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  ROGUE — signature aesthetic                                       */
+/*                                                                     */
+/*  The dashboard's visual identity. Two accent colors:                */
+/*    --rogue-green: signature / "alive" / OK / harvested              */
+/*    --rogue-red:   critical breach / dangerous / alert               */
+/*  Plus subtle orange for HIGH tier.                                  */
+/* ------------------------------------------------------------------ */
+:root {
+  --rogue-green: #00ff88;
+  --rogue-green-dim: #00ff8855;
+  --rogue-red: #ff003c;
+  --rogue-red-dim: #ff003c55;
+  --rogue-orange: #ff6b00;
+  --rogue-orange-dim: #ff6b0055;
+  --rogue-bg-deep: #050508;
+  --rogue-bg-mid: #0a0a12;
+}
+
+.dark {
+  --background: oklch(0.06 0.005 270);   /* deep blue-black, not pure black */
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.10 0.008 270);
+  --card-foreground: oklch(0.96 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --muted-foreground: oklch(0.62 0 0);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pause-offscreen utility                                            */
+/*  Toggled by <PausedOffscreen> via IntersectionObserver. Stops all  */
+/*  running CSS animations on the wrapped subtree when not in view —   */
+/*  big GPU savings for marquees, drifting gradients, etc.             */
+/* ------------------------------------------------------------------ */
+[data-rg-pause="true"],
+[data-rg-pause="true"] * {
+  animation-play-state: paused !important;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Animated background grid                                           */
+/*  Subtle drifting grid overlay — never dominates content.            */
+/* ------------------------------------------------------------------ */
+.bg-rogue-grid {
+  background-color: var(--rogue-bg-deep);
+  background-image:
+    linear-gradient(rgba(0, 255, 136, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 136, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  background-position: 0 0;
+  animation: rogue-grid-drift 30s linear infinite;
+}
+
+@keyframes rogue-grid-drift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 60px 60px; }
+}
+
+/* Radial spotlight that follows the top — gives the page depth */
+.bg-rogue-spotlight {
+  position: relative;
+}
+.bg-rogue-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    1200px 600px at 50% -10%,
+    rgba(0, 255, 136, 0.12),
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-rogue-spotlight > * { position: relative; z-index: 1; }
+
+/* ------------------------------------------------------------------ */
+/*  Entrance — staggered fade-up                                       */
+/*  Apply to lists; the data-stagger attribute sets the delay.         */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rogue-fade-up {
+  animation: rogue-fade-up 0.5s ease-out backwards;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pulse — for CRITICAL/breached elements                             */
+/*  Slow heartbeat-style pulse. Use sparingly — only on actual crit.   */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-pulse-critical {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--rogue-red-dim);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px var(--rogue-red-dim);
+  }
+}
+.animate-rogue-pulse-critical {
+  animation: rogue-pulse-critical 2.5s ease-in-out infinite;
+}
+
+@keyframes rogue-pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--rogue-green-dim);
+  }
+  50% {
+    box-shadow: 0 0 10px 2px var(--rogue-green-dim);
+  }
+}
+.animate-rogue-pulse-green {
+  animation: rogue-pulse-green 2.5s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scan line — sweeps horizontally across an element                  */
+/*  Use on hero text and high-attention cards.                         */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-scan {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.rogue-scan-line {
+  position: relative;
+  overflow: hidden;
+}
+.rogue-scan-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 136, 0.15),
+    transparent
+  );
+  animation: rogue-scan 3s linear infinite;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Glitch — quick chromatic offset for hero text                      */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-glitch {
+  0%, 100% { text-shadow: none; }
+  20% { text-shadow: -2px 0 var(--rogue-red), 2px 0 var(--rogue-green); }
+  40% { text-shadow: 2px 0 var(--rogue-red), -2px 0 var(--rogue-green); }
+  60% { text-shadow: none; }
+}
+.hover\:rogue-glitch:hover {
+  animation: rogue-glitch 0.4s ease-in-out;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Count-up — uses CSS counter for ticking numbers                    */
+/*  Apply via the <CountUp /> component.                               */
+/* ------------------------------------------------------------------ */
+@property --rogue-count {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+@keyframes rogue-count-up {
+  from { --rogue-count: 0; }
+  to   { --rogue-count: var(--rogue-target); }
+}
+.rogue-count-up {
+  counter-reset: rogue-count var(--rogue-count);
+  animation: rogue-count-up 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.rogue-count-up::before {
+  content: counter(rogue-count);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Glow underline — for nav links on hover/active                     */
+/* ------------------------------------------------------------------ */
+.rogue-nav-link {
+  position: relative;
+  padding-bottom: 4px;
+}
+.rogue-nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--rogue-green);
+  box-shadow: 0 0 8px var(--rogue-green);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rogue-nav-link:hover::after,
+.rogue-nav-link[data-active="true"]::after {
+  transform: scaleX(1);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Magnetic card — slight tilt + lift on hover                        */
+/* ------------------------------------------------------------------ */
+.rogue-card {
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background-color 0.3s ease;
+}
+.rogue-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--rogue-green);
+  box-shadow:
+    0 0 0 1px var(--rogue-green-dim),
+    0 16px 32px -8px rgba(0, 0, 0, 0.6);
+}
+
+/* Critical variant — pulsing red border instead of green */
+.rogue-card-critical {
+  border-color: var(--rogue-red-dim);
+}
+.rogue-card-critical:hover {
+  border-color: var(--rogue-red);
+  box-shadow:
+    0 0 0 1px var(--rogue-red),
+    0 16px 32px -8px rgba(255, 0, 60, 0.3);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Caret — terminal-style blinking cursor for hero                    */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-caret-blink {
+  0%, 50%   { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.rogue-caret::after {
+  content: "▮";
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--rogue-green);
+  animation: rogue-caret-blink 1s steps(1) infinite;
+}
+/* Standalone "blink this element" utility — for use on inline boxes in
+   the AttackReplay terminal where we don't want the ::after pseudo. */
+.rogue-caret-blink {
+  animation: rogue-caret-blink 1s steps(1) infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Slide-in drawer — for the matrix cell-detail panel                 */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Heatmap cell entrance — wave cascade                               */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-cell-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-rogue-cell-pop {
+  animation: rogue-cell-pop 0.4s ease-out backwards;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Cell pulses for high-severity heatmap cells                        */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-cell-pulse-red {
+  0%, 100% { background-color: rgba(255, 0, 60, 0.30); }
+  50%      { background-color: rgba(255, 0, 60, 0.55); }
+}
+.rogue-cell-critical {
+  animation: rogue-cell-pulse-red 3s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scrollbar — terminal aesthetic                                     */
+/* ------------------------------------------------------------------ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 136, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 136, 0.4);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Brand color utilities                                              */
+/* ------------------------------------------------------------------ */
+.text-rogue-green { color: var(--rogue-green); }
+.text-rogue-red   { color: var(--rogue-red); }
+.bg-rogue-green   { background-color: var(--rogue-green); }
+.bg-rogue-red     { background-color: var(--rogue-red); }
+.border-rogue-green { border-color: var(--rogue-green); }
+.border-rogue-red   { border-color: var(--rogue-red); }
+
+/* ------------------------------------------------------------------ */
+/*  Cinematic hero — animated mesh-gradient background                 */
+/*  Used on the home page only. Multiple radial gradients drift on     */
+/*  long timelines so the eye reads it as "alive" without distraction. */
+/* ------------------------------------------------------------------ */
+.bg-rogue-mesh {
+  background-color: var(--rogue-bg-deep);
+  background-image:
+    radial-gradient(900px 500px at 15% 20%, rgba(0, 255, 136, 0.14), transparent 60%),
+    radial-gradient(700px 400px at 85% 30%, rgba(255, 0, 60, 0.10), transparent 60%),
+    radial-gradient(600px 400px at 50% 90%, rgba(34, 211, 238, 0.10), transparent 60%);
+  background-size: 200% 200%;
+  animation: rogue-mesh-drift 24s ease-in-out infinite;
+}
+@keyframes rogue-mesh-drift {
+  0%,   100% { background-position: 0% 0%,    100% 0%,  50% 100%; }
+  50%        { background-position: 25% 30%,  75% 40%, 60% 80%; }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Word swap — vertically rotating word for hero subhead              */
+/*  Apply on a fixed-height wrapper containing a vertical list. The    */
+/*  list translates upward through each word every N seconds.          */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-word-cycle {
+  0%, 18%   { transform: translateY(0); }
+  22%, 40%  { transform: translateY(-100%); }
+  44%, 62%  { transform: translateY(-200%); }
+  66%, 84%  { transform: translateY(-300%); }
+  88%, 100% { transform: translateY(-400%); }
+}
+.rogue-word-rotator {
+  display: inline-flex;
+  flex-direction: column;
+  animation: rogue-word-cycle 10s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scroll reveal — bigger entrance for hero/section moments           */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-reveal {
+  from { opacity: 0; transform: translateY(28px); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+.animate-rogue-reveal {
+  animation: rogue-reveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Marquee — horizontal sources strip                                 */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.rogue-marquee {
+  animation: rogue-marquee 38s linear infinite;
+}
+.rogue-marquee-pause:hover .rogue-marquee { animation-play-state: paused; }
+
+/* ------------------------------------------------------------------ */
+/*  Lab "augmentation toggle" — energetic state transitions            */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-bar-fill {
+  from { width: var(--rogue-from, 0%); }
+  to   { width: var(--rogue-to, 0%); }
+}
+.rogue-bar-fill {
+  animation: rogue-bar-fill 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Soft pulsing glow for "active" augmentation toggles */
+@keyframes rogue-glow-soft {
+  0%, 100% { box-shadow: 0 0 0 0 var(--rogue-glow, rgba(0, 255, 136, 0.35)); }
+  50%      { box-shadow: 0 0 22px 4px var(--rogue-glow, rgba(0, 255, 136, 0.35)); }
+}
+.rogue-glow-soft {
+  animation: rogue-glow-soft 2.4s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scroll cue — gentle bounce at the bottom of the hero               */
+/* ------------------------------------------------------------------ */
+@keyframes rogue-scroll-cue {
+  0%, 100% { transform: translateY(0);  opacity: 0.4; }
+  50%      { transform: translateY(8px); opacity: 1; }
+}
+.rogue-scroll-cue {
+  animation: rogue-scroll-cue 2.2s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Augmentation-tile accent colors                                    */
+/*  Each sidebar widget gets a distinctive left-border accent so the   */
+/*  5 stacked widgets read as DIFFERENT augmentations at a glance, not */
+/*  a monotonous stack of identical cards. Colors picked for           */
+/*  dark-mode legibility + max separation in hue space (HSL spread):   */
+/*    bandit:        green  (signature / "always live")                */
+/*    persona:       purple                                            */
+/*    escalation:    amber                                             */
+/*    mutation:      cyan                                              */
+/*    stubbornness:  red    (the "this one is the killer" tile)        */
+/* ------------------------------------------------------------------ */
+.rogue-accent-bandit       { border-left: 3px solid var(--rogue-green); }
+.rogue-accent-persona      { border-left: 3px solid #a78bfa; }
+.rogue-accent-escalation   { border-left: 3px solid #fbbf24; }
+.rogue-accent-mutation     { border-left: 3px solid #22d3ee; }
+.rogue-accent-stubbornness { border-left: 3px solid #f87171; }
+
+.rogue-accent-bandit-text       { color: var(--rogue-green); }
+.rogue-accent-persona-text      { color: #c4b5fd; }
+.rogue-accent-escalation-text   { color: #fcd34d; }
+.rogue-accent-mutation-text     { color: #67e8f9; }
+.rogue-accent-stubbornness-text { color: #fca5a5; }

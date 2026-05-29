@@ -1,0 +1,107 @@
+# secrets
+.env
+.env.local
+.env.*.local
+.neon_url.local
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# uv / poetry caches (lockfiles ARE committed)
+.uv-cache/
+.poetry-cache/
+
+# node / next.js
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# db / data
+postgres-data/
+pgdata/
+*.db
+*.sqlite
+*.sqlite3
+dump.sql
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# bright data / llm cost logs (regenerated per run)
+bright_data_cost_log.csv
+llm_cost_log.csv
+*.log
+
+# build artifacts
+dist/
+build/
+*.egg-info/
+
+# runtime-generated state (bandit arm stats, dataset exports, threat-brief outputs)
+# Tracked at the directory level via tests/fixtures/.gitkeep — actual contents stay local.
+data/*
+!data/.gitkeep
+# Bandit arm stats — harmless (no secrets/PII); published so /api/bandit/stats
+# renders on a fresh clone + the Render build can COPY it.
+!data/discovery_bandit.json
+
+# LeakHub session capture — Playwright storage_state JSON. Effectively your
+# signed-in session; never commit. See scripts/_capture_leakhub_storage.py.
+leakhub_storage_state.json
+
+# notebooks / scratch
+.ipynb_checkpoints/
+scratch/
+tmp/
+
+# vendor docs archive — local reference only, not for committing
+website/
+
+# research-paper code archive — same pattern as website/ above.
+# Holds shallow clones of PAIR / Crescendo / AutoDAN / PAP reference repos
+# per ROGUE_PLAN.md §10.7 implementation checklist. Research code is not
+# licensed for redistribution in our repo; canonical sources stay on GitHub.
+papers/
+
+# Local-only agent instructions
+CLAUDE.md
+
+mani.py
+
+# AI session files (local-only)
+frontend/AGENTS.md
+frontend/CLAUDE.md
+tasks/
+
+# Internal planning / notes — not for the public repo
+ROGUE_PLAN.md
+new_methods.md
+assets/deck_slide_lines.md
+
+# Dev-scratch scripts — not part of the runnable project
+scripts/_*
+
+# Stray root npm files (accidental `npm install react-markdown` at repo root;
+# real frontend deps live in frontend/package.json)
+/package.json
+/package-lock.json

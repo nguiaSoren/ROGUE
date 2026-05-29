@@ -1,0 +1,44 @@
+# Full-stack one-command demo (Day 3 evening, scope-flex per ROGUE_PLAN.md §A.27).
+# Brings up Postgres + pgvector, the FastAPI backend, and the Next.js frontend.
+# Use docker-compose.yml for plain dev (Postgres only).
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rogue-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rogue
+      POSTGRES_PASSWORD: rogue_dev_password
+      POSTGRES_DB: rogue
+    ports: ["5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rogue -d rogue"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: { context: ., dockerfile: docker/backend.Dockerfile }
+    container_name: rogue-backend
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      DATABASE_URL: postgresql+psycopg://rogue:rogue_dev_password@postgres:5432/rogue
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BRIGHTDATA_API_KEY: ${BRIGHTDATA_API_KEY}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+    ports: ["8000:8000", "8001:8001"]
+    command: >
+      sh -c "alembic upgrade head && python scripts/seed_demo_data.py &&
+             uvicorn rogue.api.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build: { context: ./frontend, dockerfile: ../docker/frontend.Dockerfile }
+    depends_on: [backend]
+    environment: { NEXT_PUBLIC_API_URL: http://localhost:8000 }
+    ports: ["3000:3000"]
+    command: npm run start
+
+volumes:
+  postgres-data:

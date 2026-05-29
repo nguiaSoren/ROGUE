@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rogue-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rogue
+      POSTGRES_PASSWORD: rogue_dev_password
+      POSTGRES_DB: rogue
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Init script — creates `rogue_test` DB ONCE on a fresh volume so
+      # pytest never wipes the dev `rogue` DB. See docker/init-test-db.sh.
+      - ./docker/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rogue -d rogue"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
