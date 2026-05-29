@@ -454,6 +454,8 @@ async def run_reproduction(
     pair_attacker: IterativeAttacker | None = None,
     synthesized_only: bool = False,
     multimodal_only: bool = False,
+    fetch_media: bool = True,
+    media_fetcher=None,
     escalate: bool = False,
     escalate_max_spend: float | None = None,
     escalate_n_trials: int = 1,
@@ -565,6 +567,36 @@ async def run_reproduction(
 
             primitives = [_orm_to_pydantic_primitive(o) for o in primitive_orms]
             configs = [_orm_to_pydantic_config(o) for o in config_orms]
+
+            # §11.8 — AUTOMATIC media carriers. For multimodal-image primitives
+            # that describe a carrier (media_query) but don't already have a
+            # base_image, fetch a REAL image via Bright Data (disk-cached, so
+            # cheap on re-runs) and stamp it so render() composites onto it. Runs
+            # by default; only fires for multimodal; disable with --no-fetch-media.
+            if fetch_media:
+                need = [
+                    p for p in primitives
+                    if p.vector == AttackVector.MULTIMODAL_IMAGE
+                    and (p.payload_slots or {}).get("media_query")
+                    and not (p.payload_slots or {}).get("base_image")
+                ]
+                if need:
+                    if media_fetcher is None:
+                        from rogue.harvest.bright_data_client import BrightDataClient  # noqa: PLC0415
+                        from rogue.harvest.media_fetch import BrightDataMediaFetcher  # noqa: PLC0415
+                        media_fetcher = BrightDataMediaFetcher(BrightDataClient.from_env())
+                    logger.info("§11.8 resolving %d real media carrier(s) via Bright Data", len(need))
+                    for p in need:
+                        try:
+                            path = await media_fetcher.fetch_base_image_path(
+                                p.payload_slots["media_query"]
+                            )
+                        except Exception as exc:  # noqa: BLE001 — degrade to synthetic
+                            logger.warning("media fetch failed for %s: %s", p.primitive_id, exc)
+                            path = None
+                        if path is not None:
+                            p.payload_slots["base_image"] = str(path)
+                            logger.info("media: %s -> %s", p.primitive_id, path)
 
             n_pairs = len(primitives) * len(configs)
             n_calls = n_pairs * n_trials
@@ -815,6 +847,8 @@ async def run_reproduction(
             await pair_attacker.aclose()
         if planner is not None:
             await planner.aclose()
+        if media_fetcher is not None and hasattr(media_fetcher, "client"):
+            await media_fetcher.client.aclose()
         engine.dispose()
 
     return stats
@@ -923,6 +957,17 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--no-fetch-media",
+        action="store_true",
+        help=(
+            "§11.8 disable the automatic Bright Data media fetch. By DEFAULT, a "
+            "multimodal-image primitive with a `media_query` and no `base_image` "
+            "auto-fetches a real carrier image (BD SERP search + Web Unlocker, "
+            "disk-cached) and composites the attack onto it. This flag skips that "
+            "and renders synthetic canvases instead."
+        ),
+    )
+    parser.add_argument(
         "--escalate",
         action="store_true",
         help=(
@@ -1004,6 +1049,7 @@ def main(argv: list[str] | None = None) -> int:
             pair_max_iters=args.pair_max_iters,
             synthesized_only=args.synthesized_only,
             multimodal_only=args.multimodal_only,
+            fetch_media=not args.no_fetch_media,
             escalate=args.escalate,
             escalate_max_spend=args.escalate_max_spend,
             escalate_n_trials=args.escalate_n_trials,
