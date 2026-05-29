@@ -3,7 +3,10 @@
  *
  * Wraps the 7 endpoints exposed by `src/rogue/api/main.py` with TypeScript
  * types. All fetches go through `apiGet` so the API base URL + cache policy
- * (`no-store` — the dashboard always shows live data) is centralized.
+ * are centralized. Pages are cached + revalidated hourly (ISR) so visitors
+ * get instant loads instead of paying the full Vercel→Render→Neon round-trip
+ * on every view; new data in Neon surfaces within the revalidate window. The
+ * live SSE ticker is a separate client connection, so it stays real-time.
  *
  * Spec: ROGUE_PLAN.md §11.1 backend endpoints.
  */
@@ -11,9 +14,11 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
+const REVALIDATE_SECONDS = 3600;
+
 async function apiGet<T>(path: string): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const r = await fetch(url, { cache: "no-store" });
+  const r = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
   if (!r.ok) {
     throw new Error(`${path} → ${r.status} ${r.statusText}`);
   }
