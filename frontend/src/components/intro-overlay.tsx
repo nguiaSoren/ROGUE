@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Auto-play first-visit intro — 4 panels of ~5s each (20s total).
+ * Auto-play first-visit intro — 4 panels of 4s each (16s total).
  *
  * Mounts client-side, checks localStorage gate (`rogue:intro-seen`), and if
  * unseen renders a fullscreen overlay above the home page. Auto-advances
@@ -13,13 +13,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * Audio is intentionally NOT used: browser autoplay policies block audio
  * without prior user interaction, so any narration would silently fail on
  * first visit (which IS the only visit this overlay ever shows on). The
- * visual narrative carries the same story in 20 seconds.
+ * visual narrative carries the same story in 16 seconds.
  *
  * On the home page only (mounted from app/page.tsx). Returning visitors —
  * or anyone who clicks Skip — never see it again on the same browser.
  */
 const STORAGE_KEY = "rogue:intro-seen-v1";
-const PANEL_MS = 5000;
+const PANEL_MS = 4000;
 const FADE_MS = 600;
 
 type Panel = {
@@ -128,13 +128,16 @@ export function IntroOverlay() {
   // first-paint flash that resolves in <16ms anyway.
   useEffect(() => {
     let seen = false;
+    let force = false;
     try {
       seen = window.localStorage.getItem(STORAGE_KEY) === "1";
+      // `?intro` in the URL force-replays it (handy for demos / verifying changes).
+      force = new URLSearchParams(window.location.search).has("intro");
     } catch {
       /* localStorage blocked — fall through to showing */
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStage(seen ? "done" : "showing");
+    setStage(seen && !force ? "done" : "showing");
   }, []);
 
   const dismiss = useCallback(() => {
@@ -178,7 +181,7 @@ export function IntroOverlay() {
       style={{ transitionDuration: `${FADE_MS}ms` }}
       aria-modal="true"
       role="dialog"
-      aria-label="Welcome to ROGUE — 20-second intro"
+      aria-label="Welcome to ROGUE — 16-second intro"
     >
       {/* Background — animated gradient mesh + grid overlay */}
       <div
@@ -238,7 +241,7 @@ export function IntroOverlay() {
             <span className="text-muted-foreground/40">
               / {String(PANELS.length).padStart(2, "0")}
             </span>
-            <span className="text-muted-foreground/60">· 20s intro</span>
+            <span className="text-muted-foreground/60">· 16s intro</span>
           </div>
           <div className="flex gap-1.5">
             {PANELS.map((_, i) => (
