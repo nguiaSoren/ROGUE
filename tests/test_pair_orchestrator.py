@@ -14,7 +14,7 @@ Five groups:
      daily-budget bubble-up.
 
   D. Persistence wiring — build_step_orm_rows shape; _build_pair_breach_result_orm
-     in reproduce_once sets pair_iters_to_breach + persona_used.
+     in reproduce_once sets pair_iters_to_breach (persona_used stays NULL).
 
   E. Live `rogue_test` DB end-to-end — run_reproduction with pair_max_iters=2
      produces baseline BreachResults + PAIR BreachResult + RefinementStep
@@ -593,7 +593,9 @@ def test_build_step_orm_rows_shape() -> None:
 
 def test_build_pair_breach_result_orm_sets_pair_columns() -> None:
     """The PAIR-derived BreachResult row carries pair_iters_to_breach +
-    pair_attacker_total_cost_usd + persona_used='pair_iter=N'."""
+    pair_attacker_total_cost_usd; persona_used stays NULL so PAIR rows don't
+    pollute the persona A/B (the 2026-05-28 contamination fix — PAIR rows are
+    identified canonically by pair_attacker_total_cost_usd)."""
     from scripts.reproduce_once import _build_pair_breach_result_orm
 
     cell = PairCellResult(
@@ -640,12 +642,13 @@ def test_build_pair_breach_result_orm_sets_pair_columns() -> None:
     assert row.verdict == "full_breach"
     assert row.pair_iters_to_breach == 1
     assert row.pair_attacker_total_cost_usd == pytest.approx(0.014, abs=1e-9)
-    assert row.persona_used == "pair_iter=1"
+    assert row.persona_used is None
     assert row.cost_usd == pytest.approx(0.014, abs=1e-9)
 
 
 def test_build_pair_breach_result_orm_marks_no_breach() -> None:
-    """When PAIR runs all iters without breach, persona_used='pair_no_breach'."""
+    """When PAIR runs all iters without breach, the row still carries no
+    persona_used (NULL) — PAIR is identified by pair_attacker_total_cost_usd."""
     from scripts.reproduce_once import _build_pair_breach_result_orm
 
     cell = PairCellResult(
@@ -665,7 +668,7 @@ def test_build_pair_breach_result_orm_marks_no_breach() -> None:
         primitive_id="P1", config_id="C1", pair_result=cell,
     )
     assert row.pair_iters_to_breach is None
-    assert row.persona_used == "pair_no_breach"
+    assert row.persona_used is None
 
 
 # =========================================================================== #
@@ -803,7 +806,7 @@ async def test_run_reproduction_with_pair_max_iters_persists_chain(
             ]
             assert len(pair_rows) == 1
             assert pair_rows[0].pair_iters_to_breach == 0  # cracked on iter 0
-            assert pair_rows[0].persona_used == "pair_iter=0"
+            assert pair_rows[0].persona_used is None  # PAIR rows never set persona_used
             assert pair_rows[0].verdict == "full_breach"
 
             # One refinement step linked to the PAIR breach.

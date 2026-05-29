@@ -343,8 +343,9 @@ class ThreatBriefBuilder:
 
     def _source_map(self, primitive_ids: list[str]) -> dict[str, tuple[str, str]]:
         """One representative (source_type, url) per primitive — the most recently
-        fetched source. Empty dict when there are no ids / no sources."""
-        if not primitive_ids:
+        fetched source. Empty dict when there are no ids / no sources, or when the
+        builder was constructed without a session (pure-render / unit-test path)."""
+        if not primitive_ids or self.session is None:
             return {}
         rows = self.session.execute(
             text(
