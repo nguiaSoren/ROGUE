@@ -222,6 +222,17 @@ class ThreatBriefBuilder:
           ## New LOW breaches       (abbreviated, optional)
           ## Newly defended         (one-line per primitive)
         """
+        source_map = self._source_map(
+            [
+                p.primitive_id
+                for p in (
+                    *diff.new_critical,
+                    *diff.new_high,
+                    *diff.new_medium,
+                    *diff.new_low,
+                )
+            ]
+        )
         lines: list[str] = []
         lines.append(f"# ROGUE Threat Brief — {diff.target_date.isoformat()}")
         lines.append(f"Customer: `{diff.customer_id}`")
@@ -245,28 +256,28 @@ class ThreatBriefBuilder:
             lines.append("## New CRITICAL breaches")
             lines.append("")
             for p in diff.new_critical:
-                lines.append(self._render_primitive_block(p, abbrev=False))
+                lines.append(self._render_primitive_block(p, abbrev=False, source_map=source_map))
                 lines.append("")
 
         if diff.new_high:
             lines.append("## New HIGH breaches")
             lines.append("")
             for p in diff.new_high:
-                lines.append(self._render_primitive_block(p, abbrev=False))
+                lines.append(self._render_primitive_block(p, abbrev=False, source_map=source_map))
                 lines.append("")
 
         if diff.new_medium:
             lines.append("## New MEDIUM breaches")
             lines.append("")
             for p in diff.new_medium:
-                lines.append(self._render_primitive_block(p, abbrev=True))
+                lines.append(self._render_primitive_block(p, abbrev=True, source_map=source_map))
             lines.append("")
 
         if diff.new_low:
             lines.append("## New LOW breaches")
             lines.append("")
             for p in diff.new_low:
-                lines.append(self._render_primitive_block(p, abbrev=True))
+                lines.append(self._render_primitive_block(p, abbrev=True, source_map=source_map))
             lines.append("")
 
         if diff.newly_defended:
@@ -288,9 +299,14 @@ class ThreatBriefBuilder:
         return "\n".join(lines)
 
     def _render_primitive_block(
-        self, p: BreachedPrimitive, *, abbrev: bool,
+        self,
+        p: BreachedPrimitive,
+        *,
+        abbrev: bool,
+        source_map: dict[str, tuple[str, str]] | None = None,
     ) -> str:
         """Render one primitive block. Full vs abbreviated controlled by ``abbrev``."""
+        src = (source_map or {}).get(p.primitive_id)
         if abbrev:
             configs_str = ", ".join(c.config_name for c in p.breached_configs[:3])
             return (
@@ -298,6 +314,7 @@ class ThreatBriefBuilder:
                 f"(any_breach_rate up to {p.max_any_breach_rate:.0%}, "
                 f"severity {p.severity_score:.2f}) breached: {configs_str}"
                 + (f" + {len(p.breached_configs) - 3} more" if len(p.breached_configs) > 3 else "")
+                + (f" · source: [{src[0]}]({src[1]})" if src else "")
             )
 
         out: list[str] = []
@@ -305,6 +322,8 @@ class ThreatBriefBuilder:
         out.append(f"- Family: `{p.family}` / Vector: `{p.vector}`")
         out.append(f"- Severity: **{p.severity_tier.value.upper()}** (score {p.severity_score:.3f})")
         out.append(f"- Max any-breach rate across configs: **{p.max_any_breach_rate:.0%}**")
+        if src:
+            out.append(f"- Source: discovered via **{src[0]}** — [{src[1]}]({src[1]})")
         out.append("- Breached configs:")
         for c in p.breached_configs:
             # §10.6 bootstrap CI on `any_breach_rate`. B=1000 percentile
@@ -322,13 +341,41 @@ class ThreatBriefBuilder:
             )
         return "\n".join(out)
 
+    def _source_map(self, primitive_ids: list[str]) -> dict[str, tuple[str, str]]:
+        """One representative (source_type, url) per primitive — the most recently
+        fetched source. Empty dict when there are no ids / no sources."""
+        if not primitive_ids:
+            return {}
+        rows = self.session.execute(
+            text(
+                "SELECT DISTINCT ON (primitive_id) primitive_id, source_type, url "
+                "FROM source_provenances WHERE primitive_id = ANY(:ids) "
+                "ORDER BY primitive_id, fetched_at DESC"
+            ),
+            {"ids": primitive_ids},
+        ).all()
+        return {r.primitive_id: (r.source_type, r.url) for r in rows}
+
     # ------------------------------------------------------------------
     # Render — JSON
     # ------------------------------------------------------------------
 
     def render_json(self, diff: BreachDiff) -> dict[str, Any]:
         """Same data, structured for MCP / dashboard consumption."""
+        source_map = self._source_map(
+            [
+                p.primitive_id
+                for p in (
+                    *diff.new_critical,
+                    *diff.new_high,
+                    *diff.new_medium,
+                    *diff.new_low,
+                )
+            ]
+        )
+
         def _primitive_to_dict(p: BreachedPrimitive) -> dict[str, Any]:
+            src = source_map.get(p.primitive_id)
             return {
                 "primitive_id": p.primitive_id,
                 "title": p.title,
@@ -337,6 +384,7 @@ class ThreatBriefBuilder:
                 "severity_score": p.severity_score,
                 "severity_tier": p.severity_tier.value,
                 "max_any_breach_rate": p.max_any_breach_rate,
+                "source": {"source_type": src[0], "url": src[1]} if src else None,
                 "breached_configs": [
                     {
                         "config_id": c.config_id,

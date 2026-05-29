@@ -24,6 +24,7 @@ export function MatrixHeatmap({
   const [severityFilter, setSeverityFilter] = useState<
     "all" | "critical" | "high" | "any-breach"
   >("all");
+  const [configFilter, setConfigFilter] = useState<string | null>(null);
 
   // Pre-compute the worst-rate cell per (family × config) so the click
   // handler can yank the canonical primitive for the cell quickly.
@@ -37,34 +38,32 @@ export function MatrixHeatmap({
     return m;
   }, [matrix.cells]);
 
-  // Filter families.
-  const visibleFamilies = useMemo(() => {
-    if (familyFilter) return [familyFilter];
-    if (severityFilter === "all") return matrix.families;
-    if (severityFilter === "critical") {
-      return matrix.families.filter((f) =>
-        matrix.configs.some((c) => {
-          const cell = byKey.get(`${f}|${c.config_id}`);
-          return cell && cell.any_breach_rate >= 0.7;
-        }),
-      );
-    }
-    if (severityFilter === "high") {
-      return matrix.families.filter((f) =>
-        matrix.configs.some((c) => {
-          const cell = byKey.get(`${f}|${c.config_id}`);
-          return cell && cell.any_breach_rate >= 0.5;
-        }),
-      );
-    }
-    // any-breach
-    return matrix.families.filter((f) =>
-      matrix.configs.some((c) => {
-        const cell = byKey.get(`${f}|${c.config_id}`);
-        return cell && cell.any_breach_rate > 0;
-      }),
-    );
-  }, [familyFilter, severityFilter, matrix.families, matrix.configs, byKey]);
+  // Family filter selects a single family (click a row label). The severity
+  // filter no longer hides families — it DIMS cells below the threshold (see
+  // dimThreshold), so ≥50% vs ≥70% look different even when most families breach.
+  const visibleFamilies = useMemo(
+    () => (familyFilter ? [familyFilter] : matrix.families),
+    [familyFilter, matrix.families],
+  );
+
+  // Config (column) filter — click a column header to show only that deployment.
+  const visibleConfigs = useMemo(
+    () =>
+      configFilter
+        ? matrix.configs.filter((c) => c.config_id === configFilter)
+        : matrix.configs,
+    [configFilter, matrix.configs],
+  );
+
+  // Below this any-breach rate a cell is dimmed (−1 = "all" = dim nothing).
+  const dimThreshold =
+    severityFilter === "critical"
+      ? 0.7
+      : severityFilter === "high"
+        ? 0.5
+        : severityFilter === "any-breach"
+          ? 0.0001
+          : -1;
 
   // Per-config worst-case rate for the column-header heat indicator. Memoized so
   // it isn't recomputed on every render (e.g. each cell click that opens the drawer).
@@ -137,9 +136,19 @@ export function MatrixHeatmap({
             onClick={() => setFamilyFilter(null)}
           />
         )}
+        {configFilter && (
+          <FilterChip
+            label={`config: ${shortConfigName(
+              matrix.configs.find((c) => c.config_id === configFilter)
+                ?.config_name ?? configFilter,
+            )} ×`}
+            active
+            onClick={() => setConfigFilter(null)}
+          />
+        )}
         <span className="ml-auto text-[10px] font-mono text-muted-foreground">
-          {visibleFamilies.length}/{matrix.families.length} families ·{" "}
-          click any cell for breach detail
+          {visibleFamilies.length} families × {visibleConfigs.length} configs ·{" "}
+          click a row, column, or cell
         </span>
       </section>
 
@@ -154,7 +163,7 @@ export function MatrixHeatmap({
               <th className="text-left p-3 sticky left-0 bg-background/95 backdrop-blur-sm font-semibold tracking-[0.15em] uppercase text-[10px] z-10 border-r border-border min-w-[180px]">
                 Attack family
               </th>
-              {matrix.configs.map((c) => {
+              {visibleConfigs.map((c) => {
                 const worst = colWorst[c.config_id] ?? 0;
                 const headerTint =
                   worst >= 0.7
@@ -170,9 +179,18 @@ export function MatrixHeatmap({
                     title={c.config_id}
                   >
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-foreground">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConfigFilter((cf) =>
+                            cf === c.config_id ? null : c.config_id,
+                          )
+                        }
+                        className="text-foreground hover:text-rogue-green transition-colors"
+                        title="Click to show only this deployment column"
+                      >
                         {shortConfigName(c.config_name)}
-                      </span>
+                      </button>
                       <span
                         className={`text-[9px] tabular-nums ${headerTint}`}
                       >
@@ -206,9 +224,10 @@ export function MatrixHeatmap({
                     {family}
                   </button>
                 </td>
-                {matrix.configs.map((c, colIdx) => {
+                {visibleConfigs.map((c, colIdx) => {
                   const cell = byKey.get(`${family}|${c.config_id}`);
                   const rate = cell?.any_breach_rate ?? 0;
+                  const dimmed = dimThreshold >= 0 && rate < dimThreshold;
                   const stagger = Math.min((rowIdx + colIdx) * 0.02, 0.6);
                   return (
                     <td key={c.config_id} className="p-0 align-middle">
@@ -216,6 +235,7 @@ export function MatrixHeatmap({
                         rate={rate}
                         delay={stagger}
                         cell={cell}
+                        dimmed={dimmed}
                         onClick={() => cell && setOpenCell(cell)}
                       />
                     </td>
@@ -240,17 +260,21 @@ function HeatmapCell({
   rate,
   delay,
   cell,
+  dimmed = false,
   onClick,
 }: {
   rate: number;
   delay: number;
   cell: BreachCell | undefined;
+  dimmed?: boolean;
   onClick: () => void;
 }) {
   if (!cell || rate === 0) {
     return (
       <div
-        className="h-14 flex items-center justify-center text-muted-foreground/40 animate-rogue-cell-pop"
+        className={`h-14 flex items-center justify-center text-muted-foreground/40 animate-rogue-cell-pop ${
+          dimmed ? "opacity-20" : ""
+        }`}
         style={{ animationDelay: `${delay}s` }}
       >
         —
@@ -259,11 +283,16 @@ function HeatmapCell({
   }
   const intensity = Math.round(rate * 100);
   const { bg, text, pulse } = colorFor(rate);
+  // When the severity filter dims this cell (below threshold), mute it and drop
+  // the pulse so only cells that meet the threshold stand out.
+  const pulseClass = dimmed ? "" : pulse;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full h-14 flex items-center justify-center ${bg} ${text} font-bold tabular-nums border-r border-border/30 transition-all hover:scale-110 hover:z-10 hover:shadow-[0_0_16px_rgba(255,0,60,0.4)] cursor-pointer relative ${pulse} animate-rogue-cell-pop`}
+      className={`w-full h-14 flex items-center justify-center ${bg} ${text} font-bold tabular-nums border-r border-border/30 transition-all hover:scale-110 hover:z-10 hover:shadow-[0_0_16px_rgba(255,0,60,0.4)] cursor-pointer relative ${pulseClass} animate-rogue-cell-pop ${
+        dimmed ? "opacity-20 saturate-50" : ""
+      }`}
       style={{ animationDelay: `${delay}s` }}
       title={`${cell.title} on ${cell.config_name} — ${intensity}% any-breach (n=${cell.n_trials}) · click to inspect`}
     >
