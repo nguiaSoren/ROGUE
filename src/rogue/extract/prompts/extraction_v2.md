@@ -59,6 +59,23 @@ count:
 - Marketing posts from security vendors that do not describe a specific
   technique.
 - Opinion pieces, policy discussion, generic "AI safety" essays.
+- **Out-of-scope TARGET** — attacks against a model class ROGUE does not run.
+  Our reproduction panel is **black-box chat / vision / audio LLMs** (you send
+  text/images/audio and read a text reply). So set `is_attack: false` when the
+  attack targets:
+  - **text-to-image / generative-media models** (Midjourney, Stable Diffusion,
+    DALL-E, and "image-generation refusal/postfill" bypasses) — we have no
+    image generator to attack;
+  - **specialized classifiers / embedding / recommender models** (e.g. Concept
+    Bottleneck Models) — not an LLM we deploy.
+  Note: an attack *on a chat/vision LLM* that merely *mentions* such a model is
+  still in scope (e.g. a GPT-4o jailbreak that references DALL-E) — judge by the
+  actual target, not keywords.
+- **White-box / training-time** — attacks that need model weights, gradients,
+  or training/RLHF/distillation data access (gradient-optimization, adversarial
+  perturbations, GCG suffixes, ImgTrojan-style poisoning, preference/label
+  poisoning, backdoor injection). A black-box API exposes none of these, so we
+  cannot reproduce them — set `is_attack: false`.
 
 When in doubt, prefer `is_attack: false` with a one-sentence `reason`. False
 positives downstream are more expensive than false negatives — another
