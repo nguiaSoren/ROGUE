@@ -40,7 +40,7 @@ export function Nav() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/70 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/90">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between font-mono">
         <Link
           href="/"

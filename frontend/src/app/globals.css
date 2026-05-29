@@ -582,3 +582,12 @@
     animation: none !important;
   }
 }
+
+/* Drop backdrop-filter (frosted glass). Chrome re-blurs every such element as
+   content scrolls behind it — the dominant scroll jank with ~36 frosted cards
+   (Safari optimizes it, which is why it stayed smooth there). Over the near-black
+   background the frost is barely visible; cards keep their translucent background. */
+[class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
