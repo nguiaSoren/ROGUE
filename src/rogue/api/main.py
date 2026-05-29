@@ -1059,26 +1059,30 @@ def stubbornness_stats(
 
 
 @app.get("/api/bandit/stats")
-def bandit_stats() -> dict[str, Any]:
+def bandit_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
     """Top-3 / bottom-3 bandit arms by yield-per-dollar + last-updated timestamp.
 
-    Reads ``data/discovery_bandit.json`` directly (the bandit's persistent
-    state file). If the file doesn't exist yet (no harvest has run since
-    the bandit was wired), returns ``{"updated_at": null, ...}`` with
-    empty arm lists rather than 500.
+    Live from the DB: reads the ``bandit_state`` row (upserted by each harvest),
+    so the widget updates without a redeploy. Falls back to the on-disk
+    ``data/discovery_bandit.json`` if the DB row isn't present yet, and returns
+    empty arm lists rather than 500 when neither exists.
     """
-    if not BANDIT_STATE_PATH.exists():
-        return {
-            "updated_at": None,
-            "n_arms": 0,
-            "top_arms": [],
-            "bottom_arms": [],
-            "note": "bandit state file not found — run scripts/harvest_once.py to seed it",
-        }
-    try:
-        state = json.loads(BANDIT_STATE_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=500, detail=f"bandit state file unreadable: {exc}")
+    from rogue.db.bandit_state import load_bandit_state
+
+    state = load_bandit_state(db)
+    if not state:
+        if not BANDIT_STATE_PATH.exists():
+            return {
+                "updated_at": None,
+                "n_arms": 0,
+                "top_arms": [],
+                "bottom_arms": [],
+                "note": "bandit state not found — run scripts/harvest_once.py to seed it",
+            }
+        try:
+            state = json.loads(BANDIT_STATE_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=500, detail=f"bandit state unreadable: {exc}")
 
     arms = state.get("arms", [])
     warm = [a for a in arms if a.get("pulls", 0) > 0]

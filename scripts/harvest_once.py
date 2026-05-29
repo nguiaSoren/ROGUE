@@ -595,6 +595,17 @@ async def run_harvest(
                 "bandit: persisted %d arms (%d picked this run)",
                 len(bandit.arms), n_arms,
             )
+            # Mirror the state into the DB so /api/bandit/stats is live (no redeploy).
+            try:
+                from rogue.db.bandit_state import save_bandit_state
+
+                with SessionLocal() as bandit_session:
+                    save_bandit_state(bandit_session, bandit.to_dict())
+                logger.info("bandit: mirrored state to DB (bandit_state row)")
+            except Exception as exc:  # never let DB-mirroring break the harvest
+                logger.warning(
+                    "bandit: DB mirror failed (file still written): %s", exc
+                )
         except Exception as exc:  # noqa: BLE001 - bandit failure must not block harvest
             logger.warning("bandit: persist failed (%s) — state may be stale", exc)
     finally:

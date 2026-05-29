@@ -14,7 +14,7 @@ See ROGUE_PLAN.md §A.5 and §8.3 for the canonical spec.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, get_args
 
 from pgvector.sqlalchemy import Vector
@@ -380,6 +380,22 @@ class BrightDataCostLog(Base):
     )
 
 
+class BanditState(Base):
+    """Single-row store of the DiscoveryAgent ε-greedy bandit state — the same
+    dict persisted to ``data/discovery_bandit.json``, mirrored into the DB so the
+    ``/api/bandit/stats`` widget is live from the database (updates on each harvest,
+    no redeploy). ``id`` is pinned to 1; the harvest upserts that row."""
+
+    __tablename__ = "bandit_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    state: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -388,4 +404,5 @@ __all__ = [
     "BreachResult",
     "PairRefinementStep",
     "BrightDataCostLog",
+    "BanditState",
 ]
