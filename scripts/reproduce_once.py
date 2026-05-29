@@ -86,6 +86,8 @@ from rogue.db.models import (  # noqa: E402
     DeploymentConfig as DeploymentConfigORM,
     PairRefinementStep as PairRefinementStepORM,
 )
+from rogue.reproduce.coj import COJ_OPERATIONS  # noqa: E402
+from rogue.reproduce.escalation_planner import EscalationPlanner  # noqa: E402
 from rogue.reproduce.instantiator import RenderedAttack, render  # noqa: E402
 from rogue.reproduce.iterative_attacker import (  # noqa: E402
     BudgetExceededError,
@@ -138,6 +140,12 @@ class ReproductionRunStats:
     persist_errors: int = 0
     estimated_cost_usd: float = 0.0
     verdict_counts: dict[str, int] = field(default_factory=dict)
+    # §10.8 inline escalation (only when --escalate): primitives fully refused by
+    # the panel that were then laddered, and how many the ladder broke.
+    escalations_run: int = 0
+    escalation_breaches: int = 0
+    escalation_spend_usd: float = 0.0
+    escalation_winners: dict[str, int] = field(default_factory=dict)
 
     def add_verdict(self, verdict: JudgeVerdict) -> None:
         self.verdict_counts[verdict.value] = (
@@ -148,7 +156,7 @@ class ReproductionRunStats:
         verdict_str = ", ".join(
             f"{k}={v}" for k, v in sorted(self.verdict_counts.items())
         )
-        return (
+        base = (
             f"primitives={self.primitives_processed} "
             f"configs={self.configs_per_primitive} "
             f"trials={self.trials_per_pair} "
@@ -159,6 +167,17 @@ class ReproductionRunStats:
             f"est_cost=${self.estimated_cost_usd:.2f} "
             f"verdicts=[{verdict_str}]"
         )
+        if self.escalations_run:
+            winners = ", ".join(
+                f"{k}={v}" for k, v in sorted(self.escalation_winners.items())
+            )
+            base += (
+                f" | escalations_run={self.escalations_run} "
+                f"escalation_breaches={self.escalation_breaches} "
+                f"escalation_spend=${self.escalation_spend_usd:.2f} "
+                f"escalation_winners=[{winners}]"
+            )
+        return base
 
 
 def _orm_to_pydantic_primitive(orm: AttackPrimitiveORM) -> AttackPrimitive:
@@ -434,6 +453,11 @@ async def run_reproduction(
     pair_max_iters: int = 0,
     pair_attacker: IterativeAttacker | None = None,
     synthesized_only: bool = False,
+    escalate: bool = False,
+    escalate_max_spend: float | None = None,
+    escalate_n_trials: int = 1,
+    escalate_planner_model: str | None = None,
+    planner: EscalationPlanner | None = None,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -481,6 +505,15 @@ async def run_reproduction(
             judge=judge,
             max_iters=pair_max_iters,
             target_temperature=temperature,
+        )
+
+    # §10.8 inline escalation: when --escalate, a primitive the WHOLE panel
+    # refused is laddered (image → CoJ → structured → audio → escalation, stop
+    # at first breach) right after its cells finish. Planner is constructed lazily
+    # iff escalate (Claude backbone w/ auto-fallback to Llama on refusal).
+    if escalate and planner is None:
+        planner = EscalationPlanner.from_env(
+            **({"model": escalate_planner_model} if escalate_planner_model else {})
         )
 
     engine = create_engine(database_url)
@@ -555,6 +588,20 @@ async def run_reproduction(
             primitive_by_id = {p.primitive_id: p for p in primitives}
             config_by_id = {c.config_id: c for c in configs}
             pair_aborted_daily = False
+
+            # §10.8 inline escalation bookkeeping: a primitive is escalated only
+            # once ALL its cells finish AND none breached. as_completed yields
+            # cells interleaved across primitives, so track per-primitive.
+            if escalate:
+                from scripts.synthesize_escalations import (  # noqa: PLC0415
+                    DEFAULT_AUDIO_STYLES,
+                    DEFAULT_IMAGE_RENDERERS,
+                    DEFAULT_STRUCTURED_FORMATS,
+                    run_escalation_ladder_one,
+                )
+            cells_left = {p.primitive_id: len(configs) for p in primitives}
+            prim_breached = {p.primitive_id: False for p in primitives}
+            escalation_budget_hit = False
 
             for fut in asyncio.as_completed(coros):
                 pid, cid, rendered, trials = await fut
@@ -661,6 +708,80 @@ async def run_reproduction(
                         else:
                             session.commit()
 
+                # §10.8 inline escalation — run the auto-ladder on a primitive the
+                # moment its LAST cell finishes, iff the WHOLE panel refused it.
+                # The session is committed (above) so no transaction is held open
+                # during the ladder's minutes of LLM calls (avoids Neon's
+                # idle-in-transaction timeout). A winning CoJ/escalation child is
+                # persisted in its own short txn; image/structured/audio winners
+                # are slot variants of the parent (recorded, not persisted).
+                if escalate:
+                    prim_breached[pid] = prim_breached[pid] or cell_breached
+                    cells_left[pid] -= 1
+                    if (
+                        cells_left[pid] == 0
+                        and not prim_breached[pid]
+                        and not escalation_budget_hit
+                    ):
+                        if (
+                            escalate_max_spend is not None
+                            and stats.escalation_spend_usd >= escalate_max_spend
+                        ):
+                            escalation_budget_hit = True
+                            logger.warning(
+                                "escalation budget $%.2f reached — skipping further "
+                                "escalation for the remainder of the sweep",
+                                escalate_max_spend,
+                            )
+                        else:
+                            remaining = (
+                                None if escalate_max_spend is None
+                                else max(0.0, escalate_max_spend - stats.escalation_spend_usd)
+                            )
+                            res = await run_escalation_ladder_one(
+                                primitive_by_id[pid],
+                                planner=planner,
+                                panel=panel,
+                                judge=judge,
+                                configs=configs,
+                                n_trials=escalate_n_trials,
+                                temperature=temperature,
+                                image_renderers=DEFAULT_IMAGE_RENDERERS,
+                                coj_operations=COJ_OPERATIONS,
+                                structured_formats=DEFAULT_STRUCTURED_FORMATS,
+                                audio_styles=DEFAULT_AUDIO_STYLES,
+                                budget_usd=remaining,
+                            )
+                            stats.escalations_run += 1
+                            stats.escalation_spend_usd += res.spend_usd
+                            stats.estimated_cost_usd += res.spend_usd
+                            if res.winning_strategy is not None:
+                                stats.escalation_breaches += 1
+                                stats.escalation_winners[res.winning_strategy] = (
+                                    stats.escalation_winners.get(res.winning_strategy, 0) + 1
+                                )
+                                logger.info(
+                                    "escalation breach: parent=%s winner=%s model=%s spend=$%.3f",
+                                    pid, res.winning_strategy, res.breached_on, res.spend_usd,
+                                )
+                                if res.child_orm is not None:
+                                    try:
+                                        session.add(res.child_orm)
+                                        session.flush()
+                                        session.commit()
+                                    except Exception as exc:  # noqa: BLE001
+                                        stats.persist_errors += 1
+                                        session.rollback()
+                                        logger.exception(
+                                            "escalation persist failed: parent=%s err=%s",
+                                            pid, exc,
+                                        )
+                            else:
+                                logger.info(
+                                    "escalation exhausted: parent=%s spend=$%.3f attempts=%s",
+                                    pid, res.spend_usd, res.attempts,
+                                )
+
                 if pairs_done % 10 == 0 or pairs_done == n_pairs:
                     logger.info(
                         "[progress] pairs=%d/%d est_cost=$%.2f verdicts=%s",
@@ -678,6 +799,8 @@ async def run_reproduction(
             await persona_wrapper.aclose()
         if pair_attacker is not None:
             await pair_attacker.aclose()
+        if planner is not None:
+            await planner.aclose()
         engine.dispose()
 
     return stats
@@ -771,6 +894,44 @@ def main(argv: list[str] | None = None) -> int:
             "the unrefined baseline + the rest of the sweep behavior."
         ),
     )
+    parser.add_argument(
+        "--escalate",
+        action="store_true",
+        help=(
+            "§10.8 inline escalation. OFF by default = plain reproduce. When set, "
+            "any primitive the WHOLE panel refused is run through the auto-ladder "
+            "(image → CoJ → structured-data → audio → crescendo→actor→acronym, "
+            "stop at first breach) right after its cells finish — fold the "
+            "'fail → try harder' step into the reproduce pass. COSTLY: each "
+            "fully-resisting primitive can add up to ~150 LLM calls. Bound it "
+            "with --escalate-max-spend."
+        ),
+    )
+    parser.add_argument(
+        "--escalate-max-spend",
+        type=float,
+        default=None,
+        help=(
+            "§10.8 escalation budget cap in USD (estimated). Once cumulative "
+            "escalation spend reaches this, the remaining refused primitives are "
+            "NOT escalated (the baseline reproduce still completes). Omit = no cap."
+        ),
+    )
+    parser.add_argument(
+        "--escalate-n-trials",
+        type=int,
+        default=1,
+        help="§10.8 trials per (ladder variant × config). Default 1 to keep cost down.",
+    )
+    parser.add_argument(
+        "--escalate-planner-model",
+        default=None,
+        help=(
+            "§10.8 override the Tier-5 escalation planner backbone (e.g. an "
+            "OpenRouter Llama that authors escalations Claude refuses). Default "
+            "Claude w/ auto-fallback to Llama on refusal."
+        ),
+    )
     parser.add_argument("--run-id", default=None)
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
@@ -796,6 +957,13 @@ def main(argv: list[str] | None = None) -> int:
         )
     elif args.no_iterative:
         logger.info("run_id=%s --no-iterative: PAIR disabled for this run", run_id)
+    if args.escalate:
+        logger.info(
+            "run_id=%s §10.8 inline escalation ENABLED: n_trials=%d max_spend=%s planner=%s",
+            run_id, args.escalate_n_trials,
+            f"${args.escalate_max_spend:.2f}" if args.escalate_max_spend is not None else "uncapped",
+            args.escalate_planner_model or "claude+auto-fallback",
+        )
 
     stats = asyncio.run(
         run_reproduction(
@@ -807,6 +975,10 @@ def main(argv: list[str] | None = None) -> int:
             persona_technique=args.persona,
             pair_max_iters=args.pair_max_iters,
             synthesized_only=args.synthesized_only,
+            escalate=args.escalate,
+            escalate_max_spend=args.escalate_max_spend,
+            escalate_n_trials=args.escalate_n_trials,
+            escalate_planner_model=args.escalate_planner_model,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

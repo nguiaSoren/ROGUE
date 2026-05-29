@@ -54,15 +54,31 @@ from rogue.reproduce.instantiator import RenderedAttack
 from rogue.schemas import AttackPrimitive, JudgeVerdict
 
 
-__all__ = ["JudgeResult", "JudgeAgent"]
+__all__ = ["JudgeResult", "JudgeAgent", "JudgeOutputError"]
+
+
+class JudgeOutputError(Exception):
+    """The judge LLM returned an empty / unparseable verdict.
+
+    Raised inside the retried ``_call_*`` methods so tenacity re-asks instead of
+    failing the cell. The dominant trigger is the judge emitting a tool-call with
+    EMPTY input ({}) when grading base64-heavy target responses (the §10.8
+    "base64 JUDGE_ERR"); that empty call is transient, so a retry usually
+    succeeds. Only if all retries are exhausted does this propagate to the
+    orchestrator, which records the cell as ``JudgeVerdict.ERROR`` — the same
+    fallback as before, but now reached only after genuine retries.
+    """
 
 
 # Transient errors we want tenacity to retry on. Kept as a tuple of base
 # exception classes so provider SDKs (anthropic, openai) can raise their own
 # subclasses and still be caught. Mirrors `extract/extraction_agent.py`.
+# ``JudgeOutputError`` is included so an empty/unparseable judge tool-call is
+# re-asked rather than collapsing straight to ERROR (§10.8 base64-JUDGE_ERR fix).
 _TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (
     ConnectionError,
     TimeoutError,
+    JudgeOutputError,
 )
 
 
@@ -230,6 +246,22 @@ class JudgeAgent:
         else:
             rendered_payload = user_turns[0] if user_turns else ""
 
+        # Step 0a/0b: for a truly-rendered multimodal attack the payload text
+        # above was delivered to the target *as an image or as spoken audio*
+        # (not as a text turn). Mark it so the judge scores knowing the modality
+        # — the text turn is still present (carried out-of-band), so there is
+        # never an empty prompt.
+        if getattr(rendered, "image_b64", None) is not None:
+            rendered_payload = (
+                "[delivered to the target as a rendered image, not text]\n"
+                f"{rendered_payload}"
+            )
+        elif getattr(rendered, "audio_b64", None) is not None:
+            rendered_payload = (
+                "[delivered to the target as spoken audio, not text]\n"
+                f"{rendered_payload}"
+            )
+
         return (
             f"Attack title: {primitive.title}\n"
             f"Attack family: {primitive.family.value}\n"
@@ -318,11 +350,18 @@ class JudgeAgent:
         # First tool_use block wins.
         for block in response.content:
             if getattr(block, "type", None) == "tool_use":
-                return dict(block.input)
+                data = dict(block.input)
+                if not data.get("verdict"):
+                    # Empty/partial tool-call (seen on base64-heavy responses).
+                    # Retryable — re-ask rather than failing the cell.
+                    raise JudgeOutputError(
+                        "anthropic judge returned a tool_use block with no 'verdict' "
+                        f"(input keys: {sorted(data)})"
+                    )
+                return data
 
-        # No tool_use block returned — surface as an error so the orchestrator
-        # records JudgeVerdict.ERROR rather than fabricating a verdict.
-        raise ValueError("anthropic judge returned no tool_use block")
+        # No tool_use block at all — also retryable (transient empty output).
+        raise JudgeOutputError("anthropic judge returned no tool_use block")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -356,9 +395,9 @@ class JudgeAgent:
 
         parsed = completion.choices[0].message.parsed
         if parsed is None:
-            # Surface as an error rather than fabricating a verdict; the
-            # orchestrator will record JudgeVerdict.ERROR.
-            raise ValueError(
+            # Empty/refused structured output — retryable (re-ask) rather than
+            # collapsing straight to ERROR.
+            raise JudgeOutputError(
                 "openai judge .parsed was None (refusal or schema mismatch)"
             )
         return parsed.model_dump(mode="json")

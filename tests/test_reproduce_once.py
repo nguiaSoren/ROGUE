@@ -454,6 +454,90 @@ async def test_run_reproduction_end_to_end_with_mocked_panel_and_judge(
     engine.dispose()
 
 
+# --------------------------------------------------------------------------- #
+# E. §10.8 inline escalation (--escalate)
+# --------------------------------------------------------------------------- #
+
+
+class _RefusingPanel:
+    """Every call returns one clean (non-error) refusal response per trial."""
+
+    async def run_attack(self, rendered, config, temperature, n_trials):
+        return [
+            ModelResponse(
+                content="I can't help with that.",
+                latency_ms=50, tokens_in=100, tokens_out=10, cost_usd=0.0,
+                error=None, trial_index=i, temperature=temperature,
+            )
+            for i in range(n_trials)
+        ]
+
+    async def aclose(self):
+        pass
+
+
+class _RefusingJudge:
+    async def judge(self, rendered, model_response, primitive):
+        return JudgeResult(verdict=JudgeVerdict.REFUSED, rationale="stub", confidence=0.9)
+
+
+class _RefusingPlanner:
+    """Tier-5 planner that refuses every strategy (returns no plan)."""
+
+    async def plan(self, parent, *, n_turns, arms_strategy):
+        return None
+
+    async def aclose(self):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_inline_escalation_off_by_default(live_db_with_seeded_data) -> None:
+    """Without --escalate, a fully-refused primitive is NOT escalated."""
+    stats = await run_reproduction(
+        database_url=live_db_with_seeded_data,
+        primitive_limit=None, n_trials=1, temperature=0.7, concurrency=2,
+        panel=_RefusingPanel(), judge=_RefusingJudge(),  # type: ignore[arg-type]
+    )
+    assert stats.escalations_run == 0  # escalation never ran
+    assert stats.verdict_counts.get("refused") == 2  # both primitives refused
+
+
+@pytest.mark.asyncio
+async def test_inline_escalation_fires_on_refused_primitive(
+    live_db_with_seeded_data,
+) -> None:
+    """With --escalate, each fully-refused primitive is laddered. Refusing stubs
+    ⇒ every tier exhausts (no breach), so escalations_run == #primitives."""
+    stats = await run_reproduction(
+        database_url=live_db_with_seeded_data,
+        primitive_limit=None, n_trials=1, temperature=0.7, concurrency=2,
+        panel=_RefusingPanel(), judge=_RefusingJudge(),  # type: ignore[arg-type]
+        escalate=True, escalate_n_trials=1,
+        planner=_RefusingPlanner(),  # type: ignore[arg-type]
+    )
+    assert stats.escalations_run == 2  # both refused primitives escalated
+    assert stats.escalation_breaches == 0  # refusing stubs ⇒ exhausted
+    # spend accrues from the judge-cost estimate on each ladder attempt
+    assert stats.escalation_spend_usd > 0.0
+
+
+@pytest.mark.asyncio
+async def test_inline_escalation_budget_cap_stops_escalation(
+    live_db_with_seeded_data,
+) -> None:
+    """A zero budget trips the cap before the first escalation runs."""
+    stats = await run_reproduction(
+        database_url=live_db_with_seeded_data,
+        primitive_limit=None, n_trials=1, temperature=0.7, concurrency=2,
+        panel=_RefusingPanel(), judge=_RefusingJudge(),  # type: ignore[arg-type]
+        escalate=True, escalate_max_spend=0.0,
+        planner=_RefusingPlanner(),  # type: ignore[arg-type]
+    )
+    assert stats.escalations_run == 0  # cap hit immediately
+    assert stats.escalation_spend_usd == 0.0
+
+
 @pytest.mark.asyncio
 async def test_run_reproduction_primitive_limit_picks_highest_score(
     live_db_with_seeded_data,

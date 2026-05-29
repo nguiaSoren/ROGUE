@@ -239,25 +239,46 @@ def list_attacks(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """List attacks newest-first, optionally filtered by family/vector/recency."""
+    """List attacks newest-first, optionally filtered by family/vector/recency.
+
+    Graceful fallback: when nothing was discovered inside the ``since_days``
+    window (e.g. the harvester hasn't run in 48h), return the newest ``limit``
+    attacks regardless of recency and set ``stale=True`` so the UI can relabel
+    the panel ("most recent harvest") instead of rendering empty.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
-    stmt = (
-        select(AttackPrimitiveORM)
-        .where(AttackPrimitiveORM.discovered_at >= cutoff)
+    base = select(AttackPrimitiveORM)
+    if family:
+        base = base.where(AttackPrimitiveORM.family == family)
+    if vector:
+        base = base.where(AttackPrimitiveORM.vector == vector)
+
+    windowed = (
+        base.where(AttackPrimitiveORM.discovered_at >= cutoff)
         .order_by(AttackPrimitiveORM.discovered_at.desc())
         .limit(limit)
     )
-    if family:
-        stmt = stmt.where(AttackPrimitiveORM.family == family)
-    if vector:
-        stmt = stmt.where(AttackPrimitiveORM.vector == vector)
+    rows = db.execute(windowed).scalars().all()
 
-    rows = db.execute(stmt).scalars().all()
+    stale = False
+    if not rows:
+        # Nothing in-window — fall back to the newest *harvested* rows regardless
+        # of date. Excludes synthesized (escalation/mutation) children so the
+        # "captured from the open web" framing stays honest.
+        fallback = (
+            base.where(AttackPrimitiveORM.synthesized.is_(False))
+            .order_by(AttackPrimitiveORM.discovered_at.desc())
+            .limit(limit)
+        )
+        rows = db.execute(fallback).scalars().all()
+        stale = bool(rows)  # only "stale" if we actually surfaced older rows
+
     return {
         "since_days": since_days,
         "family": family,
         "vector": vector,
         "limit": limit,
+        "stale": stale,
         "count": len(rows),
         "attacks": [_primitive_to_dict(p, include_payload=True) for p in rows],
     }

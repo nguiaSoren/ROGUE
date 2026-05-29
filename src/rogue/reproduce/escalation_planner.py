@@ -72,7 +72,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from rogue.reproduce.llm_cost_log import log_anthropic_response
+from rogue.reproduce.arms_strategies import ARMS_STRATEGIES, multi_turn_strategies
+from rogue.reproduce.llm_cost_log import append_row, log_anthropic_response
 from rogue.schemas import AttackPrimitive
 
 __all__ = [
@@ -96,11 +97,16 @@ DEFAULT_CACHE_DIR = Path("data/escalation_cache")
 # stays inside the §10.7 ~$15 disciplined budget. For demo-shown primitives
 # specifically, override at call time to claude-sonnet-4-6 (cost +~$1).
 DEFAULT_PLANNER_MODEL = "claude-haiku-4-5"
+# Auto-fallback backbone: when the (aligned) primary refuses to AUTHOR an
+# escalation, the planner automatically retries with this less-aligned
+# OpenRouter model — no manual flag (the framework is autonomous). Set to None
+# to disable. Needs OPENROUTER_API_KEY.
+DEFAULT_FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct"
 
 # Bumps invalidate the cache. Bump when the prompt template changes in a
 # way that meaningfully alters output shape — adding a new strategy hint,
 # changing the requested number of turns, etc.
-PLANNER_VERSION = "v1.2026-05-27"
+PLANNER_VERSION = "v2.2026-05-29-autofallback"
 
 # Anthropic max_tokens for the plan call. 3 turns × ~150 words + slot
 # requirements JSON ≈ 800 tokens. 2048 leaves headroom.
@@ -233,9 +239,14 @@ _PLANNER_USER_PROMPT_TEMPLATE = (
 
 
 def _build_planner_messages(
-    primitive: AttackPrimitive, n_turns: int,
+    primitive: AttackPrimitive, n_turns: int, arms_strategy: str | None = None,
 ) -> tuple[str, str]:
-    """Return ``(system_prompt, user_prompt)`` for the planner call."""
+    """Return ``(system_prompt, user_prompt)`` for the planner call.
+
+    ``arms_strategy`` (one of the ARMS visual-multi-turn strategy ids — crescendo
+    / actor_attack / acronym) seeds the planner with that strategy's directive
+    (§10.8 ARMS #9). The default ``None`` keeps the built-in Crescendo framing.
+    """
     objective = (
         primitive.title.strip() or primitive.short_description.strip()[:200]
     )
@@ -247,6 +258,15 @@ def _build_planner_messages(
         "is available via tests/fixtures/slot_defaults.json)"
     )
     system = _PLANNER_SYSTEM_PROMPT.format(n_turns=n_turns)
+    if arms_strategy and arms_strategy != "crescendo":
+        strat = ARMS_STRATEGIES[arms_strategy]
+        system += (
+            f"\n\nARMS STRATEGY OVERRIDE — {strat.name} (arXiv 2510.02677):\n"
+            f"Principle: {strat.principle}\n"
+            f"Apply this instead of plain Crescendo: {strat.directive}\n"
+            "Keep the same N-turn JSON output shape; the final turn must still "
+            "land the exact original objective."
+        )
     user = _PLANNER_USER_PROMPT_TEMPLATE.format(
         objective=objective,
         payload=primitive.payload_template[:4_000],
@@ -258,6 +278,7 @@ def _build_planner_messages(
 
 def _cache_key(
     primitive_id: str, n_turns: int, model: str, planner_version: str,
+    arms_strategy: str | None = None,
 ) -> str:
     h = hashlib.sha256()
     h.update(planner_version.encode("utf-8"))
@@ -267,7 +288,59 @@ def _cache_key(
     h.update(primitive_id.encode("utf-8"))
     h.update(b"\x00")
     h.update(str(n_turns).encode("utf-8"))
+    h.update(b"\x00")
+    # Different ARMS strategies must cache separately (None == crescendo default).
+    h.update((arms_strategy or "crescendo").encode("utf-8"))
     return h.hexdigest()
+
+
+def _parse_plan_payload(
+    raw: str, n_turns: int, primitive: AttackPrimitive, model: str,
+) -> tuple["EscalationPlan | None", str]:
+    """Turn raw planner text into (EscalationPlan | None, refusal_reason).
+
+    Shared by both backbones (Anthropic + OpenRouter) so JSON-extraction, fence
+    tolerance, schema validation, and the turn-count sanity check live in one
+    place. ``refusal_reason`` is "" on success or one of
+    short_response / invalid_json / schema_validation.
+    """
+    raw = raw.strip()
+    if len(raw) < _MIN_USEFUL_PLAN_CHARS:
+        _log.info(
+            "escalation planner returned %d chars (likely refusal) for primitive=%s",
+            len(raw), primitive.primitive_id,
+        )
+        return None, "short_response"
+    # Tolerate ```json ... ``` fences despite the negative instruction.
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        _log.warning(
+            "escalation planner returned invalid JSON for primitive=%s: %s\nraw[:500]=%r",
+            primitive.primitive_id, exc, raw[:500],
+        )
+        return None, "invalid_json"
+    # Stamp planner_model so validation succeeds even if the LLM omitted it.
+    payload.setdefault("planner_model", model)
+    try:
+        plan = EscalationPlan.model_validate(payload)
+    except Exception as exc:  # pydantic.ValidationError
+        _log.warning(
+            "escalation planner output failed schema validation for primitive=%s: %s\npayload=%r",
+            primitive.primitive_id, exc, payload,
+        )
+        return None, "schema_validation"
+    if len(plan.turns) != n_turns:
+        _log.warning(
+            "escalation planner returned %d turns for primitive=%s (asked for %d); using anyway",
+            len(plan.turns), primitive.primitive_id, n_turns,
+        )
+    return plan, ""
 
 
 # ----- The planner -----
@@ -294,11 +367,14 @@ class EscalationPlanner:
         model: str = DEFAULT_PLANNER_MODEL,
         cache_dir: Path = DEFAULT_CACHE_DIR,
         planner_version: str = PLANNER_VERSION,
+        fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
     ) -> None:
         self.model = model
+        self.fallback_model = fallback_model
         self.cache_dir = cache_dir
         self.planner_version = planner_version
         self._anthropic_client: Any | None = None
+        self._openrouter_client: Any | None = None
         cache_dir.mkdir(parents=True, exist_ok=True)
 
     @classmethod
@@ -312,20 +388,22 @@ class EscalationPlanner:
         return cls(**kwargs)
 
     async def aclose(self) -> None:
-        """Release the lazy Anthropic client. Idempotent."""
-        client = self._anthropic_client
-        if client is None:
-            return
-        try:
-            await client.close()
-        except Exception:  # pragma: no cover — cleanup must never raise
-            pass
-        self._anthropic_client = None
+        """Release the lazy provider clients. Idempotent."""
+        for attr in ("_anthropic_client", "_openrouter_client"):
+            client = getattr(self, attr, None)
+            if client is None:
+                continue
+            try:
+                await client.close()
+            except Exception:  # pragma: no cover — cleanup must never raise
+                pass
+            setattr(self, attr, None)
 
     # ----- Public API -----
 
     async def plan(
         self, primitive: AttackPrimitive, n_turns: int = 3,
+        arms_strategy: str | None = None,
     ) -> EscalationPlan | None:
         """Return an EscalationPlan for ``primitive`` or None on refusal.
 
@@ -335,15 +413,28 @@ class EscalationPlanner:
         the caller can skip this primitive — there's no useful fallback for
         escalation (unlike persona, where the original payload is still the
         baseline). The caller logs + moves on.
+
+        ``arms_strategy`` selects an ARMS visual-multi-turn strategy (one of
+        ``crescendo`` / ``actor_attack`` / ``acronym``) to seed the plan (§10.8
+        ARMS #9). ``None`` (or ``crescendo``) keeps the default Crescendo arc.
         """
         if n_turns < 2 or n_turns > 6:
             raise ValueError(
                 f"n_turns must be between 2 and 6 (got {n_turns}); the planner "
                 "is calibrated for 3-turn Crescendo arcs per §10.7",
             )
+        if arms_strategy is not None:
+            valid = {s.id for s in multi_turn_strategies()}
+            if arms_strategy not in valid:
+                raise ValueError(
+                    f"arms_strategy must be a visual-multi-turn strategy "
+                    f"{sorted(valid)} (got {arms_strategy!r}); other ARMS "
+                    "patterns are realized by the renderers, not the planner",
+                )
 
         key = _cache_key(
             primitive.primitive_id, n_turns, self.model, self.planner_version,
+            arms_strategy,
         )
         cache_path = self.cache_dir / f"{key}.json"
 
@@ -368,7 +459,18 @@ class EscalationPlanner:
                     cache_path, exc,
                 )
 
-        plan = await self._call_anthropic(primitive, n_turns)
+        # Try the primary backbone; if it REFUSES to author the escalation
+        # (returns None), automatically fall back to the less-aligned backbone —
+        # no manual flag, the framework is autonomous (§10.8 ARMs).
+        plan = await self._generate(primitive, n_turns, arms_strategy, self.model)
+        if plan is None and self.fallback_model and self.fallback_model != self.model:
+            _log.info(
+                "planner primary (%s) refused primitive=%s — auto-falling back to %s",
+                self.model, primitive.primitive_id, self.fallback_model,
+            )
+            plan = await self._generate(
+                primitive, n_turns, arms_strategy, self.fallback_model,
+            )
 
         # Persist plan OR refusal — both worth caching so re-runs don't
         # re-spend the LLM budget on a primitive the model won't plan for.
@@ -395,20 +497,33 @@ class EscalationPlanner:
 
     # ----- Internals -----
 
+    async def _generate(
+        self, primitive: AttackPrimitive, n_turns: int,
+        arms_strategy: str | None, model: str,
+    ) -> EscalationPlan | None:
+        """Route a single planner call to the right backbone for ``model``."""
+        if model.startswith("claude") or model.startswith("anthropic/"):
+            return await self._call_anthropic(primitive, n_turns, arms_strategy, model)
+        return await self._call_openrouter(primitive, n_turns, arms_strategy, model)
+
     async def _call_anthropic(
         self, primitive: AttackPrimitive, n_turns: int,
+        arms_strategy: str | None = None, model: str | None = None,
     ) -> EscalationPlan | None:
-        """Single planner call. Returns EscalationPlan or None on refusal."""
+        """Single planner call via Anthropic. Returns EscalationPlan or None."""
         from anthropic import APIStatusError, BadRequestError  # noqa: PLC0415
         from anthropic import AsyncAnthropic  # noqa: PLC0415
 
+        model = model or self.model
         if self._anthropic_client is None:
             self._anthropic_client = AsyncAnthropic()
 
-        system_prompt, user_prompt = _build_planner_messages(primitive, n_turns)
+        system_prompt, user_prompt = _build_planner_messages(
+            primitive, n_turns, arms_strategy,
+        )
         try:
             response = await self._anthropic_client.messages.create(
-                model=self.model,
+                model=model,
                 max_tokens=_PLAN_MAX_TOKENS,
                 temperature=0.9,
                 system=system_prompt,
@@ -426,66 +541,12 @@ class EscalationPlanner:
         # (success / refused-short / refused-invalid-json / refused-schema).
         # Doing it once at the end keeps every consumed-tokens path logged
         # exactly once with the right `refused` flag.
-        plan: EscalationPlan | None = None
-        refusal_reason: str = ""
-
         text_parts: list[str] = []
         for block in getattr(response, "content", []) or []:
             if getattr(block, "type", None) == "text":
                 text_parts.append(getattr(block, "text", ""))
-        raw = "".join(text_parts).strip()
-
-        if len(raw) < _MIN_USEFUL_PLAN_CHARS:
-            _log.info(
-                "escalation planner returned %d chars (likely refusal) for "
-                "primitive=%s",
-                len(raw), primitive.primitive_id,
-            )
-            refusal_reason = "short_response"
-        else:
-            # The planner is instructed to emit STRICT JSON with no code
-            # fences, but tolerate ```json ... ``` defensively since some
-            # models add it despite the negative instruction.
-            if raw.startswith("```"):
-                raw = raw.strip("`")
-                if raw.startswith("json"):
-                    raw = raw[4:]
-                raw = raw.strip()
-
-            try:
-                payload = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                _log.warning(
-                    "escalation planner returned invalid JSON for "
-                    "primitive=%s: %s\nraw[:500]=%r",
-                    primitive.primitive_id, exc, raw[:500],
-                )
-                refusal_reason = "invalid_json"
-                payload = None
-
-            if payload is not None:
-                # Stamp planner_model so EscalationPlan validation always
-                # succeeds even if the LLM omitted the field (which it
-                # usually does).
-                payload.setdefault("planner_model", self.model)
-                try:
-                    plan = EscalationPlan.model_validate(payload)
-                except Exception as exc:  # pydantic.ValidationError
-                    _log.warning(
-                        "escalation planner output failed schema validation "
-                        "for primitive=%s: %s\npayload=%r",
-                        primitive.primitive_id, exc, payload,
-                    )
-                    refusal_reason = "schema_validation"
-                else:
-                    # Sanity: turn count must match what we asked for.
-                    if len(plan.turns) != n_turns:
-                        _log.warning(
-                            "escalation planner returned %d turns for "
-                            "primitive=%s (asked for %d); using anyway since "
-                            "min/max bounds passed",
-                            len(plan.turns), primitive.primitive_id, n_turns,
-                        )
+        raw = "".join(text_parts)
+        plan, refusal_reason = _parse_plan_payload(raw, n_turns, primitive, model)
 
         # One log line per API call, with refusal reason in the notes so
         # an operator can `grep schema_validation llm_cost_log.csv` to
@@ -499,12 +560,74 @@ class EscalationPlanner:
             response,
             module="escalation_planner",
             operation="plan",
-            model=self.model,
+            model=model,
             subject_id=primitive.primitive_id,
             refused=plan is None,
             notes=notes,
         )
 
+        return plan
+
+    async def _call_openrouter(
+        self, primitive: AttackPrimitive, n_turns: int,
+        arms_strategy: str | None = None, model: str | None = None,
+    ) -> EscalationPlan | None:
+        """Planner via an OpenRouter (OpenAI-compatible) model.
+
+        Lets the ladder use a less safety-aligned backbone (e.g. a Llama) that
+        will actually author escalation scripts — Claude refuses to. Same
+        parse/validate path as the Anthropic backbone (`_parse_plan_payload`).
+        """
+        import os  # noqa: PLC0415
+
+        from openai import APIStatusError, AsyncOpenAI, BadRequestError  # noqa: PLC0415
+
+        model = model or self.model
+        if self._openrouter_client is None:
+            self._openrouter_client = AsyncOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=os.environ.get("OPENROUTER_API_KEY"),
+            )
+
+        system_prompt, user_prompt = _build_planner_messages(
+            primitive, n_turns, arms_strategy,
+        )
+        try:
+            response = await self._openrouter_client.chat.completions.create(
+                model=model,
+                max_tokens=_PLAN_MAX_TOKENS,
+                temperature=0.9,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+        except (BadRequestError, APIStatusError) as exc:
+            _log.warning(
+                "escalation planner (openrouter) refused by API for primitive=%s: %s",
+                primitive.primitive_id, exc,
+            )
+            return None
+
+        choice = response.choices[0] if response.choices else None
+        raw = (getattr(getattr(choice, "message", None), "content", None) or "") if choice else ""
+        plan, refusal_reason = _parse_plan_payload(raw, n_turns, primitive, model)
+
+        usage = getattr(response, "usage", None)
+        append_row(
+            module="escalation_planner",
+            operation="plan",
+            model=model,
+            subject_id=primitive.primitive_id,
+            input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0,
+            output_tokens=int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0,
+            refused=plan is None,
+            notes=(
+                f"n_turns={n_turns}"
+                if plan is not None
+                else f"n_turns={n_turns} reason={refusal_reason}"
+            ),
+        )
         return plan
 
 

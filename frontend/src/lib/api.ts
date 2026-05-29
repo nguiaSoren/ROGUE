@@ -70,6 +70,9 @@ export type AttacksResponse = {
   family: string | null;
   vector: string | null;
   limit: number;
+  // true when nothing was discovered inside the since_days window and the API
+  // fell back to the newest rows regardless of recency (so the UI can relabel).
+  stale?: boolean;
   count: number;
   attacks: AttackPrimitive[];
 };

@@ -53,12 +53,23 @@ from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from rogue.db.models import (  # noqa: E402
     AttackPrimitive as AttackPrimitiveORM,
 )
+from rogue.reproduce.coj import COJ_OPERATIONS, decompose_coj  # noqa: E402
 from rogue.reproduce.escalation_planner import EscalationPlan, EscalationPlanner  # noqa: E402
+from rogue.reproduce.instantiator import render  # noqa: E402
+from rogue.reproduce.judge import JudgeAgent  # noqa: E402
+from rogue.reproduce.structured_data import STRUCTURED_FORMATS  # noqa: E402
+from rogue.reproduce.target_panel import (  # noqa: E402
+    TargetPanel,
+    supports_audio,
+    supports_image,
+)
 from rogue.schemas import (  # noqa: E402
     AttackFamily,
     AttackPrimitive,
     AttackVector,
+    JudgeVerdict,
     Severity,
+    demo_deployment_configs,
 )
 
 logger = logging.getLogger("rogue.scripts.synthesize_escalations")
@@ -244,7 +255,8 @@ def _load_evade_band_primitives(
 
 
 def _build_synthesized_primitive(
-    parent: AttackPrimitive, plan: EscalationPlan,
+    parent: AttackPrimitive, plan: EscalationPlan, arms_strategy: str = "crescendo",
+    image_strategy: str | None = None,
 ) -> AttackPrimitiveORM:
     """Compose a new ``synthesized=True`` AttackPrimitive ORM row from a plan.
 
@@ -252,8 +264,17 @@ def _build_synthesized_primitive(
     row 6); vector flips to USER_MULTI_TURN. Parent's family lands in
     secondary_families so the dashboard can group "escalations from
     DAN-persona primitives" etc.
+
+    ``image_strategy`` (e.g. "typographic" / "mml:wr" / "vpi:lowcontrast") makes
+    this a **multimodal** escalation: the child is flagged ``requires_multimodal``
+    and carries an ``image_strategy`` slot, so ``render()`` renders the final
+    (objective) turn as an image while the earlier escalation turns stay text —
+    ARMS visual multi-turn escalation. ``None`` ⇒ a text-only escalation.
     """
     primitive_id = ulid.new().str
+    slots = dict(parent.payload_slots or {})
+    if image_strategy:
+        slots["image_strategy"] = image_strategy
     # Don't put the parent's family into secondaries when it's already
     # MULTI_TURN_GRADIENT (which it shouldn't be for an EVADE-band single-
     # turn parent, but guard anyway).
@@ -270,13 +291,16 @@ def _build_synthesized_primitive(
         family=AttackFamily.MULTI_TURN_GRADIENT.value,
         secondary_families=secondaries,
         vector=AttackVector.USER_MULTI_TURN.value,
-        title=f"[escalation] {parent.title[:160]}",
+        title=(
+            f"[escalation:{arms_strategy}"
+            f"{('+' + image_strategy) if image_strategy else ''}] {parent.title[:150]}"
+        ),
         short_description=(
             f"§10.7 multi-turn escalation synthesized from primitive "
             f"{parent.primitive_id}. {plan.rationale[:500]}"
         ),
         payload_template=plan.turns[-1],  # last turn carries the objective
-        payload_slots=parent.payload_slots,
+        payload_slots=slots,
         multi_turn_sequence=list(plan.turns),
         slot_requirements=plan.slot_requirements,
         synthesized=True,
@@ -288,7 +312,7 @@ def _build_synthesized_primitive(
         requires_multi_turn=True,
         requires_system_prompt_access=parent.requires_system_prompt_access,
         requires_tools=parent.requires_tools,
-        requires_multimodal=False,
+        requires_multimodal=image_strategy is not None,
         discovered_at=datetime.now(timezone.utc),
         # Bump severity rationale to reflect the multi-turn family weight
         # (MULTI_TURN_GRADIENT 0.85 > most single-turn parents).
@@ -298,8 +322,495 @@ def _build_synthesized_primitive(
             f"single-turn ({parent.family.value}) → multi-turn gradient "
             f"with planner={plan.planner_model}"
         ),
-        notes=f"Crescendo-style {len(plan.turns)}-turn escalation. {plan.rationale[:1000]}",
+        notes=(
+            f"ARMS/{arms_strategy} {len(plan.turns)}-turn escalation"
+            f"{(' (multimodal: final turn as ' + image_strategy + ' image)') if image_strategy else ''}"
+            f". {plan.rationale[:1000]}"
+        ),
     )
+
+
+# ----- §10.8 ARMS escalation ladder -------------------------------------------
+# Per EVADE parent, try the three ARMS visual-multi-turn strategies IN ORDER and
+# short-circuit on the first that breaches: crescendo -> actor_attack -> acronym.
+# "Try all 3 until one succeeds, then leave the others." Unlike run_synthesis
+# (plan-only), the ladder reproduces + judges each variant to know if it worked.
+
+ESCALATION_LADDER: tuple[str, ...] = ("crescendo", "actor_attack", "acronym")
+# Tier-1 of the auto-ladder: render the ORIGINAL (refused) payload as an image
+# via each of these, in order, with NO planner — "refused text → does it breach
+# as an image?". Tried before the (planner-gated) escalation strategies.
+DEFAULT_IMAGE_RENDERERS: tuple[str, ...] = (
+    "typographic", "ocr:white_on_white", "mml:wr", "mml:base64", "vpi:lowcontrast",
+)
+# Tier-3 (text): re-cast the refused payload as a structured-data document (#12),
+# one format at a time — deterministic, no planner. (json/csv/yaml/xml.)
+DEFAULT_STRUCTURED_FORMATS: tuple[str, ...] = STRUCTURED_FORMATS
+# Tier-4 (audio): speak the refused payload with each acoustic style (#6), no
+# planner. Thin surface — only the audio-capable config (Gemini) receives these;
+# the tier auto-skips when no panel config accepts audio.
+DEFAULT_AUDIO_STYLES: tuple[str, ...] = ("plain", "fast", "noisy")
+_BREACH_VERDICTS = {JudgeVerdict.PARTIAL_BREACH, JudgeVerdict.FULL_BREACH}
+# Flat judge-call cost estimate (Sonnet rubric ≈ 6K in + 300 out ≈ $0.0225),
+# mirrors reproduce_once._JUDGE_COST_ESTIMATE_PER_CALL_USD. Used only to give the
+# inline escalation budget cap a spend signal — not billed, just estimated.
+_JUDGE_COST_ESTIMATE_USD = 0.0225
+
+
+def _image_variant(parent: AttackPrimitive, image_strategy: str) -> AttackPrimitive:
+    """A multimodal variant of ``parent``: same payload, but flagged to render as
+    an image via ``image_strategy`` (Tier-1 of the auto-ladder — no planner)."""
+    return parent.model_copy(
+        update={
+            "requires_multimodal": True,
+            "payload_slots": {**(parent.payload_slots or {}), "image_strategy": image_strategy},
+        }
+    )
+
+
+def _structured_variant(parent: AttackPrimitive, fmt: str) -> AttackPrimitive:
+    """A text variant of ``parent``: same payload, but flagged to render as a
+    structured-data injection (#12) in ``fmt`` (Tier-3 — text, no planner). Stays
+    a single-turn user_turn attack; ``render()`` rewrites the turn into the
+    data-document carrier."""
+    return parent.model_copy(
+        update={
+            "payload_slots": {**(parent.payload_slots or {}), "structured_data": fmt},
+        }
+    )
+
+
+def _audio_variant(parent: AttackPrimitive, style: str) -> AttackPrimitive:
+    """A multimodal-audio variant of ``parent``: same payload, spoken via the
+    ``style`` acoustic transform (Tier-4 — audio, no planner). Flags the vector
+    so ``render()`` speaks the last user turn into a styled WAV."""
+    return parent.model_copy(
+        update={
+            "requires_multimodal": True,
+            "vector": AttackVector.MULTIMODAL_AUDIO,
+            "payload_slots": {**(parent.payload_slots or {}), "audio_style": style},
+        }
+    )
+
+
+def _build_coj_primitive(
+    parent: AttackPrimitive, operation: str, element: str = "word",
+) -> AttackPrimitiveORM:
+    """A synthesized multi-turn child from a deterministic Chain-of-Jailbreak (#8)
+    decomposition — NO planner. Mirrors ``_build_synthesized_primitive`` but the
+    turns come from ``decompose_coj`` and there is no planner_model."""
+    primitive_id = ulid.new().str
+    turns = decompose_coj(parent.payload_template, operation, element)
+    secondaries = (
+        [parent.family.value]
+        if parent.family != AttackFamily.MULTI_TURN_GRADIENT
+        else []
+    )
+    return AttackPrimitiveORM(
+        primitive_id=primitive_id,
+        cluster_id=primitive_id,
+        canonical=True,
+        family=AttackFamily.MULTI_TURN_GRADIENT.value,
+        secondary_families=secondaries,
+        vector=AttackVector.USER_MULTI_TURN.value,
+        title=f"[coj:{operation}/{element}] {parent.title[:148]}",
+        short_description=(
+            f"Chain-of-Jailbreak ({operation}, {element}) edit-step decomposition "
+            f"of primitive {parent.primitive_id}."
+        ),
+        payload_template=turns[-1],  # final turn reconstructs the full objective
+        payload_slots=dict(parent.payload_slots or {}),
+        multi_turn_sequence=turns,
+        slot_requirements=None,  # CoJ turns are literal text — no slots to validate
+        synthesized=True,
+        derived_from_primitive_id=parent.primitive_id,
+        target_models_claimed=[],
+        claimed_success_rate=None,
+        claimed_first_seen=None,
+        reproducibility_score=parent.reproducibility_score,
+        requires_multi_turn=True,
+        requires_system_prompt_access=parent.requires_system_prompt_access,
+        requires_tools=parent.requires_tools,
+        requires_multimodal=False,
+        discovered_at=datetime.now(timezone.utc),
+        base_severity=Severity.HIGH.value,
+        severity_rationale=(
+            f"Chain-of-Jailbreak ({operation}/{element}) decomposition of "
+            f"EVADE-band parent {parent.primitive_id} ({parent.family.value})"
+        ),
+        notes=f"CoJ {operation}/{element}: {len(turns)} edit-step turns (deterministic, no planner).",
+    )
+
+
+@dataclass
+class LadderResult:
+    """Outcome of laddering one parent through the escalation strategies."""
+
+    parent_id: str
+    winning_strategy: str | None  # None ⇒ all strategies exhausted without breach
+    breached_on: str | None  # target_model that broke, or None
+    attempts: list[tuple[str, str]]  # (strategy, outcome) in the order tried
+    child_orm: AttackPrimitiveORM | None  # winning child to persist, or None
+    spend_usd: float = 0.0  # estimated LLM spend across all attempts (budget signal)
+
+
+async def _strategy_breaches(
+    child: AttackPrimitive,
+    *,
+    panel: TargetPanel,
+    judge: JudgeAgent,
+    configs: list,
+    temperature: float,
+    n_trials: int,
+) -> tuple[str | None, float]:
+    """Reproduce+judge ``child`` across configs; return (first breaching model id
+    or None, estimated spend in USD).
+
+    Short-circuits at the first PARTIAL/FULL breach across (config × trial) — the
+    ladder only needs to know the escalation worked, not the full matrix. Judge
+    hiccups and target errors count as no-breach for that trial. ``spend`` sums the
+    panel call cost (``ModelResponse.cost_usd``) plus a flat judge estimate per
+    judge call — the budget signal the inline escalation cap reads (§10.8).
+    """
+    spend = 0.0
+    for config in configs:
+        rendered = render(child, config)
+        responses = await panel.run_attack(
+            rendered=rendered, config=config, temperature=temperature, n_trials=n_trials,
+        )
+        for r in responses:
+            spend += float(getattr(r, "cost_usd", 0.0) or 0.0)
+            if r.error:
+                continue
+            try:
+                jr = await judge.judge(
+                    rendered=rendered, model_response=r.content or "", primitive=child,
+                )
+            except Exception:  # noqa: BLE001 — judge hiccup ⇒ treat as no-breach
+                continue
+            spend += _JUDGE_COST_ESTIMATE_USD
+            if jr.verdict in _BREACH_VERDICTS:
+                return config.target_model, spend
+    return None, spend
+
+
+async def run_escalation_ladder_one(
+    parent: AttackPrimitive,
+    *,
+    planner: EscalationPlanner,
+    panel: TargetPanel,
+    judge: JudgeAgent,
+    configs: list,
+    n_turns: int = DEFAULT_N_TURNS,
+    n_trials: int = 3,
+    temperature: float = 0.7,
+    strategies: tuple[str, ...] = ESCALATION_LADDER,
+    image_strategy: str | None = None,
+    image_renderers: tuple[str, ...] = (),
+    coj_operations: tuple[str, ...] = (),
+    structured_formats: tuple[str, ...] = (),
+    audio_styles: tuple[str, ...] = (),
+    budget_usd: float | None = None,
+) -> LadderResult:
+    """Auto-ladder: try transforms in order until one breaches, then STOP.
+
+    Planner-free tiers run first (cheap, deterministic, work even when the planner
+    refuses); the planner tier is last.
+
+    **Tier 1 (``image_renderers``):** render the refused payload as an image via
+    each renderer in turn, dispatched to vision configs — "refused text → does it
+    breach as an image?". Empty ⇒ skip.
+
+    **Tier 2 (``coj_operations``):** Chain-of-Jailbreak — decompose the refused
+    payload into a deterministic edit-step multi-turn chain (#8). Empty ⇒ skip.
+
+    **Tier 3 (``structured_formats``):** structured-data injection (#12, text) —
+    re-cast the refused payload as a JSON/CSV/YAML/XML document whose directive
+    field carries the instruction. Deterministic, no planner. Empty ⇒ skip.
+
+    **Tier 4 (``audio_styles``):** speak the refused payload with each acoustic
+    style (#6 — plain/fast/noisy/…), dispatched to AUDIO-capable configs only.
+    Auto-skips when no config accepts audio. Empty ⇒ skip.
+
+    **Tier 5 (``strategies``):** multi-turn escalation (crescendo/actor/acronym);
+    plan → build child → reproduce+judge. If ``image_strategy`` is set, each
+    escalation's final turn is rendered as an image (multimodal escalation).
+
+    First breach in any tier wins and the rest are SKIPPED ("leave the others").
+    Image/structured/audio-tier winners report ``winning_strategy`` of
+    ``image:<renderer>`` / ``structured:<fmt>`` / ``audio:<style>`` with no
+    persisted child (slot variants of the parent); CoJ + escalation winners carry
+    the synthesized child.
+
+    ``budget_usd``: if set, the ladder stops between tiers once estimated spend
+    reaches it (records a ``("budget", "stopped")`` attempt) — the per-primitive
+    spend cap the inline reproduce escalation reads. ``spend_usd`` on the result
+    is the estimated total across every attempt tried.
+    """
+    attempts: list[tuple[str, str]] = []
+    spend = 0.0
+
+    def _over_budget() -> bool:
+        return budget_usd is not None and spend >= budget_usd
+
+    # ---- Tier 1: the refused payload AS AN IMAGE (no planner needed) ----
+    if image_renderers and not _over_budget():
+        vision_configs = [c for c in configs if supports_image(c.target_model)]
+        for renderer in image_renderers:
+            variant = _image_variant(parent, renderer)
+            label = f"image:{renderer}"
+            try:
+                breached_on, s = await _strategy_breaches(
+                    variant, panel=panel, judge=judge, configs=vision_configs,
+                    temperature=temperature, n_trials=n_trials,
+                )
+            except ValueError as exc:
+                logger.warning("ladder image render failed parent=%s renderer=%s: %s",
+                               parent.primitive_id, renderer, exc)
+                attempts.append((label, "render_error"))
+                continue
+            spend += s
+            if breached_on is not None:
+                attempts.append((label, "breach"))
+                return LadderResult(parent.primitive_id, label, breached_on, attempts,
+                                    None, spend_usd=spend)
+            attempts.append((label, "no_breach"))
+
+    # ---- Tier 2: Chain-of-Jailbreak edit-step decomposition (NO planner) ----
+    if not _over_budget():
+        for op in coj_operations:
+            label = f"coj:{op}"
+            child_orm = _build_coj_primitive(parent, op)
+            child_pyd = _orm_to_pydantic_primitive(child_orm)
+            try:
+                breached_on, s = await _strategy_breaches(
+                    child_pyd, panel=panel, judge=judge, configs=configs,
+                    temperature=temperature, n_trials=n_trials,
+                )
+            except ValueError as exc:
+                logger.warning("ladder CoJ render failed parent=%s op=%s: %s",
+                               parent.primitive_id, op, exc)
+                attempts.append((label, "render_error"))
+                continue
+            spend += s
+            if breached_on is not None:
+                attempts.append((label, "breach"))
+                return LadderResult(parent.primitive_id, label, breached_on, attempts,
+                                    child_orm, spend_usd=spend)
+            attempts.append((label, "no_breach"))
+
+    # ---- Tier 3: structured-data injection (#12, text, NO planner) ----
+    if not _over_budget():
+        for fmt in structured_formats:
+            variant = _structured_variant(parent, fmt)
+            label = f"structured:{fmt}"
+            try:
+                breached_on, s = await _strategy_breaches(
+                    variant, panel=panel, judge=judge, configs=configs,
+                    temperature=temperature, n_trials=n_trials,
+                )
+            except ValueError as exc:
+                logger.warning("ladder structured render failed parent=%s fmt=%s: %s",
+                               parent.primitive_id, fmt, exc)
+                attempts.append((label, "render_error"))
+                continue
+            spend += s
+            if breached_on is not None:
+                attempts.append((label, "breach"))
+                return LadderResult(parent.primitive_id, label, breached_on, attempts,
+                                    None, spend_usd=spend)
+            attempts.append((label, "no_breach"))
+
+    # ---- Tier 4: audio acoustic styles (#6, NO planner) ----
+    audio_configs = [c for c in configs if supports_audio(c.target_model)]
+    if audio_styles and audio_configs and not _over_budget():
+        for style in audio_styles:
+            variant = _audio_variant(parent, style)
+            label = f"audio:{style}"
+            try:
+                breached_on, s = await _strategy_breaches(
+                    variant, panel=panel, judge=judge, configs=audio_configs,
+                    temperature=temperature, n_trials=n_trials,
+                )
+            except (ValueError, RuntimeError) as exc:
+                logger.warning("ladder audio render failed parent=%s style=%s: %s",
+                               parent.primitive_id, style, exc)
+                attempts.append((label, "render_error"))
+                continue
+            spend += s
+            if breached_on is not None:
+                attempts.append((label, "breach"))
+                return LadderResult(parent.primitive_id, label, breached_on, attempts,
+                                    None, spend_usd=spend)
+            attempts.append((label, "no_breach"))
+
+    # ---- Tier 5: multi-turn escalation (planner-driven) ----
+    if _over_budget():
+        attempts.append(("budget", "stopped"))
+        return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
+    for strat in strategies:
+        plan = await planner.plan(parent, n_turns=n_turns, arms_strategy=strat)
+        if plan is None:
+            attempts.append((strat, "refused"))
+            continue
+        child_orm = _build_synthesized_primitive(
+            parent, plan, arms_strategy=strat, image_strategy=image_strategy,
+        )
+        child_pyd = _orm_to_pydantic_primitive(child_orm)
+        try:
+            breached_on, s = await _strategy_breaches(
+                child_pyd, panel=panel, judge=judge, configs=configs,
+                temperature=temperature, n_trials=n_trials,
+            )
+        except ValueError as exc:
+            # The planner can emit a plan whose turns reference slots that
+            # can't be populated (render_multi_turn raises). That's a bad plan
+            # for THIS strategy, not a fatal error — record and try the next.
+            logger.warning(
+                "ladder render failed for parent=%s strategy=%s: %s",
+                parent.primitive_id, strat, exc,
+            )
+            attempts.append((strat, "render_error"))
+            continue
+        spend += s
+        if breached_on is not None:
+            attempts.append((strat, "breach"))
+            return LadderResult(
+                parent.primitive_id, strat, breached_on, attempts, child_orm,
+                spend_usd=spend,
+            )
+        attempts.append((strat, "no_breach"))
+    return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
+
+
+@dataclass
+class LadderStats:
+    candidates_considered: int = 0
+    breached: int = 0
+    exhausted: int = 0  # tried all strategies, none breached
+    skipped_already_synthesized: int = 0
+    persist_errors: int = 0
+    winners_by_strategy: dict[str, int] = field(default_factory=dict)
+    breaches: list[str] = field(default_factory=list)
+
+
+async def run_escalation_ladder(
+    *,
+    database_url: str,
+    limit: int,
+    n_turns: int,
+    breach_rate_threshold: float,
+    primitive_id: str | None = None,
+    n_trials: int = 3,
+    temperature: float = 0.7,
+    strategies: tuple[str, ...] = ESCALATION_LADDER,
+    image_strategy: str | None = None,
+    image_renderers: tuple[str, ...] = DEFAULT_IMAGE_RENDERERS,
+    coj_operations: tuple[str, ...] = COJ_OPERATIONS,
+    structured_formats: tuple[str, ...] = DEFAULT_STRUCTURED_FORMATS,
+    audio_styles: tuple[str, ...] = DEFAULT_AUDIO_STYLES,
+    planner_model: str | None = None,
+    planner: EscalationPlanner | None = None,
+    panel: TargetPanel | None = None,
+    judge: JudgeAgent | None = None,
+    configs: list | None = None,
+) -> LadderStats:
+    """Sweep EVADE-band parents through the escalation ladder; persist winners.
+
+    COSTLY — reproduces + judges live (like reproduce_once). The injected
+    planner/panel/judge/configs are the test seams. When ``image_strategy`` is
+    set the ladder is multimodal (final turn as an image) and dispatches to the
+    vision-capable configs only. ``planner_model`` overrides the planner backbone
+    (e.g. an OpenRouter Llama that will author escalations Claude refuses).
+    """
+    from rogue.reproduce.target_panel import supports_image  # noqa: PLC0415
+
+    _assert_schema_present(database_url)
+    if planner is None:
+        planner = EscalationPlanner.from_env(
+            **({"model": planner_model} if planner_model else {})
+        )
+    panel = panel or TargetPanel.from_env()
+    judge = judge or JudgeAgent()
+    configs = configs if configs is not None else demo_deployment_configs()
+    if image_strategy:
+        # Multimodal escalation only makes sense against vision-capable targets.
+        configs = [c for c in configs if supports_image(c.target_model)]
+
+    engine = create_engine(database_url)
+    SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+    stats = LadderStats()
+    try:
+        with SessionLocal() as session:
+            if primitive_id is not None:
+                orm = session.get(AttackPrimitiveORM, primitive_id)
+                if orm is None:
+                    raise RuntimeError(f"primitive_id not found: {primitive_id!r}")
+                orms = [orm]
+            else:
+                orms = _load_evade_band_primitives(
+                    session, limit=limit, threshold=breach_rate_threshold,
+                )
+            if not orms:
+                return stats
+            existing_children = set(
+                session.execute(
+                    text(
+                        "SELECT DISTINCT derived_from_primitive_id FROM attack_primitives "
+                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL"
+                    ),
+                ).scalars(),
+            )
+            # Release the read transaction BEFORE the slow per-primitive LLM loop.
+            # Each parent's ladder can take many minutes of API calls; holding this
+            # transaction open across them trips Neon's idle-in-transaction timeout
+            # (observed 2026-05-29). expire_on_commit=False keeps the loaded `orms`
+            # usable after commit; winners persist in their own short txn below.
+            session.commit()
+            for orm in orms:
+                parent = _orm_to_pydantic_primitive(orm)
+                if parent.primitive_id in existing_children:
+                    stats.skipped_already_synthesized += 1
+                    continue
+                stats.candidates_considered += 1
+                res = await run_escalation_ladder_one(
+                    parent, planner=planner, panel=panel, judge=judge, configs=configs,
+                    n_turns=n_turns, n_trials=n_trials, temperature=temperature,
+                    strategies=strategies, image_strategy=image_strategy,
+                    image_renderers=image_renderers, coj_operations=coj_operations,
+                    structured_formats=structured_formats, audio_styles=audio_styles,
+                )
+                if res.winning_strategy is None:
+                    stats.exhausted += 1
+                    logger.info("ladder exhausted: parent=%s attempts=%s",
+                                res.parent_id, res.attempts)
+                    continue
+                # Count + log the breach for every winner; persist a row only for
+                # escalation winners (image-tier winners carry no new primitive).
+                stats.breached += 1
+                stats.winners_by_strategy[res.winning_strategy] = (
+                    stats.winners_by_strategy.get(res.winning_strategy, 0) + 1
+                )
+                stats.breaches.append(
+                    f"{res.parent_id} -> {res.winning_strategy} @ {res.breached_on}"
+                )
+                logger.info("ladder breach: parent=%s winner=%s model=%s",
+                            res.parent_id, res.winning_strategy, res.breached_on)
+                if res.child_orm is not None:
+                    try:
+                        session.add(res.child_orm)
+                        session.flush()
+                        session.commit()
+                    except Exception as exc:  # noqa: BLE001
+                        stats.persist_errors += 1
+                        session.rollback()
+                        logger.exception("ladder persist failed: parent=%s err=%s",
+                                         res.parent_id, exc)
+    finally:
+        await planner.aclose()
+        await panel.aclose()
+        engine.dispose()
+    return stats
 
 
 async def run_synthesis(
@@ -448,6 +959,41 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--run-id", default=None)
+    parser.add_argument(
+        "--ladder",
+        action="store_true",
+        help=(
+            "ARMS escalation-ladder mode (§10.8): per parent, try "
+            "crescendo → actor_attack → acronym and STOP at the first that "
+            "breaches. COSTLY — reproduces + judges live (unlike the default "
+            "plan-only synthesis)."
+        ),
+    )
+    parser.add_argument(
+        "--n-trials",
+        type=int,
+        default=3,
+        help="ladder mode: trials per (strategy, config) before moving on (default 3)",
+    )
+    parser.add_argument(
+        "--image-strategy",
+        default=None,
+        help=(
+            "ladder mode: make it MULTIMODAL — render each escalation's final "
+            "objective turn as an image (earlier turns stay text) and dispatch to "
+            "vision configs. One of: typographic | mml:<method> | vpi:<style> | "
+            "polyjailbreak (e.g. 'mml:wr', 'vpi:lowcontrast'). Omit for text-only."
+        ),
+    )
+    parser.add_argument(
+        "--planner-model",
+        default=None,
+        help=(
+            "override the escalation-planner backbone. Default Claude Haiku "
+            "REFUSES to author jailbreak escalations; pass an OpenRouter model "
+            "that will, e.g. 'meta-llama/llama-3.1-8b-instruct'."
+        ),
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -455,6 +1001,36 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     run_id = args.run_id or uuid.uuid4().hex[:12]
+
+    if args.ladder:
+        logger.info(
+            "run_id=%s LADDER start: limit=%d n_turns=%d n_trials=%d threshold=%.2f "
+            "image_strategy=%s%s",
+            run_id, args.limit, args.n_turns, args.n_trials, args.breach_rate_threshold,
+            args.image_strategy or "text-only",
+            f" primitive_id={args.primitive_id}" if args.primitive_id else "",
+        )
+        ladder_stats = asyncio.run(
+            run_escalation_ladder(
+                database_url=args.database_url,
+                limit=args.limit,
+                n_turns=args.n_turns,
+                breach_rate_threshold=args.breach_rate_threshold,
+                primitive_id=args.primitive_id,
+                n_trials=args.n_trials,
+                image_strategy=args.image_strategy,
+                planner_model=args.planner_model,
+            ),
+        )
+        logger.info(
+            "run_id=%s LADDER done: considered=%d breached=%d exhausted=%d "
+            "skipped=%d persist_errors=%d winners=%s",
+            run_id, ladder_stats.candidates_considered, ladder_stats.breached,
+            ladder_stats.exhausted, ladder_stats.skipped_already_synthesized,
+            ladder_stats.persist_errors, ladder_stats.winners_by_strategy,
+        )
+        return 0
+
     logger.info(
         "run_id=%s start: limit=%d n_turns=%d threshold=%.2f%s",
         run_id, args.limit, args.n_turns, args.breach_rate_threshold,

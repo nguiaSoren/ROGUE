@@ -50,9 +50,138 @@ from tenacity import (
 from rogue.reproduce.instantiator import RenderedAttack
 from rogue.schemas import DeploymentConfig
 
-__all__ = ["ModelResponse", "TargetPanel"]
+__all__ = ["ModelResponse", "TargetPanel", "supports_audio", "supports_image"]
 
 _log = logging.getLogger(__name__)
+
+
+# ---------- Multimodal capability gate (Step 0a) ----------
+#
+# Vision(image)-capable panel models, verified 2026-05-29 (see
+# papers/MULTIMODAL_CONTEXT.md Step 0a). Membership is by full provider-prefixed
+# id. `meta-llama/llama-3.1-8b-instruct` is deliberately ABSENT — it is text-only
+# (vision is Llama 3.2 11B/90B), so dispatching an image to it would 400 and
+# pollute the breach matrix as a fake "failure" rather than an honest
+# modality-unsupported skip. Unknown models default to NOT capable so we never
+# silently send an image to an unverified endpoint.
+_IMAGE_CAPABLE_MODELS: frozenset[str] = frozenset(
+    {
+        "openai/gpt-5.4-nano",
+        "openai/gpt-5.4",  # stretch tier
+        "anthropic/claude-haiku-4-5",
+        "anthropic/claude-sonnet-4-6",  # stretch tier
+        "mistralai/mistral-small-2603",  # native multimodal
+        "google/gemini-3.1-flash-lite",  # image parts work via the OpenRouter route
+    }
+)
+
+
+def supports_image(target_model: str) -> bool:
+    """True iff ``target_model`` accepts image input. See ``_IMAGE_CAPABLE_MODELS``.
+
+    Used by ``TargetPanel.run_attack`` to skip-and-label (not error) an image
+    attack aimed at a text-only model. Exported so the orchestration / dashboard
+    layers can render an honest "modality-unsupported" cell rather than an ERROR.
+    """
+    return target_model in _IMAGE_CAPABLE_MODELS
+
+
+# Audio(speech)-capable panel models, verified 2026-05-29 (Step 0b). Only Gemini
+# 3.1 Flash-Lite accepts audio today — via the OpenRouter OpenAI-compat route, as
+# an `input_audio` block. Claude takes no audio; `gpt-5.4-nano` via
+# chat-completions takes no audio (would need `gpt-4o-audio-preview`). Unknown
+# models default to NOT capable (fail-safe), same as the image gate.
+_AUDIO_CAPABLE_MODELS: frozenset[str] = frozenset(
+    {
+        "google/gemini-3.1-flash-lite",
+    }
+)
+
+
+def supports_audio(target_model: str) -> bool:
+    """True iff ``target_model`` accepts audio input. See ``_AUDIO_CAPABLE_MODELS``.
+
+    Audio analogue of ``supports_image`` — drives the same skip-and-label gate.
+    """
+    return target_model in _AUDIO_CAPABLE_MODELS
+
+
+def _attach_audio_to_last_user(
+    messages: list[dict[str, Any]],
+    audio_b64: str,
+    audio_format: str,
+) -> list[dict[str, Any]]:
+    """Return a copy of ``messages`` with ``audio_b64`` attached to the last user turn.
+
+    OpenAI-compatible ``input_audio`` block (the only audio route in the panel —
+    Gemini via OpenRouter). Text payload stays first; audio is the second part.
+    System turns are untouched; a plain-string user content is required (a
+    pre-built block list is left as-is for forward-compatibility).
+
+        {"type": "input_audio", "input_audio": {"data": <b64>, "format": <fmt>}}
+    """
+    out: list[dict[str, Any]] = [dict(m) for m in messages]
+    for i in range(len(out) - 1, -1, -1):
+        if out[i].get("role") != "user":
+            continue
+        text = out[i].get("content", "")
+        if not isinstance(text, str):
+            return out
+        out[i]["content"] = [
+            {"type": "text", "text": text},
+            {
+                "type": "input_audio",
+                "input_audio": {"data": audio_b64, "format": audio_format},
+            },
+        ]
+        return out
+    return out
+
+
+def _attach_image_to_last_user(
+    messages: list[dict[str, Any]],
+    image_b64: str,
+    media_type: str,
+    *,
+    provider: str,
+) -> list[dict[str, Any]]:
+    """Return a copy of ``messages`` with ``image_b64`` attached to the last user turn.
+
+    The text payload is preserved as the first content part; the image is added
+    as a second part using the provider-specific block schema. System turns are
+    never touched (image blocks only belong in user turns). If there is no user
+    turn (should not happen — the instantiator always emits one), the messages
+    are returned unchanged.
+
+    provider="openai"   -> {"type": "image_url", "image_url": {"url": "data:<mt>;base64,<b64>"}}
+    provider="anthropic"-> {"type": "image", "source": {"type": "base64", "media_type": <mt>, "data": <b64>}}
+    """
+    out: list[dict[str, Any]] = [dict(m) for m in messages]
+    for i in range(len(out) - 1, -1, -1):
+        if out[i].get("role") != "user":
+            continue
+        text = out[i].get("content", "")
+        # Only transform a plain-string content; if a caller already passed a
+        # block list, leave it (idempotent / forward-compatible).
+        if not isinstance(text, str):
+            return out
+        if provider == "openai":
+            image_part: dict[str, Any] = {
+                "type": "image_url",
+                "image_url": {"url": f"data:{media_type};base64,{image_b64}"},
+            }
+        else:  # anthropic
+            image_part = {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": image_b64,
+                },
+            }
+        out[i]["content"] = [{"type": "text", "text": text}, image_part]
+        return out
+    return out
 
 
 # ---------- Pricing table (USD per 1,000,000 tokens) ----------
@@ -277,7 +406,29 @@ class TargetPanel:
         trial 0. The cap at 1.5 keeps us inside every panel provider's
         accepted range (OpenAI tops out at 2.0; Anthropic at 1.0 historically
         but tolerates up to 1.0+ in newer SDKs; 1.5 is the safe shared ceiling).
+
+        Multimodal gate (Step 0a): if the rendered attack carries an image but
+        the target model is not image-capable, we return an EMPTY list rather
+        than dispatching — an image sent to a text-only model 400s, which the
+        orchestrator would otherwise record as a fake ERROR cell. An empty
+        result is the honest "modality-unsupported" signal; the caller simply
+        produces no breach rows for that (attack, config) pair. See
+        papers/MULTIMODAL_CONTEXT.md Step 0a + `supports_image`.
         """
+        if rendered.image_b64 is not None and not supports_image(config.target_model):
+            _log.info(
+                "skip: image attack vs text-only model %s — modality_unsupported "
+                "(not an error; no trials dispatched)",
+                config.target_model,
+            )
+            return []
+        if rendered.audio_b64 is not None and not supports_audio(config.target_model):
+            _log.info(
+                "skip: audio attack vs non-audio model %s — modality_unsupported "
+                "(not an error; no trials dispatched)",
+                config.target_model,
+            )
+            return []
         temperatures = [min(temperature + 0.1 * i, 1.5) for i in range(n_trials)]
         coros = [
             self._dispatch_one(rendered, config, trial_index=i, temperature=t)
@@ -321,6 +472,10 @@ class TargetPanel:
                 trial_index=trial_index,
                 client_attr="_openai_client",
                 price_key=model_id,
+                image_b64=rendered.image_b64,
+                image_media_type=rendered.image_media_type,
+                audio_b64=rendered.audio_b64,
+                audio_format=rendered.audio_format,
             )
         if model_id.startswith("groq/"):
             # Groq exposes models via an OpenAI-compatible endpoint. Strip the
@@ -365,6 +520,10 @@ class TargetPanel:
                 trial_index=trial_index,
                 client_attr="_openrouter_client",
                 price_key=model_id,
+                image_b64=rendered.image_b64,
+                image_media_type=rendered.image_media_type,
+                audio_b64=rendered.audio_b64,
+                audio_format=rendered.audio_format,
             )
         if model_id.startswith("anthropic/"):
             bare_model = model_id.split("/", 1)[1]
@@ -374,6 +533,8 @@ class TargetPanel:
                 temperature=temperature,
                 trial_index=trial_index,
                 price_key=model_id,
+                image_b64=rendered.image_b64,
+                image_media_type=rendered.image_media_type,
             )
 
         raise NotImplementedError(f"unrouted provider: {model_id}")
@@ -390,7 +551,7 @@ class TargetPanel:
         base_url: str,
         api_key: str | None,
         model: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         temperature: float,
         client_attr: str,
     ) -> Any:
@@ -431,6 +592,10 @@ class TargetPanel:
         trial_index: int,
         client_attr: str,
         price_key: str,
+        image_b64: str | None = None,
+        image_media_type: str = "image/png",
+        audio_b64: str | None = None,
+        audio_format: str = "wav",
     ) -> ModelResponse:
         """Single call against any OpenAI-compatible chat-completions endpoint.
 
@@ -438,6 +603,12 @@ class TargetPanel:
         Google for us). The `client_attr` parameter names the instance slot
         the AsyncOpenAI client is cached on so the four endpoints don't share
         a single client (different base_urls / api_keys).
+
+        When `image_b64` is set (Step 0a), the image is attached to the last
+        user turn as an OpenAI-format `image_url` data-URI block before dispatch.
+        When `audio_b64` is set (Step 0b), an `input_audio` block is attached
+        instead. The OpenRouter route passes either through to Gemini / Mistral
+        unchanged.
 
         Retry policy lives on `_do_openai_compat_call` (see `_is_retryable`).
         Post-retry RateLimitError, non-retryable BadRequestError, and any
@@ -448,13 +619,23 @@ class TargetPanel:
         """
         from openai import APIStatusError, BadRequestError, RateLimitError  # noqa: PLC0415
 
+        call_messages: list[dict[str, Any]] = list(messages)
+        if image_b64 is not None:
+            call_messages = _attach_image_to_last_user(
+                call_messages, image_b64, image_media_type, provider="openai"
+            )
+        if audio_b64 is not None:
+            call_messages = _attach_audio_to_last_user(
+                call_messages, audio_b64, audio_format
+            )
+
         t0 = time.perf_counter()
         try:
             response = await self._do_openai_compat_call(
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
-                messages=messages,
+                messages=call_messages,
                 temperature=temperature,
                 client_attr=client_attr,
             )
@@ -554,7 +735,7 @@ class TargetPanel:
         model: str,
         anthropic_temp: float,
         system_prompt: str,
-        chat_messages: list[dict[str, str]],
+        chat_messages: list[dict[str, Any]],
     ) -> Any:
         """Inner retried call — raises on failure so tenacity sees the exception.
 
@@ -585,6 +766,8 @@ class TargetPanel:
         temperature: float,
         trial_index: int,
         price_key: str,
+        image_b64: str | None = None,
+        image_media_type: str = "image/png",
     ) -> ModelResponse:
         """Single call against the Anthropic Messages API.
 
@@ -595,6 +778,10 @@ class TargetPanel:
         as the `messages` payload. The instantiator only ever emits at most
         one leading system message today, but we tolerate >1 defensively.
 
+        When `image_b64` is set (Step 0a), the image is attached to the last
+        user turn as an Anthropic-format `image` block (`source.type="base64"`)
+        after the system/chat split — image blocks belong only in user turns.
+
         Retry policy lives on `_do_anthropic_call` (see `_is_retryable`).
         Post-retry exceptions are converted to structured ModelResponse here.
         """
@@ -604,7 +791,7 @@ class TargetPanel:
         # double-newline so multi-system inputs (rare but possible) round-trip
         # without losing structure.
         system_parts: list[str] = []
-        chat_messages: list[dict[str, str]] = []
+        chat_messages: list[dict[str, Any]] = []
         for msg in messages:
             if msg.get("role") == "system":
                 system_parts.append(msg.get("content", ""))
@@ -618,6 +805,11 @@ class TargetPanel:
         if not chat_messages:
             raise ValueError(
                 "anthropic dispatch: no non-system messages in RenderedAttack"
+            )
+
+        if image_b64 is not None:
+            chat_messages = _attach_image_to_last_user(
+                chat_messages, image_b64, image_media_type, provider="anthropic"
             )
 
         # Cap temperature at 1.0 for Anthropic — the SDK rejects higher values

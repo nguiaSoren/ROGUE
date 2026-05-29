@@ -218,7 +218,7 @@ async def test_plan_caches_after_first_call(tmp_path: Path) -> None:
 
     call_count = {"n": 0}
 
-    async def _stub_call(prim, n):
+    async def _stub_call(prim, n, arms_strategy=None, model=None):
         call_count["n"] += 1
         return EscalationPlan(
             objective=prim.title,
@@ -241,12 +241,12 @@ async def test_plan_caches_after_first_call(tmp_path: Path) -> None:
 async def test_plan_caches_refusal_so_reruns_dont_respend_budget(
     tmp_path: Path,
 ) -> None:
-    planner = EscalationPlanner(cache_dir=tmp_path / "cache")
+    planner = EscalationPlanner(cache_dir=tmp_path / "cache", fallback_model=None)
     parent = _make_single_turn_primitive()
 
     call_count = {"n": 0}
 
-    async def _refusing_stub(prim, n):
+    async def _refusing_stub(prim, n, arms_strategy=None, model=None):
         call_count["n"] += 1
         return None
 
@@ -516,7 +516,7 @@ async def test_run_synthesis_persists_synthesized_child(
 
     planner = EscalationPlanner(cache_dir=tmp_path / "esc_cache")
 
-    async def _stub_call(prim, n):
+    async def _stub_call(prim, n, arms_strategy=None, model=None):
         return EscalationPlan(
             objective=prim.title,
             turns=[
@@ -583,7 +583,7 @@ async def test_run_synthesis_skips_already_escalated_parent(
 
     planner = EscalationPlanner(cache_dir=tmp_path / "esc_cache")
 
-    async def _stub_call(prim, n):
+    async def _stub_call(prim, n, arms_strategy=None, model=None):
         return EscalationPlan(
             objective=prim.title,
             turns=["a", "b", "c"],

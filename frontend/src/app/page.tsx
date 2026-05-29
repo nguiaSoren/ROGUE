@@ -85,14 +85,15 @@ export default async function Home() {
           <div className="space-y-2">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green flex items-center gap-2">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
-              freshest threats · last 48h
+              {attacks?.stale ? "latest harvest · threat DB" : "freshest threats · last 48h"}
             </p>
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-              What landed since yesterday.
+              {attacks?.stale ? "The most recent attacks we've captured." : "What landed since yesterday."}
             </h2>
             <p className="text-sm text-muted-foreground max-w-xl">
-              The harvester runs continuously. Every row below is an attack
-              someone published on the open web in the last 2 days.
+              {attacks?.stale
+                ? "The harvester runs on demand. Nothing new landed in the last 48h — these are the most recent attacks in the threat DB."
+                : "The harvester runs continuously. Every row below is an attack someone published on the open web in the last 2 days."}
             </p>
             <div className="pt-2">
               <LiveAttackTicker initialAttacks={attacks?.attacks ?? []} />
