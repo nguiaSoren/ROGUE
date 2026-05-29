@@ -87,15 +87,19 @@ def test_models_metadata_has_expected_tables() -> None:
     """Base.metadata must declare the ROGUE storage tables.
 
     Extended 2026-05-27 with ``pair_refinement_steps`` (§10.7 full PAIR
-    build, migration 0007). Add new entries here when migrations add tables.
+    build, migration 0007); ``bandit_state`` (migration 0010) and
+    ``fetch_cache`` (§11.7 skip-cache, migration 0011) added 2026-05-29.
+    Add new entries here when migrations add tables.
     """
     from rogue.db.models import Base
 
     assert sorted(Base.metadata.tables.keys()) == [
         "attack_primitives",
+        "bandit_state",
         "breach_results",
         "bright_data_cost_log",
         "deployment_configs",
+        "fetch_cache",
         "pair_refinement_steps",
         "source_provenances",
     ]

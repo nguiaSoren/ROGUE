@@ -396,6 +396,32 @@ class BanditState(Base):
     )
 
 
+class FetchCache(Base):
+    """Persistent cross-run URL skip-cache (§11.7). One row per URL ROGUE has
+    ever fetched — including zero-yield ones — so a daily harvest skips
+    re-crawling / re-extracting unchanged content.
+
+    ``version_token`` is a source-supplied freshness signal (git blob SHA,
+    arxiv updated-date, reddit ``created:num_comments``, HTTP ETag) compared
+    BEFORE the Bright Data fetch (Tier B). ``content_hash`` mirrors
+    ``RawDocument.archive_hash`` and is compared BEFORE LLM extraction (Tier A,
+    universal). ``n_primitives_yielded`` records yield so a future bandit
+    reward can down-weight low-novelty sources."""
+
+    __tablename__ = "fetch_cache"
+
+    url: Mapped[str] = mapped_column(Text, primary_key=True)
+    source_type: Mapped[str] = mapped_column(String(40), index=True)
+    version_token: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    last_fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    last_status: Mapped[str] = mapped_column(String(20), default="ok")
+    n_primitives_yielded: Mapped[int] = mapped_column(Integer, default=0)
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -405,4 +431,5 @@ __all__ = [
     "PairRefinementStep",
     "BrightDataCostLog",
     "BanditState",
+    "FetchCache",
 ]

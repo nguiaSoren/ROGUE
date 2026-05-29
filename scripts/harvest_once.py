@@ -99,6 +99,7 @@ from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
 from rogue.extract.extraction_agent import ExtractionAgent  # noqa: E402
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.discovery_agent import DiscoveryAgent  # noqa: E402
+from rogue.harvest.fetch_cache import FetchCache, load_snapshot  # noqa: E402
 from rogue.schemas import AttackPrimitive, RawDocument  # noqa: E402
 from rogue.schemas.source_provenance import SourceProvenance  # noqa: E402
 
@@ -236,6 +237,7 @@ class HarvestRunStats:
     raw_docs: int = 0
     extracted: int = 0
     skipped_commentary: int = 0
+    skipped_unchanged: int = 0
     extract_errors: int = 0
     dedup_errors: int = 0
     new_clusters: int = 0
@@ -245,6 +247,7 @@ class HarvestRunStats:
         return (
             f"raw_docs={self.raw_docs} extracted={self.extracted} "
             f"skipped_commentary={self.skipped_commentary} "
+            f"skipped_unchanged={self.skipped_unchanged} "
             f"extract_errors={self.extract_errors} "
             f"dedup_errors={self.dedup_errors} "
             f"new_clusters={self.new_clusters} duplicates={self.duplicates}"
@@ -417,7 +420,36 @@ async def run_harvest(
 
         # --- Layer 1: HARVEST ---
         agent = DiscoveryAgent(bd_client, bandit=bandit)
-        raw_docs = await agent.run(since=since)
+
+        # §11.7 Tier B — preload the fetch_cache ledger so harvest can skip
+        # re-spend up front: (1) the SERP phase skips URLs we've already
+        # Web-Unlocked on a prior day (cross-run seed); (2) plugins that expose
+        # a cheap pre-fetch freshness token (github blob-SHA) skip the fetch
+        # when the token is unchanged. Best-effort — a missing table (pre-0011)
+        # just yields an empty cache, so the harvest behaves exactly as before.
+        prefetched_urls: set[str] = set()
+        version_cache: dict[str, str] = {}
+        try:
+            with SessionLocal() as _pre_session:
+                _snap = load_snapshot(_pre_session)
+            prefetched_urls = set(_snap)
+            version_cache = {
+                u: cv.version_token for u, cv in _snap.items() if cv.version_token
+            }
+            logger.info(
+                "fetch_cache: preloaded %d urls (%d with a pre-fetch token)",
+                len(prefetched_urls),
+                len(version_cache),
+            )
+        except Exception as exc:  # noqa: BLE001 — cache miss must never block harvest
+            logger.warning("fetch_cache preload skipped: %s", exc)
+        # Inject the pre-fetch token map into any plugin that supports it
+        # (duck-typed; plugins without `version_cache` are untouched).
+        for _plugin in agent.plugins:
+            if hasattr(_plugin, "version_cache"):
+                setattr(_plugin, "version_cache", version_cache)
+
+        raw_docs = await agent.run(since=since, prefetched_urls=prefetched_urls)
         stats.raw_docs = len(raw_docs)
         # Per-plugin visibility — one INFO line per plugin so a "0" never
         # again hides because the plugin ate the underlying BD error. ERROR
@@ -467,7 +499,9 @@ async def run_harvest(
         EXTRACTION_CONCURRENCY = int(os.environ.get("EXTRACTION_CONCURRENCY", "3"))
         sem = asyncio.Semaphore(EXTRACTION_CONCURRENCY)
 
-        async def extract_one(raw_doc) -> tuple[object, "AttackPrimitive | None | Exception"]:
+        async def extract_one(
+            raw_doc: RawDocument,
+        ) -> tuple[RawDocument, "AttackPrimitive | None | Exception"]:
             async with sem:
                 try:
                     primitive = await extractor.extract_from_raw_document(raw_doc)
@@ -484,13 +518,33 @@ async def run_harvest(
             spend = daily_bd_spend_usd(session)
             dedup = Deduplicator(session=session, embed_fn=embed_fn)
 
+            # §11.7 Tier A — universal pre-extraction skip. Drop docs whose body
+            # is byte-identical to what we already extracted (same url +
+            # archive_hash in the fetch_cache ledger): re-extracting only
+            # re-derives the primitive we already have, then cosine-dedups it
+            # away. Skipping here saves the LLM extraction call (the wall-clock
+            # + $ bottleneck). Works for every source.
+            fetch_cache = FetchCache(session)
+            docs_to_extract: list[RawDocument] = []
+            for d in raw_docs:
+                if fetch_cache.should_skip_extract(str(d.url), d.archive_hash):
+                    stats.skipped_unchanged += 1
+                else:
+                    docs_to_extract.append(d)
+
             logger.info(
-                "extracting %d raw_docs (concurrency=%d)",
-                len(raw_docs), EXTRACTION_CONCURRENCY,
+                "extracting %d raw_docs (%d skipped as unchanged; concurrency=%d)",
+                len(docs_to_extract),
+                stats.skipped_unchanged,
+                EXTRACTION_CONCURRENCY,
             )
             extract_results = await asyncio.gather(
-                *(extract_one(d) for d in raw_docs)
+                *(extract_one(d) for d in docs_to_extract)
             )
+
+            # §11.7 ledger writes accumulated during the persist loop, flushed
+            # once after it so cache rows aren't tangled with per-doc rollbacks.
+            cache_records: list[dict] = []
 
             # Serial dedup + persist loop on the now-extracted primitives.
             # Per-doc errors stay isolated; one bad primitive doesn't tank
@@ -505,6 +559,18 @@ async def run_harvest(
                 primitive = result
                 if primitive is None:
                     stats.skipped_commentary += 1
+                    # Record so an identical re-fetch next run skips the LLM
+                    # re-classification of known-commentary content.
+                    cache_records.append(
+                        {
+                            "url": str(raw_doc.url),
+                            "source_type": str(raw_doc.source_type),
+                            "content_hash": raw_doc.archive_hash,
+                            "version_token": raw_doc.metadata.get("version_token"),
+                            "last_status": "commentary",
+                            "n_primitives_yielded": 0,
+                        }
+                    )
                     continue
 
                 # Ensure provenance is attached (LLM may omit; we always know it).
@@ -526,12 +592,43 @@ async def run_harvest(
                     session.add(orm_row)
                     session.commit()
                     stats.extracted += 1
+                    # §11.7 — stage ledger row (content_hash for Tier A;
+                    # version_token from the plugin's listing for Tier B).
+                    cache_records.append(
+                        {
+                            "url": str(raw_doc.url),
+                            "source_type": str(raw_doc.source_type),
+                            "content_hash": raw_doc.archive_hash,
+                            "version_token": raw_doc.metadata.get("version_token"),
+                            "last_status": "ok",
+                            "n_primitives_yielded": 1 if orm_row.canonical else 0,
+                        }
+                    )
                 except Exception as exc:
                     stats.dedup_errors += 1
                     session.rollback()
                     logger.exception(
                         "dedup/persist failed: url=%s err=%s", raw_doc.url, exc,
                     )
+
+            # §11.7 — flush the fetch-cache ledger once, isolated from the
+            # per-doc primitive commits above so a mid-loop rollback can't drop
+            # cache rows. Best-effort: a ledger failure must never fail the
+            # harvest — worst case we re-crawl next run. Extract/dedup errors
+            # are intentionally NOT recorded so they retry next run.
+            if cache_records:
+                try:
+                    for rec in cache_records:
+                        fetch_cache.record(**rec)
+                    session.commit()
+                    logger.info(
+                        "fetch_cache: recorded %d urls (%d skipped as unchanged this run)",
+                        len(cache_records),
+                        stats.skipped_unchanged,
+                    )
+                except Exception as exc:  # noqa: BLE001 — ledger must not fail harvest
+                    session.rollback()
+                    logger.warning("fetch_cache ledger write failed: %s", exc)
         # --- §11.6 bandit reward attribution + persist ---
         # Per-arm attribution via URL site-pattern matching (see
         # `rogue.harvest.bandit_attribution`). For each picked arm, novel =

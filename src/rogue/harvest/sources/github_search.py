@@ -115,6 +115,11 @@ class GithubSearchPlugin(SourcePlugin):
         self.enable_deep_traversal = enable_deep_traversal
         self.deep_traversal_max_files = deep_traversal_max_files
         self.call_errors: list[str] = []
+        # §11.7 Tier B — {raw_url: blob_sha} from the fetch_cache ledger,
+        # injected by harvest_once. When a tree blob's SHA matches the cached
+        # token we skip the Web Unlocker fetch (file unchanged since last run).
+        self.version_cache: dict[str, str] = {}
+        self.skipped_unchanged: int = 0
 
     def serp_queries(self, since: datetime) -> list[str]:
         """GitHub SERP queries (docs/sources.md §5)."""
@@ -255,13 +260,14 @@ class GithubSearchPlugin(SourcePlugin):
         the repo is private — the README we already emitted in phase 2 stays
         in the harvest output regardless.
         """
-        paths = await self._fetch_repo_tree(owner, repo, branch)
-        if not paths:
+        tree_entries = await self._fetch_repo_tree(owner, repo, branch)
+        if not tree_entries:
             return []
+        sha_by_path = {path: sha for path, sha in tree_entries}
 
         # Filter to content extensions + cap. Skip README files (already fetched).
         kept: list[str] = []
-        for p in paths:
+        for p, _sha in tree_entries:
             if "." not in p:
                 continue
             ext = "." + p.rsplit(".", 1)[-1].lower()
@@ -281,6 +287,13 @@ class GithubSearchPlugin(SourcePlugin):
                 f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/"
                 + quote(path, safe="/")
             )
+            blob_sha = sha_by_path.get(path) or None
+            # §11.7 Tier B — skip the Web Unlocker fetch when this blob's SHA is
+            # unchanged since the last run (content-identical file). The SHA
+            # came free with the tree call above; no extra request.
+            if blob_sha and self.version_cache.get(raw_url) == blob_sha:
+                self.skipped_unchanged += 1
+                continue
             try:
                 page = await client.web_unlock(raw_url, format="markdown")
             except NotImplementedError:
@@ -311,6 +324,9 @@ class GithubSearchPlugin(SourcePlugin):
                             "path": path,
                             "repo_url": f"https://github.com/{owner}/{repo}",
                             "fetch_path": "serp_deep_traversal",
+                            # §11.7 — git blob SHA: the fetch_cache stores this as
+                            # the pre-fetch freshness token so next run can skip.
+                            "version_token": blob_sha,
                         },
                         discovered_via=discovered_via,
                     )
@@ -323,8 +339,15 @@ class GithubSearchPlugin(SourcePlugin):
         return out
 
     @staticmethod
-    async def _fetch_repo_tree(owner: str, repo: str, branch: str) -> list[str]:
-        """GitHub Git Tree API → list of blob paths. [] on any error.
+    async def _fetch_repo_tree(
+        owner: str, repo: str, branch: str
+    ) -> list[tuple[str, str]]:
+        """GitHub Git Tree API → list of (blob path, blob SHA). [] on any error.
+
+        The blob SHA is a git content hash — it changes iff the file content
+        changes — so it is the ideal §11.7 pre-fetch freshness token: one tree
+        call gates every file in a fixed repo (Pliny / L1B3RT4S-style), letting
+        the deep traversal skip the per-file Web Unlocker fetch when unchanged.
 
         Same pattern as the Pliny plugin's helpers. Public-repo endpoint, no
         auth needed. Rate-limited to 60 req/hr per IP — at most one call
@@ -347,4 +370,8 @@ class GithubSearchPlugin(SourcePlugin):
             tree = r.json().get("tree", [])
         except Exception:
             return []
-        return [str(e.get("path", "")) for e in tree if e.get("type") == "blob"]
+        return [
+            (str(e.get("path", "")), str(e.get("sha", "")))
+            for e in tree
+            if e.get("type") == "blob"
+        ]

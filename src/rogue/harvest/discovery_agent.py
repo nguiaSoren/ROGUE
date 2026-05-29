@@ -404,7 +404,9 @@ class DiscoveryAgent:
     # Main harvest entry point
     # ------------------------------------------------------------------
 
-    async def run(self, since: datetime) -> list[RawDocument]:
+    async def run(
+        self, since: datetime, prefetched_urls: set[str] | None = None
+    ) -> list[RawDocument]:
         """Run every registered plugin's ``fetch_since`` concurrently, then
         run the §11.6 (c-serp) bandit-driven SERP discovery phase if a bandit
         is wired.
@@ -458,12 +460,19 @@ class DiscoveryAgent:
         if self.bandit is not None and self.last_selected_arms:
             from rogue.harvest.bandit_serp_phase import run_bandit_serp_phase
 
+            # §11.7 Tier B — seed the SERP-phase skip set with BOTH this run's
+            # plugin URLs (intra-run dedup, as before) AND the persistent
+            # fetch_cache URLs (cross-run, passed in by harvest_once) so we
+            # don't re-Web-Unlock a URL we already fetched on a prior day. Same
+            # pure-URL skip semantics the SERP phase already uses intra-run,
+            # extended across runs.
             plugin_urls = {str(d.url) for d in flat_docs}
+            serp_seen = plugin_urls | (prefetched_urls or set())
             try:
                 phase = await run_bandit_serp_phase(
                     client=self.client,
                     picked_arms=self.last_selected_arms,
-                    seen_urls=plugin_urls,
+                    seen_urls=serp_seen,
                 )
             except Exception as exc:  # noqa: BLE001 — phase failure must not abort harvest
                 logger.warning(
