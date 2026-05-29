@@ -44,13 +44,24 @@ New data shows on the site within the cache window (below), or immediately after
   so new breaches appear **automatically**. No code change, no manual "refresh." (The
   `breach_matrix_daily_snapshot` materialized view is only used by
   `scripts/snapshot_breach_matrix.py`, not the dashboard, so you never refresh it for the site.)
-- **Fast local sandbox** (does NOT touch live): the old local Docker DB is kept as
-  `LOCAL_DATABASE_URL` in `.env`. Start it (`docker compose up -d`) and override for one run:
+- **Fast local sandbox** (does NOT touch live): the local Docker DB (`LOCAL_DATABASE_URL`
+  in `.env`, also Postgres 17) is for quick experiments. Start it (`docker compose up -d`)
+  and override for one run:
   ```
   DATABASE_URL="$(grep ^LOCAL_DATABASE_URL= .env | cut -d= -f2-)" uv run python scripts/reproduce_once.py ...
   ```
-  Local does NOT auto-receive Neon's data (or vice-versa) — each run writes to whichever
-  DB `DATABASE_URL` names. Default = Neon.
+
+## Keeping local ↔ Neon in sync
+The two databases are separate copies (both Postgres 17). There is **no real-time
+auto-sync** — a laptop DB and a cloud DB can't cleanly stream to each other, and it's not
+worth the fragility. Instead, `scripts/sync_db.sh` does a one-command full copy (runs the
+pg17 tools inside the local container, so nothing to install):
+```
+./scripts/sync_db.sh pull     # Neon → local : mirror the live DB into local (run after a harvest)
+./scripts/sync_db.sh push     # local → Neon : publish local to live (overwrites live — confirms first)
+```
+Typical loop: `harvest`/`reproduce` → Neon (live), then `./scripts/sync_db.sh pull` so your
+local copy matches for fast experiments.
 
 ## Caching
 Dashboard pages are cached and **revalidated every 5 minutes** (ISR) — see `REVALIDATE_SECONDS` in `frontend/src/lib/api.ts`. Visitors get instant loads; data refreshes in the background every 5 min. The live attack ticker (SSE) is a separate client connection, so it stays real-time.
