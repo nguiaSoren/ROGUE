@@ -30,26 +30,27 @@ Browser → Vercel (Next.js frontend) → Render (FastAPI backend) → Neon (Pos
 - **Vercel:** `NEXT_PUBLIC_API_BASE` = the Render API URL (baked into the build).
 - **Render:** `DATABASE_URL` = the Neon connection string, with the scheme **`postgresql+psycopg://`** (the app uses psycopg v3 — the plain `postgresql://` form crashes on boot).
 
-## How DATA works (read this before "updating the website")
-There are **two separate databases** — they are NOT auto-synced:
-1. **Local Postgres** (Docker container `rogue-postgres`) — your local `.env` `DATABASE_URL` points here. `harvest_once.py` / `reproduce_once.py` write **here** by default.
-2. **Neon** (cloud) — what the **live site** reads.
+## How DATA works — updating the live site
+Local `.env` `DATABASE_URL` now points at **Neon** (the live DB) by default, so the
+pipeline writes straight to production. There is effectively **one database** — no
+copy/sync step. **To push new data live, just run normally:**
+```
+uv run python scripts/harvest_once.py --since 1d    # new attacks    → Neon (live)
+uv run python scripts/reproduce_once.py             # run them → breaches → Neon (live)
+```
+New data shows on the site within the cache window (below), or immediately after the next deploy.
 
-So when you find new attacks, **Neon is the DB that the live site needs updated.** Two ways:
-- **A — run the pipeline straight against Neon** (set `DATABASE_URL` to the Neon `postgresql+psycopg://...` string for that run):
+- **The breach matrix is a live SQL view** (`breach_matrix`), computed on every request —
+  so new breaches appear **automatically**. No code change, no manual "refresh." (The
+  `breach_matrix_daily_snapshot` materialized view is only used by
+  `scripts/snapshot_breach_matrix.py`, not the dashboard, so you never refresh it for the site.)
+- **Fast local sandbox** (does NOT touch live): the old local Docker DB is kept as
+  `LOCAL_DATABASE_URL` in `.env`. Start it (`docker compose up -d`) and override for one run:
   ```
-  DATABASE_URL='postgresql+psycopg://...neon...' uv run python scripts/harvest_once.py --since 1d
-  DATABASE_URL='postgresql+psycopg://...neon...' uv run python scripts/reproduce_once.py
-  # if breach data changed, refresh the snapshot:
-  psql '<neon url>' -c 'REFRESH MATERIALIZED VIEW breach_matrix_daily_snapshot;'
+  DATABASE_URL="$(grep ^LOCAL_DATABASE_URL= .env | cut -d= -f2-)" uv run python scripts/reproduce_once.py ...
   ```
-- **B — run locally, then sync local → Neon** (dump + restore, as in the initial load):
-  ```
-  docker compose exec -T postgres pg_dump -U rogue -d rogue --no-owner --no-privileges | gzip > dump.sql.gz
-  gunzip -c dump.sql.gz | psql '<neon url>'
-  ```
-
-New Neon data surfaces on the live site within the cache window (below), or immediately after a redeploy.
+  Local does NOT auto-receive Neon's data (or vice-versa) — each run writes to whichever
+  DB `DATABASE_URL` names. Default = Neon.
 
 ## Caching
-Dashboard pages are cached and **revalidated hourly** (ISR) — see `REVALIDATE_SECONDS` in `frontend/src/lib/api.ts`. Visitors get instant loads; the data refreshes in the background every hour. The live attack ticker (SSE) is a separate client connection, so it stays real-time.
+Dashboard pages are cached and **revalidated every 5 minutes** (ISR) — see `REVALIDATE_SECONDS` in `frontend/src/lib/api.ts`. Visitors get instant loads; data refreshes in the background every 5 min. The live attack ticker (SSE) is a separate client connection, so it stays real-time.
