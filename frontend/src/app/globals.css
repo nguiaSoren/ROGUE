@@ -224,25 +224,19 @@
 /*  Pulse — for CRITICAL/breached elements                             */
 /*  Slow heartbeat-style pulse. Use sparingly — only on actual crit.   */
 /* ------------------------------------------------------------------ */
+/* Opacity (not box-shadow) so it's compositor-only — box-shadow pulses repaint
+   every frame, which is a Chrome scroll-jank source with several on screen. */
 @keyframes rogue-pulse-critical {
-  0%, 100% {
-    box-shadow: 0 0 0 0 var(--rogue-red-dim);
-  }
-  50% {
-    box-shadow: 0 0 12px 2px var(--rogue-red-dim);
-  }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
 }
 .animate-rogue-pulse-critical {
   animation: rogue-pulse-critical 2.5s ease-in-out infinite;
 }
 
 @keyframes rogue-pulse-green {
-  0%, 100% {
-    box-shadow: 0 0 0 0 var(--rogue-green-dim);
-  }
-  50% {
-    box-shadow: 0 0 10px 2px var(--rogue-green-dim);
-  }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
 }
 .animate-rogue-pulse-green {
   animation: rogue-pulse-green 2.5s ease-in-out infinite;
@@ -420,8 +414,8 @@
 /*  Cell pulses for high-severity heatmap cells                        */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-cell-pulse-red {
-  0%, 100% { background-color: rgba(255, 0, 60, 0.30); }
-  50%      { background-color: rgba(255, 0, 60, 0.55); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
 }
 .rogue-cell-critical {
   animation: rogue-cell-pulse-red 3s ease-in-out infinite;
@@ -461,8 +455,8 @@
     radial-gradient(900px 500px at 15% 20%, rgba(0, 255, 136, 0.14), transparent 60%),
     radial-gradient(700px 400px at 85% 30%, rgba(255, 0, 60, 0.10), transparent 60%),
     radial-gradient(600px 400px at 50% 90%, rgba(34, 211, 238, 0.10), transparent 60%);
-  background-size: 200% 200%;
-  animation: rogue-mesh-drift 24s ease-in-out infinite;
+  /* static gradient (drift removed): animating background-position repaints the
+     whole hero every frame in Chrome. The gradient look is unchanged. */
 }
 @keyframes rogue-mesh-drift {
   0%,   100% { background-position: 0% 0%,    100% 0%,  50% 100%; }
@@ -523,8 +517,8 @@
 
 /* Soft pulsing glow for "active" augmentation toggles */
 @keyframes rogue-glow-soft {
-  0%, 100% { box-shadow: 0 0 0 0 var(--rogue-glow, rgba(0, 255, 136, 0.35)); }
-  50%      { box-shadow: 0 0 22px 4px var(--rogue-glow, rgba(0, 255, 136, 0.35)); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
 }
 .rogue-glow-soft {
   animation: rogue-glow-soft 2.4s ease-in-out infinite;
