@@ -453,6 +453,7 @@ async def run_reproduction(
     pair_max_iters: int = 0,
     pair_attacker: IterativeAttacker | None = None,
     synthesized_only: bool = False,
+    multimodal_only: bool = False,
     escalate: bool = False,
     escalate_max_spend: float | None = None,
     escalate_n_trials: int = 1,
@@ -534,6 +535,19 @@ async def run_reproduction(
                 # baseline primitives that already have breach_results.
                 primitives_q = primitives_q.where(
                     AttackPrimitiveORM.synthesized.is_(True),
+                )
+            if multimodal_only:
+                # §10.8 re-run: fire ONLY primitives whose VECTOR is multimodal,
+                # so render() emits REAL image/audio (the old runs tested them as
+                # text via the now-removed stub). We key on vector, NOT the
+                # requires_multimodal flag, because render() drives media off the
+                # vector — some rows are flagged requires_multimodal=True yet have
+                # a text vector (they would still render as text). Those mismatches
+                # are a data-quality issue, not a real multimodal render.
+                primitives_q = primitives_q.where(
+                    AttackPrimitiveORM.vector.in_(
+                        [AttackVector.MULTIMODAL_IMAGE.value, AttackVector.MULTIMODAL_AUDIO.value]
+                    ),
                 )
             if primitive_limit is not None:
                 primitives_q = primitives_q.limit(primitive_limit)
@@ -895,6 +909,20 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--multimodal-only",
+        action="store_true",
+        help=(
+            "§10.8 re-run: restrict the sweep to primitives whose VECTOR is "
+            "multimodal (multimodal_image / multimodal_audio) so they're "
+            "reproduced as REAL image/audio renders. The earlier runs tested them "
+            "as text via the removed stub; this regenerates honest multimodal "
+            "breach data (vision/audio configs only — text-only configs skipped "
+            "per modality gating). NOTE: keys on vector, not requires_multimodal "
+            "(some rows are flagged multimodal but have a text vector → those are "
+            "a data-quality mismatch and render as text, so they're excluded)."
+        ),
+    )
+    parser.add_argument(
         "--escalate",
         action="store_true",
         help=(
@@ -975,6 +1003,7 @@ def main(argv: list[str] | None = None) -> int:
             persona_technique=args.persona,
             pair_max_iters=args.pair_max_iters,
             synthesized_only=args.synthesized_only,
+            multimodal_only=args.multimodal_only,
             escalate=args.escalate,
             escalate_max_spend=args.escalate_max_spend,
             escalate_n_trials=args.escalate_n_trials,

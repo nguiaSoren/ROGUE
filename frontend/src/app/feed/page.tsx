@@ -94,7 +94,9 @@ export default async function FeedPage() {
           </p>
           <h1 className="text-4xl font-bold tracking-tight">Live Feed</h1>
           <p className="text-sm text-muted-foreground">
-            Newest attack primitives surfaced from the open web — last 7 days.
+            {attacks?.stale
+              ? "Newest attack primitives we've captured — nothing new in the last 7 days, so showing the most recent harvest."
+              : "Newest attack primitives surfaced from the open web — last 7 days."}
           </p>
         </header>
 
@@ -104,7 +106,7 @@ export default async function FeedPage() {
           style={{ animationDelay: "0.1s" }}
         >
           <KpiTile
-            label="Attacks (7d)"
+            label={attacks?.stale ? "Attacks (latest)" : "Attacks (7d)"}
             value={attacks?.count ?? null}
             sub="harvested + extracted"
             tint="green"
@@ -143,7 +145,7 @@ export default async function FeedPage() {
           {/* LEFT — intel ribbon: families + products distribution */}
           <aside className="space-y-4 lg:order-1">
             <IntelRibbon
-              title="hot families · 7d"
+              title={attacks?.stale ? "hot families · latest" : "hot families · 7d"}
               data={familyCounts.map((f) => ({ label: f.family, value: f.n }))}
               accent="var(--rogue-green)"
               empty="no recent attacks"
