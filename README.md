@@ -5,7 +5,7 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 > the open web via Bright Data, reproduces them against your deployment configuration,
 > ships a daily diff of which attacks now bypass your guardrails.
 
-[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-demo.vercel.app)
+[![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
 [![Video](https://img.shields.io/badge/video-5min-blue)](#)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](pyproject.toml)
