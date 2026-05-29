@@ -35,7 +35,10 @@ from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.orm.attributes import flag_modified  # noqa: E402
 
-from rogue.db.models import AttackPrimitive as AttackPrimitiveORM  # noqa: E402
+from rogue.db.models import (  # noqa: E402
+    AttackPrimitive as AttackPrimitiveORM,
+    SourceProvenance as SourceProvenanceORM,
+)
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.media_fetch import BrightDataMediaFetcher  # noqa: E402
 
@@ -90,8 +93,15 @@ async def run(*, database_url: str, limit: int | None, primitive_id: str | None,
                     skipped += 1
                     continue
                 query = query_override or slots.get("media_query") or _derive_query(orm)
+                src_url = session.execute(
+                    select(SourceProvenanceORM.url)
+                    .where(SourceProvenanceORM.primitive_id == orm.primitive_id)
+                    .limit(1)
+                ).scalar()
                 logger.info("primitive=%s query=%r", orm.primitive_id, query)
-                path = await fetcher.fetch_base_image_path(query, session=session)
+                path = await fetcher.fetch_base_image_path(
+                    query, orm.primitive_id, source_url=src_url, session=session
+                )
                 if path is None:
                     failed += 1
                     continue

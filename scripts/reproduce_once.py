@@ -587,9 +587,11 @@ async def run_reproduction(
                         media_fetcher = BrightDataMediaFetcher(BrightDataClient.from_env())
                     logger.info("§11.8 resolving %d real media carrier(s) via Bright Data", len(need))
                     for p in need:
+                        src_url = str(p.sources[0].url) if p.sources else None
                         try:
                             path = await media_fetcher.fetch_base_image_path(
-                                p.payload_slots["media_query"]
+                                p.payload_slots["media_query"], p.primitive_id,
+                                source_url=src_url,
                             )
                         except Exception as exc:  # noqa: BLE001 — degrade to synthetic
                             logger.warning("media fetch failed for %s: %s", p.primitive_id, exc)

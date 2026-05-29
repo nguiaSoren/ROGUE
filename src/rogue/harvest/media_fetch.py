@@ -23,7 +23,7 @@ network call lives HERE (harvest layer), never inside ``render()``.
 from __future__ import annotations
 
 import base64
-import hashlib
+import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -52,13 +52,21 @@ def _looks_like_image(data: bytes) -> bool:
     return any(data.startswith(m) for m in _IMAGE_MAGIC)
 
 
-class BrightDataMediaFetcher:
-    """Fetch + cache a real carrier image for a text description, via Bright Data.
+# Carrier file extension by content-type (fallback to magic-byte sniff → jpg).
+_EXT_BY_CTYPE = {
+    "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+    "image/gif": "gif", "image/webp": "webp", "image/bmp": "bmp",
+}
 
-    ``client`` is a ``BrightDataClient`` (the SERP + Web Unlocker products).
-    Pass an explicit ``cache_dir`` for tests. All fetches are cached as base64
-    text under ``cache_dir/{sha256(query)[:16]}.b64`` — first call spends BD
-    credit, every later call (any run) is a free disk read.
+
+class BrightDataMediaFetcher:
+    """Fetch + cache a real carrier image for a multimodal attack, via Bright Data.
+
+    ``client`` is a ``BrightDataClient`` (SERP + Web Unlocker). Carriers are
+    stored **per attack** so they're browsable: ``cache_dir/{primitive_id}/``
+    holds ``carrier.{ext}`` (the real image, proper extension — opens on
+    double-click) + ``meta.json`` (source URL, query, where it was fetched from).
+    First fetch spends BD credit; every later call is a free disk read.
     """
 
     def __init__(
@@ -72,41 +80,61 @@ class BrightDataMediaFetcher:
         self.cache_dir = Path(cache_dir)
         self.max_candidates = max_candidates
 
-    def cache_path(self, query: str) -> Path:
-        """Deterministic on-disk path for ``query``'s cached RAW image bytes."""
-        digest = hashlib.sha256(query.strip().lower().encode("utf-8")).hexdigest()[:16]
-        return self.cache_dir / f"{digest}.img"
+    def asset_dir(self, primitive_id: str) -> Path:
+        """The per-attack folder holding ``carrier.{ext}`` + ``meta.json``."""
+        return self.cache_dir / primitive_id
 
-    def cached_path(self, query: str) -> Optional[Path]:
-        """Return the cached raw-image path for ``query`` if present (no BD call)."""
-        path = self.cache_path(query)
-        return path if path.exists() and path.stat().st_size > 0 else None
+    def cached_path(self, primitive_id: str) -> Optional[Path]:
+        """Return the cached ``carrier.*`` path for this attack, or None."""
+        d = self.asset_dir(primitive_id)
+        if d.is_dir():
+            for f in sorted(d.glob("carrier.*")):
+                if f.is_file() and f.stat().st_size > 0:
+                    return f
+        return None
+
+    @staticmethod
+    def _ext_for(content_type: str, data: bytes) -> str:
+        ct = (content_type or "").split(";")[0].strip().lower()
+        if ct in _EXT_BY_CTYPE:
+            return _EXT_BY_CTYPE[ct]
+        if data.startswith(b"\x89PNG"):
+            return "png"
+        if data.startswith(b"GIF"):
+            return "gif"
+        if data.startswith(b"RIFF"):
+            return "webp"
+        if data.startswith(b"BM"):
+            return "bmp"
+        return "jpg"
 
     async def fetch_base_image_path(
         self,
         query: str,
+        primitive_id: str,
         *,
+        source_url: Optional[str] = None,
         session=None,
     ) -> Optional[Path]:
-        """Resolve ``query`` → a cached RAW-image file PATH (cache-first).
+        """Resolve ``query`` → a per-attack ``carrier.{ext}`` PATH (cache-first).
 
-        The path plugs straight into the renderers' ``base_image`` slot (which
-        reads a file as raw bytes). Returns None (caller falls back to the
-        synthetic render) when: the query is blank, BD credentials are absent,
-        the search returns nothing, or no candidate downloads as a valid image.
-        Never raises for the no-result path — a missing carrier is a degraded
-        render, not a pipeline error.
+        Stored under ``cache_dir/{primitive_id}/`` with a ``meta.json`` recording
+        ``source_url`` / ``media_query`` / where it was fetched from. The path
+        plugs into the renderers' ``base_image`` slot. Returns None (caller falls
+        back to the synthetic render) when the query/primitive_id is blank, BD
+        credentials are absent, the search returns nothing, or no candidate
+        downloads as a valid image. Never raises for the no-result path.
         """
-        if not query or not query.strip():
+        if not query or not query.strip() or not primitive_id:
             return None
 
-        hit = self.cached_path(query)
+        hit = self.cached_path(primitive_id)
         if hit is not None:
             return hit
 
         # No credentials → don't attempt a network call; degrade to synthetic.
         if not getattr(self.client, "api_key", ""):
-            logger.info("media_fetch: no BD api_key — skipping fetch for %r", query[:60])
+            logger.info("media_fetch: no BD api_key — skipping fetch for %s", primitive_id)
             return None
 
         try:
@@ -119,36 +147,52 @@ class BrightDataMediaFetcher:
 
         for url in urls:
             try:
-                data, _ctype = await self.client.fetch_image_bytes(url, session=session)
+                data, ctype = await self.client.fetch_image_bytes(url, session=session)
             except Exception as exc:  # noqa: BLE001 — try the next candidate
                 logger.warning("media_fetch: download failed %s: %s", url[:80], exc)
                 continue
             if not _looks_like_image(data):
                 logger.info("media_fetch: %s is not a valid image, trying next", url[:80])
                 continue
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-            path = self.cache_path(query)
+            d = self.asset_dir(primitive_id)
+            d.mkdir(parents=True, exist_ok=True)
+            path = d / f"carrier.{self._ext_for(ctype, data)}"
             path.write_bytes(data)
-            logger.info("media_fetch: cached carrier for %r (%d bytes) from %s",
-                        query[:60], len(data), url[:80])
+            (d / "meta.json").write_text(
+                json.dumps(
+                    {
+                        "primitive_id": primitive_id,
+                        "media_query": query,
+                        "source_url": source_url,
+                        "fetched_from": url,
+                        "content_type": ctype,
+                        "bytes": len(data),
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            logger.info("media_fetch: cached carrier %s (%d bytes) from %s",
+                        path, len(data), url[:80])
             return path
 
-        logger.warning("media_fetch: no downloadable image for %r (%d candidates)",
-                       query[:60], len(urls))
+        logger.warning("media_fetch: no downloadable image for %s (%r, %d candidates)",
+                       primitive_id, query[:60], len(urls))
         return None
 
     async def fetch_base_image_b64(
         self,
         query: str,
+        primitive_id: str,
         *,
+        source_url: Optional[str] = None,
         session=None,
     ) -> Optional[str]:
-        """Convenience: resolve ``query`` → base64 of the carrier image (or None).
-
-        Wraps :meth:`fetch_base_image_path` for callers that want bytes inline
-        rather than a ``base_image`` file path.
-        """
-        path = await self.fetch_base_image_path(query, session=session)
+        """Convenience: resolve → base64 of the carrier image (or None)."""
+        path = await self.fetch_base_image_path(
+            query, primitive_id, source_url=source_url, session=session
+        )
         if path is None:
             return None
         return base64.b64encode(path.read_bytes()).decode("ascii")
