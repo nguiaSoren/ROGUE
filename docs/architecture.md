@@ -107,6 +107,13 @@ The harvest layer is built around a `DiscoveryAgent` that:
 
 This is a real agentic loop, not "for query in queries: requests.get(query)". The DiscoveryAgent runs an epsilon-greedy bandit over a 39-query pool, learning per-query yield-per-dollar across daily runs (per ROGUE_PLAN.md §11.6, locked-as-committed 2026-05-24 PM — replaces the earlier "LLM-planning evolves Day 2" framing). Same agentic principle in extraction: `ExtractionAgent` chooses which schema fields to populate confidently and which to defer, with rationale stored.
 
+**Persistent skip-cache (§11.7).** Where the bandit decides *which queries* to spend on, the cross-run `fetch_cache` table decides *which individual URLs not to re-pay for* — so re-running the harvest over many days stops re-spending on content it already took. Two tiers, keyed by URL:
+
+- **Tier B (pre-fetch, saves Bright Data $):** skip the BD fetch entirely when the source's cheap freshness `version_token` is unchanged since last run — git blob SHA, arXiv `updated` date, Reddit `created:num_comments`, or HTTP `ETag`. Implemented for the per-URL sources that expose such a token.
+- **Tier A (pre-extraction, universal, saves LLM $):** skip the LLM extraction when the fetched body's `content_hash` (`RawDocument.archive_hash`) is unchanged.
+
+Every processed URL is recorded (including zero-yield ones — the worst to re-crawl), so the ledger grows monotonically across runs. This prunes cost *before* the fetch/extract spend; the pgvector dedup gate runs *after* and only stops a duplicate from being *stored*. Net: a daily (or 9-day) re-run pays only for **genuinely new or changed** URLs — unchanged ones are skipped, new ones are fetched, changed ones are re-fetched and re-extracted.
+
 ## What the reproduce layer actually does (multimodal + escalation)
 
 Layer 4 is more than "send text, judge the reply." Two build-time extensions (§10.7–§10.10) live *inside* the §3 architecture — they enrich Layer 4, they do not redesign the five layers:
