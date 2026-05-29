@@ -168,6 +168,25 @@ def _parse_date(s: str | None) -> date:
     return date.fromisoformat(s)
 
 
+# When /matrix or /brief is requested without a ?date=, which day to default to:
+#   "most-data"   → the day with the most breach cells (best for a demo / data gap)
+#   "most-recent" → the latest day with data (the right default once daily runs flow)
+# Set the REPORT_DEFAULT_DATE env var to switch with no code change.
+REPORT_DEFAULT_DATE = os.getenv("REPORT_DEFAULT_DATE", "most-data")
+
+
+def _default_report_date(db: Session) -> date | None:
+    """The day used by /matrix and /brief when no explicit ?date= is given."""
+    if REPORT_DEFAULT_DATE == "most-recent":
+        return db.execute(text("SELECT max(run_date) FROM breach_matrix")).scalar()
+    return db.execute(
+        text(
+            "SELECT run_date FROM breach_matrix GROUP BY run_date "
+            "ORDER BY COUNT(*) DESC, run_date DESC LIMIT 1"
+        )
+    ).scalar()
+
+
 # --------------------------------------------------------------------------- #
 # 1. GET /api/health
 # --------------------------------------------------------------------------- #
@@ -321,16 +340,7 @@ def breach_matrix(
     if date_str and date_str != "today":
         target = _parse_date(date_str)
     else:
-        # No date requested → the day with the most cells (richest grid), ties
-        # broken toward the most recent. Never an empty heatmap during a gap;
-        # in steady daily-run state this is the latest complete sweep.
-        richest = db.execute(
-            text(
-                "SELECT run_date FROM breach_matrix GROUP BY run_date "
-                "ORDER BY COUNT(*) DESC, run_date DESC LIMIT 1"
-            )
-        ).scalar()
-        target = richest or _parse_date(date_str)
+        target = _default_report_date(db) or _parse_date(date_str)
 
     rows = db.execute(
         text(
@@ -416,11 +426,7 @@ def brief(
     if date_str and date_str != "today":
         target = _parse_date(date_str)
     else:
-        # No date requested → latest day with breach data, so the brief is never
-        # empty during a gap (today may have no run yet). The diff is that day vs
-        # the prior one — the real "what changed" story.
-        latest = db.execute(text("SELECT max(run_date) FROM breach_matrix")).scalar()
-        target = latest or _parse_date(date_str)
+        target = _default_report_date(db) or _parse_date(date_str)
 
     ext = "md" if fmt == "markdown" else "json"
     brief_path = THREAT_BRIEFS_DIR / f"{target.isoformat()}.{ext}"

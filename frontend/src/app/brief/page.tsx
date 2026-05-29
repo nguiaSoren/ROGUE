@@ -1,6 +1,7 @@
 import { api, BriefJson } from "@/lib/api";
 import { BriefMarkdown } from "@/components/brief-markdown";
 import { BriefExecSnapshot } from "@/components/brief-exec-snapshot";
+import { BriefDownloads } from "@/components/brief-downloads";
 
 /**
  * /brief — Threat Brief.
@@ -59,22 +60,11 @@ export default async function BriefPage() {
                 : "Rendered live from today's breach matrix (no disk snapshot yet)."}
             </p>
           </div>
-          <div className="flex items-center gap-2 font-mono text-xs">
-            <a
-              href={`http://localhost:8000/api/brief?date=${briefMarkdown.target_date}&format=markdown`}
-              className="px-3 py-1.5 border border-border rounded-md hover:border-rogue-green hover:text-rogue-green transition-colors"
-              download
-            >
-              ↓ .md
-            </a>
-            <a
-              href={`http://localhost:8000/api/brief?date=${briefMarkdown.target_date}&format=json`}
-              className="px-3 py-1.5 border border-border rounded-md hover:border-rogue-green hover:text-rogue-green transition-colors"
-              download
-            >
-              ↓ .json
-            </a>
-          </div>
+          <BriefDownloads
+            date={briefMarkdown.target_date}
+            markdown={briefMarkdown.markdown}
+            json={briefJson}
+          />
         </header>
 
         {/* Executive snapshot — JSON-driven */}
