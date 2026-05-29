@@ -964,6 +964,85 @@ class BrightDataClient:
         return result
 
     # ------------------------------------------------------------------
+    # Media fetch (§11.8) — SERP image search + binary download.
+    # Real-image carriers for multimodal attacks (composited via base_image).
+    # ------------------------------------------------------------------
+
+    async def serp_image_search(
+        self,
+        query: str,
+        count: int = 5,
+        *,
+        session: "Session | None" = None,
+    ) -> list[str]:
+        """SERP API — Google **Images** search; return candidate image URLs.
+
+        Uses ``udm=2`` (Google image-search mode, replaced ``tbm=isch`` in 2026)
+        + ``brd_json=1`` (Bright Data parsed JSON) per
+        ``website/SERP-API/send-your-first-request.md``. Returns up to ``count``
+        URLs, full-resolution (``original_image``) first, falling back to the
+        thumbnail (``image``). Empty list if the search returns nothing parseable.
+        """
+        encoded = quote_plus(query)
+        target_url = (
+            f"https://www.google.com/search?q={encoded}&udm=2&brd_json=1&hl=en&gl=us"
+        )
+        body = {"zone": self.serp_zone, "url": target_url, "format": "raw"}
+        response = await self._post_json(f"{self._base_url}/request", json=body)
+
+        urls: list[str] = []
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+        images = data.get("images") if isinstance(data, dict) else None
+        if isinstance(images, list):
+            for img in images:
+                if not isinstance(img, dict):
+                    continue
+                u = img.get("original_image") or img.get("image")
+                if isinstance(u, str) and u.startswith("http"):
+                    urls.append(u)
+                if len(urls) >= count:
+                    break
+
+        self._log_cost(
+            session,
+            product="serp",
+            units=1,
+            cost_usd=_estimate_cost("serp", units=1),
+            notes=f"images:{query[:80]}",
+        )
+        return urls
+
+    async def fetch_image_bytes(
+        self,
+        url: str,
+        *,
+        session: "Session | None" = None,
+    ) -> tuple[bytes, str]:
+        """Web Unlocker — download the RAW BYTES of a (binary) URL, e.g. an image.
+
+        Unlike :meth:`web_unlock` (which returns ``response.text`` for HTML /
+        markdown and would mangle binary), this returns ``response.content``
+        unmodified plus the upstream ``content-type`` — the bytes ready to
+        base64 onto a ``RenderedAttack`` / composite as a ``base_image``. Per
+        ``website/WEB-UNLOCKER/send-your-first-request.md`` (``format:"raw"``).
+        """
+        body = {"zone": self.unlocker_zone, "url": url, "format": "raw"}
+        response = await self._post_json(f"{self._base_url}/request", json=body)
+        content_type = response.headers.get("content-type", "application/octet-stream")
+
+        self._log_cost(
+            session,
+            product="unlocker",
+            units=1,
+            cost_usd=_estimate_cost("unlocker", units=1),
+            notes=f"image:{url[:180]}",
+        )
+        return response.content, content_type
+
+    # ------------------------------------------------------------------
     # Scraping Browser (fallback) — product #4 in §6.1
     # Cost: bandwidth-billed, a few cents per session.
     # ------------------------------------------------------------------
