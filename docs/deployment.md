@@ -20,7 +20,7 @@ Browser → Vercel (Next.js frontend) → Render (FastAPI backend) → Neon (Pos
 | **Vercel** | Next.js frontend. **Root Directory = `frontend/`** | Hobby (free) | vercel.com |
 | **Render** | FastAPI backend, built from `docker/backend.Dockerfile` | Free Web Service — sleeps after ~15 min idle (cold start ~30-50s) | dashboard.render.com |
 | **Neon** | Postgres 17 + pgvector — **the database** | Free (0.5 GB, scales to zero) | console.neon.tech |
-| **UptimeRobot** | Pings the backend so it doesn't sleep | Free, 5-min interval | uptimerobot.com |
+| **UptimeRobot** | Pings the backend so it doesn't sleep | Free, 5-min interval | dashboard.uptimerobot.com/monitors |
 
 ## How deploys work (CODE)
 - Push to `main` on GitHub → **Vercel rebuilds the frontend AND Render rebuilds the backend automatically.**
