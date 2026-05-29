@@ -43,8 +43,10 @@ With probability ε (here 10%), pick a random arm to **explore**. The other
 exploration is the "prevents lockup" bit — without it, if a good arm got
 unlucky early, you'd never try it again.
 
-**Cold-start** means: before any of this learning kicks in, try each of the
-36 arms once. Otherwise you'd have no data to be greedy about.
+**Cold-start** means: before any of this learning kicks in, try each arm in
+the pool (39 arms) once. Otherwise you'd have no data to be greedy about. (If
+arms are added later, they're cold too — they get pulled first on the next run,
+which is why the live "warm" count can trail the pool size for a run or two.)
 
 ## The daily loop
 
@@ -80,7 +82,7 @@ a small widget:
 │   blog_lakera_attack        266.7/$  │
 │   reddit_localllama_uncensor 133.3/$ │
 │                                      │
-│ 36 arms · 36 warm                    │
+│ 39 arms · 36 warm                    │
 │ seeded 2026-05-27 · last live 2026-05-27
 └──────────────────────────────────────┘
 ```

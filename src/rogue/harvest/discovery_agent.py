@@ -2,7 +2,7 @@
 
 Day-1 version (this file): hand-tuned 10-query SERP set + all 10 source
 plugins, fanned out via ``asyncio.gather`` with per-plugin error isolation.
-The "5–10 SERP queries per day out of a pool of ~38" framing from §3.3 is
+The "5–10 SERP queries per day out of a pool of 39" framing from §3.3 is
 fulfilled by :data:`DAY1_HANDPICKED_QUERIES` — that constant is what the
 §11.6 epsilon-greedy bandit replaces on Day 2 evening (the bandit lives in
 ``rogue.harvest.bandit`` and plugs in here via the ``query_picker`` arg).
@@ -79,7 +79,7 @@ __all__ = [
 # Day-1 hand-tuned query set
 # --------------------------------------------------------------------------- #
 
-# 10 SERP queries hand-picked from the ~38-query pool in §5.2 to maximize
+# 10 SERP queries hand-picked from the 39-query pool in §5.2 to maximize
 # expected daily-delta yield across the 5 Bright Data products. Two from
 # each high-yield source bucket; ``{date}`` is the literal substitution
 # token consumed by :meth:`DiscoveryAgent.serp_queries`.
@@ -112,7 +112,7 @@ DAY1_HANDPICKED_QUERIES: tuple[str, ...] = (
 
 
 # --------------------------------------------------------------------------- #
-# §11.6 bandit query pool — the FULL ~38-query arm set (superset of the
+# §11.6 bandit query pool — the FULL 39-query arm set (superset of the
 # Day-1 hand-picked 10). Each arm has a stable `arm_id` (used as the dict
 # key in the persisted bandit state) and a query template with `{date}`.
 # --------------------------------------------------------------------------- #

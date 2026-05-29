@@ -26,7 +26,7 @@ Extracted from ROGUE_PLAN.md §5. The list is built so that 5+ can break complet
 
 ## Per-source SERP discovery queries
 
-Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool ~32; DiscoveryAgent picks 8–12 per daily run based on recent yield.
+Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool 39; DiscoveryAgent picks ~10 per daily run based on recent yield.
 
 **#1 r/ChatGPTJailbreak**
 - `site:reddit.com/r/ChatGPTJailbreak after:{date}`

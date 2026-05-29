@@ -105,7 +105,7 @@ The harvest layer is built around a `DiscoveryAgent` that:
 4. For each result, decides whether to deep-fetch: pre-built Web Scraper for social sources, Web Unlocker for static blogs, Scraping Browser as fallback.
 5. Updates discovery memory: which queries surfaced novel primitives, which sources are most prolific.
 
-This is a real agentic loop, not "for query in queries: requests.get(query)". The DiscoveryAgent runs an epsilon-greedy bandit over a 32-query pool, learning per-query yield-per-dollar across daily runs (per ROGUE_PLAN.md §11.6, locked-as-committed 2026-05-24 PM — replaces the earlier "LLM-planning evolves Day 2" framing). Same agentic principle in extraction: `ExtractionAgent` chooses which schema fields to populate confidently and which to defer, with rationale stored.
+This is a real agentic loop, not "for query in queries: requests.get(query)". The DiscoveryAgent runs an epsilon-greedy bandit over a 39-query pool, learning per-query yield-per-dollar across daily runs (per ROGUE_PLAN.md §11.6, locked-as-committed 2026-05-24 PM — replaces the earlier "LLM-planning evolves Day 2" framing). Same agentic principle in extraction: `ExtractionAgent` chooses which schema fields to populate confidently and which to defer, with rationale stored.
 
 ## What the reproduce layer actually does (multimodal + escalation)
 

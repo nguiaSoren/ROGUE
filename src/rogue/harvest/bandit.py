@@ -5,7 +5,7 @@ LOCKED-AS-COMMITTED per ROGUE_PLAN.md §1.6 hidden-depth manifest item 5 and
 Wired unconditionally into ``DiscoveryAgent.run()``; the dashboard's
 ``/feed`` widget surfaces top-3 / bottom-3 arms to the depth-pass judge.
 
-Why this exists: with ~38 SERP queries in the §5.2 pool, blindly running all
+Why this exists: with 39 SERP queries in the §5.2 pool, blindly running all
 of them every day burns SERP credit on dead queries. Epsilon-greedy lets the
 harvest learn — high-yield queries (lots of NEW canonical primitives per
 dollar) get pulled more; dead queries get pulled occasionally for exploration
