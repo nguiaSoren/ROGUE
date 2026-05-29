@@ -293,8 +293,15 @@ export const api = {
   },
   attackDetail: (primitiveId: string) =>
     apiGet<{ primitive: AttackPrimitive; breaches: unknown[] }>(`/api/attacks/${primitiveId}`),
-  breachMatrix: (date?: string) =>
-    apiGet<BreachMatrixResponse>(`/api/breaches/matrix${date ? `?date=${date}` : ""}`),
+  breachMatrix: (date?: string, include?: "baseline" | "augmented") => {
+    const q = new URLSearchParams();
+    if (date) q.set("date", date);
+    if (include) q.set("include", include);
+    const qs = q.toString();
+    return apiGet<BreachMatrixResponse>(
+      `/api/breaches/matrix${qs ? `?${qs}` : ""}`,
+    );
+  },
   brief: (date?: string, format: "markdown" | "json" = "markdown") => {
     const q = new URLSearchParams();
     if (date) q.set("date", date);

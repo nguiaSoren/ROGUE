@@ -332,9 +332,18 @@ def attack_detail(
 @app.get("/api/breaches/matrix")
 def breach_matrix(
     date_str: str | None = Query(None, alias="date"),
+    include: str = Query("baseline", alias="include"),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """Breach matrix for one day. Returns the heatmap data the frontend needs."""
+    """Breach matrix heatmap.
+
+    ``include=baseline`` (default) → single-shot breaches for one day (the clean
+    grid). ``include=augmented`` → all-time **worst-case** per (primitive × config):
+    the highest breach rate any technique reached (baseline / persona / PAIR), so
+    the toggle shows "how bad it gets with our stress tests." It's all-time rather
+    than per-day because the augmentation sweep ran on a different day than the
+    baseline bulk — a per-day augmented view would be empty on the default day.
+    """
     from rogue.diff.bootstrap import bootstrap_ci
 
     if date_str and date_str != "today":
@@ -342,29 +351,79 @@ def breach_matrix(
     else:
         target = _default_report_date(db) or _parse_date(date_str)
 
-    rows = db.execute(
-        text(
-            """
-            SELECT
-                bm.primitive_id,
-                bm.deployment_config_id,
-                bm.n_trials,
-                bm.any_breach_rate,
-                bm.full_breach_rate,
-                bm.avg_confidence,
-                ap.title,
-                ap.family,
-                ap.vector,
-                dc.name AS config_name,
-                dc.target_model
-            FROM breach_matrix bm
-            JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
-            JOIN deployment_configs dc ON dc.config_id = bm.deployment_config_id
-            WHERE bm.run_date = :target_date
-            """
-        ),
-        {"target_date": target},
-    ).all()
+    if include == "augmented":
+        rows = db.execute(
+            text(
+                """
+                WITH per_tech AS (
+                    SELECT
+                        br.primitive_id,
+                        br.deployment_config_id,
+                        CASE
+                            WHEN br.pair_attacker_total_cost_usd IS NOT NULL THEN 'pair'
+                            WHEN br.persona_used IS NOT NULL THEN 'persona'
+                            ELSE 'baseline'
+                        END AS technique,
+                        COUNT(*) FILTER (WHERE br.verdict != 'error') AS n_judged,
+                        COUNT(*) FILTER (WHERE br.verdict IN ('partial_breach','full_breach')) AS n_breach,
+                        COUNT(*) FILTER (WHERE br.verdict = 'full_breach') AS n_full,
+                        AVG(br.judge_confidence) FILTER (WHERE br.verdict != 'error') AS avg_conf
+                    FROM breach_results br
+                    GROUP BY 1, 2, 3
+                ),
+                ranked AS (
+                    SELECT
+                        primitive_id, deployment_config_id, n_judged,
+                        n_breach::float / NULLIF(n_judged, 0) AS any_rate,
+                        n_full::float / NULLIF(n_judged, 0) AS full_rate,
+                        avg_conf
+                    FROM per_tech WHERE n_judged > 0
+                ),
+                worst AS (
+                    SELECT DISTINCT ON (primitive_id, deployment_config_id)
+                        primitive_id, deployment_config_id, n_judged, any_rate, full_rate, avg_conf
+                    FROM ranked
+                    ORDER BY primitive_id, deployment_config_id, any_rate DESC
+                )
+                SELECT
+                    w.primitive_id,
+                    w.deployment_config_id,
+                    w.n_judged AS n_trials,
+                    w.any_rate AS any_breach_rate,
+                    w.full_rate AS full_breach_rate,
+                    w.avg_conf AS avg_confidence,
+                    ap.title, ap.family, ap.vector,
+                    dc.name AS config_name, dc.target_model
+                FROM worst w
+                JOIN attack_primitives ap ON ap.primitive_id = w.primitive_id
+                JOIN deployment_configs dc ON dc.config_id = w.deployment_config_id
+                """
+            ),
+        ).all()
+    else:
+        rows = db.execute(
+            text(
+                """
+                SELECT
+                    bm.primitive_id,
+                    bm.deployment_config_id,
+                    bm.n_trials,
+                    bm.any_breach_rate,
+                    bm.full_breach_rate,
+                    bm.avg_confidence,
+                    ap.title,
+                    ap.family,
+                    ap.vector,
+                    dc.name AS config_name,
+                    dc.target_model
+                FROM breach_matrix bm
+                JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
+                JOIN deployment_configs dc ON dc.config_id = bm.deployment_config_id
+                WHERE bm.run_date = :target_date
+                """
+            ),
+            {"target_date": target},
+        ).all()
 
     cells: list[dict[str, Any]] = []
     families: dict[str, int] = {}

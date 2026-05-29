@@ -16,11 +16,13 @@ import { plainifyRate } from "@/lib/plain-numbers";
  */
 export default async function MatrixPage() {
   let matrix: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
+  let augmented: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let stubbornness: Awaited<ReturnType<typeof api.stubbornnessStats>> | null = null;
   let error: string | null = null;
   try {
-    [matrix, stubbornness] = await Promise.all([
+    [matrix, augmented, stubbornness] = await Promise.all([
       api.breachMatrix(),
+      api.breachMatrix(undefined, "augmented").catch(() => null),
       api.stubbornnessStats().catch(() => null),
     ]);
   } catch (e) {
@@ -144,7 +146,7 @@ export default async function MatrixPage() {
         )}
 
         {/* Interactive heatmap (client component) */}
-        <MatrixHeatmap matrix={matrix} stubbornness={stubbornness} />
+        <MatrixHeatmap matrix={matrix} augmented={augmented} stubbornness={stubbornness} />
 
         <Legend />
 

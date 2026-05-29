@@ -14,9 +14,11 @@ import { MatrixCellDrawer } from "@/components/matrix-drawer";
  */
 export function MatrixHeatmap({
   matrix,
+  augmented,
   stubbornness,
 }: {
   matrix: BreachMatrixResponse;
+  augmented?: BreachMatrixResponse | null;
   stubbornness: StubbornnessStatsResponse | null;
 }) {
   const [openCell, setOpenCell] = useState<BreachCell | null>(null);
@@ -25,34 +27,39 @@ export function MatrixHeatmap({
     "all" | "critical" | "high" | "any-breach"
   >("all");
   const [configFilter, setConfigFilter] = useState<string | null>(null);
+  const [showAugmented, setShowAugmented] = useState(false);
+
+  // Active dataset: baseline (raw harvested prompt, N=5/cell, today) vs.
+  // augmented (all-time worst-case per cell across persona-wrap + PAIR).
+  const active = showAugmented && augmented ? augmented : matrix;
 
   // Pre-compute the worst-rate cell per (family × config) so the click
   // handler can yank the canonical primitive for the cell quickly.
   const byKey = useMemo(() => {
     const m = new Map<string, BreachCell>();
-    for (const c of matrix.cells) {
+    for (const c of active.cells) {
       const key = `${c.family}|${c.deployment_config_id}`;
       const prev = m.get(key);
       if (!prev || c.any_breach_rate > prev.any_breach_rate) m.set(key, c);
     }
     return m;
-  }, [matrix.cells]);
+  }, [active.cells]);
 
   // Family filter selects a single family (click a row label). The severity
   // filter no longer hides families — it DIMS cells below the threshold (see
   // dimThreshold), so ≥50% vs ≥70% look different even when most families breach.
   const visibleFamilies = useMemo(
-    () => (familyFilter ? [familyFilter] : matrix.families),
-    [familyFilter, matrix.families],
+    () => (familyFilter ? [familyFilter] : active.families),
+    [familyFilter, active.families],
   );
 
   // Config (column) filter — click a column header to show only that deployment.
   const visibleConfigs = useMemo(
     () =>
       configFilter
-        ? matrix.configs.filter((c) => c.config_id === configFilter)
-        : matrix.configs,
-    [configFilter, matrix.configs],
+        ? active.configs.filter((c) => c.config_id === configFilter)
+        : active.configs,
+    [configFilter, active.configs],
   );
 
   // Below this any-breach rate a cell is dimmed (−1 = "all" = dim nothing).
@@ -69,16 +76,16 @@ export function MatrixHeatmap({
   // it isn't recomputed on every render (e.g. each cell click that opens the drawer).
   const colWorst = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const c of matrix.configs) {
+    for (const c of active.configs) {
       m[c.config_id] = Math.max(
         0,
-        ...matrix.families.map((f) =>
+        ...active.families.map((f) =>
           byKey.get(`${f}|${c.config_id}`)?.any_breach_rate ?? 0,
         ),
       );
     }
     return m;
-  }, [matrix.configs, matrix.families, byKey]);
+  }, [active.configs, active.families, byKey]);
 
   const stubByConfig = useMemo(() => {
     const m: Record<string, number | null> = {};
@@ -90,6 +97,46 @@ export function MatrixHeatmap({
 
   return (
     <>
+      {/* Baseline vs. augmented toggle — swaps the whole grid between the raw
+          harvested-prompt rates and the all-time worst-case once the attacker
+          is allowed to adapt (persona-wrap + PAIR). */}
+      {augmented && (
+        <section className="flex items-center gap-3 flex-wrap animate-rogue-fade-up">
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mr-1">
+            attacker:
+          </span>
+          <div className="inline-flex rounded-md border border-border overflow-hidden font-mono text-[10px] uppercase tracking-wider">
+            <button
+              type="button"
+              onClick={() => setShowAugmented(false)}
+              className={`px-3 py-1.5 transition-colors ${
+                !showAugmented
+                  ? "bg-rogue-green/15 text-rogue-green"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Baseline
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAugmented(true)}
+              className={`px-3 py-1.5 border-l border-border transition-colors ${
+                showAugmented
+                  ? "bg-rogue-red/15 text-rogue-red"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              + Augmentations
+            </button>
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground max-w-md leading-snug">
+            {showAugmented
+              ? "worst-case across persona-wrap + PAIR refinement — how hot each cell gets once the attacker adapts (all-time)"
+              : "raw harvested prompt, N=5 trials per cell — no adaptation"}
+          </span>
+        </section>
+      )}
+
       {/* Filter bar */}
       <section className="flex items-center gap-2 flex-wrap animate-rogue-fade-up">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mr-2">
@@ -139,7 +186,7 @@ export function MatrixHeatmap({
         {configFilter && (
           <FilterChip
             label={`config: ${shortConfigName(
-              matrix.configs.find((c) => c.config_id === configFilter)
+              active.configs.find((c) => c.config_id === configFilter)
                 ?.config_name ?? configFilter,
             )} ×`}
             active
