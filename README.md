@@ -22,7 +22,7 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 ## Live demo
 
-- Dashboard: https://rogue-demo.vercel.app  <!-- TODO Day 4: real URL -->
+- Dashboard: https://rogue-eosin.vercel.app
 - Video walkthrough: TODO  <!-- TODO Day 4: YouTube/Loom link -->
 - MCP server: configure Claude Desktop / Cursor to query ROGUE directly (see below)
 

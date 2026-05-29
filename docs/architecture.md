@@ -70,16 +70,17 @@ Extracted from ROGUE_PLAN.md §3. Do not redesign during the build.
 | Web framework | FastAPI | Async, Pydantic-native, low ceremony |
 | Schemas | Pydantic v2 | Required for OpenAI/Anthropic structured-output mode |
 | Async orchestration | `asyncio` + `httpx.AsyncClient` | LangGraph adds complexity without payoff |
-| Database | Postgres 16 + pgvector | Single store for attacks, breaches, embeddings, dedup |
+| Database | Postgres 17 + pgvector | Single store for attacks, breaches, embeddings, dedup |
 | Queue | Postgres `LISTEN/NOTIFY` for jobs | One fewer service to host |
-| Frontend | Next.js 14 (app router) + shadcn/ui + Tailwind | Vercel-native, terminal/CISO aesthetic |
+| Frontend | Next.js 16 (app router) + shadcn/ui + Tailwind | Vercel-native, terminal/CISO aesthetic |
 | Charts | Recharts | Lightest weight that looks polished |
 | LLM (extraction) | Claude Haiku or GPT-4o-mini | Cheap, reliable structured output |
 | LLM (judge) | Claude Sonnet or GPT-4o | Quality matters; bounded cost |
 | LLM (target panel) | OpenRouter + native APIs | Multi-model fanout, no self-hosting |
 | Bright Data | Web Scraper API, SERP API, Web Unlocker, Scraping Browser, MCP Server | §6 |
-| Hosting (frontend) | Vercel | Free, instant, in submission guidelines |
-| Hosting (backend) | Fly.io or Railway | $5–10/duration, Postgres + Python service in one |
+| Hosting (frontend) | Vercel (free Hobby) | Live: rogue-eosin.vercel.app |
+| Hosting (backend) | Render (free Web Service) | Live: rogue-api-mr5w.onrender.com |
+| Hosting (database) | Neon (free Postgres 17 + pgvector) | Cloud DB the live site reads — see docs/deployment.md |
 | Demo Slack | New workspace, one channel, one webhook | Throwaway |
 
 **Locked decisions worth restating:**

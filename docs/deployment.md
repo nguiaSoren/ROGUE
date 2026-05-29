@@ -44,6 +44,8 @@ New data shows on the site within the cache window (below), or immediately after
   so new breaches appear **automatically**. No code change, no manual "refresh." (The
   `breach_matrix_daily_snapshot` materialized view is only used by
   `scripts/snapshot_breach_matrix.py`, not the dashboard, so you never refresh it for the site.)
+- **The bandit widget is live too** — its state lives in Neon (`bandit_state` table, upserted
+  by the harvest), so `/api/bandit/stats` reflects the latest harvest automatically (no redeploy).
 - **Fast local sandbox** (does NOT touch live): the local Docker DB (`LOCAL_DATABASE_URL`
   in `.env`, also Postgres 17) is for quick experiments. Start it (`docker compose up -d`)
   and override for one run:

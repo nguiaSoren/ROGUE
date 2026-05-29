@@ -34,7 +34,7 @@ ENV PYTHONPATH="/app/src"
 EXPOSE 8000 8001
 
 # Prod start: apply migrations (idempotent — Neon is pre-migrated, this is a
-# safety net), then serve on the platform-injected $PORT (Railway) or 8000.
+# safety net), then serve on the platform-injected $PORT (Render) or 8000.
 # No seed_demo_data here — real data is restored into Neon out of band.
 # docker-compose.full.yml overrides this with its own alembic + seed + uvicorn chain.
 CMD ["sh", "-c", "alembic upgrade head && uvicorn rogue.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
