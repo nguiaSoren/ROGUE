@@ -905,7 +905,7 @@ class BrightDataClient:
 
         self._log_cost(
             session,
-            product="serp",
+            product="serp_api",
             units=1,
             cost_usd=_estimate_cost("serp", units=1),
             notes=f"{engine_lc}:{query[:80]}",
@@ -956,7 +956,7 @@ class BrightDataClient:
 
         self._log_cost(
             session,
-            product="unlocker",
+            product="web_unlocker",
             units=1,
             cost_usd=_estimate_cost("unlocker", units=1),
             notes=url[:200],
@@ -1008,7 +1008,7 @@ class BrightDataClient:
 
         self._log_cost(
             session,
-            product="serp",
+            product="serp_api",
             units=1,
             cost_usd=_estimate_cost("serp", units=1),
             notes=f"images:{query[:80]}",
@@ -1035,7 +1035,7 @@ class BrightDataClient:
 
         self._log_cost(
             session,
-            product="unlocker",
+            product="web_unlocker",
             units=1,
             cost_usd=_estimate_cost("unlocker", units=1),
             notes=f"image:{url[:180]}",
