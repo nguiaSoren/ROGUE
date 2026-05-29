@@ -174,17 +174,29 @@
 /* ------------------------------------------------------------------ */
 .bg-rogue-grid {
   background-color: var(--rogue-bg-deep);
+  position: relative;
+}
+/* Grid lines live on an oversized ::after that drifts via `transform`
+   (compositor-only — no per-frame repaint, unlike animating background-position).
+   `::before` is already used by .bg-rogue-spotlight on the same <main>. */
+.bg-rogue-grid::after {
+  content: "";
+  position: absolute;
+  inset: -60px;
   background-image:
     linear-gradient(rgba(0, 255, 136, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 255, 136, 0.04) 1px, transparent 1px);
   background-size: 60px 60px;
-  background-position: 0 0;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
   animation: rogue-grid-drift 30s linear infinite;
 }
+.bg-rogue-grid > * { position: relative; z-index: 1; }
 
 @keyframes rogue-grid-drift {
-  0%   { background-position: 0 0; }
-  100% { background-position: 60px 60px; }
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(60px, 60px); }
 }
 
 /* Radial spotlight that follows the top — gives the page depth */
@@ -567,3 +579,22 @@
 .rogue-accent-escalation-text   { color: #fcd34d; }
 .rogue-accent-mutation-text     { color: #67e8f9; }
 .rogue-accent-stubbornness-text { color: #fca5a5; }
+
+/* ------------------------------------------------------------------ */
+/*  Reduced motion — honor the OS "reduce motion" setting by stopping  */
+/*  the infinite loops (grid drift, mesh, glow/pulse, marquee, etc.).  */
+/*  Static frames read identically; one-shot entrances are left alone. */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .bg-rogue-grid::after,
+  .bg-rogue-mesh,
+  .animate-rogue-pulse-critical,
+  .animate-rogue-pulse-green,
+  .rogue-cell-critical,
+  .rogue-glow-soft,
+  .rogue-scroll-cue,
+  .rogue-marquee-pause,
+  [class*="rogue-marquee"] {
+    animation: none !important;
+  }
+}

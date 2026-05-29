@@ -66,21 +66,28 @@ export function MatrixHeatmap({
     );
   }, [familyFilter, severityFilter, matrix.families, matrix.configs, byKey]);
 
-  // Per-config worst-case rate for the column-header heat indicator.
-  const colWorst: Record<string, number> = {};
-  for (const c of matrix.configs) {
-    colWorst[c.config_id] = Math.max(
-      0,
-      ...matrix.families.map((f) =>
-        byKey.get(`${f}|${c.config_id}`)?.any_breach_rate ?? 0,
-      ),
-    );
-  }
+  // Per-config worst-case rate for the column-header heat indicator. Memoized so
+  // it isn't recomputed on every render (e.g. each cell click that opens the drawer).
+  const colWorst = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const c of matrix.configs) {
+      m[c.config_id] = Math.max(
+        0,
+        ...matrix.families.map((f) =>
+          byKey.get(`${f}|${c.config_id}`)?.any_breach_rate ?? 0,
+        ),
+      );
+    }
+    return m;
+  }, [matrix.configs, matrix.families, byKey]);
 
-  const stubByConfig: Record<string, number | null> = {};
-  for (const row of stubbornness?.per_config ?? []) {
-    stubByConfig[row.config_id] = row.avg_iters_to_breach;
-  }
+  const stubByConfig = useMemo(() => {
+    const m: Record<string, number | null> = {};
+    for (const row of stubbornness?.per_config ?? []) {
+      m[row.config_id] = row.avg_iters_to_breach;
+    }
+    return m;
+  }, [stubbornness]);
 
   return (
     <>
