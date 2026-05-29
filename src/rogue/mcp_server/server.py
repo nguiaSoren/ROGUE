@@ -115,7 +115,7 @@ def query_attacks(
 
     Args:
         family: Optional attack family filter (e.g. "indirect_prompt_injection",
-            "jailbreak_persona", "training_data_extraction"). See the 14-family
+            "jailbreak_persona", "training_data_extraction"). See the 15-family
             ROGUE taxonomy. None = all families.
         vector: Optional injection vector filter (e.g. "user_turn",
             "rag_document", "tool_output", "system_prompt"). None = all vectors.

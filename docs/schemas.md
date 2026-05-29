@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 
 class AttackFamily(str, Enum):
-    # 14 families — see docs/taxonomy.md
+    # 15 families — see docs/taxonomy.md
     DIRECT_INSTRUCTION_OVERRIDE = "direct_instruction_override"
     ROLE_HIJACK = "role_hijack"
     DAN_PERSONA = "dan_persona"
@@ -27,6 +27,7 @@ class AttackFamily(str, Enum):
     OBFUSCATION_ENCODING = "obfuscation_encoding"
     LANGUAGE_SWITCHING = "language_switching"
     MULTIMODAL_INJECTION = "multimodal_injection"
+    MULTI_TURN_PERSONA_CHAIN = "multi_turn_persona_chain"  # added 2026-05-27 (ActorAttack), §4.2 row 15
 
 
 class AttackVector(str, Enum):
@@ -89,7 +90,14 @@ class AttackPrimitive(BaseModel):
     )
     payload_slots: dict[str, str] = Field(
         default_factory=dict,
-        description="Default slot values used when no customer override exists."
+        description=(
+            "Default substitution-slot values used when no customer override "
+            "exists (§4.3 vocabulary). ALSO carries reproduce-layer "
+            "renderer/strategy selectors read by render() — not substituted: "
+            "image_strategy (typographic|ocr:<s>|mml:<m>|vpi:<s>|exif|polyjailbreak), "
+            "mml_method, vpi_style, ocr_style, exif, polyjailbreak, base_image, "
+            "audio_style, structured_data (json|csv|yaml|xml). See modality_renderers/."
+        )
     )
     multi_turn_sequence: Optional[list[str]] = Field(
         None,
@@ -156,3 +164,10 @@ class BreachResult(BaseModel):
 - **Why `DeploymentConfig` and not just `customer_system_prompt_id`?** Because attacks like `TOOL_USE_HIJACK` need to know *which tools* the deployment exposes. A system prompt alone underspecifies the attack surface.
 - **Why `secondary_families` list?** Because OWASP LLM01 indirect prompt injection often combines with TOOL_USE_HIJACK, and a single-label classifier hides that signal. Multi-label is a future paper; primary + secondaries is enough for the hackathon.
 - **Why `multi_turn_sequence` separate from `payload_template`?** Multi-turn attacks (Crescendo, Many-shot) are not single strings. The reproduction layer's `render()` returns a list of messages for these primitives.
+
+## Reproduce-layer types not in `schemas/` (referenced here for completeness)
+
+These live in `src/rogue/reproduce/`, not `src/rogue/schemas/`, but a reader chasing the schema story will hit them:
+
+- **`RenderedAttack`** (`reproduce/instantiator.py`) — the output of `render(primitive, config)`: the chat-message list plus **out-of-band multimodal payloads** `image_b64` / `image_media_type` (png or jpeg for EXIF) and `audio_b64` / `audio_format`. Carried out-of-band on purpose so `messages` stays plain text and only the dispatch layer (`target_panel`) is multimodal-aware — it attaches the image/audio as a provider-specific content block (OpenAI `image_url` data-URI / Anthropic `image.source.base64` / OpenAI-compat `input_audio`). This is the real-multimodal path (§10.8) that replaced the earlier text-only stub.
+- **`BreachResult` (ORM, `db/models.py`)** carries extra columns beyond the wire model above for §10.7: `persona_used` (PAP A/B), `pair_iters_to_breach` + `pair_attacker_total_cost_usd` (iterative-attacker chains). The wire `BreachResult` here is the reproduction-core subset.

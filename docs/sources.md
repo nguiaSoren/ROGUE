@@ -102,7 +102,7 @@ Every source has a hard timeout (15s SERP, 30s Web Unlocker, 60s Scraping Browse
 
 1. **High overlap.** Reddit + X catch the same attack within hours. arXiv preprints get tweeted before they're indexed.
 2. **Multiplicative coverage.** Each Reddit subreddit has 100+ posts/week; each tracked X account has 20+ posts/week. ~2000 candidate documents per daily run.
-3. **Quality > quantity.** 14-family taxonomy means 5–10 *novel* attacks per week keeps the threat brief interesting.
+3. **Quality > quantity.** 15-family taxonomy means 5–10 *novel* attacks per week keeps the threat brief interesting.
 
 If Day 3 backfill yields <50 unique primitives across 14 days, expand the X account list (cheapest addition). Don't add subreddits — every additional sub means understanding its norms.
 

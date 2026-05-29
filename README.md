@@ -190,7 +190,7 @@ See `docs/architecture.md` for the five-layer pipeline diagram + locked stack ta
 
 ## Capabilities
 
-- 14-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
+- 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
 - 14-slot payload-template vocabulary for cross-deployment reproduction
 - 15-source open-web harvest list — see `docs/sources.md`
 - 5-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out.

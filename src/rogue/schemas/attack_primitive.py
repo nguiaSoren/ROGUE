@@ -8,7 +8,7 @@ Every layer of the pipeline reads or writes against this:
   - Diff layer reads family + vector + base_severity to compute the threat brief.
   - ROGUE MCP server exposes AttackPrimitive dicts to Claude/Cursor consumers.
 
-See ROGUE_PLAN.md §4.1 for the schema spec and §4.2 for the 14-family taxonomy.
+See ROGUE_PLAN.md §4.1 for the schema spec and §4.2 for the 15-family taxonomy.
 """
 
 from __future__ import annotations

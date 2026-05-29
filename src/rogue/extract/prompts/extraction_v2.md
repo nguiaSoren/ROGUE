@@ -39,7 +39,7 @@ An adversarial method — disclosed, demonstrated, or proposed — by which an L
 system can be made to behave outside its intended boundaries. Examples that
 count:
 
-- Jailbreaks (any of the 14 families below).
+- Jailbreaks (any of the 15 families below).
 - Prompt injections (direct, indirect, multi-turn).
 - System-prompt leak / extraction techniques.
 - Tool-use hijacks against agentic systems.

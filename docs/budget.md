@@ -35,6 +35,18 @@ Headroom: $210+. The $250 is generous. Web Scraper API's pay-per-success model i
 
 If tight: cut N=5 trials to N=3, panel from 5 models to 3 (GPT-4o-mini, Claude Haiku, Llama-3-8B). Cost drops to ~$80.
 
+## Escalation ladder — the "try harder" pass (§10.8, default OFF)
+
+Reproduction above is the baseline pass. The **auto-escalation ladder** is an *optional second pass* over the attacks the panel refused (`synthesize_escalations.py --ladder`, or inline `reproduce_once.py --escalate`). It's the dominant variable cost when on, because it tries up to ~18 transformed variants × the panel × judge per refused attack.
+
+| Item | Estimate |
+|---|---|
+| One fully-resisting primitive, exhausts all tiers (`n_trials=1`) | **~150–180 LLM calls ≈ ~$2** (judge-dominated; observed live 2026-05-29: 181 calls / ~13 min) |
+| One primitive that breaches early (short-circuit) | a few calls ≈ $0.05–0.30 |
+| Full-corpus escalation delta (~85 EVADE-band primitives) | **~$10 (most breach early) → ~$170 (all exhaust)** — roughly doubles a full run in the worst case |
+
+**Bound it with `--escalate-max-spend $X`** (estimated-USD cap): once cumulative escalation spend hits it, remaining refused primitives are skipped and the baseline pass still completes. Keep escalation OFF for ordinary runs; turn it on deliberately, capped. (The planned §10.10 escalation bandit will cut this by front-loading the likely-winning strategy → earlier short-circuit → fewer calls.)
+
 ## If Bright Data credit runs out
 
 Ask in Discord — the page explicitly says additional credits are available on request. If denied, cut from 15 sources to 8.

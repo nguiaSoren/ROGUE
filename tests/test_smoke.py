@@ -6,7 +6,7 @@ Covers:
   - AttackPrimitive carries the load-bearing indexes + pgvector(1536) column
   - alembic.ini parses and the initial revision (0001) is discoverable
   - BrightDataClient exposes the 6 locked async surfaces + from_env()
-  - ExtractionAgent loads its prompt and the prompt mentions all 14 families
+  - ExtractionAgent loads its prompt and the prompt mentions all 15 families
   - (network-gated) Postgres at DATABASE_URL is reachable + accepts SELECT 1
   - (network-gated) alembic upgrade head + downgrade base round-trips cleanly
 
