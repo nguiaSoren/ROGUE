@@ -451,17 +451,17 @@ async def run_harvest(
             # Harvest ONLY X (skip the other 9 plugins + the bandit SERP
             # discovery phase). Link-following stays on so Pliny's outbound
             # links are still followed (Feature C). Fast/cheap focused run.
-            from rogue.harvest.sources import XUserTimelinePlugin
+            from rogue.harvest.sources import XViaUnlockerPlugin
 
-            plugins = [XUserTimelinePlugin(handles=list(x_handles) if x_handles else None)]
+            plugins = [XViaUnlockerPlugin(handles=list(x_handles) if x_handles else None)]
             agent_bandit = None  # no SERP phase in X-only mode
             logger.info("X-ONLY harvest for handles: %s", ", ".join(x_handles or ["<defaults>"]))
         elif x_handles:
             from rogue.harvest.discovery_agent import default_plugins
-            from rogue.harvest.sources import XUserTimelinePlugin
+            from rogue.harvest.sources import XViaUnlockerPlugin
 
-            plugins = default_plugins() + [XUserTimelinePlugin(handles=list(x_handles))]
-            logger.info("X timeline ENABLED for handles: %s", ", ".join(x_handles))
+            plugins = default_plugins() + [XViaUnlockerPlugin(handles=list(x_handles))]
+            logger.info("X (SERP+Unlocker) ENABLED for handles: %s", ", ".join(x_handles))
         agent = DiscoveryAgent(
             bd_client, plugins=plugins, bandit=agent_bandit, follow_links=follow_links
         )

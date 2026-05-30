@@ -334,7 +334,7 @@ async def test_run_harvest_isolates_extract_errors(live_db, tmp_path) -> None:
 async def test_run_harvest_x_handles_adds_x_plugin(live_db, tmp_path) -> None:
     """--x-handles → the X timeline plugin is added to the DiscoveryAgent's
     plugin list (it's off by default)."""
-    from rogue.harvest.sources import XUserTimelinePlugin
+    from rogue.harvest.sources import XViaUnlockerPlugin
 
     mock_extractor = MagicMock()
     mock_extractor.extract_from_raw_document = AsyncMock(return_value=None)
@@ -360,7 +360,7 @@ async def test_run_harvest_x_handles_adds_x_plugin(live_db, tmp_path) -> None:
         )
 
         plugins = mock_discovery_cls.call_args.kwargs["plugins"]
-        x_plugins = [p for p in plugins if isinstance(p, XUserTimelinePlugin)]
+        x_plugins = [p for p in plugins if isinstance(p, XViaUnlockerPlugin)]
         assert len(x_plugins) == 1
         assert x_plugins[0].handles == ["elder_plinius"]
 
@@ -395,7 +395,7 @@ async def test_run_harvest_no_x_handles_keeps_default_plugins(live_db, tmp_path)
 @pytest.mark.asyncio
 async def test_run_harvest_x_only_runs_just_x_and_skips_serp(live_db, tmp_path) -> None:
     """--x-only → plugins == [X plugin] and bandit=None (no SERP discovery phase)."""
-    from rogue.harvest.sources import XUserTimelinePlugin
+    from rogue.harvest.sources import XViaUnlockerPlugin
 
     mock_extractor = MagicMock()
     mock_extractor.extract_from_raw_document = AsyncMock(return_value=None)
@@ -424,7 +424,7 @@ async def test_run_harvest_x_only_runs_just_x_and_skips_serp(live_db, tmp_path) 
 
         kw = mock_discovery_cls.call_args.kwargs
         plugins = kw["plugins"]
-        assert len(plugins) == 1 and isinstance(plugins[0], XUserTimelinePlugin)
+        assert len(plugins) == 1 and isinstance(plugins[0], XViaUnlockerPlugin)
         assert plugins[0].handles == ["elder_plinius"]
         assert kw["bandit"] is None  # SERP discovery phase skipped
 

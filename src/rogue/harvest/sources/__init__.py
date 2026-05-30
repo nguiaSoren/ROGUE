@@ -11,6 +11,7 @@ from .obliteratus_hf import ObliteratusHfPlugin
 from .pliny_github import PlinyGithubPlugin
 from .reddit_subreddit import RedditSubredditPlugin
 from .x_user_timeline import XUserTimelinePlugin
+from .x_via_unlocker import XViaUnlockerPlugin
 
 __all__ = [
     "SourcePlugin",
@@ -24,4 +25,5 @@ __all__ = [
     "PlinyGithubPlugin",
     "RedditSubredditPlugin",
     "XUserTimelinePlugin",
+    "XViaUnlockerPlugin",
 ]

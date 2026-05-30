@@ -18,10 +18,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
-import html as _html
 import logging
 import os
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,36 +42,16 @@ from rogue.harvest.bandit_serp_phase import _infer_source_type  # noqa: E402
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.media_extract import media_urls_for_document  # noqa: E402
 from rogue.harvest.media_ingest import MediaIngestor  # noqa: E402
+from rogue.harvest.x_status import parse_x_status  # noqa: E402
 from rogue.schemas import RawDocument  # noqa: E402
 
 logger = logging.getLogger("rogue.scripts.harvest_url")
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue"
 
-_TWIMG_RE = re.compile(r"https://pbs\.twimg\.com/media/[A-Za-z0-9_\-]+")
-_OG_TITLE_RE = re.compile(
-    r'<meta[^>]+property=["\']og:title["\'][^>]*content=["\']([^"\']+)', re.I
-)
-
 
 def _is_x(url: str) -> bool:
     return "x.com/" in url or "twitter.com/" in url
-
-
-def _extract_x(html: str, url: str) -> tuple[str, list[str]]:
-    """For an X status page: pull the tweet text (og:title) + the media images."""
-    m = _OG_TITLE_RE.search(html)
-    title = _html.unescape(m.group(1)) if m else ""
-    # og:title is 'Pliny the Liberator on X: "<tweet text>"' — keep it whole; it
-    # carries the announcement, and the screenshots carry the payload.
-    # Full-res image URLs (the base form 404s without a format param).
-    seen, imgs = set(), []
-    for base in _TWIMG_RE.findall(html):
-        if base not in seen:
-            seen.add(base)
-            imgs.append(f"{base}?format=jpg&name=large")
-    body = f"X post: {url}\n\n{title}"
-    return body, imgs
 
 
 def _default_openai_embed_fn(model: str = "text-embedding-3-small"):
@@ -96,7 +74,7 @@ async def harvest_url(url: str, database_url: str, source_type: str | None) -> i
         logger.info("fetched %d bytes (status %s)", len(html), page.status_code)
 
         if _is_x(url):
-            raw_content, media_urls = _extract_x(html, url)
+            raw_content, media_urls = parse_x_status(html, url)
             content_format = "text"
         else:
             raw_content, content_format = html, "html"

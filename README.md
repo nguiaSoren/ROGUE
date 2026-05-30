@@ -279,32 +279,28 @@ Env toggles: `EXTRACTION_CONCURRENCY` (TPM-aware fan-out) · `HARVEST_INGEST_IMA
 
 #### Scraping a specific X account on demand (`--x-handles`)
 
-**Why it's a flag, not always-on:** Bright Data's X "discover-by-profile-URL" scraper averages **~5–15 minutes per handle**, so leaving X in the default daily harvest would push every run toward an hour+. It's therefore **disabled by default** (`default_plugins()` omits it) — every other source (Reddit, arXiv, GitHub, blogs, Pliny's GitHub) still runs. When you specifically want a practitioner's latest X drops, you opt in for that one run:
+X is the hardest source to scrape (brutal anti-bot), so it's **off by default** (`default_plugins()` omits it) — every other source still runs. Opt in for a run with `--x-handles`:
 
 ```bash
-# scrape elder_plinius's posts from the last 21 days (then extract/dedup/persist)
+# scrape elder_plinius's recent posts (then extract/ingest-images/dedup/persist)
 uv run python scripts/harvest_once.py --since 21d --x-handles elder_plinius
 # multiple handles:
 uv run python scripts/harvest_once.py --since 14d --x-handles elder_plinius,wunderwuzzi23
 ```
 
-The handle's recent posts (within `--since`, capped at the 50 most-recent BD returns) flow through the **same** pipeline as any source: a screenshot of a jailbreak prompt is **vision-read / ingested** (multimodal image ingestion), and a link to a repo/write-up is **followed 1-hop** and processed. Requires `BRIGHTDATA_X_POSTS_DATASET_ID` in `.env`.
+**How it works (the reliable path):** BD's *structured* X scraper (discover-by-profile-URL) times out / returns empty for these accounts, so `--x-handles` uses **`XViaUnlockerPlugin`**: it **SERP-discovers** `site:x.com/<handle> after:<date>` to find recent status URLs, then **Web-Unlocks each one** and parses the tweet text + `pbs.twimg` screenshots. Those flow through the same pipeline as any source — screenshots are **vision-read / ingested** (multimodal), outbound links **followed 1-hop**. Both SERP + Web Unlocker are fast (no async-snapshot poll), so there's no timeout to tune.
 
-**Two practical knobs for X:**
-- `--x-only` — harvest **only** the X handle(s), skipping the other 9 sources + the SERP phase (a fast, focused re-run; link-following stays on).
-- **BD's X scraper is slow and its async snapshot can exceed the 600s poll default** — bump it for X runs: `BRIGHTDATA_POLL_TIMEOUT_SECONDS=1800` in `.env`. (A timeout shows as `BrightDataAsyncPollTimeout` + `x_user_timeline docs=0`.)
+> **Caveat:** discovery is bounded by **Google's index of X**, which X heavily restricts — so very-fresh posts (last hours/days) may not be SERP-discoverable yet. For a *known-fresh* post, fetch it directly by URL (below).
 
-```bash
-# focused X-only re-run with a generous timeout:
-BRIGHTDATA_POLL_TIMEOUT_SECONDS=1800 \
-  uv run python scripts/harvest_once.py --since 21d --x-only --x-handles elder_plinius
-```
+- `--x-only` — harvest **only** the X handle(s), skipping the other 9 sources + the SERP discovery phase (fast, focused re-run; link-following stays on).
 
-**When the profile scraper still won't return a post**, grab the exact tweet by URL — BD's *Web Unlocker* fetches a single X status page (text + screenshots) even when the profile scraper returns empty:
+**For a known URL (the most reliable path — used for video-fresh drops):** grab the exact tweet by URL. Web Unlocker fetches a single X status page (text + screenshots) even when discovery returns nothing:
 
 ```bash
 uv run python scripts/harvest_url.py --url "https://x.com/elder_plinius/status/<id>"
 ```
+
+(`BRIGHTDATA_POLL_TIMEOUT_SECONDS` is still useful for Reddit's async snapshots, which *do* poll — see `.env.example`.)
 
 `harvest_url.py` web-unlocks one URL, ingests its images (the jailbreak screenshots → vision-read), extracts + dedups + persists the primitive, and syncs to Neon — then prints a `--primitive-ids <id>` command to reproduce just that attack against the panel. (This is how a freshly-posted X jailbreak gets from tweet → breach-matrix cell.)
 
