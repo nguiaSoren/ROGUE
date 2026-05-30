@@ -81,6 +81,26 @@ export default async function MatrixPage({
     null,
   );
 
+  // Featured attack: Pliny's (elder_plinius) X jailbreak. It ties several other
+  // attacks at 100%/100%, so the matrix-wide "worst" pick is arbitrary among the
+  // ties — pin Pliny as the headline when it's present in the current view
+  // (the label stays honest since it genuinely ties for worst). Falls back to
+  // the computed worst cell on any day Pliny isn't in the matrix.
+  const FEATURED_PRIMITIVE_ID = "01KSWGSAY2ZJ7E7WEPB1QX7N55";
+  const featuredCell = matrix.cells
+    .filter((c) => c.primitive_id === FEATURED_PRIMITIVE_ID)
+    .reduce<typeof matrix.cells[number] | null>((acc, c) => {
+      if (acc === null) return c;
+      if (c.any_breach_rate > acc.any_breach_rate) return c;
+      if (
+        c.any_breach_rate === acc.any_breach_rate &&
+        c.full_breach_rate > acc.full_breach_rate
+      )
+        return c;
+      return acc;
+    }, null);
+  const headlineCell = featuredCell ?? worstCell;
+
   // Most-vulnerable config: column with the highest worst-rate across families.
   const configWorstScore: Record<string, number> = {};
   for (const c of matrix.cells) {
@@ -139,9 +159,9 @@ export default async function MatrixPage({
         </header>
 
         {/* Worst-attacker callout — links to the full (family × config) breakdown */}
-        {worstCell && worstCell.any_breach_rate > 0 && (
+        {headlineCell && headlineCell.any_breach_rate > 0 && (
           <Link
-            href={`/matrix/cell?family=${encodeURIComponent(worstCell.family)}&config=${encodeURIComponent(worstCell.deployment_config_id)}&date=${matrix.target_date}`}
+            href={`/matrix/cell?family=${encodeURIComponent(headlineCell.family)}&config=${encodeURIComponent(headlineCell.deployment_config_id)}&date=${matrix.target_date}`}
             className="group block rogue-card rogue-card-critical border border-rogue-red/40 rounded-lg p-5 bg-rogue-red/5 animate-rogue-fade-up transition-colors hover:bg-rogue-red/10 hover:border-rogue-red/60"
             style={{ animationDelay: "0.05s" }}
           >
@@ -153,16 +173,16 @@ export default async function MatrixPage({
                     — see full breakdown →
                   </span>
                 </p>
-                <p className="text-lg font-bold leading-tight truncate" title={worstCell.title}>
-                  {worstCell.title}
+                <p className="text-lg font-bold leading-tight truncate" title={headlineCell.title}>
+                  {headlineCell.title}
                 </p>
                 <p className="text-xs font-mono text-muted-foreground">
-                  {worstCell.family} · {worstCell.vector} · breached{" "}
-                  <span className="text-foreground">{worstCell.config_name}</span> at{" "}
+                  {headlineCell.family} · {headlineCell.vector} · breached{" "}
+                  <span className="text-foreground">{headlineCell.config_name}</span> at{" "}
                   <span className="text-rogue-red tabular-nums">
-                    {Math.round(worstCell.any_breach_rate * 100)}%
+                    {Math.round(headlineCell.any_breach_rate * 100)}%
                   </span>{" "}
-                  (n={worstCell.n_trials})
+                  (n={headlineCell.n_trials})
                 </p>
               </div>
               <div className="text-right">
