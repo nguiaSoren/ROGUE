@@ -574,6 +574,7 @@ async def run_reproduction(
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
     only_unreproduced: bool = False,
+    primitive_ids: list[str] | None = None,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -639,19 +640,36 @@ async def run_reproduction(
 
     try:
         with SessionLocal() as session:
-            primitives_q = (
-                select(AttackPrimitiveORM)
-                .where(AttackPrimitiveORM.canonical.is_(True))
-                .order_by(AttackPrimitiveORM.reproducibility_score.desc())
-            )
-            if synthesized_only:
+            if primitive_ids:
+                # Targeted run: reproduce EXACTLY the named primitive_ids
+                # (canonical or not — an explicit list wins over every other
+                # filter). For demoing a specific attack, e.g. Pliny's latest
+                # Claude-Opus-4.6 jailbreak, against the panel.
+                primitives_q = (
+                    select(AttackPrimitiveORM)
+                    .where(AttackPrimitiveORM.primitive_id.in_(list(primitive_ids)))
+                    .order_by(AttackPrimitiveORM.reproducibility_score.desc())
+                )
+                primitive_orms = list(session.execute(primitives_q).scalars())
+                logger.info("targeted reproduce: %d/%d primitive_ids found",
+                            len(primitive_orms), len(primitive_ids))
+                # Skip the filter block below.
+                _skip_filters = True
+            else:
+                _skip_filters = False
+                primitives_q = (
+                    select(AttackPrimitiveORM)
+                    .where(AttackPrimitiveORM.canonical.is_(True))
+                    .order_by(AttackPrimitiveORM.reproducibility_score.desc())
+                )
+            if not _skip_filters and synthesized_only:
                 # §10.7 disciplined sweep: fire ONLY synthesized children
                 # (escalation + mutation rows) so we don't pay to re-fire
                 # baseline primitives that already have breach_results.
                 primitives_q = primitives_q.where(
                     AttackPrimitiveORM.synthesized.is_(True),
                 )
-            if multimodal_only:
+            if not _skip_filters and multimodal_only:
                 # §10.8 re-run: fire ONLY primitives whose VECTOR is multimodal,
                 # so render() emits REAL image/audio (the old runs tested them as
                 # text via the now-removed stub). We key on vector, NOT the
@@ -664,7 +682,7 @@ async def run_reproduction(
                         [AttackVector.MULTIMODAL_IMAGE.value, AttackVector.MULTIMODAL_AUDIO.value]
                     ),
                 )
-            if only_unreproduced:
+            if not _skip_filters and only_unreproduced:
                 # Incremental sweep: fire ONLY primitives that have NO
                 # breach_results yet — i.e. the genuinely-new attacks (e.g. a
                 # freshly-harvested Pliny post), skipping everything already
@@ -679,9 +697,10 @@ async def run_reproduction(
                         BreachResultORM.primitive_id == AttackPrimitiveORM.primitive_id
                     )
                 )
-            if primitive_limit is not None:
-                primitives_q = primitives_q.limit(primitive_limit)
-            primitive_orms = list(session.execute(primitives_q).scalars())
+            if not _skip_filters:
+                if primitive_limit is not None:
+                    primitives_q = primitives_q.limit(primitive_limit)
+                primitive_orms = list(session.execute(primitives_q).scalars())
 
             config_orms = list(
                 session.execute(select(DeploymentConfigORM)).scalars()
@@ -1065,6 +1084,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--primitive-ids",
+        default=None,
+        help=(
+            "Comma-separated primitive_ids to reproduce EXACTLY (canonical or "
+            "not) — an explicit list overrides every other selection filter. "
+            "For a focused demo: fire just one attack (e.g. Pliny's latest "
+            "Claude-Opus-4.6 jailbreak) against the panel."
+        ),
+    )
+    parser.add_argument(
         "--only-unreproduced",
         action="store_true",
         help=(
@@ -1237,6 +1266,11 @@ def main(argv: list[str] | None = None) -> int:
             escalate_planner_model=args.escalate_planner_model,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
+            primitive_ids=(
+                [p.strip() for p in args.primitive_ids.split(",") if p.strip()]
+                if args.primitive_ids
+                else None
+            ),
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

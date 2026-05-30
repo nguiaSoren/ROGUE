@@ -310,6 +310,7 @@ uv run python scripts/reproduce_once.py --primitive-limit 50 --judge-batch
 |---|---|---|
 | `--primitive-limit N` | all | Cap how many primitives are reproduced — the top-N by `reproducibility_score` (a cost cap, **not** "the newest"). |
 | `--only-unreproduced` | off | Incremental sweep: reproduce **only** primitives with no `breach_results` yet (the genuinely-new attacks), skipping everything already done. Off by default so re-grade / re-test runs still re-fire the corpus. |
+| `--primitive-ids A,B,…` | — | Reproduce **exactly** the named primitive_ids (canonical or not) — overrides every other selection filter. For a focused demo of one specific attack against the panel. |
 | `--n-trials N` | 5 | Trials per (primitive × config) — powers the bootstrap CI. |
 | `--temperature T` | 0.7 | Target-model sampling temperature. |
 | `--concurrency N` | — | Parallel target calls. |
