@@ -257,6 +257,25 @@ def _orm_to_pydantic_config(orm: DeploymentConfigORM) -> DeploymentConfig:
     )
 
 
+def _needs_media_carrier(primitive: AttackPrimitive) -> bool:
+    """True iff a multimodal-image primitive needs a real carrier (re)fetched.
+
+    Fires when the primitive describes a carrier (``media_query``) and has no
+    *usable* ``base_image`` — either none set, OR a ``base_image`` whose file is
+    missing on disk (e.g. ``data/media_cache/`` was cleared). Checking the file
+    on disk — not just the slot's presence — is what makes deleting the media
+    cache safe: a dangling carrier path is treated as a cache miss and
+    re-fetched, instead of crashing ``render()`` on a missing file.
+    """
+    slots = primitive.payload_slots or {}
+    if primitive.vector != AttackVector.MULTIMODAL_IMAGE:
+        return False
+    if not slots.get("media_query"):
+        return False
+    base = slots.get("base_image")
+    return not base or not os.path.exists(base)
+
+
 def _build_breach_result_orm(
     *,
     primitive_id: str,
@@ -574,12 +593,7 @@ async def run_reproduction(
             # cheap on re-runs) and stamp it so render() composites onto it. Runs
             # by default; only fires for multimodal; disable with --no-fetch-media.
             if fetch_media:
-                need = [
-                    p for p in primitives
-                    if p.vector == AttackVector.MULTIMODAL_IMAGE
-                    and (p.payload_slots or {}).get("media_query")
-                    and not (p.payload_slots or {}).get("base_image")
-                ]
+                need = [p for p in primitives if _needs_media_carrier(p)]
                 if need:
                     if media_fetcher is None:
                         from rogue.harvest.bright_data_client import BrightDataClient  # noqa: PLC0415
@@ -599,6 +613,16 @@ async def run_reproduction(
                         if path is not None:
                             p.payload_slots["base_image"] = str(path)
                             logger.info("media: %s -> %s", p.primitive_id, path)
+                        else:
+                            # Fetch failed and the primitive only reached `need`
+                            # because its carrier was missing on disk — drop the
+                            # dangling base_image so render() degrades to a
+                            # synthetic carrier instead of crashing on it.
+                            p.payload_slots.pop("base_image", None)
+                            logger.info(
+                                "media: %s -> synthetic (fetch failed, cleared "
+                                "stale carrier path)", p.primitive_id,
+                            )
 
             n_pairs = len(primitives) * len(configs)
             n_calls = n_pairs * n_trials

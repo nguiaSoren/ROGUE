@@ -25,12 +25,14 @@ from rogue.reproduce.judge import JudgeResult
 from rogue.reproduce.target_panel import ModelResponse
 from rogue.schemas import (
     AttackPrimitive,
+    AttackVector,
     JudgeVerdict,
     demo_deployment_configs,
 )
 from scripts.reproduce_once import (
     ReproductionRunStats,
     _build_breach_result_orm,
+    _needs_media_carrier,
     _orm_to_pydantic_config,
     _orm_to_pydantic_primitive,
     run_reproduction,
@@ -54,6 +56,53 @@ def _database_url() -> str:
 def _load_golden_primitive() -> AttackPrimitive:
     fp = FIXTURES_DIR / "01_multilingual_african_languages.json"
     return AttackPrimitive.model_validate(json.loads(fp.read_text(encoding="utf-8")))
+
+
+def _mm_primitive(slots: dict, vector: AttackVector = AttackVector.MULTIMODAL_IMAGE):
+    """Golden primitive re-stamped with a multimodal vector + given slots.
+    ``model_copy`` skips re-validation, so we can set the multimodal vector
+    without the requires_multimodal validator — the helper only reads
+    ``vector`` + ``payload_slots``."""
+    return _load_golden_primitive().model_copy(
+        update={"vector": vector, "payload_slots": slots}
+    )
+
+
+# --------------------------------------------------------------------------- #
+# A0. Media-carrier need detection (deleting the cache must trigger a re-fetch)
+# --------------------------------------------------------------------------- #
+
+
+def test_needs_carrier_when_no_base_image() -> None:
+    p = _mm_primitive({"media_query": "bank login screenshot"})
+    assert _needs_media_carrier(p) is True
+
+
+def test_needs_carrier_false_when_base_image_present_on_disk(tmp_path: Path) -> None:
+    carrier = tmp_path / "carrier.jpg"
+    carrier.write_bytes(b"\xff\xd8\xff")  # any bytes — only existence matters
+    p = _mm_primitive({"media_query": "q", "base_image": str(carrier)})
+    assert _needs_media_carrier(p) is False
+
+
+def test_needs_carrier_true_when_base_image_missing_on_disk() -> None:
+    """The bug this fixes: a base_image set in the DB but whose file was
+    deleted (cleared media cache) must count as a cache miss → re-fetch,
+    not crash render() on the missing file."""
+    p = _mm_primitive(
+        {"media_query": "q", "base_image": "data/media_cache/DELETED/carrier.webp"}
+    )
+    assert _needs_media_carrier(p) is True
+
+
+def test_needs_carrier_false_for_non_multimodal() -> None:
+    p = _mm_primitive({"media_query": "q"}, vector=AttackVector.USER_TURN)
+    assert _needs_media_carrier(p) is False
+
+
+def test_needs_carrier_false_without_media_query() -> None:
+    p = _mm_primitive({})  # multimodal but nothing to fetch from
+    assert _needs_media_carrier(p) is False
 
 
 # --------------------------------------------------------------------------- #
