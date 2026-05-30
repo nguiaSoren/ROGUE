@@ -108,7 +108,24 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 4. HOW ROGUE THINKS ------------------------------------------ */}
+        {/* 4. CONNECT VIA MCP — query it yourself, one click ----------- */}
+        <section className="space-y-4 animate-rogue-fade-up">
+          <div className="space-y-1">
+            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
+              query it yourself
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+              Connect ROGUE to your IDE.
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+              ROGUE is also a live MCP server — ask Claude Desktop, Cursor, or
+              Windsurf about the threat DB directly. One click connects it.
+            </p>
+          </div>
+          <McpConnect />
+        </section>
+
+        {/* 5. HOW ROGUE THINKS ------------------------------------------ */}
         <HowRogueThinks
           nSources={19}
           nPrimitives={health?.n_primitives ?? null}
@@ -116,7 +133,7 @@ export default async function Home() {
           nBreaches={health?.n_breaches ?? null}
         />
 
-        {/* 5. AUGMENTATION SHOWCASE ------------------------------------ */}
+        {/* 6. AUGMENTATION SHOWCASE ------------------------------------ */}
         <AugmentationShowcase
           bandit={bandit}
           persona={persona}
@@ -125,7 +142,7 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
-        {/* 6. AUGMENTATION LAB — interactive --------------------------- */}
+        {/* 7. AUGMENTATION LAB — interactive --------------------------- */}
         <AugmentationLab
           persona={persona}
           escalation={escalation}
@@ -133,7 +150,7 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
-        {/* 7. DEEP-DIVE LINKS ------------------------------------------ */}
+        {/* 8. DEEP-DIVE LINKS ------------------------------------------ */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
@@ -165,22 +182,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 8. CONNECT VIA MCP ----------------------------------------- */}
-        <section className="space-y-4 animate-rogue-fade-up">
-          <div className="space-y-1">
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
-              query it yourself
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-              Connect ROGUE to your IDE.
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-              ROGUE is also a live MCP server — ask Claude Desktop, Cursor, or
-              Windsurf about the threat DB directly. One click connects it.
-            </p>
-          </div>
-          <McpConnect />
-        </section>
       </div>
     </main>
   );
