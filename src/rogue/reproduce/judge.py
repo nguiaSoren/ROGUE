@@ -392,48 +392,24 @@ class JudgeAgent:
             "system message."
         )
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type(_TRANSIENT_ERRORS),
-        reraise=True,
-    )
-    async def _call_anthropic(self, user_message: str) -> dict[str, Any]:
-        """Anthropic tool-use call. Returns the raw tool-call input dict.
-
-        Tool-use mode pins the judge output to a JSON object matching the
-        `emit_verdict` schema (mirrors `JudgeResult` but with `verdict` typed
-        as a string enum the judge can populate freely; coercion to the
-        `JudgeVerdict` enum happens in `_validate_verdict`).
+    def anthropic_grade_kwargs(self, user_message: str) -> dict[str, Any]:
+        """The exact ``messages.create`` kwargs for one grading call — the
+        single source of truth shared by the inline judge (``_call_anthropic``)
+        AND the Batch-API path (``judge_batch.JudgeBatch``), so the two can
+        never drift. Prompt-caches the rubric (cache reads ~0.1× input).
         """
-        # IMPLEMENT Day 1 §10.1 — replace the SDK's default env-var pickup
-        # with a wired `rogue.config.settings.ANTHROPIC_API_KEY` once §A.3
-        # ships. Day 0: rely on the SDK default so this module imports
-        # cleanly without keys set.
-        from anthropic import AsyncAnthropic
-
-        if self._anthropic_client is None:
-            self._anthropic_client = AsyncAnthropic()
-
-        # Strip the "anthropic/" provider prefix to get the bare model id.
-        bare_model = self.model.split("/", 1)[1]
-
-        response = await self._anthropic_client.messages.create(
-            model=bare_model,
-            max_tokens=1024,
-            # Prompt-cache the rubric/system prompt (~5.5K tokens, identical on
-            # every grading call) — cache reads are ~0.1× input price, so a
-            # reproduce sweep pays the rubric's input cost once per 5-min window
-            # instead of per cell. The per-call user message stays uncached.
-            system=[
+        return {
+            "model": self.model.split("/", 1)[1],  # strip "anthropic/"
+            "max_tokens": 1024,
+            "system": [
                 {
                     "type": "text",
                     "text": self.prompt,
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
-            messages=[{"role": "user", "content": user_message}],
-            tools=[
+            "messages": [{"role": "user", "content": user_message}],
+            "tools": [
                 {
                     "name": "emit_verdict",
                     "description": (
@@ -473,7 +449,34 @@ class JudgeAgent:
                     },
                 }
             ],
-            tool_choice={"type": "tool", "name": "emit_verdict"},
+            "tool_choice": {"type": "tool", "name": "emit_verdict"},
+        }
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(_TRANSIENT_ERRORS),
+        reraise=True,
+    )
+    async def _call_anthropic(self, user_message: str) -> dict[str, Any]:
+        """Anthropic tool-use call. Returns the raw tool-call input dict.
+
+        Tool-use mode pins the judge output to a JSON object matching the
+        `emit_verdict` schema (mirrors `JudgeResult` but with `verdict` typed
+        as a string enum the judge can populate freely; coercion to the
+        `JudgeVerdict` enum happens in `_validate_verdict`).
+        """
+        # IMPLEMENT Day 1 §10.1 — replace the SDK's default env-var pickup
+        # with a wired `rogue.config.settings.ANTHROPIC_API_KEY` once §A.3
+        # ships. Day 0: rely on the SDK default so this module imports
+        # cleanly without keys set.
+        from anthropic import AsyncAnthropic
+
+        if self._anthropic_client is None:
+            self._anthropic_client = AsyncAnthropic()
+
+        response = await self._anthropic_client.messages.create(
+            **self.anthropic_grade_kwargs(user_message)
         )
 
         if getattr(response, "stop_reason", None) == "refusal":
