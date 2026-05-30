@@ -393,6 +393,43 @@ async def test_run_harvest_no_x_handles_keeps_default_plugins(live_db, tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_run_harvest_x_only_runs_just_x_and_skips_serp(live_db, tmp_path) -> None:
+    """--x-only → plugins == [X plugin] and bandit=None (no SERP discovery phase)."""
+    from rogue.harvest.sources import XUserTimelinePlugin
+
+    mock_extractor = MagicMock()
+    mock_extractor.extract_from_raw_document = AsyncMock(return_value=None)
+    mock_bd_client = MagicMock()
+    mock_bd_client.aclose = AsyncMock()
+
+    from decimal import Decimal as _Decimal
+    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+        agent_instance = MagicMock()
+        agent_instance.run = AsyncMock(return_value=[])
+        agent_instance.last_run_reports = []
+        agent_instance.last_selected_arms = []
+        mock_discovery_cls.return_value = agent_instance
+
+        await run_harvest(
+            since=datetime.now(timezone.utc) - timedelta(days=2),
+            database_url=live_db,
+            bd_client=mock_bd_client,
+            extractor=mock_extractor,
+            embed_fn=lambda t: [0.0] * 1536,
+            bandit_state_path=tmp_path / "discovery_bandit.json",
+            x_handles=["elder_plinius"],
+            x_only=True,
+        )
+
+        kw = mock_discovery_cls.call_args.kwargs
+        plugins = kw["plugins"]
+        assert len(plugins) == 1 and isinstance(plugins[0], XUserTimelinePlugin)
+        assert plugins[0].handles == ["elder_plinius"]
+        assert kw["bandit"] is None  # SERP discovery phase skipped
+
+
+@pytest.mark.asyncio
 async def test_run_harvest_ingests_images_and_passes_to_extractor(
     live_db, tmp_path
 ) -> None:

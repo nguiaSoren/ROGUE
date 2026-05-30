@@ -379,6 +379,7 @@ async def run_harvest(
     bandit_state_path: Path | None = None,
     media_ingestor: MediaIngestor | None = None,
     x_handles: list[str] | None = None,
+    x_only: bool = False,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
 
@@ -445,14 +446,24 @@ async def run_harvest(
         # specific accounts' recent posts (then Feature-A image ingestion +
         # Feature-C link following apply to them like any source).
         plugins = None
-        if x_handles:
+        agent_bandit = bandit
+        if x_only:
+            # Harvest ONLY X (skip the other 9 plugins + the bandit SERP
+            # discovery phase). Link-following stays on so Pliny's outbound
+            # links are still followed (Feature C). Fast/cheap focused run.
+            from rogue.harvest.sources import XUserTimelinePlugin
+
+            plugins = [XUserTimelinePlugin(handles=list(x_handles) if x_handles else None)]
+            agent_bandit = None  # no SERP phase in X-only mode
+            logger.info("X-ONLY harvest for handles: %s", ", ".join(x_handles or ["<defaults>"]))
+        elif x_handles:
             from rogue.harvest.discovery_agent import default_plugins
             from rogue.harvest.sources import XUserTimelinePlugin
 
             plugins = default_plugins() + [XUserTimelinePlugin(handles=list(x_handles))]
             logger.info("X timeline ENABLED for handles: %s", ", ".join(x_handles))
         agent = DiscoveryAgent(
-            bd_client, plugins=plugins, bandit=bandit, follow_links=follow_links
+            bd_client, plugins=plugins, bandit=agent_bandit, follow_links=follow_links
         )
 
         # §11.7 Tier B — preload the fetch_cache ledger so harvest can skip
@@ -832,6 +843,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--x-only",
+        action="store_true",
+        help=(
+            "Harvest ONLY X (the handles from --x-handles, or the 4 defaults) — "
+            "skip the other 9 sources + the SERP discovery phase. Fast, focused "
+            "re-run; link-following from the posts stays on. Pair with a bumped "
+            "BRIGHTDATA_POLL_TIMEOUT_SECONDS (X is slow)."
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
         help="Override for the per-run correlation id (default: a fresh UUID).",
@@ -860,6 +881,7 @@ def main(argv: list[str] | None = None) -> int:
             extraction_model=args.extraction_model,
             embedding_model=args.embedding_model,
             x_handles=x_handles,
+            x_only=args.x_only,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

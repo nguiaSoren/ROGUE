@@ -290,6 +290,16 @@ uv run python scripts/harvest_once.py --since 14d --x-handles elder_plinius,wund
 
 The handle's recent posts (within `--since`, capped at the 50 most-recent BD returns) flow through the **same** pipeline as any source: a screenshot of a jailbreak prompt is **vision-read / ingested** (multimodal image ingestion), and a link to a repo/write-up is **followed 1-hop** and processed. Requires `BRIGHTDATA_X_POSTS_DATASET_ID` in `.env`.
 
+**Two practical knobs for X:**
+- `--x-only` — harvest **only** the X handle(s), skipping the other 9 sources + the SERP phase (a fast, focused re-run; link-following stays on).
+- **BD's X scraper is slow and its async snapshot can exceed the 600s poll default** — bump it for X runs: `BRIGHTDATA_POLL_TIMEOUT_SECONDS=1800` in `.env`. (A timeout shows as `BrightDataAsyncPollTimeout` + `x_user_timeline docs=0`.)
+
+```bash
+# focused X-only re-run with a generous timeout:
+BRIGHTDATA_POLL_TIMEOUT_SECONDS=1800 \
+  uv run python scripts/harvest_once.py --since 21d --x-only --x-handles elder_plinius
+```
+
 ### `scripts/reproduce_once.py` — render → target panel → judge → persist
 
 ```bash
