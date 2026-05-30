@@ -64,9 +64,20 @@ export default async function MatrixPage({
   const maxRate = allRates.length ? Math.max(...allRates) : 0;
   const criticalCellCount = matrix.cells.filter((c) => c.any_breach_rate >= 0.7).length;
 
-  // Worst attacker today: primitive with the highest single-cell rate.
+  // Worst attacker today: highest single-cell any-breach rate, tie-broken by
+  // full-breach (matches the grid cell's worst-offending pick, so the headline
+  // and the cell drawer agree on which primitive is "worst").
   const worstCell = matrix.cells.reduce<typeof matrix.cells[number] | null>(
-    (acc, c) => (acc === null || c.any_breach_rate > acc.any_breach_rate ? c : acc),
+    (acc, c) => {
+      if (acc === null) return c;
+      if (c.any_breach_rate > acc.any_breach_rate) return c;
+      if (
+        c.any_breach_rate === acc.any_breach_rate &&
+        c.full_breach_rate > acc.full_breach_rate
+      )
+        return c;
+      return acc;
+    },
     null,
   );
 

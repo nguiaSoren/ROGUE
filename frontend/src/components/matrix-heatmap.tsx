@@ -61,7 +61,16 @@ export function MatrixHeatmap({
     for (const c of active.cells) {
       const key = `${c.family}|${c.deployment_config_id}`;
       const prev = m.get(key);
-      if (!prev || c.any_breach_rate > prev.any_breach_rate) m.set(key, c);
+      // Worst = highest any-breach, tie-broken by full-breach so the most
+      // fully-broken primitive headlines the cell (e.g. a 100%/100% beats a
+      // 100%/80% at the same any-breach rate).
+      if (
+        !prev ||
+        c.any_breach_rate > prev.any_breach_rate ||
+        (c.any_breach_rate === prev.any_breach_rate &&
+          c.full_breach_rate > prev.full_breach_rate)
+      )
+        m.set(key, c);
     }
     return m;
   }, [active.cells]);
