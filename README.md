@@ -194,10 +194,31 @@ See `docs/architecture.md` for the five-layer pipeline diagram + locked stack ta
 - 14-slot payload-template vocabulary for cross-deployment reproduction
 - 15-source open-web harvest list — see `docs/sources.md`
 - 5-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out.
-- Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH) with calibration
+- Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), validated against **independent human labels — 91.8% refusal-axis agreement on WildGuardTest** (see [Judge calibration](#judge-calibration))
 - Daily threat brief (markdown + JSON) + Slack webhook
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
 - **True multimodal red-team** — renders attacks as real images/audio and an autonomous escalation ladder (see below)
+
+## Judge calibration
+
+Every breach number ROGUE reports is ultimately an LLM verdict, so the entire matrix inherits the judge's error rate. "Trust the judge" is not good enough — so the judge is scored against **independent human labels**, not just spot-checked.
+
+**External validation — WildGuardTest.** The judge is scored against [WildGuardTest](https://huggingface.co/datasets/allenai/wildguardmix) (Allen AI) — ~1.7k responses labeled by independent human annotators. WildGuardTest annotates *response refusal* as a task separate from *response harm*, the same split ROGUE's verdicts make, so the judge is scored on two axes instead of being collapsed to safe/unsafe. Scored on the **human-annotated Test split only** — the Train split is GPT-4-labeled, and scoring against it would be the model-grades-model circularity this whole exercise exists to escape. One judge call per item; fully reproducible via `scripts/eval_wildguard.py` (seed-deterministic subset).
+
+| Axis | Agreement with independent human annotators | n |
+|---|---|---|
+| **Refusal** — did the model cleanly decline? | **91.8%** | 196 |
+| **Harm** — was the response harmful? (adversarial prompts) | 78.1% | 196 |
+
+The **refusal axis (91.8%)** is the headline number: `REFUSED` ↔ human-labeled refusal is a 1:1 construct match, so this is a clean, independent agreement figure — the thing that converts "an LLM grades an LLM, trust us" into a measured claim.
+
+The **harm axis (78.1%)** is reported with one honest caveat. Its disagreement is asymmetric — the judge **over-calls** harm (false positives ≫ false negatives) — but two distinct things sit inside that gap: (1) genuine judge over-eagerness, and (2) a *construct* difference — ROGUE's `breach` means *the attacker gained traction*, whereas WildGuard's harm label means *the response is harmful content*; a response can give partial traction without itself being harmful content. A re-run restricted to adversarial prompts only **ruled out** a benign-compliance sampling artifact (the harm number was unchanged), so the over-eagerness is real, not an artifact of the sample.
+
+**Independent cross-check — StrongREJECT.** To probe whether the breach matrix runs *hot*, a second published grader — the **StrongREJECT** rubric autograder (arXiv [2402.10260](https://arxiv.org/abs/2402.10260); rubric copied verbatim from the reference implementation) — was run over 50 of ROGUE's own reproduce rows, stratified across verdicts and all five target models (`scripts/second_grader_pass.py`). StrongREJECT's headline finding is that automated graders *overstate* jailbreak success, so this is the adversarial test of ROGUE's numbers. It passes: the judge agrees with StrongREJECT **82%** of the time, and the **inflation delta is ≤ 0 at every threshold** across the grader's full 0.01–0.75 range (−16% at the most lenient cut, converging to 0% at the strictest — *never positive*). ROGUE's judge is, if anything, **more conservative** than StrongREJECT — the breach rates are not inflated by an over-eager grader. (Raw 0–1 scores are persisted per-item, so the threshold sweep is recomputed offline with no re-grading.)
+
+These two external checks point in apparently opposite directions — WildGuard's *harm* axis says the judge over-calls, StrongREJECT says it under-calls — and that is the honest, useful result: they measure different constructs (harmful *content* vs jailbreak *effectiveness*) at different strictness, and together they **bracket** ROGUE's judge from both sides. It sits stricter than a lenient effectiveness grader and looser than a strict harmful-content label — exactly where a *"did the attacker gain useful traction"* verdict should land. No single external tool flags the matrix as inflated.
+
+**In-distribution gate.** The judge also ships a calibration runner (`src/rogue/reproduce/judge_calibration.py`): hand-labeled `(attack, model response, verdict)` triples scored against the live judge with a locked ship/refine gate (`< 0.80` agreement → refine the rubric; `≥ 0.90` → ship) and an explicit **false-positive breach rate** — how often the judge cries breach on a response a human cleared.
 
 ## Multimodal red-team
 

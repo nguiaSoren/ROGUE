@@ -23,6 +23,7 @@ dependencies = [
     "mcp>=1.0",
     "playwright>=1.60.0",
     "pillow>=10.4",
+    "datasets>=4.8.5",
 ]
 
 [project.optional-dependencies]

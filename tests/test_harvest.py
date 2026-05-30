@@ -749,7 +749,7 @@ async def test_cost_log_inserted_when_session_passed() -> None:
     assert session.add.called, "session.add should be invoked when session is provided"
     (added,), _ = session.add.call_args
     assert isinstance(added, BrightDataCostLog)
-    assert added.product == "unlocker"
+    assert added.product == "web_unlocker"
     assert added.units == 1
     # Cost is the midpoint of the unlocker pricing band — > 0 and < 1 cent.
     assert added.cost_usd > 0.0
