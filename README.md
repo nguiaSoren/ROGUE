@@ -26,6 +26,76 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 - Video walkthrough: TODO  <!-- TODO Day 4: YouTube/Loom link -->
 - MCP server: configure Claude Desktop / Cursor to query ROGUE directly (see below)
 
+## MCP integration
+
+ROGUE exposes its threat-intelligence database as a **producer-side MCP server** — Claude Desktop / Cursor / Windsurf users can query the live breach matrix from inside their IDE.
+
+### Install (one command)
+
+```bash
+uv run python scripts/install_mcp.py           # Claude Desktop (default)
+uv run python scripts/install_mcp.py --client cursor    # or: cursor / windsurf
+```
+
+This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing.
+
+> **Reviewer flow (any MCP client):** clone the repo → `uv run python scripts/install_mcp.py` (writes the pointer at *your* clone's path) → restart the client. No manual JSON editing. ROGUE is a standard MCP server, so any compliant client works — the installer just covers Claude Desktop / Cursor / Windsurf out of the box; everything else can point at the same `uv … -m rogue.mcp_server.server` command (stdio) or the HTTP endpoint on :8001 (see [Transport](#transport)).
+
+<details><summary>Or edit the config by hand</summary>
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "rogue": {
+      "command": "uv",
+      "args": [
+        "--directory", "/absolute/path/to/ROGUE",
+        "run", "python", "-m", "rogue.mcp_server.server"
+      ]
+    }
+  }
+}
+```
+
+Replace the `--directory` path with your local repo location.
+
+</details>
+
+Requires a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py` ran at least once); the deployed build reads the live Neon DB.
+
+### Tools exposed
+
+| Tool | Purpose |
+|---|---|
+| `query_attacks(family?, vector?, since_days?, limit?)` | Filter the attack-primitive corpus by family/vector/recency. Returns full primitive records with sources. |
+| `query_diff(date_str?)` | Today vs yesterday breach diff — what's new, what's newly defended, per-tier counts. |
+| `query_threat_brief(date_str?, format?)` | Full daily threat brief in markdown or JSON. Reads from `data/threat_briefs/` then falls back to live DB render. |
+| `query_breaches_for_config(deployment_config_id, since_days?, limit?)` | Per-trial breach results for one customer deployment, with judge rationale + model-response excerpts. |
+| `query_attack_detail(primitive_id)` | One attack's full record + its per-config breach aggregates (n_full / n_partial / n_refused / n_evaded). |
+
+### Try it
+
+After connecting, ask Claude:
+
+> "What new attacks broke our customer support config in the last 24 hours?"
+
+Claude will call `query_diff` + `query_breaches_for_config` and summarize.
+
+### Transport
+
+**Stdio** by default (the Claude Desktop path) — the server runs as a subprocess Claude Desktop spawns, logging to stderr so the JSON-RPC channel on stdout stays clean.
+
+For **remote** clients (Cursor / Windsurf / a hosted client), serve the same five tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
+
+```bash
+ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
+# serves http://127.0.0.1:8001/mcp  (set ROGUE_MCP_HOST=0.0.0.0 to expose off-box)
+```
+
+`ROGUE_MCP_TRANSPORT` accepts `stdio` | `sse` | `streamable-http`; `ROGUE_MCP_PORT` / `ROGUE_MCP_HOST` override the bind address.
+
 ## Quick start (local)
 
 ```bash
@@ -139,76 +209,6 @@ augmentation story stay tied together visually.
 Executive snapshot (net Δ vs yesterday, top-3 worst new attackers,
 recommended action), tier-count chips, then the full markdown brief with
 `.md` and `.json` download buttons.
-
-## MCP integration
-
-ROGUE exposes its threat-intelligence database as a **producer-side MCP server** — Claude Desktop / Cursor / Windsurf users can query the live breach matrix from inside their IDE.
-
-### Install (one command)
-
-```bash
-uv run python scripts/install_mcp.py           # Claude Desktop (default)
-uv run python scripts/install_mcp.py --client cursor    # or: cursor / windsurf
-```
-
-This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing.
-
-> **Reviewer flow (any MCP client):** clone the repo → `uv run python scripts/install_mcp.py` (writes the pointer at *your* clone's path) → restart the client. No manual JSON editing. ROGUE is a standard MCP server, so any compliant client works — the installer just covers Claude Desktop / Cursor / Windsurf out of the box; everything else can point at the same `uv … -m rogue.mcp_server.server` command (stdio) or the HTTP endpoint on :8001 (see [Transport](#transport)).
-
-<details><summary>Or edit the config by hand</summary>
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "rogue": {
-      "command": "uv",
-      "args": [
-        "--directory", "/absolute/path/to/ROGUE",
-        "run", "python", "-m", "rogue.mcp_server.server"
-      ]
-    }
-  }
-}
-```
-
-Replace the `--directory` path with your local repo location.
-
-</details>
-
-Requires a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py` ran at least once); the deployed build reads the live Neon DB.
-
-### Tools exposed
-
-| Tool | Purpose |
-|---|---|
-| `query_attacks(family?, vector?, since_days?, limit?)` | Filter the attack-primitive corpus by family/vector/recency. Returns full primitive records with sources. |
-| `query_diff(date_str?)` | Today vs yesterday breach diff — what's new, what's newly defended, per-tier counts. |
-| `query_threat_brief(date_str?, format?)` | Full daily threat brief in markdown or JSON. Reads from `data/threat_briefs/` then falls back to live DB render. |
-| `query_breaches_for_config(deployment_config_id, since_days?, limit?)` | Per-trial breach results for one customer deployment, with judge rationale + model-response excerpts. |
-| `query_attack_detail(primitive_id)` | One attack's full record + its per-config breach aggregates (n_full / n_partial / n_refused / n_evaded). |
-
-### Try it
-
-After connecting, ask Claude:
-
-> "What new attacks broke our customer support config in the last 24 hours?"
-
-Claude will call `query_diff` + `query_breaches_for_config` and summarize.
-
-### Transport
-
-**Stdio** by default (the Claude Desktop path) — the server runs as a subprocess Claude Desktop spawns, logging to stderr so the JSON-RPC channel on stdout stays clean.
-
-For **remote** clients (Cursor / Windsurf / a hosted client), serve the same five tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
-
-```bash
-ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
-# serves http://127.0.0.1:8001/mcp  (set ROGUE_MCP_HOST=0.0.0.0 to expose off-box)
-```
-
-`ROGUE_MCP_TRANSPORT` accepts `stdio` | `sse` | `streamable-http`; `ROGUE_MCP_PORT` / `ROGUE_MCP_HOST` override the bind address.
 
 ## Architecture
 
