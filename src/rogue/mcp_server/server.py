@@ -104,7 +104,37 @@ def _get_session() -> Session:
 # --------------------------------------------------------------------------- #
 
 
-mcp = FastMCP("rogue")
+# `instructions` is the server-level description the MCP `initialize` response
+# returns — it's what Claude Desktop / Cursor / VS Code show as the server's
+# description (the config schemas themselves have no description field). Keep it
+# tight: what ROGUE is, what the data is, and when to reach for each tool.
+_INSTRUCTIONS = """\
+ROGUE — continuous open-web LLM red-team. This server exposes ROGUE's live
+threat-intelligence database: real jailbreak and prompt-injection attacks
+harvested from 15+ open-web sources via Bright Data, reproduced against customer
+deployment configs (model × system-prompt × tools), and graded by an independent
+judge. All tools are READ-ONLY and return live data from the breach matrix.
+
+When to use each tool:
+• query_attacks — browse/filter the attack-primitive corpus by family, vector,
+  or recency (e.g. "show indirect_prompt_injection attacks from the last 7 days").
+• query_diff — what changed today vs yesterday: newly-breaching and newly-defended
+  cells, per-severity counts (e.g. "any new critical attacks today?").
+• query_threat_brief — the full daily CISO-readable threat brief (markdown/JSON).
+• query_breaches_for_config — per-trial breach results for ONE customer deployment,
+  with judge rationale + model-response excerpts (e.g. "what broke our support bot?").
+• query_attack_detail — one attack's full record + its per-config breach aggregates
+  (n_full / n_partial / n_refused / n_evaded).
+
+Attack families follow ROGUE's taxonomy (jailbreak, indirect_prompt_injection,
+multimodal_injection, …); breach rates are MAX any-breach over N=5 trials per cell.
+"""
+
+mcp = FastMCP(
+    "rogue",
+    instructions=_INSTRUCTIONS,
+    website_url="https://rogue-eosin.vercel.app",
+)
 
 
 # --------------------------------------------------------------------------- #
