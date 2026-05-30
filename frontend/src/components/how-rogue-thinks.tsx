@@ -1,4 +1,5 @@
 import { Term } from "@/components/glossary";
+import { SourceLogo } from "@/components/ui/source-logo";
 
 /**
  * 3-step narrative: HARVEST → REPRODUCE → DEFEND.
@@ -46,7 +47,23 @@ export function HowRogueThinks({
           metric={nSources}
           metricUnit="open-web sources"
           headline="Stream the latest jailbreaks."
-          body="Reddit, X, GitHub, Hugging Face, arXiv, leaks — fanned out through 5 Bright Data products. New attacks land in the DB within minutes of being posted."
+          body={
+            <>
+              <SourceLogo source="Reddit" className="text-foreground/55 mr-0.5" />
+              Reddit,{" "}
+              <SourceLogo source="X" className="text-foreground/55 mr-0.5" />X,{" "}
+              <SourceLogo source="GitHub" className="text-foreground/55 mr-0.5" />
+              GitHub,{" "}
+              <SourceLogo
+                source="Hugging Face"
+                className="text-foreground/55 mr-0.5"
+              />
+              Hugging Face,{" "}
+              <SourceLogo source="arXiv" className="text-foreground/55 mr-0.5" />
+              arXiv, leaks — fanned out through 5 Bright Data products. New
+              attacks land in the DB within minutes of being posted.
+            </>
+          }
           delay="0.1s"
         />
         <Step

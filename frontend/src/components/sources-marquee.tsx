@@ -175,7 +175,15 @@ export function SourcesMarquee({
         <MetricTile
           value="19"
           unit="open-web sources fanned out"
-          sub="Reddit · X · GitHub · HuggingFace · arXiv · leaks"
+          sub={
+            <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
+              <SourceLogo source="Reddit" className="text-foreground/60" />Reddit ·{" "}
+              <SourceLogo source="X" className="text-foreground/60" />X ·{" "}
+              <SourceLogo source="GitHub" className="text-foreground/60" />GitHub ·{" "}
+              <SourceLogo source="HuggingFace" className="text-foreground/60" />HuggingFace ·{" "}
+              <SourceLogo source="arXiv" className="text-foreground/60" />arXiv · leaks
+            </span>
+          }
           tint="green"
         />
         <MetricTile
