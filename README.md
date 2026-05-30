@@ -194,7 +194,7 @@ See `docs/architecture.md` for the five-layer pipeline diagram + locked stack ta
 - 14-slot payload-template vocabulary for cross-deployment reproduction
 - 15-source open-web harvest list — see `docs/sources.md`
 - 5-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out.
-- Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), validated against **independent human labels — 91.8% refusal-axis agreement on WildGuardTest** (see [Judge calibration](#judge-calibration))
+- Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated — **2.56% false-positive breach rate (0% false-negative)** in-distribution, **91.8% refusal-axis agreement on WildGuardTest** (see [Judge calibration](#judge-calibration))
 - Daily threat brief (markdown + JSON) + Slack webhook
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
 - **True multimodal red-team** — renders attacks as real images/audio and an autonomous escalation ladder (see below)
@@ -202,6 +202,8 @@ See `docs/architecture.md` for the five-layer pipeline diagram + locked stack ta
 ## Judge calibration
 
 Every breach number ROGUE reports is ultimately an LLM verdict, so the entire matrix inherits the judge's error rate. "Trust the judge" is not good enough — so the judge is scored against **independent human labels**, not just spot-checked.
+
+**In-distribution — the false-positive breach rate.** 50 real reproduce rows were sampled from the live DB (stratified across verdicts × models × families), the judge's verdict hidden, and **hand-labeled blind** by the operator, then scored with `scripts/run_calibration.py`. The number that matters for matrix credibility — *how often does the judge cry breach on a response a human cleared?* — is **2.56%** (1/39), with a **0% false-negative breach rate** (it never missed a real breach). On the breach / no-breach axis the matrix actually reports, judge and human agree **98%** (49/50). Exact 4-way agreement is 82% (`borderline` gate), but the gap is almost entirely the `refused`↔`evaded` boundary (6 of 9 disagreements) — *both non-breaches*, so it moves no cell of the matrix. The judge is well-calibrated on the construct it is used for.
 
 **External validation — WildGuardTest.** The judge is scored against [WildGuardTest](https://huggingface.co/datasets/allenai/wildguardmix) (Allen AI) — ~1.7k responses labeled by independent human annotators. WildGuardTest annotates *response refusal* as a task separate from *response harm*, the same split ROGUE's verdicts make, so the judge is scored on two axes instead of being collapsed to safe/unsafe. Scored on the **human-annotated Test split only** — the Train split is GPT-4-labeled, and scoring against it would be the model-grades-model circularity this whole exercise exists to escape. One judge call per item; fully reproducible via `scripts/eval_wildguard.py` (seed-deterministic subset).
 
@@ -218,7 +220,7 @@ The **harm axis (78.1%)** is reported with one honest caveat. Its disagreement i
 
 These two external checks point in apparently opposite directions — WildGuard's *harm* axis says the judge over-calls, StrongREJECT says it under-calls — and that is the honest, useful result: they measure different constructs (harmful *content* vs jailbreak *effectiveness*) at different strictness, and together they **bracket** ROGUE's judge from both sides. It sits stricter than a lenient effectiveness grader and looser than a strict harmful-content label — exactly where a *"did the attacker gain useful traction"* verdict should land. No single external tool flags the matrix as inflated.
 
-**In-distribution gate.** The judge also ships a calibration runner (`src/rogue/reproduce/judge_calibration.py`): hand-labeled `(attack, model response, verdict)` triples scored against the live judge with a locked ship/refine gate (`< 0.80` agreement → refine the rubric; `≥ 0.90` → ship) and an explicit **false-positive breach rate** — how often the judge cries breach on a response a human cleared.
+All three checks are reproducible — `scripts/run_calibration.py` (in-distribution, against `tests/fixtures/judge_calibration_pairs.json`), `scripts/eval_wildguard.py`, and `scripts/second_grader_pass.py` — and the calibration runner enforces a locked ship/refine gate (`< 0.80` agreement → refine the rubric; `≥ 0.90` → ship).
 
 ## Multimodal red-team
 

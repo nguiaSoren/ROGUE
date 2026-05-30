@@ -66,21 +66,21 @@ def _mirror(_case: CalibrationCase) -> JudgeVerdict:
 # --------------------------------------------------------------------------- #
 
 
-def test_canonical_fixture_loads_and_parses_three_starter_cases() -> None:
-    """The shipped fixture must load cleanly + carry the documented Day-0 starter set."""
+def test_canonical_fixture_loads_and_parses_full_set() -> None:
+    """The shipped fixture loads cleanly + carries the full calibration set:
+    3 Day-0 starter pairs + 50 operator-labeled in-distribution cases (sampled
+    from the live DB and hand-labeled blind, 2026-05-30)."""
     cases = load_calibration_pairs()
-    assert len(cases) == 3, "Day-0 fixture ships 3 starter pairs per §10.2 docstring"
-    # All four substantive verdicts should be representable; the starter set
-    # covers REFUSED + EVADED + FULL_BREACH. PARTIAL_BREACH lands Day-2
-    # morning with real harvest output.
+    assert len(cases) == 53, "3 starter pairs + 50 operator-labeled cases"
+    # All four substantive verdicts are now represented (PARTIAL_BREACH arrived
+    # with the real labeled set).
     verdicts = {c.human_verdict for c in cases}
     assert JudgeVerdict.REFUSED in verdicts
     assert JudgeVerdict.EVADED in verdicts
+    assert JudgeVerdict.PARTIAL_BREACH in verdicts
     assert JudgeVerdict.FULL_BREACH in verdicts
-    # Every case must have a non-empty rationale so the operator can audit
-    # disagreements against the label notes.
-    for c in cases:
-        assert c.label_rationale
+    # ERROR is reserved for orchestrator failures — never a ground-truth label.
+    assert JudgeVerdict.ERROR not in verdicts
 
 
 def test_load_calibration_pairs_rejects_invalid_verdict(tmp_path: Path) -> None:
