@@ -300,6 +300,14 @@ BRIGHTDATA_POLL_TIMEOUT_SECONDS=1800 \
   uv run python scripts/harvest_once.py --since 21d --x-only --x-handles elder_plinius
 ```
 
+**When the profile scraper still won't return a post**, grab the exact tweet by URL — BD's *Web Unlocker* fetches a single X status page (text + screenshots) even when the profile scraper returns empty:
+
+```bash
+uv run python scripts/harvest_url.py --url "https://x.com/elder_plinius/status/<id>"
+```
+
+`harvest_url.py` web-unlocks one URL, ingests its images (the jailbreak screenshots → vision-read), extracts + dedups + persists the primitive, and syncs to Neon — then prints a `--primitive-ids <id>` command to reproduce just that attack against the panel. (This is how a freshly-posted X jailbreak gets from tweet → breach-matrix cell.)
+
 ### `scripts/reproduce_once.py` — render → target panel → judge → persist
 
 ```bash
