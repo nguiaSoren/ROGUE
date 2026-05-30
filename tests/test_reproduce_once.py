@@ -504,6 +504,96 @@ async def test_run_reproduction_end_to_end_with_mocked_panel_and_judge(
 
 
 @pytest.mark.asyncio
+async def test_run_reproduction_only_unreproduced_skips_done(
+    live_db_with_seeded_data,
+) -> None:
+    """--only-unreproduced: a primitive that already has breach_results is
+    skipped; only the not-yet-reproduced one fires."""
+    from sqlalchemy import create_engine, func, select
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from rogue.db.models import BreachResult as BreachResultORM
+
+    done_pid = "01TESTPRIM0" + "0" * 16   # score-9 primitive (already done)
+    new_pid = "01TESTPRIM1" + "0" * 16    # score-6 primitive (not yet)
+    config_id = demo_deployment_configs()[0].config_id
+
+    # Pre-seed ONE breach_result for the score-9 primitive → it must be skipped.
+    engine = create_engine(live_db_with_seeded_data)
+    with Session(engine) as s:
+        s.add(
+            BreachResultORM(
+                breach_id="01EXISTINGBREACH" + "0" * 9,
+                primitive_id=done_pid,
+                deployment_config_id=config_id,
+                trial_index=0,
+                temperature=0.7,
+                rendered_payload="x",
+                model_response="y",
+                verdict="evaded",
+                judge_rationale="prior run",
+                judge_confidence=0.5,
+                latency_ms=10,
+                tokens_in=1,
+                tokens_out=1,
+                cost_usd=0.0,
+                ran_at=datetime.now(timezone.utc),
+            )
+        )
+        s.commit()
+    engine.dispose()
+
+    class _StubPanel:
+        async def run_attack(self, rendered, config, temperature, n_trials):
+            return [
+                ModelResponse(
+                    content="complied", latency_ms=10, tokens_in=1, tokens_out=1,
+                    cost_usd=0.0, error=None, trial_index=i, temperature=temperature,
+                )
+                for i in range(n_trials)
+            ]
+
+        async def aclose(self):
+            pass
+
+    class _StubJudge:
+        async def judge(self, rendered, model_response, primitive):
+            return JudgeResult(
+                verdict=JudgeVerdict.FULL_BREACH, rationale="stub", confidence=0.9
+            )
+
+    stats = await run_reproduction(
+        database_url=live_db_with_seeded_data,
+        primitive_limit=None,
+        n_trials=1,
+        temperature=0.7,
+        concurrency=1,
+        panel=_StubPanel(),     # type: ignore[arg-type]
+        judge=_StubJudge(),     # type: ignore[arg-type]
+        only_unreproduced=True,
+    )
+
+    # Only the not-yet-reproduced primitive fired.
+    assert stats.primitives_processed == 1
+
+    # The NEW breach_results are all for new_pid; done_pid keeps only its 1 seed.
+    engine = create_engine(live_db_with_seeded_data)
+    SessionLocal = sessionmaker(bind=engine)
+    with SessionLocal() as session:
+        n_new = session.execute(
+            select(func.count()).select_from(BreachResultORM)
+            .where(BreachResultORM.primitive_id == new_pid)
+        ).scalar_one()
+        n_done = session.execute(
+            select(func.count()).select_from(BreachResultORM)
+            .where(BreachResultORM.primitive_id == done_pid)
+        ).scalar_one()
+        assert n_new == 1          # the freshly-reproduced one
+        assert n_done == 1         # untouched — still just the seed
+    engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_run_reproduction_judge_batch_path(
     live_db_with_seeded_data, monkeypatch
 ) -> None:

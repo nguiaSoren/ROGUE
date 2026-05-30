@@ -573,6 +573,7 @@ async def run_reproduction(
     escalate_planner_model: str | None = None,
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
+    only_unreproduced: bool = False,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -662,6 +663,21 @@ async def run_reproduction(
                     AttackPrimitiveORM.vector.in_(
                         [AttackVector.MULTIMODAL_IMAGE.value, AttackVector.MULTIMODAL_AUDIO.value]
                     ),
+                )
+            if only_unreproduced:
+                # Incremental sweep: fire ONLY primitives that have NO
+                # breach_results yet — i.e. the genuinely-new attacks (e.g. a
+                # freshly-harvested Pliny post), skipping everything already
+                # reproduced. OFF by default so the re-grade / re-test / new-day
+                # workflows (which deliberately re-fire) keep working. NOT EXISTS
+                # is keyed on primitive_id so a primitive that breached on ANY
+                # prior run is skipped.
+                from sqlalchemy import exists as _exists
+
+                primitives_q = primitives_q.where(
+                    ~_exists().where(
+                        BreachResultORM.primitive_id == AttackPrimitiveORM.primitive_id
+                    )
                 )
             if primitive_limit is not None:
                 primitives_q = primitives_q.limit(primitive_limit)
@@ -1049,6 +1065,18 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--only-unreproduced",
+        action="store_true",
+        help=(
+            "Incremental sweep: reproduce ONLY primitives that have no "
+            "breach_results yet (the genuinely-new attacks, e.g. a freshly-"
+            "harvested Pliny post), skipping everything already reproduced. "
+            "OFF by default so re-grade / re-test / new-day workflows (which "
+            "deliberately re-fire the whole corpus) keep working. Combine with "
+            "--judge-batch for a cheap, latency-tolerant catch-up pass."
+        ),
+    )
+    parser.add_argument(
         "--synthesized-only",
         action="store_true",
         help=(
@@ -1208,6 +1236,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_n_trials=args.escalate_n_trials,
             escalate_planner_model=args.escalate_planner_model,
             judge_batch=args.judge_batch,
+            only_unreproduced=args.only_unreproduced,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

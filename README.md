@@ -270,11 +270,25 @@ uv run python scripts/harvest_once.py --since 1d
 | Flag | Default | What it does |
 |---|---|---|
 | `--since` | `1d` | Harvest window (`1d`, `14d`, `6h`). |
+| `--x-handles` | off | Comma-separated X handles to scrape this run (e.g. `elder_plinius`). X is **off by default** (BD's profile scraper is slow, ~5–15 min/handle); opt in per run. Pulls each handle's recent posts within `--since`; attached images are ingested and outbound links followed. Needs `BRIGHTDATA_X_POSTS_DATASET_ID`. |
 | `--database-url` | `$DATABASE_URL` or local | Target SQLAlchemy URL. |
 | `--extraction-model` | `$EXTRACTION_MODEL` / `anthropic/claude-haiku-4-5` | Provider-prefixed extraction model (system prompt is prompt-cached). |
 | `--embedding-model` | `text-embedding-3-small` | OpenAI embedding model for dedup. |
 
 Env toggles: `EXTRACTION_CONCURRENCY` (TPM-aware fan-out) · `HARVEST_INGEST_IMAGES=0` (disable multimodal image ingestion) · `MEDIA_INGEST_MAX_PER_DOC` (4) / `MEDIA_INGEST_MAX_TOTAL` (60) · `HARVEST_FOLLOW_LINKS=0` (disable post→link following).
+
+#### Scraping a specific X account on demand (`--x-handles`)
+
+**Why it's a flag, not always-on:** Bright Data's X "discover-by-profile-URL" scraper averages **~5–15 minutes per handle**, so leaving X in the default daily harvest would push every run toward an hour+. It's therefore **disabled by default** (`default_plugins()` omits it) — every other source (Reddit, arXiv, GitHub, blogs, Pliny's GitHub) still runs. When you specifically want a practitioner's latest X drops, you opt in for that one run:
+
+```bash
+# scrape elder_plinius's posts from the last 21 days (then extract/dedup/persist)
+uv run python scripts/harvest_once.py --since 21d --x-handles elder_plinius
+# multiple handles:
+uv run python scripts/harvest_once.py --since 14d --x-handles elder_plinius,wunderwuzzi23
+```
+
+The handle's recent posts (within `--since`, capped at the 50 most-recent BD returns) flow through the **same** pipeline as any source: a screenshot of a jailbreak prompt is **vision-read / ingested** (multimodal image ingestion), and a link to a repo/write-up is **followed 1-hop** and processed. Requires `BRIGHTDATA_X_POSTS_DATASET_ID` in `.env`.
 
 ### `scripts/reproduce_once.py` — render → target panel → judge → persist
 
@@ -284,7 +298,8 @@ uv run python scripts/reproduce_once.py --primitive-limit 50 --judge-batch
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--primitive-limit N` | all | Cap how many primitives are reproduced (cost control). |
+| `--primitive-limit N` | all | Cap how many primitives are reproduced — the top-N by `reproducibility_score` (a cost cap, **not** "the newest"). |
+| `--only-unreproduced` | off | Incremental sweep: reproduce **only** primitives with no `breach_results` yet (the genuinely-new attacks), skipping everything already done. Off by default so re-grade / re-test runs still re-fire the corpus. |
 | `--n-trials N` | 5 | Trials per (primitive × config) — powers the bootstrap CI. |
 | `--temperature T` | 0.7 | Target-model sampling temperature. |
 | `--concurrency N` | — | Parallel target calls. |

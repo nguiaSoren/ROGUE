@@ -378,6 +378,7 @@ async def run_harvest(
     extractor: ExtractionAgent | None = None,
     bandit_state_path: Path | None = None,
     media_ingestor: MediaIngestor | None = None,
+    x_handles: list[str] | None = None,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
 
@@ -439,7 +440,20 @@ async def run_harvest(
         # Feature C: post→link following is on unless HARVEST_FOLLOW_LINKS=0
         # (spends Web-Unlocker credit, bounded by the phase caps).
         follow_links = os.environ.get("HARVEST_FOLLOW_LINKS", "1") != "0"
-        agent = DiscoveryAgent(bd_client, bandit=bandit, follow_links=follow_links)
+        # X timeline scraping is OFF by default (BD's discover-by-profile-url
+        # scraper is slow, ~5-15 min/handle). Opt in via --x-handles to harvest
+        # specific accounts' recent posts (then Feature-A image ingestion +
+        # Feature-C link following apply to them like any source).
+        plugins = None
+        if x_handles:
+            from rogue.harvest.discovery_agent import default_plugins
+            from rogue.harvest.sources import XUserTimelinePlugin
+
+            plugins = default_plugins() + [XUserTimelinePlugin(handles=list(x_handles))]
+            logger.info("X timeline ENABLED for handles: %s", ", ".join(x_handles))
+        agent = DiscoveryAgent(
+            bd_client, plugins=plugins, bandit=bandit, follow_links=follow_links
+        )
 
         # §11.7 Tier B — preload the fetch_cache ledger so harvest can skip
         # re-spend up front: (1) the SERP phase skips URLs we've already
@@ -805,6 +819,19 @@ def main(argv: list[str] | None = None) -> int:
         help="OpenAI embedding model id (1536-d to match the pgvector column).",
     )
     parser.add_argument(
+        "--x-handles",
+        default=None,
+        help=(
+            "Comma-separated X/Twitter handles to scrape this run (e.g. "
+            "'elder_plinius' or 'elder_plinius,wunderwuzzi23'). X is OFF by "
+            "default — BD's discover-by-profile-url scraper is slow (~5-15 "
+            "min/handle), so opt in only when you want it. Pulls each handle's "
+            "recent posts within --since; attached images are ingested (Feature "
+            "A) and outbound links followed (Feature C). Needs "
+            "BRIGHTDATA_X_POSTS_DATASET_ID set."
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
         help="Override for the per-run correlation id (default: a fresh UUID).",
@@ -821,12 +848,18 @@ def main(argv: list[str] | None = None) -> int:
     since = parse_since(args.since)
     logger.info("harvest window: since=%s", since.isoformat())
 
+    x_handles = (
+        [h.strip() for h in args.x_handles.split(",") if h.strip()]
+        if args.x_handles
+        else None
+    )
     stats = asyncio.run(
         run_harvest(
             since=since,
             database_url=args.database_url,
             extraction_model=args.extraction_model,
             embedding_model=args.embedding_model,
+            x_handles=x_handles,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())
