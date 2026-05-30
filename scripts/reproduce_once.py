@@ -824,6 +824,14 @@ async def run_reproduction(
                         "--judge-batch is baseline-only; ignoring "
                         "escalate/pair/persona for this run",
                     )
+                # Release the outer session BEFORE the long panel+batch wait:
+                # the primitive/config SELECTs above left it idle-in-transaction,
+                # and Neon kills such connections (IdleInTransactionSessionTimeout),
+                # making the `with`-block's exit-time rollback raise AFTER the
+                # data is already committed. The batch phase self-manages its own
+                # DB connection (database_url), so the session isn't needed past
+                # here. Closing now makes the with-block's later close a no-op.
+                session.close()
                 await _run_judge_batch_phase(
                     primitives=primitives, configs=configs, panel=panel,
                     judge=judge, database_url=database_url, stats=stats,
