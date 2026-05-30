@@ -389,9 +389,30 @@ def query_attack_detail(primitive_id: str) -> dict[str, Any]:
 
 
 def _parse_iso_date(date_str: str | None) -> date:
-    if not date_str:
-        return datetime.now(timezone.utc).date()
-    return date.fromisoformat(date_str)
+    """Resolve a report date for the diff/brief tools.
+
+    An explicit ``YYYY-MM-DD`` always wins. Otherwise default to the
+    **most-recent run day with breach data** (mirrors the dashboard), falling
+    back to today UTC only if the matrix is empty. Defaulting to a bare "today"
+    made ``query_diff`` look empty whenever the latest run was an earlier day —
+    e.g. data landed on the 30th but "today" is the 31st, so the diff computed
+    ``breach_set(31) - breach_set(30)`` = nothing, hiding that day's new attacks.
+    """
+    if date_str:
+        return date.fromisoformat(date_str)
+    try:
+        with _get_session() as session:
+            latest = session.execute(
+                text("SELECT max(run_date) FROM breach_matrix")
+            ).scalar()
+        if latest:
+            return latest
+    except Exception:
+        logger.warning(
+            "could not resolve most-recent run date; defaulting to today UTC",
+            exc_info=True,
+        )
+    return datetime.now(timezone.utc).date()
 
 
 def _enum_str(v: Any) -> Any:
