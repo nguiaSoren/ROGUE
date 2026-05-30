@@ -194,6 +194,7 @@ def _attach_image_to_last_user(
 _PRICE_PER_MILLION: dict[str, tuple[float, float]] = {
     "openai/gpt-5.4-nano": (0.20, 1.25),
     "anthropic/claude-haiku-4-5": (1.00, 5.00),
+    "anthropic/claude-opus-4-8": (15.00, 75.00),  # Opus-tier estimate — cost log only
     "groq/llama-3.1-8b-instant": (0.05, 0.08),  # Llama 3.1 8B Instant 128k — verified 2026-05-25 from Groq pricing page ($0.05/$0.08 confirmed). (Original ID `meta-llama/Llama-3.1-8B-Instruct` did NOT exist on Groq's public model list; corrected 2026-05-24 PM via GET /models.)
     "meta-llama/llama-3.1-8b-instruct": (0.02, 0.05),  # OpenRouter — locked 2026-05-26 as the canonical Llama slot (Groq dev-tier upgrade gated; OpenRouter is also cheaper at $0.02/$0.05 vs Groq's $0.05/$0.08, so this isn't just a fallback — it's the strictly-better choice. "Instruct" is the upstream Meta name; Groq's "Instant" suffix was Groq-branding for their inference-stack optimization, not a different fine-tune). Pricing verified from OpenRouter model page.
     "mistralai/mistral-small-2603": (0.15, 0.60),  # Mistral Small 4 via OpenRouter — verified 2026-05-25 ($0.15/$0.60). Pinned from `-latest` to the explicit 2026-03-17 release because vendor `-latest` tags can re-point mid-quarter.
