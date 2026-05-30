@@ -19,9 +19,17 @@ Five tools per §6.2 spec (line 1067):
   query_breaches_for_config(deployment_config_id, ...)    → list[BreachResult]
   query_attack_detail(primitive_id)                       → primitive + linked breaches
 
-Transport: stdio (the standard for Claude Desktop). Run via:
+Transport: stdio by default (the standard for Claude Desktop). Run via:
 
     uv run python -m rogue.mcp_server.server
+
+For remote access (Cursor / Windsurf / a hosted client), serve the same tools
+over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
+
+    ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
+
+(``ROGUE_MCP_TRANSPORT`` accepts ``stdio`` | ``sse`` | ``streamable-http``;
+``ROGUE_MCP_PORT`` / ``ROGUE_MCP_HOST`` override the default 127.0.0.1:8001.)
 
 Claude Desktop config (drop into `~/Library/Application Support/Claude/claude_desktop_config.json`):
 
@@ -415,22 +423,51 @@ def _primitive_to_dict(
 # --------------------------------------------------------------------------- #
 
 
-def main() -> None:
-    """Run the MCP server over stdio.
+_VALID_TRANSPORTS = ("stdio", "sse", "streamable-http")
 
-    Claude Desktop spawns this process and talks to it via stdin/stdout per
-    the MCP protocol. Logs go to stderr to avoid corrupting the JSON-RPC
-    stream on stdout.
+
+def main() -> None:
+    """Run the MCP server.
+
+    Default transport is **stdio** — Claude Desktop spawns this process and
+    talks to it via stdin/stdout per the MCP protocol. Logs go to stderr
+    (basicConfig's default) to avoid corrupting the JSON-RPC stream on stdout.
+
+    Set ``ROGUE_MCP_TRANSPORT=streamable-http`` (or the legacy ``sse``) to serve
+    over HTTP on ``ROGUE_MCP_PORT`` instead (default **8001** — a dedicated port
+    alongside the FastAPI dashboard backend on 8000). This is the remote-access
+    path: Cursor / Windsurf / a hosted client can query the threat DB over HTTP
+    without spawning a local subprocess. Override the bind address with
+    ``ROGUE_MCP_HOST`` (default 127.0.0.1; set 0.0.0.0 to expose off-box).
     """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        # Force-route logging to stderr (NOT stdout) — stdout is the MCP
-        # JSON-RPC channel and any stray print/log line would corrupt it.
-        # FastMCP installs its own stdout-only protocol handler.
+        # basicConfig defaults to a StreamHandler on stderr — never stdout,
+        # which is the MCP JSON-RPC channel for the stdio transport.
     )
-    logger.info("ROGUE MCP server starting — 5 tools available")
-    mcp.run()
+    transport = os.getenv("ROGUE_MCP_TRANSPORT", "stdio").strip().lower()
+    if transport not in _VALID_TRANSPORTS:
+        raise SystemExit(
+            f"ROGUE_MCP_TRANSPORT={transport!r} invalid; "
+            f"expected one of {', '.join(_VALID_TRANSPORTS)}"
+        )
+
+    if transport == "stdio":
+        logger.info("ROGUE MCP server starting — 5 tools — transport=stdio")
+    else:
+        # HTTP transports bind a real port; default 8001 so we never collide
+        # with the FastAPI dashboard backend on 8000.
+        mcp.settings.host = os.getenv("ROGUE_MCP_HOST", "127.0.0.1")
+        mcp.settings.port = int(os.getenv("ROGUE_MCP_PORT", "8001"))
+        logger.info(
+            "ROGUE MCP server starting — 5 tools — transport=%s on http://%s:%d",
+            transport,
+            mcp.settings.host,
+            mcp.settings.port,
+        )
+
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

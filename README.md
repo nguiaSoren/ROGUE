@@ -144,6 +144,17 @@ recommended action), tier-count chips, then the full markdown brief with
 
 ROGUE exposes its threat-intelligence database as a **producer-side MCP server** — Claude Desktop / Cursor / Windsurf users can query the live breach matrix from inside their IDE.
 
+### Install (one command)
+
+```bash
+uv run python scripts/install_mcp.py           # Claude Desktop (default)
+uv run python scripts/install_mcp.py --client cursor    # or: cursor / windsurf
+```
+
+This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing.
+
+<details><summary>Or edit the config by hand</summary>
+
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart Claude Desktop:
 
 ```json
@@ -160,7 +171,11 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 }
 ```
 
-Replace the `--directory` path with your local repo location. Requires Postgres running (`docker compose up -d`) and a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py` already ran at least once).
+Replace the `--directory` path with your local repo location.
+
+</details>
+
+Requires a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py` ran at least once); the deployed build reads the live Neon DB.
 
 ### Tools exposed
 
@@ -182,7 +197,16 @@ Claude will call `query_diff` + `query_breaches_for_config` and summarize.
 
 ### Transport
 
-Stdio (the Claude Desktop default). The server runs as a subprocess Claude Desktop spawns. Logs to stderr so the JSON-RPC channel on stdout stays clean.
+**Stdio** by default (the Claude Desktop path) — the server runs as a subprocess Claude Desktop spawns, logging to stderr so the JSON-RPC channel on stdout stays clean.
+
+For **remote** clients (Cursor / Windsurf / a hosted client), serve the same five tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
+
+```bash
+ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
+# serves http://127.0.0.1:8001/mcp  (set ROGUE_MCP_HOST=0.0.0.0 to expose off-box)
+```
+
+`ROGUE_MCP_TRANSPORT` accepts `stdio` | `sse` | `streamable-http`; `ROGUE_MCP_PORT` / `ROGUE_MCP_HOST` override the bind address.
 
 ## Architecture
 
