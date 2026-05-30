@@ -30,7 +30,20 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 ROGUE exposes its threat-intelligence database as a **producer-side MCP server** — Claude Desktop / Cursor / Windsurf users can query the live breach matrix from inside their IDE.
 
-### Install (one command)
+### Hosted — zero setup (recommended)
+
+The MCP server is mounted into the live API, so there's nothing to clone or run:
+
+```
+https://rogue-api-mr5w.onrender.com/mcp/
+```
+
+- **From the dashboard:** the [home page](https://rogue-eosin.vercel.app) has **Add to Cursor** / **Add to VS Code** one-click buttons + a copy-URL.
+- **Claude Desktop:** Settings → Connectors → Add custom connector → paste the URL.
+
+It's read-only (the five query tools below). For local development against your own DB, use the one-command installer instead:
+
+### Install locally (one command)
 
 ```bash
 uv run python scripts/install_mcp.py           # Claude Desktop (default)
