@@ -14,14 +14,22 @@ import { plainifyRate } from "@/lib/plain-numbers";
  * Column headers carry the §10.7 PAIR avg-iters-to-breach so the matrix
  * and the augmentation A/B story stay tied together visually.
  */
-export default async function MatrixPage() {
+export default async function MatrixPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  // ?date=YYYY-MM-DD pins a specific run day (e.g. a fresh harvest's reproduce
+  // that isn't the default "most-data" day). Omitted → the API's default.
+  const { date } = await searchParams;
+
   let matrix: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let augmented: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let stubbornness: Awaited<ReturnType<typeof api.stubbornnessStats>> | null = null;
   let error: string | null = null;
   try {
     [matrix, augmented, stubbornness] = await Promise.all([
-      api.breachMatrix(),
+      api.breachMatrix(date),
       api.breachMatrix(undefined, "augmented").catch(() => null),
       api.stubbornnessStats().catch(() => null),
     ]);
