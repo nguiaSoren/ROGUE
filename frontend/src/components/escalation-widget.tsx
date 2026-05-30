@@ -2,6 +2,7 @@ import type { EscalationStatsResponse } from "@/lib/api";
 import { SparkBars } from "@/components/spark";
 import { ExplainerHeader } from "@/components/explainer";
 import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
+import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
  * §10.7 Multi-turn escalation A/B tile — sidebar widget on /feed.
@@ -129,7 +130,10 @@ function EscalationConfigRow({
           className="truncate text-foreground flex-1 min-w-0"
           title={`${row.config_name} · ${row.target_model}`}
         >
-          {row.config_name}
+          <span className="inline-flex items-center gap-1.5">
+            <ProviderLogo model={row.target_model} className="text-xs opacity-70" />
+            {row.config_name}
+          </span>
         </span>
         <span className={`tabular-nums whitespace-nowrap ${tint}`}>
           {row.delta > 0 ? "+" : ""}

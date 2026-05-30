@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BreachCell } from "@/lib/api";
+import { ProviderLogo } from "@/components/ui/provider-logo";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -126,7 +127,10 @@ export function MatrixCellDrawer({
               cell · {cell.family}
             </p>
             <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate max-w-[400px]">
-              {cell.config_name} · {cell.target_model}
+              <span className="inline-flex items-center gap-1.5">
+                <ProviderLogo model={cell.target_model} className="text-xs opacity-80" />
+                {cell.config_name} · {cell.target_model}
+              </span>
             </p>
           </div>
           <button

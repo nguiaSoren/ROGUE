@@ -2,6 +2,7 @@ import type { PersonaStatsResponse } from "@/lib/api";
 import { SparkBars } from "@/components/spark";
 import { ExplainerHeader } from "@/components/explainer";
 import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
+import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
  * §10.7 Persona augmentation A/B tile — sidebar widget on /feed.
@@ -119,7 +120,12 @@ function TopCellRow({
         </span>
       </div>
       <div className="text-[10px] text-muted-foreground truncate" title={cell.config_name}>
-        on {cell.config_name} · {cell.n_wrapped_trials}t
+        on{" "}
+        <span className="inline-flex items-center gap-1.5">
+          <ProviderLogo model={cell.config_name} className="text-[10px] opacity-70" />
+          {cell.config_name}
+        </span>{" "}
+        · {cell.n_wrapped_trials}t
       </div>
     </li>
   );

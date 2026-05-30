@@ -8,6 +8,7 @@ import type {
   StubbornnessStatsResponse,
 } from "@/lib/api";
 import { AUGMENTATION_ACCENTS } from "@/components/augmentation-meta";
+import { ProviderLogo } from "@/components/ui/provider-logo";
 import { plainifyRate } from "@/lib/plain-numbers";
 
 /**
@@ -229,7 +230,10 @@ export function AugmentationLab({
                       : "border-border text-muted-foreground hover:border-rogue-green/40 hover:text-foreground"
                   }`}
                 >
-                  {c.config_name.replace(/^Acme\s*·\s*/, "")}
+                  <span className="inline-flex items-center gap-1.5">
+                    <ProviderLogo model={c.target_model} className="text-xs opacity-80" />
+                    {c.config_name.replace(/^Acme\s*·\s*/, "")}
+                  </span>
                 </button>
               );
             })}
