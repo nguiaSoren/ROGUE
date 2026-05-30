@@ -190,7 +190,7 @@ def _parse_date(s: str | None) -> date:
 #   "most-recent"   → the latest day with data (the right default once daily runs flow)
 #   "YYYY-MM-DD"    → pin a specific run day (e.g. 2026-05-30, the fresh-breach day)
 # Set the REPORT_DEFAULT_DATE env var to switch with no code change.
-REPORT_DEFAULT_DATE = os.getenv("REPORT_DEFAULT_DATE", "most-data")
+REPORT_DEFAULT_DATE = os.getenv("REPORT_DEFAULT_DATE", "most-recent")
 
 
 def _default_report_date(db: Session) -> date | None:
