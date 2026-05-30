@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SourceLogo } from "@/components/ui/source-logo";
 
 /**
  * Auto-play first-visit intro — 4 panels of 4s each (16s total).
@@ -341,9 +342,10 @@ function HarvestVisual() {
           {sources.map((s, i) => (
             <span
               key={s}
-              className="px-2 py-1 rounded-md border border-border bg-card/40 font-mono text-[11px] animate-rogue-fade-up"
+              className="px-2 py-1 rounded-md border border-border bg-card/40 font-mono text-[11px] animate-rogue-fade-up inline-flex items-center gap-1.5"
               style={{ animationDelay: `${0.6 + i * 0.07}s` }}
             >
+              <SourceLogo source={s} className="text-foreground/70" />
               {s}
             </span>
           ))}

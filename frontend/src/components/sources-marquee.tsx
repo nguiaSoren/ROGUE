@@ -1,6 +1,7 @@
 import type { BanditStatsResponse } from "@/lib/api";
 import { Term } from "@/components/glossary";
 import { PausedOffscreen } from "@/components/paused-offscreen";
+import { SourceLogo } from "@/components/ui/source-logo";
 import { plainifyYield } from "@/lib/plain-numbers";
 
 /**
@@ -211,6 +212,7 @@ export function SourcesMarquee({
                   className="inline-block w-1.5 h-1.5 rounded-full"
                   style={{ background: s.tint, boxShadow: `0 0 6px ${s.tint}` }}
                 />
+                <SourceLogo source={s.name} className="text-foreground/70 text-sm" />
                 <span className="text-foreground">{s.name}</span>
                 <span className="text-muted-foreground">· {s.via}</span>
               </div>
