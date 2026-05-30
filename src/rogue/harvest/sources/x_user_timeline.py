@@ -34,19 +34,23 @@ __all__ = ["XUserTimelinePlugin"]
 # default ran serial via for-loop, putting the daily harvest at risk of
 # 1-3hr just for X. The 4 kept are jailbreak/red-team practitioner accounts
 # (highest signal-to-noise for AttackPrimitive extraction):
-#   * pliny           — Pliny the Prompter; the L1B3RT4S / CL4R1T4S corpus author
-#   * simonw          — Simon Willison; daily prompt-injection commentary
-#   * embracethered   — Johann Rehberger; MCP / tool-exfiltration write-ups
-#   * llm_sec         — LLM security researcher; novel-technique sightings
+#   * elder_plinius   — Pliny the Prompter; the L1B3RT4S / CL4R1T4S corpus author
+#   * wunderwuzzi23   — Johann Rehberger (embracethered.com); prompt-injection →
+#                       RCE, MCP / tool-exfiltration write-ups
+#   * simonw          — Simon Willison; *named* prompt injection; daily commentary
+#   * goodside        — Riley Goodside; *discovered* prompt injection (2022)
+# (Handles verified on X 2026-05-30 — the prior list "pliny / embracethered /
+#  llm_sec" used wrong/nonexistent usernames; @elder_plinius and @wunderwuzzi23
+#  are the real handles, llm_sec did not exist → replaced with @goodside.)
 # Dropped: garak_ml / lakera (org accounts, mostly product PR); hardmaru
 # (general ML, low jailbreak content); AnthropicAI / OpenAIDevs / GoogleDeepMind
 # (vendor PR — not attacker-side); doomslide / plinz (low post frequency).
 # Re-add any by passing `handles=[...]` to the constructor.
 DEFAULT_HANDLES = [
-    "pliny",
+    "elder_plinius",
+    "wunderwuzzi23",
     "simonw",
-    "embracethered",
-    "llm_sec",
+    "goodside",
 ]
 
 
