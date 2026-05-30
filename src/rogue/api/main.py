@@ -57,6 +57,7 @@ from rogue.db.image_cache import (  # noqa: E402
     media_type_for,
     resolve_image_on_disk,
 )
+from mcp.server.transport_security import TransportSecuritySettings  # noqa: E402
 from rogue.mcp_server.server import mcp as rogue_mcp  # noqa: E402
 
 logger = logging.getLogger("rogue.api")
@@ -110,6 +111,12 @@ rogue_mcp.settings.streamable_http_path = "/"
 # the endpoint survives a multi-worker / autoscaled host. Our tools are plain
 # request/response queries — no server-initiated streams — so we lose nothing.
 rogue_mcp.settings.stateless_http = True
+# DNS-rebinding protection defaults to localhost-only, which 421s the public
+# Render host. It guards localhost servers from malicious web pages — not the
+# threat model for a public, read-only endpoint — so disable it here.
+rogue_mcp.settings.transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=False,
+)
 _mcp_app = rogue_mcp.streamable_http_app()
 
 

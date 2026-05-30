@@ -6,6 +6,7 @@ import { CinematicHero } from "@/components/cinematic-hero";
 import { HowRogueThinks } from "@/components/how-rogue-thinks";
 import { IntroOverlay } from "@/components/intro-overlay";
 import { LiveAttackTicker } from "@/components/live-attack-ticker";
+import { McpConnect } from "@/components/mcp-connect";
 import { MiniMatrix } from "@/components/mini-matrix";
 import { SourcesMarquee } from "@/components/sources-marquee";
 
@@ -162,6 +163,23 @@ export default async function Home() {
               desc="Today's CISO-readable diff vs yesterday. Markdown + JSON exports. The artifact you'd actually send."
             />
           </div>
+        </section>
+
+        {/* 8. CONNECT VIA MCP ----------------------------------------- */}
+        <section className="space-y-4 animate-rogue-fade-up">
+          <div className="space-y-1">
+            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
+              query it yourself
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+              Connect ROGUE to your IDE.
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+              ROGUE is also a live MCP server — ask Claude Desktop, Cursor, or
+              Windsurf about the threat DB directly. One click connects it.
+            </p>
+          </div>
+          <McpConnect />
         </section>
       </div>
     </main>
