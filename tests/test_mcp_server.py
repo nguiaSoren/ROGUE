@@ -50,8 +50,8 @@ def test_module_imports_without_db_connection() -> None:
     assert srv._SessionLocal is None
 
 
-def test_all_five_tools_registered() -> None:
-    """The §6.2 spec requires exactly these 5 tools by these names."""
+def test_all_tools_registered() -> None:
+    """The §6.2 spec tools + the query_worst_attacks convenience tool."""
     from rogue.mcp_server import server as srv
 
     expected = {
@@ -60,6 +60,7 @@ def test_all_five_tools_registered() -> None:
         "query_threat_brief",
         "query_breaches_for_config",
         "query_attack_detail",
+        "query_worst_attacks",
     }
     registered = set(srv.mcp._tool_manager._tools.keys())
     assert registered == expected, f"expected {expected}, got {registered}"

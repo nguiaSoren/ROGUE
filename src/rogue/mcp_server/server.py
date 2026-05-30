@@ -11,13 +11,14 @@ on BOTH sides of the harvest pipeline:
     support config in the last 24 hours?" and have Claude call our tools
     in-IDE.
 
-Five tools per §6.2 spec (line 1067):
+Six tools (§6.2 spec, line 1067, + query_worst_attacks):
 
   query_attacks(family?, vector?, since_days?, limit?)   → list[AttackPrimitive]
   query_diff(date?)                                       → today vs yesterday diff
   query_threat_brief(date?, format?)                      → markdown threat brief
   query_breaches_for_config(deployment_config_id, ...)    → list[BreachResult]
   query_attack_detail(primitive_id)                       → primitive + linked breaches
+  query_worst_attacks(model_family?, limit?)              → hardest-breaching attacks
 
 Transport: stdio by default (the standard for Claude Desktop). Run via:
 
@@ -116,6 +117,10 @@ deployment configs (model × system-prompt × tools), and graded by an independe
 judge. All tools are READ-ONLY and return live data from the breach matrix.
 
 When to use each tool:
+• query_worst_attacks — the fast "am I exposed?" answer: the hardest-breaching
+  attacks. Pass your model family (claude / gpt / gemini / llama / mistral) to
+  scope it to the closest config in the panel (e.g. "worst attacks against a
+  model like me?").
 • query_attacks — browse/filter the attack-primitive corpus by family, vector,
   or recency (e.g. "show indirect_prompt_injection attacks from the last 7 days").
 • query_diff — what changed today vs yesterday: newly-breaching and newly-defended
@@ -379,6 +384,129 @@ def query_attack_detail(primitive_id: str) -> dict[str, Any]:
                     "last_ran_at": row.last_ran_at.isoformat() if row.last_ran_at else None,
                 }
                 for row in per_config
+            ],
+        }
+
+
+# --------------------------------------------------------------------------- #
+# Tool 6: query_worst_attacks
+# --------------------------------------------------------------------------- #
+
+# Map a loosely-typed model family to the substring that identifies the closest
+# config's target_model. Lets a client say "claude" and get the Claude config.
+_MODEL_FAMILY_ALIASES = {
+    "claude": "claude", "anthropic": "claude",
+    "gpt": "gpt", "openai": "gpt", "chatgpt": "gpt", "o1": "gpt",
+    "gemini": "gemini", "google": "gemini", "bard": "gemini",
+    "llama": "llama", "meta": "llama",
+    "mistral": "mistral", "mixtral": "mistral",
+}
+
+
+@mcp.tool()
+def query_worst_attacks(model_family: str | None = None, limit: int = 10) -> dict[str, Any]:
+    """Highest-breach-rate attacks — optionally against the model closest to yours.
+
+    The fast "am I exposed?" answer: the attacks that breach hardest, all-time.
+    Pass your own model's family and ROGUE maps it to the closest config in its
+    panel and returns the worst attacks against THAT config — so an assistant can
+    answer "what are the worst attacks against a model like me?" in one call.
+
+    Args:
+        model_family: optional — "claude"/"anthropic", "gpt"/"openai",
+            "gemini"/"google", "llama"/"meta", or "mistral". Maps to the closest
+            deployment config (e.g. "claude" -> the Claude Haiku config) and
+            scopes results to it. None = worst attacks across ALL configs.
+        limit: max attacks to return (default 10, max 50).
+
+    Returns:
+        {matched_config: {config_id, config_name, target_model} | null,
+         note: str,
+         attacks: [{primitive_id, title, family, vector, config_name,
+                    target_model, any_breach_rate, full_breach_rate, n_trials}]}
+        sorted worst-first (any-breach desc, then full-breach desc).
+    """
+    limit = max(1, min(50, limit))
+
+    with _get_session() as session:
+        matched = None
+        cfg_id = None
+        if model_family:
+            token = _MODEL_FAMILY_ALIASES.get(model_family.strip().lower())
+            if token is None:
+                return {
+                    "matched_config": None,
+                    "note": (
+                        f"unknown model_family {model_family!r}; expected one of "
+                        f"{sorted(set(_MODEL_FAMILY_ALIASES))}. Returning nothing — "
+                        "call again with a known family or omit it for all-configs."
+                    ),
+                    "attacks": [],
+                }
+            row = session.execute(
+                text(
+                    "SELECT config_id, name, target_model FROM deployment_configs "
+                    "WHERE lower(target_model) LIKE :t OR lower(name) LIKE :t LIMIT 1"
+                ),
+                {"t": f"%{token}%"},
+            ).first()
+            if row is not None:
+                cfg_id = row.config_id
+                matched = {
+                    "config_id": row.config_id,
+                    "config_name": row.name,
+                    "target_model": row.target_model,
+                }
+
+        rows = session.execute(
+            text(
+                f"""
+                WITH agg AS (
+                    SELECT br.primitive_id, br.deployment_config_id,
+                        COUNT(*) FILTER (WHERE br.verdict != 'error') AS n,
+                        COUNT(*) FILTER (WHERE br.verdict IN ('partial_breach','full_breach'))::float
+                            / NULLIF(COUNT(*) FILTER (WHERE br.verdict != 'error'), 0) AS any_rate,
+                        COUNT(*) FILTER (WHERE br.verdict = 'full_breach')::float
+                            / NULLIF(COUNT(*) FILTER (WHERE br.verdict != 'error'), 0) AS full_rate
+                    FROM breach_results br
+                    {"WHERE br.deployment_config_id = :cfg" if cfg_id else ""}
+                    GROUP BY 1, 2
+                )
+                SELECT a.primitive_id, a.deployment_config_id, a.n, a.any_rate, a.full_rate,
+                       ap.title, ap.family, ap.vector, dc.name AS config_name, dc.target_model
+                FROM agg a
+                JOIN attack_primitives ap ON ap.primitive_id = a.primitive_id
+                JOIN deployment_configs dc ON dc.config_id = a.deployment_config_id
+                WHERE a.any_rate > 0
+                ORDER BY a.any_rate DESC, a.full_rate DESC, a.n DESC
+                LIMIT :limit
+                """
+            ),
+            {"cfg": cfg_id, "limit": limit} if cfg_id else {"limit": limit},
+        ).all()
+
+        note = (
+            f"worst attacks against {matched['target_model']} (closest config to "
+            f"{model_family!r})" if matched else
+            (f"no config matched {model_family!r}; showing worst across all configs"
+             if model_family else "worst attacks across all configs")
+        )
+        return {
+            "matched_config": matched,
+            "note": note,
+            "attacks": [
+                {
+                    "primitive_id": r.primitive_id,
+                    "title": r.title,
+                    "family": _enum_str(r.family),
+                    "vector": _enum_str(r.vector),
+                    "config_name": r.config_name,
+                    "target_model": r.target_model,
+                    "any_breach_rate": round(float(r.any_rate or 0.0), 3),
+                    "full_breach_rate": round(float(r.full_rate or 0.0), 3),
+                    "n_trials": int(r.n or 0),
+                }
+                for r in rows
             ],
         }
 
