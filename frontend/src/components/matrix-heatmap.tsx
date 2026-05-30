@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { BreachCell, BreachMatrixResponse, StubbornnessStatsResponse } from "@/lib/api";
 import { MatrixCellDrawer } from "@/components/matrix-drawer";
+import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
  * Interactive breach heatmap. Renders the (family × config) grid, with each
@@ -236,7 +237,13 @@ export function MatrixHeatmap({
                         className="text-foreground hover:text-rogue-green transition-colors"
                         title="Click to show only this deployment column"
                       >
-                        {shortConfigName(c.config_name)}
+                        <span className="inline-flex items-center gap-1.5">
+                          <ProviderLogo
+                            model={c.config_name}
+                            className="text-sm opacity-80"
+                          />
+                          {shortConfigName(c.config_name)}
+                        </span>
                       </button>
                       <span
                         className={`text-[9px] tabular-nums ${headerTint}`}
