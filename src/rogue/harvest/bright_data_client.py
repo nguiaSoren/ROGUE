@@ -309,6 +309,18 @@ class BrightDataClient:
         whitespace + treat any value starting with ``#`` as effectively
         unset. Verified 2026-05-26 via per-source smoke test.
         """
+        # Async-snapshot poll timeout is env-overridable: BD's X
+        # discover-by-profile scraper can take 15-30+ min, exceeding the 600s
+        # default, so a Pliny-X harvest needs e.g.
+        # BRIGHTDATA_POLL_TIMEOUT_SECONDS=1800. Falls back to the defaults on a
+        # blank/unparseable value.
+        def _float_env(name: str, default: float) -> float:
+            raw = _env_clean(name)
+            try:
+                return float(raw) if raw else default
+            except ValueError:
+                return default
+
         return cls(
             api_key=_env_clean("BRIGHTDATA_API_KEY") or "",
             serp_zone=_env_clean("BRIGHTDATA_SERP_ZONE") or "",
@@ -317,6 +329,12 @@ class BrightDataClient:
             reddit_dataset_id=_env_clean("BRIGHTDATA_REDDIT_DATASET_ID"),
             x_posts_dataset_id=_env_clean("BRIGHTDATA_X_POSTS_DATASET_ID"),
             hf_dataset_id=_env_clean("BRIGHTDATA_HUGGINGFACE_DATASET_ID"),
+            poll_interval_seconds=_float_env(
+                "BRIGHTDATA_POLL_INTERVAL_SECONDS", _POLL_INTERVAL_SECONDS_DEFAULT
+            ),
+            poll_timeout_seconds=_float_env(
+                "BRIGHTDATA_POLL_TIMEOUT_SECONDS", _POLL_TIMEOUT_SECONDS_DEFAULT
+            ),
         )
 
     # ------------------------------------------------------------------
