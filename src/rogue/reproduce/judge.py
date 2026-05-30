@@ -231,7 +231,7 @@ class JudgeAgent:
         # that classifies harmful content instead of refusing. The model id is
         # the bare OpenRouter id (``provider/model``, used verbatim — no prefix).
         self.fallback_model: str = fallback_model or os.environ.get(
-            "JUDGE_FALLBACK_MODEL", "deepseek/deepseek-v3.2"
+            "JUDGE_FALLBACK_MODEL", "deepseek/deepseek-v4-flash"
         )
 
         prompt_path = (
@@ -295,10 +295,19 @@ class JudgeAgent:
                     "anthropic judge refused (stop_reason=refusal); routing to "
                     "secondary judge %s", self.fallback_model,
                 )
-                data = await self._call_fallback_judge(user_message)
+                data = await self._grade_via_openrouter(
+                    user_message, self.fallback_model
+                )
                 graded_by_secondary = True
         elif self.model.startswith("openai/"):
             data = await self._call_openai(user_message)
+        elif self.model.startswith("openrouter/"):
+            # OpenRouter model as the PRIMARY judge (e.g. a permissive open model
+            # that doesn't hit Anthropic's refusal). The id after the prefix is
+            # the OpenRouter model id, used verbatim.
+            data = await self._grade_via_openrouter(
+                user_message, self.model.split("/", 1)[1]
+            )
         else:
             raise NotImplementedError(
                 f"provider for {self.model} not wired — Day 1"
@@ -412,7 +421,17 @@ class JudgeAgent:
         response = await self._anthropic_client.messages.create(
             model=bare_model,
             max_tokens=1024,
-            system=self.prompt,
+            # Prompt-cache the rubric/system prompt (~5.5K tokens, identical on
+            # every grading call) — cache reads are ~0.1× input price, so a
+            # reproduce sweep pays the rubric's input cost once per 5-min window
+            # instead of per cell. The per-call user message stays uncached.
+            system=[
+                {
+                    "type": "text",
+                    "text": self.prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": user_message}],
             tools=[
                 {
@@ -487,11 +506,15 @@ class JudgeAgent:
         retry=retry_if_exception_type(_TRANSIENT_ERRORS),
         reraise=True,
     )
-    async def _call_fallback_judge(self, user_message: str) -> dict[str, Any]:
-        """Secondary judge for cells the primary (Anthropic) judge REFUSED.
+    async def _grade_via_openrouter(
+        self, user_message: str, model_id: str
+    ) -> dict[str, Any]:
+        """Grade with an OpenRouter (OpenAI-compatible) model — used both as the
+        secondary judge for Anthropic-refused cells (``model_id`` =
+        ``self.fallback_model``) AND as a primary judge when ``self.model`` is
+        ``openrouter/...``.
 
-        Calls ``self.fallback_model`` — a permissive open model via OpenRouter
-        (OpenAI-compatible) that classifies harmful content instead of hitting a
+        A permissive open model classifies harmful content instead of hitting a
         ``refusal`` stop-reason. Open models don't reliably support tool-use, so
         this is a plain chat completion parsed leniently by
         :func:`_parse_verdict_text`. Needs ``OPENROUTER_API_KEY``.
@@ -505,7 +528,7 @@ class JudgeAgent:
             )
 
         completion = await self._openrouter_client.chat.completions.create(
-            model=self.fallback_model,  # OpenRouter id used verbatim
+            model=model_id,  # OpenRouter id used verbatim
             max_tokens=1024,
             messages=[
                 {"role": "system", "content": self.prompt},
@@ -520,8 +543,8 @@ class JudgeAgent:
         data = _parse_verdict_text(text)
         if data is None:
             raise JudgeOutputError(
-                "secondary judge produced no parseable verdict "
-                f"(model={self.fallback_model}, text excerpt: {text[:200]!r})"
+                "openrouter judge produced no parseable verdict "
+                f"(model={model_id}, text excerpt: {text[:200]!r})"
             )
         return data
 
