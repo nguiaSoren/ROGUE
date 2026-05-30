@@ -1,3 +1,5 @@
+![ROGUE — The Red-Team That Never Sleeps](assets/cover.png)
+
 # ROGUE — Open-web LLM Threat Intelligence Agent
 
 ### _The Red-Team That Never Sleeps._
@@ -215,7 +217,7 @@ The bandit widget's arm rows each carry a CSS-only hover-card with
 
 ### `/matrix` — breach heatmap
 
-14 attack families × 5 deployment configs. Click any red cell to see the
+15 attack families × 6 deployment configs. Click any red cell to see the
 exact primitive that cracked it, with 95% bootstrap CIs. Column headers
 carry the PAIR avg-iters-to-breach so the matrix and the §10.7
 augmentation story stay tied together visually.
@@ -235,7 +237,7 @@ See `docs/architecture.md` for the five-layer pipeline diagram + locked stack ta
 - 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
 - 14-slot payload-template vocabulary for cross-deployment reproduction
 - 15-source open-web harvest list — see `docs/sources.md`
-- 5-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out.
+- 6-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out — **plus Claude Opus 4.8**, a flagship added to reproduce the elder_plinius jailbreak against a frontier model (it breached at 100%; Claude Haiku held).
 - Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated on 50 blind-labeled rows — **2.56% false-positive breach rate (1/39), 0 missed breaches (0/11)**, plus **91.8% refusal-axis agreement on WildGuardTest** (n=196) (small samples — see [Judge calibration](#judge-calibration))
 - Daily threat brief (markdown + JSON) + Slack webhook
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
