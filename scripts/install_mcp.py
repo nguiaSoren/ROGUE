@@ -132,6 +132,44 @@ def install(config_path: Path, *, dry_run: bool = False) -> int:
     return 0
 
 
+def uninstall(config_path: Path, *, dry_run: bool = False) -> int:
+    """Remove the `rogue` entry from a client config (the inverse of install).
+
+    Config-file MCP servers can't always be deleted from the client's UI — they
+    live in this file — so this is how you remove the local `rogue` server.
+    Leaves every other key/server untouched; no-op if it isn't present.
+    """
+    if not config_path.exists():
+        print(f"✓ {config_path} doesn't exist — nothing to remove.")
+        return 0
+    raw = config_path.read_text(encoding="utf-8").strip()
+    try:
+        existing = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as exc:
+        print(f"!! {config_path} is not valid JSON ({exc}) — fix it first.", file=sys.stderr)
+        return 2
+    servers = existing.get("mcpServers")
+    if not isinstance(servers, dict) or SERVER_NAME not in servers:
+        print(f"✓ '{SERVER_NAME}' not in {config_path} — nothing to remove.")
+        return 0
+
+    del servers[SERVER_NAME]
+    rendered = json.dumps(existing, indent=2)
+    if dry_run:
+        print(f"# dry-run: would remove '{SERVER_NAME}' from {config_path}:\n")
+        print(rendered)
+        return 0
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    backup = config_path.with_suffix(config_path.suffix + f".bak-{stamp}")
+    backup.write_text(config_path.read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"• backed up existing config → {backup}")
+    config_path.write_text(rendered + "\n", encoding="utf-8")
+    print(f"✓ removed '{SERVER_NAME}' → {config_path}")
+    print("→ Fully quit and reopen the client so it drops the server.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -149,7 +187,12 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print the merged config instead of writing it.",
+        help="Print the resulting config instead of writing it.",
+    )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove the 'rogue' server from the client config instead of adding it.",
     )
     args = parser.parse_args()
 
@@ -158,6 +201,8 @@ def main() -> int:
         print(f"!! no known {args.client} config path for this OS.", file=sys.stderr)
         return 2
 
+    if args.uninstall:
+        return uninstall(config_path, dry_run=args.dry_run)
     return install(config_path, dry_run=args.dry_run)
 
 

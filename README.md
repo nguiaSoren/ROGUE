@@ -39,7 +39,7 @@ https://rogue-api-mr5w.onrender.com/mcp/
 ```
 
 - **From the dashboard:** the [home page](https://rogue-eosin.vercel.app) has **Add to Cursor** / **Add to VS Code** one-click buttons + a copy-URL.
-- **Claude Desktop:** Settings → Connectors → Add custom connector → paste the URL.
+- **Claude Desktop:** Settings → **Customize** (connectors moved here) → add a custom connector → paste the URL.
 
 It's read-only (the five query tools below). For local development against your own DB, use the one-command installer instead:
 
@@ -50,7 +50,7 @@ uv run python scripts/install_mcp.py           # Claude Desktop (default)
 uv run python scripts/install_mcp.py --client cursor    # or: cursor / windsurf
 ```
 
-This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing.
+This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing, or `--uninstall` to remove the `rogue` entry (config-file servers can't always be deleted from the client UI).
 
 > **Reviewer flow (any MCP client):** clone the repo → `uv run python scripts/install_mcp.py` (writes the pointer at *your* clone's path) → restart the client. No manual JSON editing. ROGUE is a standard MCP server, so any compliant client works — the installer just covers Claude Desktop / Cursor / Windsurf out of the box; everything else can point at the same `uv … -m rogue.mcp_server.server` command (stdio) or the HTTP endpoint on :8001 (see [Transport](#transport)).
 
