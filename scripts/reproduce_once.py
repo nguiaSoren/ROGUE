@@ -627,6 +627,7 @@ async def run_reproduction(
     judge_batch: bool = False,
     only_unreproduced: bool = False,
     primitive_ids: list[str] | None = None,
+    config_ids: list[str] | None = None,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -756,9 +757,14 @@ async def run_reproduction(
                     primitives_q = primitives_q.limit(primitive_limit)
                 primitive_orms = list(session.execute(primitives_q).scalars())
 
-            config_orms = list(
-                session.execute(select(DeploymentConfigORM)).scalars()
-            )
+            config_q = select(DeploymentConfigORM)
+            if config_ids:
+                # Targeted run: only these deployment configs (e.g. test one new
+                # model against a primitive without re-firing the whole panel).
+                config_q = config_q.where(
+                    DeploymentConfigORM.config_id.in_(list(config_ids))
+                )
+            config_orms = list(session.execute(config_q).scalars())
             if not config_orms:
                 raise RuntimeError(
                     "no DeploymentConfigs in DB — run: "
@@ -1156,6 +1162,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--config-ids",
+        default=None,
+        help=(
+            "Comma-separated deployment config_ids to reproduce against (default "
+            "= all configs in the panel). Use with --primitive-ids to test ONE "
+            "attack against ONE model without re-firing the whole panel."
+        ),
+    )
+    parser.add_argument(
         "--only-unreproduced",
         action="store_true",
         help=(
@@ -1331,6 +1346,11 @@ def main(argv: list[str] | None = None) -> int:
             primitive_ids=(
                 [p.strip() for p in args.primitive_ids.split(",") if p.strip()]
                 if args.primitive_ids
+                else None
+            ),
+            config_ids=(
+                [c.strip() for c in args.config_ids.split(",") if c.strip()]
+                if args.config_ids
                 else None
             ),
         )
