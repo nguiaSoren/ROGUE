@@ -1,4 +1,7 @@
 # ROGUE — Open-web LLM Threat Intelligence Agent
+
+### _The Red-Team That Never Sleeps._
+
 Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data × LLM threat intelligence hackathon submission.
 
 > Continuous red-team for production LLM deployments. Harvests new jailbreaks from
