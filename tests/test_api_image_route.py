@@ -135,3 +135,33 @@ def test_serves_image_under_media_cache(client) -> None:
         assert r.content == _PNG
     finally:
         f.unlink(missing_ok=True)
+
+
+# --------------------------------------------------------------------------- #
+# REPORT_DEFAULT_DATE — literal-date pin (no DB for the literal branch)
+# --------------------------------------------------------------------------- #
+
+
+def test_default_report_date_literal_pin(monkeypatch) -> None:
+    import rogue.api.main as m
+    from datetime import date as _date
+
+    monkeypatch.setattr(m, "REPORT_DEFAULT_DATE", "2026-05-30")
+    # literal branch returns without touching the DB → object() is never used
+    assert m._default_report_date(object()) == _date(2026, 5, 30)
+
+
+def test_default_report_date_bad_literal_falls_back(monkeypatch) -> None:
+    import rogue.api.main as m
+
+    monkeypatch.setattr(m, "REPORT_DEFAULT_DATE", "not-a-date")
+
+    class _Result:
+        def scalar(self):
+            return None
+
+    class _DB:
+        def execute(self, *a, **k):
+            return _Result()
+
+    assert m._default_report_date(_DB()) is None  # fell through to the most-data query
