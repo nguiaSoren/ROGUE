@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -56,6 +57,7 @@ from rogue.db.image_cache import (  # noqa: E402
     media_type_for,
     resolve_image_on_disk,
 )
+from rogue.mcp_server.server import mcp as rogue_mcp  # noqa: E402
 
 logger = logging.getLogger("rogue.api")
 
@@ -98,22 +100,47 @@ def get_session() -> Iterator[Session]:
 # --------------------------------------------------------------------------- #
 
 
+# Mount the producer-side MCP server into this same app so it ships with the
+# already-deployed API — no separate service. Clients reach it at
+# ``<api-host>/mcp`` over streamable-http; the local stdio path (Claude Desktop)
+# is unchanged. We set the inner path to "/" so mounting at "/mcp" yields exactly
+# "/mcp" (no double segment).
+rogue_mcp.settings.streamable_http_path = "/"
+# Stateless: each request is self-contained (no in-memory session affinity), so
+# the endpoint survives a multi-worker / autoscaled host. Our tools are plain
+# request/response queries — no server-initiated streams — so we lose nothing.
+rogue_mcp.settings.stateless_http = True
+_mcp_app = rogue_mcp.streamable_http_app()
+
+
+@asynccontextmanager
+async def _lifespan(_app: "FastAPI"):
+    # FastMCP's streamable-http transport needs its session-manager lifespan
+    # running for the duration of the server; nest it under the API's lifespan.
+    async with _mcp_app.router.lifespan_context(_app):
+        yield
+
+
 app = FastAPI(
     title="ROGUE Dashboard API",
     description=(
         "Read-only API behind the ROGUE dashboard. Surfaces the harvest + "
         "reproduce pipeline's outputs: attack primitives, breach matrix, "
-        "daily threat brief, and bandit telemetry."
+        "daily threat brief, and bandit telemetry. Also mounts the ROGUE MCP "
+        "server at /mcp (streamable-http) for remote IDE clients."
     ),
     version="0.1.0",
+    lifespan=_lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET"],
+    # POST/DELETE/OPTIONS as well — the /mcp streamable-http endpoint uses them.
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/mcp", _mcp_app)
 
 
 # --------------------------------------------------------------------------- #
