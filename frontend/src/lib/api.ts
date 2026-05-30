@@ -334,7 +334,10 @@ export const api = {
   },
   attackDetail: (primitiveId: string) =>
     apiGet<{ primitive: AttackPrimitive; breaches: unknown[] }>(`/api/attacks/${primitiveId}`),
-  breachMatrix: (date?: string, include?: "baseline" | "augmented") => {
+  breachMatrix: (
+    date?: string,
+    include?: "baseline" | "augmented" | "alltime_baseline" | "thisrun_augmented",
+  ) => {
     const q = new URLSearchParams();
     if (date) q.set("date", date);
     if (include) q.set("include", include);

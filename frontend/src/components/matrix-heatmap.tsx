@@ -15,11 +15,17 @@ import { ProviderLogo } from "@/components/ui/provider-logo";
  */
 export function MatrixHeatmap({
   matrix,
+  thisRunAugmented,
+  allTimeBaseline,
   augmented,
   stubbornness,
 }: {
+  // The four quadrants of the SCOPE × ATTACKER 2×2. `matrix` is the only one
+  // guaranteed present (this-run × baseline); the rest fall back to it.
   matrix: BreachMatrixResponse;
-  augmented?: BreachMatrixResponse | null;
+  thisRunAugmented?: BreachMatrixResponse | null; // this-run × augmented
+  allTimeBaseline?: BreachMatrixResponse | null; // all-time × baseline
+  augmented?: BreachMatrixResponse | null; // all-time × augmented
   stubbornness: StubbornnessStatsResponse | null;
 }) {
   const [openCell, setOpenCell] = useState<BreachCell | null>(null);
@@ -28,11 +34,25 @@ export function MatrixHeatmap({
     "all" | "critical" | "high" | "any-breach"
   >("all");
   const [configFilter, setConfigFilter] = useState<string | null>(null);
+  // Two fully-independent axes (the 2×2):
+  //   SCOPE    — this run (one day) vs all-time (every run day merged)
+  //   ATTACKER — baseline (raw single-shot) vs + augmentations (persona + PAIR)
+  const [scope, setScope] = useState<"this-run" | "all-time">("this-run");
   const [showAugmented, setShowAugmented] = useState(false);
 
-  // Active dataset: baseline (raw harvested prompt, N=5/cell, today) vs.
-  // augmented (all-time worst-case per cell across persona-wrap + PAIR).
-  const active = showAugmented && augmented ? augmented : matrix;
+  const hasAugment = Boolean(thisRunAugmented || augmented);
+  const hasAllTime = Boolean(allTimeBaseline || augmented);
+
+  // Active dataset = the quadrant for (scope, attacker). Any missing quadrant
+  // degrades gracefully back toward the always-present this-run baseline.
+  const active = useMemo(() => {
+    if (scope === "all-time") {
+      return showAugmented
+        ? augmented ?? allTimeBaseline ?? matrix
+        : allTimeBaseline ?? matrix;
+    }
+    return showAugmented ? thisRunAugmented ?? matrix : matrix;
+  }, [scope, showAugmented, matrix, thisRunAugmented, allTimeBaseline, augmented]);
 
   // Pre-compute the worst-rate cell per (family × config) so the click
   // handler can yank the canonical primitive for the cell quickly.
@@ -98,41 +118,77 @@ export function MatrixHeatmap({
 
   return (
     <>
-      {/* Baseline vs. augmented toggle — swaps the whole grid between the raw
-          harvested-prompt rates and the all-time worst-case once the attacker
-          is allowed to adapt (persona-wrap + PAIR). */}
-      {augmented && (
-        <section className="flex items-center gap-3 flex-wrap animate-rogue-fade-up">
-          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mr-1">
-            attacker:
-          </span>
-          <div className="inline-flex rounded-md border border-border overflow-hidden font-mono text-[10px] uppercase tracking-wider">
-            <button
-              type="button"
-              onClick={() => setShowAugmented(false)}
-              className={`px-3 py-1.5 transition-colors ${
-                !showAugmented
-                  ? "bg-rogue-green/15 text-rogue-green"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Baseline
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAugmented(true)}
-              className={`px-3 py-1.5 border-l border-border transition-colors ${
-                showAugmented
-                  ? "bg-rogue-red/15 text-rogue-red"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              + Augmentations
-            </button>
-          </div>
+      {/* SCOPE × ATTACKER — two fully independent toggles (the 2×2). SCOPE
+          swaps the date window (this run's day vs every run merged); ATTACKER
+          swaps the technique set (raw single-shot vs persona-wrap + PAIR). */}
+      {(hasAllTime || hasAugment) && (
+        <section className="flex items-center gap-x-5 gap-y-3 flex-wrap animate-rogue-fade-up">
+          {hasAllTime && (
+            <div className="inline-flex items-center gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                scope:
+              </span>
+              <div className="inline-flex rounded-md border border-border overflow-hidden font-mono text-[10px] uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => setScope("this-run")}
+                  className={`px-3 py-1.5 transition-colors ${
+                    scope === "this-run"
+                      ? "bg-rogue-green/15 text-rogue-green"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  This run
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope("all-time")}
+                  className={`px-3 py-1.5 border-l border-border transition-colors ${
+                    scope === "all-time"
+                      ? "bg-rogue-green/15 text-rogue-green"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  All-time
+                </button>
+              </div>
+            </div>
+          )}
+          {hasAugment && (
+            <div className="inline-flex items-center gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                attacker:
+              </span>
+              <div className="inline-flex rounded-md border border-border overflow-hidden font-mono text-[10px] uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => setShowAugmented(false)}
+                  className={`px-3 py-1.5 transition-colors ${
+                    !showAugmented
+                      ? "bg-rogue-green/15 text-rogue-green"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Baseline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAugmented(true)}
+                  className={`px-3 py-1.5 border-l border-border transition-colors ${
+                    showAugmented
+                      ? "bg-rogue-red/15 text-rogue-red"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  + Augmentations
+                </button>
+              </div>
+            </div>
+          )}
           <span className="text-[10px] font-mono text-muted-foreground max-w-md leading-snug">
+            {scope === "all-time" ? "every run day merged · " : "this run's day · "}
             {showAugmented
-              ? "worst-case across persona-wrap + PAIR refinement — how hot each cell gets once the attacker adapts (all-time)"
+              ? "worst-case across persona-wrap + PAIR refinement — how hot each cell gets once the attacker adapts"
               : "raw harvested prompt, N=5 trials per cell — no adaptation"}
           </span>
         </section>

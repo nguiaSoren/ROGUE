@@ -23,16 +23,24 @@ export default async function MatrixPage({
   // that isn't the default "most-data" day). Omitted → the API's default.
   const { date } = await searchParams;
 
+  // The SCOPE × ATTACKER 2×2 needs all four quadrant datasets. Only the
+  // top-left (this-run × baseline) is required; the other three degrade to null
+  // and the heatmap falls back to baseline if a quadrant is unavailable.
   let matrix: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
+  let thisRunAugmented: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
+  let allTimeBaseline: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let augmented: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let stubbornness: Awaited<ReturnType<typeof api.stubbornnessStats>> | null = null;
   let error: string | null = null;
   try {
-    [matrix, augmented, stubbornness] = await Promise.all([
-      api.breachMatrix(date),
-      api.breachMatrix(undefined, "augmented").catch(() => null),
-      api.stubbornnessStats().catch(() => null),
-    ]);
+    [matrix, thisRunAugmented, allTimeBaseline, augmented, stubbornness] =
+      await Promise.all([
+        api.breachMatrix(date), // this-run × baseline
+        api.breachMatrix(date, "thisrun_augmented").catch(() => null), // this-run × augmented
+        api.breachMatrix(undefined, "alltime_baseline").catch(() => null), // all-time × baseline
+        api.breachMatrix(undefined, "augmented").catch(() => null), // all-time × augmented
+        api.stubbornnessStats().catch(() => null),
+      ]);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
@@ -154,7 +162,13 @@ export default async function MatrixPage({
         )}
 
         {/* Interactive heatmap (client component) */}
-        <MatrixHeatmap matrix={matrix} augmented={augmented} stubbornness={stubbornness} />
+        <MatrixHeatmap
+          matrix={matrix}
+          thisRunAugmented={thisRunAugmented}
+          allTimeBaseline={allTimeBaseline}
+          augmented={augmented}
+          stubbornness={stubbornness}
+        />
 
         <Legend />
 
