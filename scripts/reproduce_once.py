@@ -77,7 +77,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from sqlalchemy import create_engine, inspect, select  # noqa: E402
+from sqlalchemy import create_engine, insert, inspect, select  # noqa: E402
+from sqlalchemy.exc import OperationalError  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from rogue.db.models import (  # noqa: E402
@@ -418,7 +419,7 @@ async def _run_judge_batch_phase(
     configs: list[DeploymentConfig],
     panel: TargetPanel,
     judge: JudgeAgent,
-    session,
+    database_url: str,
     stats: ReproductionRunStats,
     n_trials: int,
     temperature: float,
@@ -469,6 +470,12 @@ async def _run_judge_batch_phase(
     logger.info("BATCH judge: grading %d cells in one batch …", len(items))
     verdicts = await JudgeBatch(judge).grade(items) if items else {}
 
+    # Build every row in memory first (the batch wait already burned ~minutes;
+    # we do NOT touch the DB until we have all verdicts). Then persist with a
+    # FRESH, chunked, retrying connection — the session that existed before the
+    # long panel+batch wait is dead (Neon drops idle SSL connections, which
+    # silently lost an entire $22 sweep on 2026-05-30).
+    rows: list[BreachResultORM] = []
     for pid, cid, rendered, responses in panel_results:
         for resp in responses:
             if resp.error:
@@ -483,25 +490,70 @@ async def _run_judge_batch_phase(
                     rationale="judge batch returned no verdict for this cell",
                     confidence=0.0,
                 )
-            try:
-                row = _build_breach_result_orm(
+            rows.append(
+                _build_breach_result_orm(
                     primitive_id=pid, config_id=cid,
                     rendered=rendered, response=resp, judge_result=vr,
                 )
-                session.add(row)
-                stats.breach_results_persisted += 1
-                stats.add_verdict(vr.verdict)
-                stats.estimated_cost_usd += resp.cost_usd
-                if resp.error:
-                    stats.target_call_errors += 1
-                elif vr.verdict is JudgeVerdict.ERROR:
-                    stats.judge_call_errors += 1
-            except Exception as exc:  # noqa: BLE001
-                stats.persist_errors += 1
-                session.rollback()
-                logger.exception("batch persist failed %s/%s: %s", pid, cid, exc)
-    session.commit()
+            )
+            stats.add_verdict(vr.verdict)
+            stats.estimated_cost_usd += resp.cost_usd
+            if resp.error:
+                stats.target_call_errors += 1
+            elif vr.verdict is JudgeVerdict.ERROR:
+                stats.judge_call_errors += 1
+
+    persisted, persist_errors = _persist_breach_rows(database_url, rows)
+    stats.breach_results_persisted = persisted
+    stats.persist_errors += persist_errors
     return stats
+
+
+def _persist_breach_rows(
+    database_url: str,
+    orm_rows: list[BreachResultORM],
+    *,
+    chunk: int = 200,
+    retries: int = 3,
+) -> tuple[int, int]:
+    """Persist breach-result rows on a FRESH connection, in chunks, with retry.
+
+    The batch path holds no DB connection during the long panel+batch wait, so
+    this opens a brand-new engine (``pool_pre_ping`` so a stale pooled conn is
+    detected + replaced) and commits in small chunks — a dropped connection
+    loses at most one chunk, not the whole sweep, and each chunk reconnects and
+    retries. Returns ``(persisted, failed)``.
+    """
+    if not orm_rows:
+        return 0, 0
+    cols = [c.name for c in BreachResultORM.__table__.columns]
+    dicts = [{c: getattr(r, c) for c in cols} for r in orm_rows]
+
+    engine = create_engine(database_url, pool_pre_ping=True)
+    persisted = failed = 0
+    try:
+        for i in range(0, len(dicts), chunk):
+            part = dicts[i : i + chunk]
+            for attempt in range(retries):
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(insert(BreachResultORM.__table__), part)
+                    persisted += len(part)
+                    break
+                except OperationalError as exc:
+                    logger.warning(
+                        "persist chunk %d retry %d/%d (%s) — reconnecting",
+                        i // chunk, attempt + 1, retries, type(exc).__name__,
+                    )
+                    engine.dispose()
+                    engine = create_engine(database_url, pool_pre_ping=True)
+                    if attempt == retries - 1:
+                        failed += len(part)
+                        logger.error("persist chunk %d FAILED after %d retries", i // chunk, retries)
+    finally:
+        engine.dispose()
+    logger.info("batch persist: %d rows committed, %d failed", persisted, failed)
+    return persisted, failed
 
 
 def _build_pair_breach_result_orm(
@@ -633,7 +685,9 @@ async def run_reproduction(
             **({"model": escalate_planner_model} if escalate_planner_model else {})
         )
 
-    engine = create_engine(database_url)
+    # pool_pre_ping: detect + replace a connection Neon dropped during a long
+    # phase (idle SSL timeout) instead of erroring on the next statement.
+    engine = create_engine(database_url, pool_pre_ping=True)
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
     stats = ReproductionRunStats(trials_per_pair=n_trials)
@@ -772,7 +826,7 @@ async def run_reproduction(
                     )
                 await _run_judge_batch_phase(
                     primitives=primitives, configs=configs, panel=panel,
-                    judge=judge, session=session, stats=stats,
+                    judge=judge, database_url=database_url, stats=stats,
                     n_trials=n_trials, temperature=temperature,
                     concurrency=concurrency,
                 )
