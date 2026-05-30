@@ -231,7 +231,7 @@ class JudgeAgent:
         # that classifies harmful content instead of refusing. The model id is
         # the bare OpenRouter id (``provider/model``, used verbatim — no prefix).
         self.fallback_model: str = fallback_model or os.environ.get(
-            "JUDGE_FALLBACK_MODEL", "meta-llama/llama-3.1-8b-instruct"
+            "JUDGE_FALLBACK_MODEL", "deepseek/deepseek-v3.2"
         )
 
         prompt_path = (
