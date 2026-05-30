@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { BriefJson, BreachedPrimitiveBrief } from "@/lib/api";
 
 /**
@@ -122,10 +123,21 @@ function TopAttackerCard({
       medium: "border-yellow-500/40 bg-yellow-500/5",
       low: "border-blue-500/40 bg-blue-500/5",
     }[primitive.severity_tier.toLowerCase()] ?? "border-border";
-  return (
-    <div
-      className={`rogue-card border rounded-md p-3 bg-card/40 backdrop-blur-sm ${tierTint}`}
-    >
+
+  // The config behind max_any_breach_rate — the worst-hit (family × config)
+  // cell. Clicking the card drills into that cell on /matrix/cell, the same
+  // breakdown the matrix grid opens.
+  const worstConfig = [...primitive.breached_configs].sort(
+    (a, b) => b.any_breach_rate - a.any_breach_rate,
+  )[0];
+  const href = worstConfig
+    ? `/matrix/cell?family=${encodeURIComponent(
+        primitive.family,
+      )}&config=${encodeURIComponent(worstConfig.config_id)}`
+    : null;
+
+  const body = (
+    <>
       <div className="flex items-baseline justify-between gap-2">
         <p className={`text-2xl font-bold tabular-nums leading-none ${tint}`}>
           {Math.round(rate * 100)}%
@@ -140,7 +152,31 @@ function TopAttackerCard({
       <p className="text-[10px] font-mono text-muted-foreground mt-1 truncate">
         {primitive.family} · {primitive.breached_configs.length} configs hit
       </p>
-    </div>
+    </>
+  );
+
+  // Non-clickable fallback when there's no breached config to drill into.
+  if (!href) {
+    return (
+      <div
+        className={`rogue-card border rounded-md p-3 bg-card/40 backdrop-blur-sm ${tierTint}`}
+      >
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      title={`View ${primitive.family} × ${worstConfig.config_name} cell breakdown`}
+      className={`group rogue-card border rounded-md p-3 bg-card/40 backdrop-blur-sm block transition-colors hover:bg-card/70 hover:border-foreground/30 focus:outline-none focus-visible:ring-1 focus-visible:ring-foreground/40 ${tierTint}`}
+    >
+      {body}
+      <p className="text-[9px] font-mono uppercase tracking-[0.18em] text-muted-foreground mt-2 pt-2 border-t border-border/50 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition">
+        view cell →
+      </p>
+    </Link>
   );
 }
 
