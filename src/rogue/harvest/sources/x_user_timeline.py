@@ -131,6 +131,10 @@ class XUserTimelinePlugin(SourcePlugin):
                             http_status=200,
                             metadata=metadata,
                             discovered_via=None,
+                            # Multimodal ingestion (Feature A): the post's own
+                            # images (Pliny screenshots of jailbreak prompts) so
+                            # the media-download step can fetch + vision-read them.
+                            media_urls=list(post.media_urls),
                         )
                     )
                 except Exception:

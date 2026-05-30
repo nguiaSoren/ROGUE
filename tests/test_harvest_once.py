@@ -330,6 +330,78 @@ async def test_run_harvest_isolates_extract_errors(live_db, tmp_path) -> None:
     assert stats.extract_errors == 1
 
 
+@pytest.mark.asyncio
+async def test_run_harvest_ingests_images_and_passes_to_extractor(
+    live_db, tmp_path
+) -> None:
+    """Feature A end-to-end: a doc with an image → the injected MediaIngestor
+    downloads it → the ExtractionImages reach extract_from_raw_document, and the
+    images_ingested counter ticks."""
+    from rogue.extract.extraction_agent import ExtractionImage
+    from rogue.harvest.media_ingest import IngestedImage
+
+    # A real on-disk PNG so ExtractionImage carries a usable verbatim path.
+    img_path = tmp_path / "shot.png"
+    img_path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"bytes")
+
+    raw = _make_raw_document(url="https://x.com/elder_plinius/status/1", content="img post")
+    primitive = _load_golden_primitive().model_copy(
+        update={"primitive_id": "01HFGZRX4QHARVESTONCEIMG00004", "sources": []},
+    )
+
+    captured: dict = {}
+
+    async def _extract(raw_doc, images=None):
+        captured["images"] = images
+        return primitive
+
+    mock_extractor = MagicMock()
+    mock_extractor.extract_from_raw_document = AsyncMock(side_effect=_extract)
+
+    # Fake ingestor: returns one IngestedImage for the doc.
+    ingested = IngestedImage(
+        url="https://pbs.twimg.com/media/a.png",
+        path=img_path,
+        media_type="image/png",
+        b64="QUJD",
+    )
+    mock_ingestor = MagicMock()
+    mock_ingestor.ingest_for_document = AsyncMock(return_value=[ingested])
+
+    mock_bd_client = MagicMock()
+    mock_bd_client.aclose = AsyncMock()
+
+    def zero_embed_fn(text: str) -> list[float]:
+        return [0.0] * 1536
+
+    from decimal import Decimal as _Decimal
+    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+        agent_instance = MagicMock()
+        agent_instance.run = AsyncMock(return_value=[raw])
+        agent_instance.last_run_reports = []
+        mock_discovery_cls.return_value = agent_instance
+
+        stats = await run_harvest(
+            since=datetime.now(timezone.utc) - timedelta(days=1),
+            database_url=live_db,
+            bd_client=mock_bd_client,
+            extractor=mock_extractor,
+            embed_fn=zero_embed_fn,
+            bandit_state_path=tmp_path / "discovery_bandit.json",
+            media_ingestor=mock_ingestor,
+        )
+
+    assert stats.images_ingested == 1
+    mock_ingestor.ingest_for_document.assert_awaited_once()
+    # The extractor received exactly one ExtractionImage carrying the cached path.
+    imgs = captured["images"]
+    assert imgs is not None and len(imgs) == 1
+    assert isinstance(imgs[0], ExtractionImage)
+    assert imgs[0].path == str(img_path)
+    assert imgs[0].media_type == "image/png"
+
+
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #

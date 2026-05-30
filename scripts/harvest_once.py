@@ -96,10 +96,11 @@ from rogue.db.models import (  # noqa: E402
     SourceProvenance as SourceProvenanceORM,
 )
 from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
-from rogue.extract.extraction_agent import ExtractionAgent  # noqa: E402
+from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # noqa: E402
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.discovery_agent import DiscoveryAgent  # noqa: E402
 from rogue.harvest.fetch_cache import FetchCache, load_snapshot  # noqa: E402
+from rogue.harvest.media_ingest import MediaIngestor  # noqa: E402
 from rogue.schemas import AttackPrimitive, RawDocument  # noqa: E402
 from rogue.schemas.source_provenance import SourceProvenance  # noqa: E402
 
@@ -242,6 +243,7 @@ class HarvestRunStats:
     dedup_errors: int = 0
     new_clusters: int = 0
     duplicates: int = 0
+    images_ingested: int = 0
 
     def summary_line(self) -> str:
         return (
@@ -250,7 +252,8 @@ class HarvestRunStats:
             f"skipped_unchanged={self.skipped_unchanged} "
             f"extract_errors={self.extract_errors} "
             f"dedup_errors={self.dedup_errors} "
-            f"new_clusters={self.new_clusters} duplicates={self.duplicates}"
+            f"new_clusters={self.new_clusters} duplicates={self.duplicates} "
+            f"images_ingested={self.images_ingested}"
         )
 
 
@@ -374,17 +377,24 @@ async def run_harvest(
     bd_client: BrightDataClient | None = None,
     extractor: ExtractionAgent | None = None,
     bandit_state_path: Path | None = None,
+    media_ingestor: MediaIngestor | None = None,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
 
-    ``embed_fn`` / ``bd_client`` / ``extractor`` / ``bandit_state_path`` are
-    injection seams used by the test suite to swap out the three network-
-    dependent components and isolate the bandit state file. In production
-    all four default to None and are constructed here from env vars per
-    ``BrightDataClient.from_env()`` + ``OpenAI()`` + ``ExtractionAgent``;
-    ``bandit_state_path`` falls back to ``data/discovery_bandit.json``.
-    Tests MUST pass a ``tmp_path`` so the production bandit file isn't
-    overwritten with the mock-driven zero state.
+    ``embed_fn`` / ``bd_client`` / ``extractor`` / ``bandit_state_path`` /
+    ``media_ingestor`` are injection seams used by the test suite to swap out
+    the network-dependent components and isolate the bandit state file. In
+    production they default to None and are constructed here from env vars per
+    ``BrightDataClient.from_env()`` + ``OpenAI()`` + ``ExtractionAgent`` +
+    ``MediaIngestor(bd_client)``; ``bandit_state_path`` falls back to
+    ``data/discovery_bandit.json``. Tests MUST pass a ``tmp_path`` so the
+    production bandit file isn't overwritten with the mock-driven zero state.
+
+    Multimodal ingestion (Feature A): unless ``HARVEST_INGEST_IMAGES=0``, each
+    harvested document's own images (X ``photos``, blog ``<img>`` …) are
+    downloaded via Web Unlocker and vision-read by the extraction agent. Bounded
+    by ``MEDIA_INGEST_MAX_PER_DOC`` (default 4) and ``MEDIA_INGEST_MAX_TOTAL``
+    (default 60) so image download can't blow the BD budget.
     """
     # Preflight: verify the schema is present BEFORE we start spending money
     # on BD + LLM calls that would otherwise all fail at the persist step.
@@ -400,6 +410,13 @@ async def run_harvest(
         embed_fn = _default_openai_embed_fn(embedding_model)
     if extractor is None:
         extractor = ExtractionAgent(model=extraction_model)
+    # Multimodal ingestion (Feature A) — construct unless explicitly disabled.
+    # Reuses the same BD client (Web Unlocker) for image downloads.
+    if media_ingestor is None and os.environ.get("HARVEST_INGEST_IMAGES", "1") != "0":
+        media_ingestor = MediaIngestor(
+            bd_client,
+            max_images_per_doc=int(os.environ.get("MEDIA_INGEST_MAX_PER_DOC", "4")),
+        )
 
     engine = create_engine(database_url)
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -419,7 +436,10 @@ async def run_harvest(
         bandit = EpsilonGreedyBandit.from_disk(bandit_arms, BANDIT_STATE_PATH)
 
         # --- Layer 1: HARVEST ---
-        agent = DiscoveryAgent(bd_client, bandit=bandit)
+        # Feature C: post→link following is on unless HARVEST_FOLLOW_LINKS=0
+        # (spends Web-Unlocker credit, bounded by the phase caps).
+        follow_links = os.environ.get("HARVEST_FOLLOW_LINKS", "1") != "0"
+        agent = DiscoveryAgent(bd_client, bandit=bandit, follow_links=follow_links)
 
         # §11.7 Tier B — preload the fetch_cache ledger so harvest can skip
         # re-spend up front: (1) the SERP phase skips URLs we've already
@@ -474,6 +494,15 @@ async def run_harvest(
                     report.plugin_name, report.error,
                 )
 
+        # Feature C telemetry — how many post→links were followed this run.
+        if getattr(agent, "last_link_follow_count", 0):
+            logger.info(
+                "post→link follow: %d links followed ($%.4f Unlocker spend, %d errors)",
+                agent.last_link_follow_count,
+                agent.last_link_follow_cost,
+                len(agent.last_link_follow_errors),
+            )
+
         # --- Layer 2 + 3 + persist: concurrent extract + serial dedup ---
         # Extraction is the wall-clock bottleneck (Anthropic TPM cap dominates).
         # Fan out extract_from_raw_document with a Semaphore-bounded concurrency
@@ -499,12 +528,51 @@ async def run_harvest(
         EXTRACTION_CONCURRENCY = int(os.environ.get("EXTRACTION_CONCURRENCY", "3"))
         sem = asyncio.Semaphore(EXTRACTION_CONCURRENCY)
 
+        # Feature A run-level image budget — a hard cap on how many images the
+        # whole run will download (Web Unlocker credit). `used` is mutated under
+        # the asyncio single-thread model (no lock needed; tasks yield only at
+        # awaits). Per-doc count is bounded separately by the ingestor.
+        media_budget = {
+            "used": 0,
+            "cap": int(os.environ.get("MEDIA_INGEST_MAX_TOTAL", "60")),
+        }
+
+        async def _ingest_images(raw_doc: RawDocument) -> "list[ExtractionImage] | None":
+            """Download (cache-first) the doc's images → ExtractionImages, or None.
+
+            No-op when ingestion is disabled, the run budget is spent, or the doc
+            carries no images. Failures are isolated — a bad image never sinks
+            the doc's extraction (it just runs text-only)."""
+            if media_ingestor is None or media_budget["used"] >= media_budget["cap"]:
+                return None
+            try:
+                ingested = await media_ingestor.ingest_for_document(raw_doc)
+            except Exception as exc:  # noqa: BLE001 — image failure ⇒ text-only
+                logger.warning("media ingest failed: url=%s err=%s", raw_doc.url, exc)
+                return None
+            if not ingested:
+                return None
+            media_budget["used"] += len(ingested)
+            stats.images_ingested += len(ingested)
+            return [
+                ExtractionImage(
+                    b64=im.b64,
+                    media_type=im.media_type,
+                    source_url=im.url,
+                    path=str(im.path),
+                )
+                for im in ingested
+            ]
+
         async def extract_one(
             raw_doc: RawDocument,
         ) -> tuple[RawDocument, "AttackPrimitive | None | Exception"]:
             async with sem:
                 try:
-                    primitive = await extractor.extract_from_raw_document(raw_doc)
+                    images = await _ingest_images(raw_doc)
+                    primitive = await extractor.extract_from_raw_document(
+                        raw_doc, images=images
+                    )
                     return (raw_doc, primitive)
                 except Exception as exc:  # noqa: BLE001 - we surface every error
                     return (raw_doc, exc)

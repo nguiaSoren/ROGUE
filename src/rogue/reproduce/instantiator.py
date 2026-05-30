@@ -376,6 +376,63 @@ def _read_image_b64(path: str | None) -> str | None:
         return base64.b64encode(fh.read()).decode("ascii")
 
 
+# Magic-byte → IANA media type for a verbatim (ingested) image. Extension is the
+# fallback. Matches the formats the vision dispatch (`target_panel`) accepts.
+_IMAGE_MEDIA_TYPE_BY_EXT = {
+    "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+    "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
+}
+
+
+def _image_media_type_for_path(path: str) -> str:
+    """Sniff an image file's IANA media type (magic bytes, extension fallback)."""
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(16)
+    except OSError:
+        head = b""
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if head.startswith(b"RIFF"):
+        return "image/webp"
+    if head.startswith(b"BM"):
+        return "image/bmp"
+    ext = Path(path).suffix.lower().lstrip(".")
+    return _IMAGE_MEDIA_TYPE_BY_EXT.get(ext, "image/png")
+
+
+def _render_verbatim_image_payload(
+    messages: list[dict[str, str]],
+    base_image_path: str | None,
+) -> tuple[list[dict[str, str]], str | None, str]:
+    """Send an INGESTED image AS-IS — no synthetic render (multimodal ingestion).
+
+    Unlike every other ``_render_*_payload`` (which draw the payload text into a
+    PNG), this carries the *exact bytes* of the image the source actually
+    published: the harvested image IS the attack (Feature A, Case 2). The last
+    user turn is replaced with ``_IMAGE_CARRIER_PROMPT`` (a benign "read the
+    attached image" pointer) and the verbatim image is returned out-of-band.
+
+    Returns ``(new_messages, image_b64, media_type)``. Degrades to
+    ``(messages, None, "image/png")`` — caller treats it as a text-only render —
+    when the path is missing/unreadable or there is no user turn (never raises).
+    """
+    image_b64 = _read_image_b64(base_image_path)
+    if image_b64 is None:
+        return messages, None, "image/png"
+    media_type = _image_media_type_for_path(base_image_path)  # type: ignore[arg-type]
+    out: list[dict[str, str]] = [dict(m) for m in messages]
+    for i in range(len(out) - 1, -1, -1):
+        if out[i].get("role") == "user":
+            out[i]["content"] = _IMAGE_CARRIER_PROMPT
+            return out, image_b64, media_type
+    return out, None, "image/png"
+
+
 def _render_image_payload(
     messages: list[dict[str, str]],
     base_image_path: str | None = None,
@@ -600,6 +657,12 @@ def render(
     Any image strategy also honours ``payload_slots["base_image"]`` (a file path)
     — a screenshot you supply that the attack is composited onto.
 
+    Multimodal ingestion (Feature A) adds ``image_strategy="verbatim"``: the
+    harvested document's OWN image IS the payload, so its exact bytes (cached at
+    ``payload_slots["base_image"]`` by the extraction layer) are sent as-is — NO
+    synthetic render, no compositing. The last user turn becomes the benign
+    image-carrier pointer and ``image_media_type`` is sniffed from the file.
+
     Orthogonally, a TEXT primitive can opt into ``payload_slots["structured_data"]``
     (#12 — {json, csv, yaml, xml}): the last user turn is rewritten as a
     data-processing document with the payload embedded as a directive field amid
@@ -638,6 +701,11 @@ def render(
             )
         ):
             image_strategy = _auto_image_strategy(primitive)
+        # "verbatim" (multimodal ingestion, Feature A — Case 2): the source's
+        # OWN image IS the payload; send the cached bytes as-is, no render. The
+        # image lives at payload_slots["base_image"] (a path the extraction layer
+        # resolved from the ingested image's cache location).
+        verbatim = image_strategy == "verbatim"
         if image_strategy == "polyjailbreak":
             polyjailbreak = polyjailbreak or "1"
         elif image_strategy == "exif":
@@ -648,7 +716,7 @@ def render(
             vpi_style = vpi_style or image_strategy.split(":", 1)[1]
         elif image_strategy and image_strategy.startswith("ocr:"):
             ocr_style = ocr_style or image_strategy.split(":", 1)[1]
-        # "typographic" needs no specific slot — it's the default branch below.
+        # "typographic" / "verbatim" need no specific slot — handled below.
 
         has_image = bool(
             mml_method or vpi_style or ocr_style or exif_flag or polyjailbreak or image_strategy
@@ -660,7 +728,11 @@ def render(
         if primitive.vector == AttackVector.MULTIMODAL_AUDIO and not has_image:
             messages, audio_b64 = _render_audio_payload(messages, slots.get("audio_style"))
         elif primitive.vector == AttackVector.MULTIMODAL_IMAGE or has_image:
-            if polyjailbreak:
+            if verbatim:
+                messages, image_b64, image_media_type = _render_verbatim_image_payload(
+                    messages, base_image
+                )
+            elif polyjailbreak:
                 messages, image_b64 = _render_polyjailbreak_payload(messages, base_image)
                 is_multi_turn = True
             elif mml_method:

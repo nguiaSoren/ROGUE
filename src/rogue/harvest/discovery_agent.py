@@ -347,6 +347,7 @@ class DiscoveryAgent:
         plugins: Iterable[SourcePlugin] | None = None,
         query_picker: QueryPicker | None = None,
         bandit: "EpsilonGreedyBandit | None" = None,  # noqa: UP037 - forward ref
+        follow_links: bool = True,
     ) -> None:
         self.client = client
         self.plugins: list[SourcePlugin] = (
@@ -354,6 +355,10 @@ class DiscoveryAgent:
         )
         self.query_picker: QueryPicker = query_picker or self._day1_query_picker
         self.bandit = bandit  # if set, takes precedence over query_picker
+        # Feature C: follow outbound links from post docs 1-hop (default on;
+        # bounded by the phase's per-doc/total caps). Harvest_once flips it off
+        # via HARVEST_FOLLOW_LINKS=0.
+        self.follow_links = follow_links
         self.last_run_reports: list[PluginRunReport] = []
         # The most-recent select() result, exposed for the harvest script's
         # reward attribution call. Tuple of (arm_id, substituted_query).
@@ -365,6 +370,10 @@ class DiscoveryAgent:
         # to ``bandit.record(...)``.
         self.last_serp_phase_cost: dict[str, float] = {}
         self.last_serp_phase_errors: dict[str, list[str]] = {}
+        # Feature C post→link-follow telemetry (mirrors the SERP-phase fields).
+        self.last_link_follow_count: int = 0
+        self.last_link_follow_cost: float = 0.0
+        self.last_link_follow_errors: list[str] = []
 
     # ------------------------------------------------------------------
     # Query selection
@@ -450,6 +459,11 @@ class DiscoveryAgent:
             )
         self.last_run_reports = reports
 
+        # Snapshot the plugin/post docs BEFORE the discovery phases append to
+        # `flat_docs`. The link-follow phase mines ONLY these (1-hop: never the
+        # SERP phase's or its own fetched pages).
+        plugin_docs = list(flat_docs)
+
         # --- §11.6 (c-serp) bandit-driven SERP discovery phase ---
         # Only fires when (a) a bandit is wired AND (b) select() actually
         # picked arms. URL dedup against plugin output prevents double-paying
@@ -474,15 +488,43 @@ class DiscoveryAgent:
                     picked_arms=self.last_selected_arms,
                     seen_urls=serp_seen,
                 )
+                flat_docs.extend(phase.docs)
+                self.last_serp_phase_cost = phase.per_arm_cost
+                self.last_serp_phase_errors = phase.per_arm_errors
             except Exception as exc:  # noqa: BLE001 — phase failure must not abort harvest
                 logger.warning(
                     "bandit SERP phase failed (%s) — proceeding with plugin docs only",
                     exc,
                 )
-                return flat_docs
-            flat_docs.extend(phase.docs)
-            self.last_serp_phase_cost = phase.per_arm_cost
-            self.last_serp_phase_errors = phase.per_arm_errors
+
+        # --- Feature C: post→link following phase ---
+        # Follows outbound links from the post docs 1-hop (e.g. an X post →
+        # the GitHub repo it links to). Deduped against EVERYTHING already in
+        # the pipeline (plugin docs + SERP docs + cross-run fetch_cache) so it
+        # never re-fetches known content. Bounded by the phase's caps; failure
+        # is logged, never fatal.
+        self.last_link_follow_count = 0
+        self.last_link_follow_cost = 0.0
+        self.last_link_follow_errors = []
+        if self.follow_links and plugin_docs:
+            from rogue.harvest.link_follow_phase import run_link_follow_phase
+
+            link_seen = {str(d.url) for d in flat_docs} | (prefetched_urls or set())
+            try:
+                lf = await run_link_follow_phase(
+                    client=self.client,
+                    source_docs=plugin_docs,
+                    seen_urls=link_seen,
+                )
+                flat_docs.extend(lf.docs)
+                self.last_link_follow_count = lf.followed
+                self.last_link_follow_cost = lf.cost_usd
+                self.last_link_follow_errors = lf.errors
+            except Exception as exc:  # noqa: BLE001 — link-follow must not abort harvest
+                logger.warning(
+                    "post→link follow phase failed (%s) — proceeding without it",
+                    exc,
+                )
 
         return flat_docs
 

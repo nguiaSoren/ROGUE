@@ -30,6 +30,7 @@ import hashlib
 import logging
 import os
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,31 @@ from rogue.schemas import AttackPrimitive, RawDocument
 # silently re-raising. Uses the stdlib logger so consumers can configure
 # handlers/levels via their own logging.config without taking a dep.
 logger = logging.getLogger("rogue.extract.extraction_agent")
+
+
+@dataclass(frozen=True)
+class ExtractionImage:
+    """One image attached to a document, for the multimodal extraction call (Feature A).
+
+    The extraction LLM vision-reads these alongside the document text and decides,
+    per ``extraction_v3.md``, which of three cases each image is:
+
+      1. text-in-image is the payload  → transcribe into ``payload_template`` (text vector);
+      2. the image itself is the payload → ``vector=multimodal_image`` + verbatim send;
+      3. a supplement / figure          → context only.
+
+    For case 2, ``path`` must be set: the on-disk location is written into
+    ``payload_slots["base_image"]`` so the reproduction layer can re-send the
+    EXACT bytes (no synthetic re-render). Produced from a
+    ``rogue.harvest.media_ingest.IngestedImage`` by the harvest orchestrator;
+    ``index`` is its position in the attached-image list (what the LLM cites as
+    ``payload_image_index``).
+    """
+
+    b64: str
+    media_type: str = "image/png"
+    source_url: str | None = None
+    path: str | None = None
 
 
 # Transient errors we want tenacity to retry on. Kept as a tuple of base
@@ -304,6 +330,60 @@ def _normalize_extraction_payload(
     return data
 
 
+def _resolve_image_payload_slots(
+    data: Any,
+    images: "list[ExtractionImage]",
+) -> Any:
+    """Resolve a case-2 (image-IS-the-payload) extraction into a verbatim primitive.
+
+    When the extraction LLM judges that one of the attached images is itself the
+    attack (not text to transcribe, not a supplement), it sets
+    ``payload_slots["image_strategy"] = "verbatim"`` and names the attached image
+    by ``payload_slots["payload_image_index"]``. The LLM cannot know the image's
+    on-disk path, so we resolve the index → the cached file path here (same
+    trust-the-harvest-side pattern as R1/R8 in the normalizer) and stamp the
+    multimodal vector. The reproduction layer then sends those exact bytes — no
+    synthetic re-render.
+
+    No-ops for non-dict input, the skip flag, or any primitive that did not
+    request the ``verbatim`` strategy. Demotes to ``is_attack: false`` when the
+    LLM claims an image payload but no usable ingested image is available
+    (unreproducible).
+    """
+    if not isinstance(data, dict) or data.get("is_attack") is False:
+        return data
+    slots = data.get("payload_slots")
+    if not isinstance(slots, dict) or slots.get("image_strategy") != "verbatim":
+        return data
+
+    usable = [img for img in (images or []) if img.path]
+    if not usable:
+        logger.warning(
+            "extraction demoted to is_attack=false: image_strategy=verbatim but no "
+            "ingested image with a cached path is available (unreproducible)",
+        )
+        return {
+            "is_attack": False,
+            "reason": "image-is-payload (verbatim) but no usable ingested image",
+        }
+
+    try:
+        idx = int(slots.get("payload_image_index", 0))
+    except (TypeError, ValueError):
+        idx = 0
+    idx = max(0, min(idx, len(usable) - 1))
+    chosen = usable[idx]
+
+    slots["base_image"] = str(chosen.path)
+    slots.pop("payload_image_index", None)
+    # An image-as-payload is, by definition, a multimodal-image vector; stamp it
+    # so the AttackVector.MULTIMODAL_IMAGE consistency validator passes even if
+    # the LLM under-specified vector/requires_multimodal.
+    data["vector"] = "multimodal_image"
+    data["requires_multimodal"] = True
+    return data
+
+
 class ExtractionAgent:
     """LLM-driven extractor: raw document -> `AttackPrimitive` or `None`.
 
@@ -315,14 +395,15 @@ class ExtractionAgent:
             or ``"openai/gpt-4o-mini"``. If omitted, reads ``EXTRACTION_MODEL``
             from the environment (default ``anthropic/claude-haiku-4-5``).
         prompt_version: which prompt revision to load from the ``prompts/``
-            directory. Default ``"v2"`` (2026-05-27 — adds the §"Output
-            discipline" section that prevents R1–R8 normalizer failure modes
-            at source); ``"v1"`` is preserved for re-extraction of primitives
-            that cited it. Primitives record this in their provenance so
-            re-extraction is reproducible.
+            directory. Default ``"v3"`` (2026-05-30 — adds the §"Image inputs"
+            three-case decision for multimodal ingestion, Feature A, on top of
+            v2's §"Output discipline"); ``"v2"`` (2026-05-27) and ``"v1"`` are
+            preserved for re-extraction of primitives that cited them.
+            Primitives record this in their provenance so re-extraction is
+            reproducible.
     """
 
-    def __init__(self, model: str | None = None, prompt_version: str = "v2") -> None:
+    def __init__(self, model: str | None = None, prompt_version: str = "v3") -> None:
         self.model: str = model or os.environ.get(
             "EXTRACTION_MODEL", "anthropic/claude-haiku-4-5"
         )
@@ -354,6 +435,7 @@ class ExtractionAgent:
         fetched_at: datetime | None = None,
         *,
         bright_data_product: str = "web_unlocker",
+        images: "list[ExtractionImage] | None" = None,
     ) -> AttackPrimitive | None:
         """Extract an `AttackPrimitive` from a raw document, or return `None`.
 
@@ -363,6 +445,12 @@ class ExtractionAgent:
             source_type: one of the literal values from `SourceType` (reddit,
                 x, arxiv, github, blog, ...).
             fetched_at: when ROGUE fetched the document; defaults to "now UTC".
+            images: images attached to the document (multimodal ingestion,
+                Feature A). When present, they are vision-read alongside the
+                text and the prompt's §"Image inputs" three-case decision
+                governs whether each becomes transcribed text, a verbatim
+                image payload, or context. Defaults to None (text-only — the
+                pre-Feature-A behaviour, byte-for-byte).
             bright_data_product: which BD product fetched the doc — used only
                 if the extraction LLM omits ``sources`` (which it routinely
                 does on simple docs). When that happens we synth a minimal
@@ -394,17 +482,19 @@ class ExtractionAgent:
                 len(extraction_text),
             )
 
+        images = images or []
         user_message = self._build_user_message(
             raw_document=extraction_text,
             source_url=source_url,
             source_type=source_type,
             fetched_at=fetched_at,
+            n_images=len(images),
         )
 
         if self.model.startswith("anthropic/"):
-            data = await self._call_anthropic(user_message)
+            data = await self._call_anthropic(user_message, images)
         elif self.model.startswith("openai/"):
-            data = await self._call_openai(user_message)
+            data = await self._call_openai(user_message, images)
         else:
             raise NotImplementedError(
                 f"provider for {self.model} not wired — Day 1"
@@ -424,6 +514,13 @@ class ExtractionAgent:
             fetched_at=fetched_at,
             bright_data_product=bright_data_product,
         )
+
+        # Feature A — case 2: if the LLM judged an attached image to BE the
+        # payload (image_strategy=verbatim), resolve the cited image to its
+        # on-disk path so reproduce sends the exact bytes (no re-render). Always
+        # run it (cheap no-op unless verbatim) so a hallucinated verbatim on a
+        # text-only doc demotes cleanly instead of failing schema validation.
+        data = _resolve_image_payload_slots(data, images)
 
         return self._validate_or_none(data)
 
@@ -447,6 +544,7 @@ class ExtractionAgent:
     async def extract_from_raw_document(
         self,
         raw_doc: RawDocument,
+        images: "list[ExtractionImage] | None" = None,
     ) -> AttackPrimitive | None:
         """Adapter: project a harvest-layer :class:`RawDocument` onto :meth:`extract`.
 
@@ -470,6 +568,9 @@ class ExtractionAgent:
                 # (fires when the LLM omits `sources`) records the correct
                 # label rather than the `extract()` default of "web_unlocker".
                 bright_data_product=str(raw_doc.bright_data_product),
+                # Feature A — images already downloaded by the harvest
+                # media-ingest step; None/empty for text-only docs.
+                images=images,
             )
         except ValidationError:
             logger.exception(
@@ -488,8 +589,28 @@ class ExtractionAgent:
         source_url: str,
         source_type: str,
         fetched_at: datetime,
+        n_images: int = 0,
     ) -> str:
-        """Render the user-turn template (shared shape across extraction_v1.md / v2.md)."""
+        """Render the user-turn template (shared shape across extraction_v1–v3.md).
+
+        When ``n_images`` > 0, an "Attached images" note is added so the model
+        knows how many images follow and how to reference one by index in
+        ``payload_slots["payload_image_index"]`` (the §"Image inputs" three-case
+        decision in extraction_v3.md).
+        """
+        images_note = ""
+        if n_images > 0:
+            plural = "s" if n_images != 1 else ""
+            images_note = (
+                f"\n\nAttached image{plural}: {n_images}, in order "
+                f"(index 0..{n_images - 1}). Each image is preceded by an "
+                "'[image index N]' marker. Apply the §\"Image inputs\" "
+                "three-case decision: transcribe text-in-image into "
+                "payload_template, OR (if the image itself is the attack) set "
+                'payload_slots["image_strategy"]="verbatim" and '
+                'payload_slots["payload_image_index"]="<N>", OR treat it as a '
+                "supplement (context only)."
+            )
         return (
             f"Document URL: {source_url}\n"
             f"Source type: {source_type}\n"
@@ -497,6 +618,7 @@ class ExtractionAgent:
             f"Document content:\n---\n{raw_document}\n---\n\n"
             'Extract the AttackPrimitive. If the document does not describe '
             'an attack, respond with {"is_attack": false, "reason": "..."}.'
+            f"{images_note}"
         )
 
     @retry(
@@ -505,13 +627,22 @@ class ExtractionAgent:
         retry=retry_if_exception_type(_TRANSIENT_ERRORS),
         reraise=True,
     )
-    async def _call_anthropic(self, user_message: str) -> dict[str, Any]:
+    async def _call_anthropic(
+        self,
+        user_message: str,
+        images: "list[ExtractionImage] | None" = None,
+    ) -> dict[str, Any]:
         """Anthropic tool-use call. Returns the raw tool-call input dict.
 
         Tool-use mode pins the model output to a JSON object validating against
         `AttackPrimitive.model_json_schema()`. The "or skip" branch is encoded
         as the optional `is_attack: false` top-level field handled by
         `_validate_or_none`.
+
+        When ``images`` are present, the user turn becomes a content-block list:
+        the text message followed by one ``[image index N]`` text marker + one
+        ``image`` block per attached image (same ``image.source.base64`` shape
+        ``reproduce.target_panel`` uses for dispatch).
         """
         # IMPLEMENT Day 1 §9.4 — replace the lazy import + bare client init
         # with a wired-up `rogue.config.settings.ANTHROPIC_API_KEY` once the
@@ -525,11 +656,28 @@ class ExtractionAgent:
         # Strip the "anthropic/" provider prefix to get the bare model id.
         bare_model = self.model.split("/", 1)[1]
 
+        if images:
+            content: Any = [{"type": "text", "text": user_message}]
+            for i, img in enumerate(images):
+                content.append({"type": "text", "text": f"[image index {i}]"})
+                content.append(
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": img.media_type,
+                            "data": img.b64,
+                        },
+                    }
+                )
+        else:
+            content = user_message
+
         response = await self._anthropic_client.messages.create(
             model=bare_model,
             max_tokens=4096,
             system=self.prompt,
-            messages=[{"role": "user", "content": user_message}],
+            messages=[{"role": "user", "content": content}],
             tools=[
                 {
                     "name": "extract_attack_primitive",
@@ -564,11 +712,17 @@ class ExtractionAgent:
         retry=retry_if_exception_type(_TRANSIENT_ERRORS),
         reraise=True,
     )
-    async def _call_openai(self, user_message: str) -> dict[str, Any]:
+    async def _call_openai(
+        self,
+        user_message: str,
+        images: "list[ExtractionImage] | None" = None,
+    ) -> dict[str, Any]:
         """OpenAI structured-output call via Pydantic-aware `.parse()`.
 
         Uses the SDK's `response_format=AttackPrimitive` so the parsed object
-        comes back already validated against the schema.
+        comes back already validated against the schema. When ``images`` are
+        present the user turn becomes a content-part list: the text, then an
+        ``[image index N]`` marker + an ``image_url`` data-URI part per image.
         """
         # IMPLEMENT Day 1 §9.4 — same caveat as the Anthropic branch: switch
         # to `rogue.config.settings.OPENAI_API_KEY` once §A.3 lands.
@@ -579,11 +733,24 @@ class ExtractionAgent:
 
         bare_model = self.model.split("/", 1)[1]
 
+        if images:
+            user_content: Any = [{"type": "text", "text": user_message}]
+            for i, img in enumerate(images):
+                user_content.append({"type": "text", "text": f"[image index {i}]"})
+                user_content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{img.media_type};base64,{img.b64}"},
+                    }
+                )
+        else:
+            user_content = user_message
+
         completion = await self._openai_client.beta.chat.completions.parse(
             model=bare_model,
             messages=[
                 {"role": "system", "content": self.prompt},
-                {"role": "user", "content": user_message},
+                {"role": "user", "content": user_content},
             ],
             response_format=AttackPrimitive,
         )

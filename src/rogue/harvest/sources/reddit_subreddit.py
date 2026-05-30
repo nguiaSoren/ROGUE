@@ -238,6 +238,10 @@ class RedditSubredditPlugin(SourcePlugin):
                             **extra_metadata,
                         },
                         discovered_via=discovered_via,
+                        # Multimodal ingestion (Feature A): an image-only Reddit
+                        # post (screenshot of a jailbreak) carries its image
+                        # here so the media-download step can vision-read it.
+                        media_urls=list(post.media_urls),
                     )
                 )
             except Exception as exc:

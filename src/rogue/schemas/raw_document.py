@@ -81,6 +81,21 @@ class RawDocument(BaseModel):
             "like an arXiv RSS feed"
         ),
     )
+    media_urls: list[str] = Field(
+        default_factory=list,
+        max_length=64,
+        description=(
+            "Image URLs attached to this document (multimodal ingestion — Feature A). "
+            "Populated by source plugins from structured JSON (X `photos`, Reddit "
+            "`images`) or derived from HTML/markdown `<img>` tags via "
+            "`rogue.harvest.media_extract.extract_media_urls`. The harvest "
+            "media-download step (`rogue.harvest.media_ingest`) fetches each one "
+            "so the extraction agent can vision-read it. Distinct from "
+            "`payload_slots['media_query']` (§11.8): media_urls are the document's "
+            "OWN images (a candidate payload), not a generic carrier to composite a "
+            "text attack onto. Empty for text-only documents."
+        ),
+    )
 
     model_config = {"frozen": True}  # immutable after creation
 

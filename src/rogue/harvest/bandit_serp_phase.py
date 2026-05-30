@@ -260,7 +260,9 @@ def _infer_source_type(url: str) -> str:
     lo = url.lower()
     if "arxiv.org" in lo:
         return "arxiv"
-    if "github.com" in lo or "githubusercontent.com" in lo:
+    # github.com + raw.githubusercontent.com + *.github.io project/user pages
+    # (the post→link follower's canonical example, giovannigatti.github.io).
+    if "github.com" in lo or "githubusercontent.com" in lo or "github.io" in lo:
         return "github"
     if "reddit.com" in lo:
         return "reddit"

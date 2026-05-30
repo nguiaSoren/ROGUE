@@ -138,6 +138,10 @@ class HuggingFaceDiscussionPlugin(SourcePlugin):
                                     "n_posts": len(thread.posts),
                                 },
                                 discovered_via=None,
+                                # Multimodal ingestion (Feature A): images
+                                # embedded in the thread's posts (JSON source —
+                                # the body-img extractor can't see into JSON).
+                                media_urls=list(thread.media_urls),
                             )
                         )
                     except Exception:

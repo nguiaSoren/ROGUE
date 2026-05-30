@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import logging
 import os
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal, Optional
@@ -45,8 +46,14 @@ from tenacity import (
     wait_exponential,
 )
 
+from rogue.harvest.media_extract import (
+    extract_media_urls_from_json as _extract_media_urls_from_json,
+)
+
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+
+logger = logging.getLogger("rogue.harvest.bright_data_client")
 
 __all__ = [
     "BrightDataClient",
@@ -166,6 +173,11 @@ class RedditPost(BaseModel):
     permalink: str
     score: int
     comments: list[dict] = Field(default_factory=list)
+    # Image URLs attached to the post (the Reddit dataset's `photos` array —
+    # same shape as the X dataset). Powers multimodal ingestion (Feature A): an
+    # image-only Reddit post (a screenshot of a jailbreak) lands here. Excludes
+    # `videos`. See XPost.media_urls for the full rationale.
+    media_urls: list[str] = Field(default_factory=list)
 
 
 class XPost(BaseModel):
@@ -178,6 +190,12 @@ class XPost(BaseModel):
     posted_at: datetime
     permalink: str
     metrics: dict = Field(default_factory=dict)
+    # Image URLs attached to the post (the X dataset's `photos` array — see
+    # website/WEB SCRAPER API/social-media-apis/twitter-posts-discover-by-profile-url-most-recent.md).
+    # Powers multimodal ingestion (Feature A): a Pliny screenshot of a jailbreak
+    # prompt lands here. Excludes `videos` (vision LLMs take stills, not clips)
+    # and `profile_image_link` (the author avatar — never a payload).
+    media_urls: list[str] = Field(default_factory=list)
 
 
 class HFDiscussion(BaseModel):
@@ -189,6 +207,11 @@ class HFDiscussion(BaseModel):
     title: str
     posts: list[dict] = Field(default_factory=list)
     started_at: datetime
+    # Image URLs embedded in the thread's posts (multimodal ingestion, Feature
+    # A). HF discussions carry images as markdown/links inside post bodies under
+    # best-guess (unprovisioned) field names, so these are collected by a
+    # field-name-agnostic JSON walk rather than a single `photos` array.
+    media_urls: list[str] = Field(default_factory=list)
 
 
 class SerpResponse(BaseModel):
@@ -963,6 +986,44 @@ class BrightDataClient:
         )
         return result
 
+    async def resolve_redirect(
+        self,
+        url: str,
+        *,
+        timeout: float = 10.0,
+        transport: "httpx.BaseTransport | httpx.AsyncBaseTransport | None" = None,
+    ) -> str:
+        """Resolve a short/redirect URL to its final destination (Feature C).
+
+        The post→link follower needs the REAL destination of a ``t.co``-style
+        shortener so dedup / domain-routing / provenance key on the true URL,
+        not the opaque short link. Implemented as a cheap HEAD (GET fallback for
+        shorteners that reject HEAD) that follows redirects — **NOT** a
+        BD-billed Web Unlocker fetch, and on a SEPARATE auth-less httpx client
+        so the BD bearer token is never leaked to the third-party shortener.
+
+        ``transport`` is a test seam (inject an ``httpx.MockTransport``); None
+        uses the default network transport.
+
+        Returns the FINAL URL, or the input ``url`` unchanged on any error /
+        timeout (degrade-safe — a failed resolution just means we follow the
+        short link as-is downstream).
+        """
+        try:
+            async with httpx.AsyncClient(
+                follow_redirects=True, timeout=timeout, transport=transport
+            ) as client:
+                resp = await client.head(url)
+                # Some shorteners 405/400 on HEAD — retry with GET (no body read
+                # needed; we only want the post-redirect URL).
+                if resp.status_code >= 400:
+                    resp = await client.get(url)
+                final = str(resp.url)
+                return final or url
+        except Exception as exc:  # noqa: BLE001 — degrade to the unresolved url
+            logger.debug("resolve_redirect failed for %s: %s", url[:120], exc)
+            return url
+
     # ------------------------------------------------------------------
     # Media fetch (§11.8) — SERP image search + binary download.
     # Real-image carriers for multimodal attacks (composited via base_image).
@@ -1202,6 +1263,20 @@ def _parse_dt(value: Any) -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _photo_urls_from_record(record: dict[str, Any]) -> list[str]:
+    """Lift a social-post record's image array (`photos`, `images` fallback).
+
+    Shared by the X and Reddit adapters — both BD social datasets expose the
+    same `photos: [url, ...]` shape (`null` on text-only posts). Keeps only
+    http(s) string URLs; `videos` and `profile_image_link` are never read here.
+    """
+    return [
+        u
+        for u in (record.get("photos") or record.get("images") or [])
+        if isinstance(u, str) and u.startswith(("http://", "https://"))
+    ]
+
+
 def _record_to_reddit_post(record: dict[str, Any], *, subreddit_fallback: str) -> RedditPost:
     """Adapt one Reddit scraper record into a ``RedditPost``.
 
@@ -1219,6 +1294,7 @@ def _record_to_reddit_post(record: dict[str, Any], *, subreddit_fallback: str) -
         permalink=str(record.get("url") or record.get("permalink") or ""),
         score=int(record.get("num_upvotes") or record.get("score") or 0),
         comments=list(record.get("comments") or []),
+        media_urls=_photo_urls_from_record(record),
     )
 
 
@@ -1238,6 +1314,10 @@ def _record_to_x_post(record: dict[str, Any]) -> XPost:
         for k in ("likes", "retweets", "replies", "views", "hashtags")
         if k in record
     }
+    # `photos` is the X dataset's image array (verified against the posts
+    # discover-by-profile schema). `videos` and `profile_image_link` are
+    # deliberately excluded — see XPost.media_urls docstring.
+    media_urls = _photo_urls_from_record(record)
     return XPost(
         post_id=post_id,
         author_handle=str(record.get("user_posted") or record.get("author") or ""),
@@ -1245,6 +1325,7 @@ def _record_to_x_post(record: dict[str, Any]) -> XPost:
         posted_at=_parse_dt(record.get("date_posted") or record.get("posted_at")),
         permalink=url,
         metrics=metrics,
+        media_urls=media_urls,
     )
 
 
@@ -1264,4 +1345,7 @@ def _record_to_hf_discussion(
         title=str(record.get("title") or ""),
         posts=list(record.get("posts") or []),
         started_at=_parse_dt(record.get("started_at") or record.get("date_posted")),
+        # Walk the whole record (post bodies included) for embedded images —
+        # field-name-agnostic because the HF discussion schema is best-guess.
+        media_urls=_extract_media_urls_from_json(record),
     )
