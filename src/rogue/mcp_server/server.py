@@ -118,9 +118,10 @@ judge. All tools are READ-ONLY and return live data from the breach matrix.
 
 When to use each tool:
 • query_worst_attacks — the fast "am I exposed?" answer: the hardest-breaching
-  attacks. Pass your model family (claude / gpt / gemini / llama / mistral) to
-  scope it to the closest config in the panel (e.g. "worst attacks against a
-  model like me?").
+  attacks. When the user asks about "a model like me / you", pass YOUR OWN model
+  identity (you know what you are — e.g. Claude Opus 4.8 → "claude-opus-4-8");
+  ROGUE scopes results to the closest config, so you never need the user to name
+  the model. Omit it for the worst across all configs.
 • query_attacks — browse/filter the attack-primitive corpus by family, vector,
   or recency (e.g. "show indirect_prompt_injection attacks from the last 7 days").
 • query_diff — what changed today vs yesterday: newly-breaching and newly-defended
@@ -392,15 +393,23 @@ def query_attack_detail(primitive_id: str) -> dict[str, Any]:
 # Tool 6: query_worst_attacks
 # --------------------------------------------------------------------------- #
 
-# Map a loosely-typed model family to the substring that identifies the closest
-# config's target_model. Lets a client say "claude" and get the Claude config.
-_MODEL_FAMILY_ALIASES = {
-    "claude": "claude", "anthropic": "claude",
-    "gpt": "gpt", "openai": "gpt", "chatgpt": "gpt", "o1": "gpt",
-    "gemini": "gemini", "google": "gemini", "bard": "gemini",
-    "llama": "llama", "meta": "llama",
-    "mistral": "mistral", "mixtral": "mistral",
-}
+# Tokens scanned (in priority order) inside the caller's model_family string to
+# find the substring that identifies the closest config's target_model. Specific
+# Claude TIERS (opus/sonnet/haiku) come before the generic "claude"/"anthropic"
+# so "claude-opus-4-8" resolves to the Opus config, not whichever Claude is first.
+# Substring-scan (not exact-match) so a full id like "claude-opus-4-8", a label
+# like "Claude Opus 4.8", or a bare "opus" all resolve correctly.
+_MODEL_FAMILY_TOKENS = (
+    "opus", "sonnet", "haiku",        # Claude tiers (most specific first)
+    "gpt", "nano",                    # OpenAI
+    "gemini", "llama", "mistral",     # other model names
+    "claude", "anthropic", "openai", "google", "meta",  # provider fallbacks
+)
+
+
+def _resolve_family_token(model_family: str) -> str | None:
+    s = model_family.strip().lower()
+    return next((t for t in _MODEL_FAMILY_TOKENS if t in s), None)
 
 
 @mcp.tool()
@@ -408,15 +417,20 @@ def query_worst_attacks(model_family: str | None = None, limit: int = 10) -> dic
     """Highest-breach-rate attacks — optionally against the model closest to yours.
 
     The fast "am I exposed?" answer: the attacks that breach hardest, all-time.
-    Pass your own model's family and ROGUE maps it to the closest config in its
-    panel and returns the worst attacks against THAT config — so an assistant can
-    answer "what are the worst attacks against a model like me?" in one call.
+
+    IMPORTANT for assistants: when a user asks "what would hit a model like me?",
+    pass YOUR OWN model identity as ``model_family`` (you know what model you are
+    — e.g. Claude Opus 4.8 → pass ``"claude-opus-4-8"`` or ``"opus"``). ROGUE maps
+    it to the closest deployment config and scopes results to it, so you never
+    need the user to name the model.
 
     Args:
-        model_family: optional — "claude"/"anthropic", "gpt"/"openai",
-            "gemini"/"google", "llama"/"meta", or "mistral". Maps to the closest
-            deployment config (e.g. "claude" -> the Claude Haiku config) and
-            scopes results to it. None = worst attacks across ALL configs.
+        model_family: optional — your model's name or family. Accepts a full id
+            ("claude-opus-4-8"), a tier ("opus"/"sonnet"/"haiku"), or a provider
+            ("gpt"/"openai", "gemini"/"google", "llama"/"meta", "mistral",
+            "claude"/"anthropic"). Specific tiers win over the generic provider,
+            so "claude-opus-4-8" → the Opus config (not Haiku). None = worst
+            attacks across ALL configs.
         limit: max attacks to return (default 10, max 50).
 
     Returns:
@@ -432,14 +446,14 @@ def query_worst_attacks(model_family: str | None = None, limit: int = 10) -> dic
         matched = None
         cfg_id = None
         if model_family:
-            token = _MODEL_FAMILY_ALIASES.get(model_family.strip().lower())
+            token = _resolve_family_token(model_family)
             if token is None:
                 return {
                     "matched_config": None,
                     "note": (
-                        f"unknown model_family {model_family!r}; expected one of "
-                        f"{sorted(set(_MODEL_FAMILY_ALIASES))}. Returning nothing — "
-                        "call again with a known family or omit it for all-configs."
+                        f"couldn't map model_family {model_family!r} to a known "
+                        f"model token {list(_MODEL_FAMILY_TOKENS)}. Returning "
+                        "nothing — retry with your model name or omit for all-configs."
                     ),
                     "attacks": [],
                 }
