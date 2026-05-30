@@ -830,6 +830,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())
+
+    # Cache any ingested images into the DB, then auto-push to Neon — both
+    # data-only, no spend, no-op when NEON_DATABASE_URL is unset / on Neon.
+    from rogue.db.image_cache import maybe_cache_images
+    from rogue.db.neon_sync import maybe_auto_sync
+
+    maybe_cache_images(args.database_url)
+    maybe_auto_sync(args.database_url)
     return 0
 
 

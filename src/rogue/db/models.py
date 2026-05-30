@@ -28,6 +28,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
 )
@@ -188,6 +189,10 @@ class AttackPrimitive(Base):
         back_populates="primitive", cascade="all, delete-orphan"
     )
     breaches: Mapped[list["BreachResult"]] = relationship(back_populates="primitive")
+    # DB-stored image bytes (one-to-one), for the deployed drawer/cell view.
+    image: Mapped[Optional["PrimitiveImage"]] = relationship(
+        cascade="all, delete-orphan", uselist=False
+    )
 
     # Composite / vector indices. Per-column scalar indices are declared with
     # ``index=True`` above; this block adds the pgvector ANN index and gives the
@@ -422,6 +427,36 @@ class FetchCache(Base):
     n_primitives_yielded: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class PrimitiveImage(Base):
+    """The real image bytes for one multimodal/carrier primitive, stored IN the
+    DB so they travel to Neon with the data sync and render on the DEPLOYED site.
+
+    The image files live on local disk under ``data/media_cache/`` (§11.8
+    per-attack ``{id}/carrier.*`` carriers + Feature-A ``ingested/`` payloads),
+    but that disk is local-only — the deployed Render API can't read it. This
+    one-row-per-primitive table holds the bytes + media type so the image route
+    serves them anywhere. Populated by ``rogue.db.image_cache.cache_images_to_db``
+    from the on-disk cache; synced to Neon by ``rogue.db.neon_sync``.
+    """
+
+    __tablename__ = "primitive_images"
+
+    primitive_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("attack_primitives.primitive_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    media_type: Mapped[str] = mapped_column(String(40))  # e.g. "image/png"
+    image_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    byte_size: Mapped[int] = mapped_column(Integer, default=0)
+    # Where the bytes came from — "carrier" (§11.8) or "ingested" (Feature A).
+    source: Mapped[str] = mapped_column(String(20), default="carrier")
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -432,4 +467,5 @@ __all__ = [
     "BrightDataCostLog",
     "BanditState",
     "FetchCache",
+    "PrimitiveImage",
 ]

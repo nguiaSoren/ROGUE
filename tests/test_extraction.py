@@ -118,8 +118,14 @@ async def test_anthropic_path_emits_correct_tool_use_payload() -> None:
     assert kwargs["model"] == "claude-haiku-4-5", (
         "provider prefix must be stripped before sending to SDK"
     )
-    assert kwargs["system"] == agent.prompt, (
-        "system message must be the loaded extraction prompt"
+    # System prompt is sent as a prompt-cached block (cache_control: ephemeral)
+    # so the ~20 KB rubric is charged at ~0.1x after the first call in a window.
+    assert isinstance(kwargs["system"], list), "system must be a cache-control block list"
+    assert kwargs["system"][0]["text"] == agent.prompt, (
+        "system block must carry the loaded extraction prompt"
+    )
+    assert kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}, (
+        "extraction system prompt must be prompt-cached"
     )
     tools = kwargs["tools"]
     assert len(tools) == 1

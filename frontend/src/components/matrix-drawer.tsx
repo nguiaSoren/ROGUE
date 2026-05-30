@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { BreachCell } from "@/lib/api";
 import { ProviderLogo } from "@/components/ui/provider-logo";
 
@@ -31,6 +32,8 @@ type AttackDetailResponse = {
     payload_template: string | null;
     requires_multi_turn: boolean;
     requires_tools: string[];
+    requires_multimodal?: boolean;
+    has_image?: boolean;
     sources?: { url: string; bright_data_product: string | null }[];
   };
   breaches: BreachDetail[];
@@ -47,10 +50,13 @@ type AttackDetailResponse = {
 export function MatrixCellDrawer({
   open,
   cell,
+  date,
   onClose,
 }: {
   open: boolean;
   cell: BreachCell | null;
+  /** Matrix run-date — threads into the "see all primitives" cell-page link. */
+  date?: string;
   onClose: () => void;
 }) {
   // Track which primitive_id the current `detail` was fetched for. If the
@@ -180,6 +186,16 @@ export function MatrixCellDrawer({
             </p>
           </section>
 
+          {/* See every breaching primitive in this (family × config) cell. */}
+          <Link
+            href={`/matrix/cell?family=${encodeURIComponent(cell.family)}&config=${encodeURIComponent(
+              cell.deployment_config_id,
+            )}${date ? `&date=${encodeURIComponent(date)}` : ""}`}
+            className="block rounded-md border border-rogue-green/30 bg-rogue-green/5 px-4 py-2.5 text-xs font-mono text-rogue-green hover:bg-rogue-green/10 transition-colors"
+          >
+            see all breaching primitives in this cell →
+          </Link>
+
           {/* Primitive */}
           {loading && !shownDetail && (
             <p className="text-xs font-mono text-muted-foreground">
@@ -231,6 +247,10 @@ export function MatrixCellDrawer({
                     {shownDetail.primitive.payload_template}
                   </pre>
                 </section>
+              )}
+
+              {shownDetail.primitive.has_image && (
+                <PayloadImage primitiveId={shownDetail.primitive.primitive_id} />
               )}
 
               {thisConfigBreach && (
@@ -292,7 +312,32 @@ export function MatrixCellDrawer({
   );
 }
 
-function VerdictBar({
+/**
+ * Renders the primitive's real image — the §11.8 fetched carrier OR the
+ * Feature-A verbatim-ingested payload image — from /api/attacks/{id}/image.
+ * Hides itself entirely if the route 404s (the deployed API only has the bytes
+ * when the harvest that cached them ran on its filesystem).
+ */
+export function PayloadImage({ primitiveId }: { primitiveId: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <section className="space-y-1.5">
+      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
+        payload image — sent verbatim to the vision panel
+      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`${API_BASE}/api/attacks/${primitiveId}/image`}
+        alt="attack payload / carrier image"
+        onError={() => setFailed(true)}
+        className="max-h-80 w-auto rounded-md border border-border/60 bg-card/40"
+      />
+    </section>
+  );
+}
+
+export function VerdictBar({
   full,
   partial,
   refused,
@@ -340,7 +385,7 @@ function VerdictBar({
   );
 }
 
-function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
   useEffect(() => {

@@ -150,7 +150,14 @@ def main(argv: list[str] | None = None) -> int:
                     {"vd": v.verdict.value, "r": v.rationale[:2000], "cf": v.confidence, "b": bid},
                 )
         upd += len(chunk)
-    logger.info("updated %d rows. Refresh the matrix snapshot to publish.", upd)
+    logger.info("updated %d rows.", upd)
+
+    # Auto-push the re-graded verdicts to Neon (data-only, no spend) when
+    # NEON_DATABASE_URL is set — so the live matrix reflects the re-grade with
+    # no manual step. No-op when unset or already running against Neon.
+    from rogue.db.neon_sync import maybe_auto_sync
+
+    maybe_auto_sync(args.database_url)
     return 0
 
 

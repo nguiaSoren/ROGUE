@@ -257,6 +257,50 @@ The renderers can draw a synthetic image — but a multimodal attack is far more
 
 So Bright Data does double duty: it **discovers** the attacks (SERP + Web Unlocker + Web Scraper + Scraping Browser + MCP) *and* **sources the real images** the multimodal attacks are tested against. The fetch is cached (deterministic replays, no re-spend) and gated (`$`-billed, run deliberately). `harvest → extract (media_query) → fetch-media (Bright Data) → reproduce (composite)`.
 
+## Pipeline CLI reference
+
+The two `$`-billed driver scripts (run deliberately — they spend Bright Data + LLM credit and write the live DB). All flags are optional.
+
+### `scripts/harvest_once.py` — harvest → extract → dedup → persist
+
+```bash
+uv run python scripts/harvest_once.py --since 1d
+```
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--since` | `1d` | Harvest window (`1d`, `14d`, `6h`). |
+| `--database-url` | `$DATABASE_URL` or local | Target SQLAlchemy URL. |
+| `--extraction-model` | `$EXTRACTION_MODEL` / `anthropic/claude-haiku-4-5` | Provider-prefixed extraction model (system prompt is prompt-cached). |
+| `--embedding-model` | `text-embedding-3-small` | OpenAI embedding model for dedup. |
+
+Env toggles: `EXTRACTION_CONCURRENCY` (TPM-aware fan-out) · `HARVEST_INGEST_IMAGES=0` (disable multimodal image ingestion) · `MEDIA_INGEST_MAX_PER_DOC` (4) / `MEDIA_INGEST_MAX_TOTAL` (60) · `HARVEST_FOLLOW_LINKS=0` (disable post→link following).
+
+### `scripts/reproduce_once.py` — render → target panel → judge → persist
+
+```bash
+uv run python scripts/reproduce_once.py --primitive-limit 50 --judge-batch
+```
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--primitive-limit N` | all | Cap how many primitives are reproduced (cost control). |
+| `--n-trials N` | 5 | Trials per (primitive × config) — powers the bootstrap CI. |
+| `--temperature T` | 0.7 | Target-model sampling temperature. |
+| `--concurrency N` | — | Parallel target calls. |
+| `--multimodal-only` | off | Only `multimodal_image` / `multimodal_audio` primitives, rendered as real image/audio (vision/audio configs only). |
+| `--no-fetch-media` | off | Skip the §11.8 real-carrier fetch; render synthetic canvases instead. |
+| `--persona NAME` | off | §10.7 PAP persona wrap (`'Expert Endorsement'`, …, or `random`) — the B side of the A/B. |
+| `--synthesized-only` | off | Only `synthesized=True` rows (escalation/mutation children). |
+| `--pair-max-iters N` | 0 | §10.7 PAIR: up to N iterative-attacker refinements per evaded/refused trial. |
+| `--no-iterative` | off | Force `--pair-max-iters=0`. |
+| `--escalate` | off | §10.8 inline auto-ladder for panel-wide refusals (COSTLY; bound with `--escalate-max-spend`). |
+| `--escalate-max-spend USD` | none | Cap cumulative escalation spend. |
+| `--escalate-n-trials N` | 1 | Trials per ladder variant × config. |
+| `--escalate-planner-model` | Claude+fallback | Override the Tier-5 escalation planner backbone. |
+| `--judge-batch` | off | Grade via the Anthropic **Batch API** (50% off + caching, latency-tolerant; baseline-only). |
+| `--database-url` | `$DATABASE_URL` or local | Target SQLAlchemy URL. |
+
 ## Repository layout
 
 ```

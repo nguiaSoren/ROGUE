@@ -4,7 +4,9 @@ Seven endpoints per ROGUE_PLAN.md §11.1:
 
   * GET  /api/attacks?since_days=7&family=...        — list AttackPrimitives
   * GET  /api/attacks/{id}                            — full primitive + breach rollup
+  * GET  /api/attacks/{id}/image                      — the primitive's real carrier/payload image
   * GET  /api/breaches/matrix?date=YYYY-MM-DD         — breach matrix + CI per cell
+  * GET  /api/breaches/cell?family=&config=&date=     — every breaching primitive in one cell
   * GET  /api/brief?date=YYYY-MM-DD&format=...        — threat brief md/json
   * GET  /api/sse/feed                                — Server-Sent Events stream of newest primitives
   * GET  /api/bandit/stats                            — top-3/bottom-3 bandit arms
@@ -40,7 +42,7 @@ load_dotenv()
 
 from fastapi import Depends, FastAPI, HTTPException, Query  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import StreamingResponse  # noqa: E402
+from fastapi.responses import FileResponse, Response, StreamingResponse  # noqa: E402
 from sqlalchemy import create_engine, select, text  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
@@ -48,6 +50,11 @@ from rogue.db.models import (  # noqa: E402
     AttackPrimitive as AttackPrimitiveORM,
     BreachResult as BreachResultORM,
     DeploymentConfig as DeploymentConfigORM,
+    PrimitiveImage as PrimitiveImageORM,
+)
+from rogue.db.image_cache import (  # noqa: E402
+    media_type_for,
+    resolve_image_on_disk,
 )
 
 logger = logging.getLogger("rogue.api")
@@ -133,6 +140,14 @@ def _primitive_to_dict(
     if truncate_payload and len(payload) > 500:
         payload = payload[:500] + "...[truncated]"
 
+    # Image availability for the drawer/cell view. DB-stored bytes
+    # (primitive_images, synced to Neon) work on the deployed site; the on-disk
+    # media-cache file is the local-dev fallback. Served by
+    # GET /api/attacks/{id}/image.
+    has_image = primitive.image is not None or (
+        resolve_image_on_disk(primitive.primitive_id, primitive.payload_slots) is not None
+    )
+
     return {
         "primitive_id": primitive.primitive_id,
         "title": primitive.title,
@@ -141,6 +156,8 @@ def _primitive_to_dict(
         "base_severity": _enum_str(primitive.base_severity),
         "short_description": primitive.short_description,
         "payload_template": payload if include_payload else None,
+        "requires_multimodal": bool(primitive.requires_multimodal),
+        "has_image": has_image,
         "reproducibility_score": primitive.reproducibility_score,
         "canonical": primitive.canonical,
         "cluster_id": primitive.cluster_id,
@@ -346,6 +363,32 @@ def attack_detail(
 
 
 # --------------------------------------------------------------------------- #
+# 3b. GET /api/attacks/{id}/image  — serve the primitive's real carrier/payload image
+# --------------------------------------------------------------------------- #
+
+@app.get("/api/attacks/{primitive_id}/image")
+def attack_image(
+    primitive_id: str,
+    db: Session = Depends(get_session),
+):
+    """Serve the primitive's real image — the §11.8 fetched carrier OR the
+    Feature-A verbatim-ingested payload image.
+
+    DB-FIRST: serves the bytes stored in ``primitive_images`` (synced to Neon →
+    works on the deployed site). Falls back to the local ``data/media_cache``
+    file (local dev). 404 only when neither has it."""
+    row = db.get(PrimitiveImageORM, primitive_id)
+    if row is not None and row.image_bytes:
+        return Response(content=row.image_bytes, media_type=row.media_type)
+    primitive = db.get(AttackPrimitiveORM, primitive_id)
+    if primitive is not None:
+        resolved = resolve_image_on_disk(primitive_id, primitive.payload_slots or {})
+        if resolved is not None:
+            return FileResponse(resolved, media_type=media_type_for(resolved))
+    raise HTTPException(status_code=404, detail="no image for this primitive")
+
+
+# --------------------------------------------------------------------------- #
 # 4. GET /api/breaches/matrix
 # --------------------------------------------------------------------------- #
 
@@ -500,6 +543,123 @@ def breach_matrix(
         "families": sorted(families.keys()),
         "configs": [{"config_id": cid, "config_name": name} for cid, name in sorted(configs.items())],
         "cells": cells,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# 4b. GET /api/breaches/cell — EVERY breaching primitive in one (family × config)
+# --------------------------------------------------------------------------- #
+
+
+@app.get("/api/breaches/cell")
+def breach_cell(
+    family: str = Query(...),
+    config_id: str = Query(..., alias="config"),
+    date_str: str | None = Query(None, alias="date"),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """All primitives with any-breach > 0 in one (family × config) cell.
+
+    The matrix grid collapses a cell to its single worst-offending primitive;
+    this returns the FULL list (sorted worst-first) with the same per-primitive
+    detail the drawer shows — payload, provenance, image flag, CI, and the
+    verdict histogram — so the dashboard can render a dedicated cell page.
+    """
+    from rogue.diff.bootstrap import bootstrap_ci
+
+    if date_str and date_str != "today":
+        target = _parse_date(date_str)
+    else:
+        target = _default_report_date(db) or _parse_date(date_str)
+
+    rows = db.execute(
+        text(
+            """
+            SELECT bm.primitive_id, bm.n_trials, bm.any_breach_rate,
+                   bm.full_breach_rate, bm.avg_confidence,
+                   COALESCE(jr.refused, false) AS refused
+            FROM breach_matrix bm
+            JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
+            LEFT JOIN (
+                SELECT primitive_id, deployment_config_id, ran_at::date AS rd,
+                       bool_or(judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
+                FROM breach_results GROUP BY 1, 2, 3
+            ) jr
+              ON jr.primitive_id = bm.primitive_id
+             AND jr.deployment_config_id = bm.deployment_config_id
+             AND jr.rd = bm.run_date
+            WHERE bm.run_date = :d
+              AND ap.family = :fam
+              AND bm.deployment_config_id = :cfg
+              AND bm.any_breach_rate > 0
+            ORDER BY bm.any_breach_rate DESC, bm.full_breach_rate DESC
+            """
+        ),
+        {"d": target, "fam": family, "cfg": config_id},
+    ).all()
+
+    # Per-primitive verdict histogram for this config on this day (one query).
+    hist_rows = db.execute(
+        text(
+            """
+            SELECT primitive_id,
+                   COUNT(*) FILTER (WHERE verdict = 'full_breach')    AS n_full,
+                   COUNT(*) FILTER (WHERE verdict = 'partial_breach') AS n_partial,
+                   COUNT(*) FILTER (WHERE verdict = 'evaded')         AS n_evaded,
+                   COUNT(*) FILTER (WHERE verdict = 'refused')        AS n_refused,
+                   COUNT(*) FILTER (WHERE verdict = 'error')          AS n_error,
+                   MAX(ran_at) AS last_ran_at
+            FROM breach_results
+            WHERE deployment_config_id = :cfg AND ran_at::date = :d
+            GROUP BY primitive_id
+            """
+        ),
+        {"d": target, "cfg": config_id},
+    ).all()
+    hist = {r.primitive_id: r for r in hist_rows}
+
+    config = db.get(DeploymentConfigORM, config_id)
+
+    primitives: list[dict[str, Any]] = []
+    for r in rows:
+        prim = db.get(AttackPrimitiveORM, r.primitive_id)
+        if prim is None:
+            continue
+        detail = _primitive_to_dict(prim, include_payload=True, truncate_payload=False)
+        n_trials = int(r.n_trials or 0)
+        rate = float(r.any_breach_rate or 0.0)
+        n_succ = int(round(rate * n_trials))
+        ci_lo, ci_hi = bootstrap_ci([True] * n_succ + [False] * (n_trials - n_succ))
+        h = hist.get(r.primitive_id)
+        primitives.append(
+            {
+                **detail,
+                "n_trials": n_trials,
+                "any_breach_rate": rate,
+                "any_breach_ci_lo": ci_lo,
+                "any_breach_ci_hi": ci_hi,
+                "full_breach_rate": float(r.full_breach_rate or 0.0),
+                "avg_confidence": float(r.avg_confidence) if r.avg_confidence is not None else None,
+                "refused": bool(r.refused),
+                "histogram": {
+                    "full_breach": int(h.n_full) if h else 0,
+                    "partial_breach": int(h.n_partial) if h else 0,
+                    "evaded": int(h.n_evaded) if h else 0,
+                    "refused": int(h.n_refused) if h else 0,
+                    "error": int(h.n_error) if h else 0,
+                },
+                "last_ran_at": h.last_ran_at.isoformat() if h and h.last_ran_at else None,
+            }
+        )
+
+    return {
+        "target_date": target.isoformat(),
+        "family": family,
+        "config_id": config_id,
+        "config_name": config.name if config else config_id,
+        "target_model": config.target_model if config else None,
+        "n_primitives": len(primitives),
+        "primitives": primitives,
     }
 
 

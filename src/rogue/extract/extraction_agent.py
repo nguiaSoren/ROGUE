@@ -676,7 +676,18 @@ class ExtractionAgent:
         response = await self._anthropic_client.messages.create(
             model=bare_model,
             max_tokens=4096,
-            system=self.prompt,
+            # Prompt-cache the extraction system prompt (the ~20 KB v3 rubric is
+            # re-sent on EVERY document). `cache_control: ephemeral` charges it
+            # at ~0.1× input after the first call in each 5-min window — the same
+            # trick the judge uses (judge.py::anthropic_grade_kwargs). Zero
+            # behaviour change; the cached block is byte-identical per agent.
+            system=[
+                {
+                    "type": "text",
+                    "text": self.prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": content}],
             tools=[
                 {

@@ -304,6 +304,7 @@ export function MatrixHeatmap({
       <MatrixCellDrawer
         open={openCell !== null}
         cell={openCell}
+        date={matrix.target_date}
         onClose={() => setOpenCell(null)}
       />
     </>

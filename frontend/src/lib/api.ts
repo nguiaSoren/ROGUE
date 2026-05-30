@@ -53,7 +53,42 @@ export type AttackPrimitive = {
   requires_multi_turn: boolean;
   requires_system_prompt_access: boolean;
   requires_tools: string[];
+  /** vector ∈ {multimodal_image, multimodal_audio} or requires_multimodal flag. */
+  requires_multimodal?: boolean;
+  /** True when the primitive carries a real image (§11.8 carrier or Feature-A
+   *  verbatim-ingested) servable at /api/attacks/{id}/image. */
+  has_image?: boolean;
   sources: SourceProvenance[];
+};
+
+/** One breaching primitive in a (family × config) cell — the matrix stats plus
+ *  the per-primitive detail the drawer shows. Returned by /api/breaches/cell. */
+export type CellPrimitive = AttackPrimitive & {
+  n_trials: number;
+  any_breach_rate: number;
+  any_breach_ci_lo: number;
+  any_breach_ci_hi: number;
+  full_breach_rate: number;
+  avg_confidence: number | null;
+  refused: boolean;
+  histogram: {
+    full_breach: number;
+    partial_breach: number;
+    evaded: number;
+    refused: number;
+    error: number;
+  };
+  last_ran_at: string | null;
+};
+
+export type BreachCellResponse = {
+  target_date: string;
+  family: string;
+  config_id: string;
+  config_name: string;
+  target_model: string | null;
+  n_primitives: number;
+  primitives: CellPrimitive[];
 };
 
 export type HealthResponse = {
@@ -307,6 +342,11 @@ export const api = {
     return apiGet<BreachMatrixResponse>(
       `/api/breaches/matrix${qs ? `?${qs}` : ""}`,
     );
+  },
+  breachCell: (family: string, config: string, date?: string) => {
+    const q = new URLSearchParams({ family, config });
+    if (date) q.set("date", date);
+    return apiGet<BreachCellResponse>(`/api/breaches/cell?${q.toString()}`);
   },
   brief: (date?: string, format: "markdown" | "json" = "markdown") => {
     const q = new URLSearchParams();
