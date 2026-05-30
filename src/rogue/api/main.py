@@ -436,10 +436,21 @@ def breach_matrix(
                     ap.family,
                     ap.vector,
                     dc.name AS config_name,
-                    dc.target_model
+                    dc.target_model,
+                    COALESCE(jr.refused, false) AS refused
                 FROM breach_matrix bm
                 JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
                 JOIN deployment_configs dc ON dc.config_id = bm.deployment_config_id
+                -- did any trial in this cell get graded by the secondary judge
+                -- because the primary (Sonnet) refused? (the [JUDGE_REFUSED→…] flag)
+                LEFT JOIN (
+                    SELECT primitive_id, deployment_config_id, ran_at::date AS rd,
+                           bool_or(judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
+                    FROM breach_results GROUP BY 1, 2, 3
+                ) jr
+                  ON jr.primitive_id = bm.primitive_id
+                 AND jr.deployment_config_id = bm.deployment_config_id
+                 AND jr.rd = bm.run_date
                 WHERE bm.run_date = :target_date
                 """
             ),
@@ -475,6 +486,10 @@ def breach_matrix(
                 "any_breach_ci_hi": ci_hi,
                 "full_breach_rate": float(r.full_breach_rate or 0.0),
                 "avg_confidence": float(r.avg_confidence) if r.avg_confidence is not None else None,
+                # True iff the primary (Sonnet) judge refused some trial in this
+                # cell and it was graded by the secondary judge. Augmented branch
+                # has no such column → defaults to False.
+                "refused": bool(r._mapping.get("refused") or False),
             }
         )
 

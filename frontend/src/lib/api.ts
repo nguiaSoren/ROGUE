@@ -91,6 +91,9 @@ export type BreachCell = {
   any_breach_ci_hi: number;
   full_breach_rate: number;
   avg_confidence: number | null;
+  /** A trial in this cell was graded by the secondary judge because the
+   *  primary (Sonnet) judge refused (the [JUDGE_REFUSED→…] flag). */
+  refused?: boolean;
 };
 
 export type BreachMatrixResponse = {

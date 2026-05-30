@@ -132,6 +132,14 @@ export function MatrixCellDrawer({
                 {cell.config_name} · {cell.target_model}
               </span>
             </p>
+            {cell.refused && (
+              <span
+                className="mt-1 inline-flex items-center gap-1 rounded border border-rogue-red/30 bg-rogue-red/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rogue-red"
+                title="The primary judge (Claude Sonnet) refused to grade a trial in this cell, so it was graded by the secondary judge — flagged as lower-trust provenance."
+              >
+                judge refused → fallback
+              </span>
+            )}
           </div>
           <button
             type="button"
