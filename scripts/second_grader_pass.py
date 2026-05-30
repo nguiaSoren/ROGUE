@@ -52,6 +52,7 @@ from rogue.reproduce.strongreject_grader import (  # noqa: E402
     build_strongreject_prompt,
     combined_score,
     compare_graders,
+    flag_disagreements,
     grades_to_rows,
     parse_grader_response,
     threshold_sweep,
@@ -146,6 +147,8 @@ async def _grade_all(
         verdict = JudgeVerdict(row["judge_verdict"])
         records.append(
             {
+                "breach_id": row.get("source_breach_id", ""),
+                "family": row.get("family", ""),
                 "target_model": row.get("target_model", "unknown"),
                 "rogue_verdict": verdict.value,
                 "rogue_breach": to_breach_binary(verdict),
@@ -168,7 +171,9 @@ def _comp(c) -> dict:
     }
 
 
-def _serialize(report, sweep, *, model: str, threshold: float, n_errors: int) -> dict:
+def _serialize(
+    report, sweep, flagged, *, model: str, threshold: float, n_errors: int
+) -> dict:
     return {
         "grader": "strongreject_rubric",
         "grader_model": model,
@@ -179,6 +184,11 @@ def _serialize(report, sweep, *, model: str, threshold: float, n_errors: int) ->
         "threshold_sweep": [
             {"threshold": pt.threshold, **_comp(pt.report.overall)} for pt in sweep
         ],
+        "disagreement_flagger": {
+            "scope": "harmful_content_families",
+            "threshold": threshold,
+            "n_flagged": len(flagged),
+        },
     }
 
 
@@ -232,19 +242,22 @@ def main(argv: list[str] | None = None) -> int:
             target_model=r["target_model"],
             rogue_breach=r["rogue_breach"],
             strongreject_score=r["strongreject_score"],
+            family=r["family"],
+            breach_id=r["breach_id"],
         )
         for r in records
     ]
     report = compare_graders(grades_to_rows(grades, args.threshold))
     sweep = threshold_sweep(grades)  # default thresholds, offline
+    flagged = flag_disagreements(grades, args.threshold)  # harmful-content scope
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / "strongreject_report.json"
     out_path.write_text(
         json.dumps(
             _serialize(
-                report, sweep, model=args.grader_model, threshold=args.threshold,
-                n_errors=n_errors,
+                report, sweep, flagged, model=args.grader_model,
+                threshold=args.threshold, n_errors=n_errors,
             ),
             indent=2,
         ),
@@ -256,6 +269,25 @@ def main(argv: list[str] | None = None) -> int:
     with items_path.open("w", encoding="utf-8") as fh:
         for r in records:
             fh.write(json.dumps(r) + "\n")
+
+    # Scoped disagreement flagger → cells for human spot-check (harmful-content
+    # families only, where StrongREJECT's rubric is a clean fit).
+    flagged_path = OUTPUT_DIR / "strongreject_flagged.jsonl"
+    with flagged_path.open("w", encoding="utf-8") as fh:
+        for cell in flagged:
+            fh.write(
+                json.dumps(
+                    {
+                        "breach_id": cell.breach_id,
+                        "family": cell.family,
+                        "target_model": cell.target_model,
+                        "rogue_breach": cell.rogue_breach,
+                        "strongreject_breach": cell.strongreject_breach,
+                        "strongreject_score": cell.strongreject_score,
+                    }
+                )
+                + "\n"
+            )
 
     print("\n" + "=" * 70)
     for line in report.summary_lines():
@@ -269,9 +301,21 @@ def main(argv: list[str] | None = None) -> int:
             f"rogue={c.rogue_breach_rate:.0%} sr={c.strongreject_breach_rate:.0%} "
             f"delta={c.inflation_delta:+.0%}"
         )
+    print("-" * 70)
+    print(
+        f"disagreement flagger (harmful-content families, t={args.threshold}): "
+        f"{len(flagged)} cell(s) for review"
+    )
+    for cell in flagged:
+        print(
+            f"  {cell.breach_id} [{cell.family} · {cell.target_model}] "
+            f"rogue_breach={cell.rogue_breach} sr_breach={cell.strongreject_breach} "
+            f"(score={cell.strongreject_score:.3f})"
+        )
     print("=" * 70)
     print(f"report   → {out_path}")
     print(f"per-item → {items_path}")
+    print(f"flagged  → {flagged_path}")
     return 0
 
 
