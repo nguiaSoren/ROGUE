@@ -412,6 +412,98 @@ async def _run_one_pair(
     return rendered, out
 
 
+async def _run_judge_batch_phase(
+    *,
+    primitives: list[AttackPrimitive],
+    configs: list[DeploymentConfig],
+    panel: TargetPanel,
+    judge: JudgeAgent,
+    session,
+    stats: ReproductionRunStats,
+    n_trials: int,
+    temperature: float,
+    concurrency: int,
+) -> ReproductionRunStats:
+    """Baseline-only reproduce with the Anthropic Batch-API judge (50% off).
+
+    Phased + isolated from the inline path (no PAIR / escalation): run every
+    panel, grade ALL responses in one batch, then persist. Latency-tolerant —
+    the batch usually finishes in minutes. Refused cells fall back to the
+    secondary judge inside ``JudgeBatch``. Panel errors / cells the batch
+    couldn't grade are recorded as ``ERROR`` so every cell still has a row.
+    """
+    from rogue.reproduce.judge_batch import BatchGradeItem, JudgeBatch  # noqa: PLC0415
+
+    prim_by = {p.primitive_id: p for p in primitives}
+    sem = asyncio.Semaphore(concurrency)
+
+    async def _panel(p: AttackPrimitive, c: DeploymentConfig):
+        async with sem:
+            rendered = render(p, c)
+            responses = await panel.run_attack(
+                rendered=rendered, config=c,
+                temperature=temperature, n_trials=n_trials,
+            )
+            return p.primitive_id, c.config_id, rendered, responses
+
+    panel_results = await asyncio.gather(
+        *(_panel(p, c) for p in primitives for c in configs)
+    )
+
+    # One batch for every non-error response. custom_id is a short index ("c<N>")
+    # to stay within the Batch API id constraints; map back via id(response).
+    items: list[BatchGradeItem] = []
+    resp_cid: dict[int, str] = {}
+    for pid, _cid, rendered, responses in panel_results:
+        for resp in responses:
+            if resp.error:
+                continue
+            cid = f"c{len(items)}"
+            resp_cid[id(resp)] = cid
+            items.append(
+                BatchGradeItem(
+                    custom_id=cid, rendered=rendered,
+                    model_response=resp.content or "", primitive=prim_by[pid],
+                )
+            )
+    logger.info("BATCH judge: grading %d cells in one batch …", len(items))
+    verdicts = await JudgeBatch(judge).grade(items) if items else {}
+
+    for pid, cid, rendered, responses in panel_results:
+        for resp in responses:
+            if resp.error:
+                vr = JudgeResult(
+                    verdict=JudgeVerdict.ERROR,
+                    rationale=f"target-model error: {resp.error[:1900]}",
+                    confidence=0.0,
+                )
+            else:
+                vr = verdicts.get(resp_cid.get(id(resp), "")) or JudgeResult(
+                    verdict=JudgeVerdict.ERROR,
+                    rationale="judge batch returned no verdict for this cell",
+                    confidence=0.0,
+                )
+            try:
+                row = _build_breach_result_orm(
+                    primitive_id=pid, config_id=cid,
+                    rendered=rendered, response=resp, judge_result=vr,
+                )
+                session.add(row)
+                stats.breach_results_persisted += 1
+                stats.add_verdict(vr.verdict)
+                stats.estimated_cost_usd += resp.cost_usd
+                if resp.error:
+                    stats.target_call_errors += 1
+                elif vr.verdict is JudgeVerdict.ERROR:
+                    stats.judge_call_errors += 1
+            except Exception as exc:  # noqa: BLE001
+                stats.persist_errors += 1
+                session.rollback()
+                logger.exception("batch persist failed %s/%s: %s", pid, cid, exc)
+    session.commit()
+    return stats
+
+
 def _build_pair_breach_result_orm(
     *,
     primitive_id: str,
@@ -480,6 +572,7 @@ async def run_reproduction(
     escalate_n_trials: int = 1,
     escalate_planner_model: str | None = None,
     planner: EscalationPlanner | None = None,
+    judge_batch: bool = False,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -633,6 +726,29 @@ async def run_reproduction(
                 n_trials,
                 n_calls,
             )
+
+            if judge_batch:
+                # Isolated baseline-only batch path (50% off). Ignores
+                # PAIR/escalation by design — those need inline verdicts.
+                if escalate or pair_max_iters > 0 or persona_technique:
+                    logger.warning(
+                        "--judge-batch is baseline-only; ignoring "
+                        "escalate/pair/persona for this run",
+                    )
+                await _run_judge_batch_phase(
+                    primitives=primitives, configs=configs, panel=panel,
+                    judge=judge, session=session, stats=stats,
+                    n_trials=n_trials, temperature=temperature,
+                    concurrency=concurrency,
+                )
+                logger.info(
+                    "run BATCH done: primitives=%d configs=%d trials=%d "
+                    "breach_results=%d judge_errors=%d verdicts=%s",
+                    len(primitives), len(configs), n_trials,
+                    stats.breach_results_persisted, stats.judge_call_errors,
+                    dict(sorted(stats.verdict_counts.items())),
+                )
+                return stats
 
             semaphore = asyncio.Semaphore(concurrency)
             pairs_done = 0
@@ -1007,6 +1123,17 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--judge-batch",
+        action="store_true",
+        help=(
+            "Judge via the Anthropic Batch API (flat 50%% off + prompt caching). "
+            "Latency-tolerant (the batch usually finishes in minutes), ideal for "
+            "overnight/background reproduce. Baseline-only — ignores "
+            "PAIR/escalation/persona. Refused cells fall back to the secondary "
+            "judge inline."
+        ),
+    )
+    parser.add_argument(
         "--escalate-max-spend",
         type=float,
         default=None,
@@ -1080,6 +1207,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_max_spend=args.escalate_max_spend,
             escalate_n_trials=args.escalate_n_trials,
             escalate_planner_model=args.escalate_planner_model,
+            judge_batch=args.judge_batch,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

@@ -21,7 +21,7 @@ from typing import Iterator
 import pytest
 
 from rogue.reproduce.instantiator import RenderedAttack
-from rogue.reproduce.judge import JudgeResult
+from rogue.reproduce.judge import JudgeAgent, JudgeResult
 from rogue.reproduce.target_panel import ModelResponse
 from rogue.schemas import (
     AttackPrimitive,
@@ -501,6 +501,69 @@ async def test_run_reproduction_end_to_end_with_mocked_panel_and_judge(
         ).scalar_one()
         assert full_count == 2
     engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_run_reproduction_judge_batch_path(
+    live_db_with_seeded_data, monkeypatch
+) -> None:
+    """--judge-batch: panels run, all responses graded in one (mocked) batch,
+    panel-error cells synthesized to ERROR, rows persisted — same shape as the
+    inline path. JudgeBatch is patched so no real Anthropic batch is created."""
+    import rogue.reproduce.judge_batch as jb_mod
+
+    class _StubPanel:
+        async def run_attack(self, rendered, config, temperature, n_trials):
+            out = []
+            for i in range(n_trials):
+                if i == 0:
+                    out.append(ModelResponse(
+                        content="model complied.", latency_ms=100, tokens_in=200,
+                        tokens_out=40, cost_usd=0.001, error=None,
+                        trial_index=i, temperature=temperature,
+                    ))
+                else:
+                    out.append(ModelResponse(
+                        content="", latency_ms=10, tokens_in=0, tokens_out=0,
+                        cost_usd=0.0, error="rate_limit: sim",
+                        trial_index=i, temperature=temperature,
+                    ))
+            return out
+
+        async def aclose(self):
+            pass
+
+    class _FakeJudgeBatch:
+        def __init__(self, judge):
+            self.judge = judge
+
+        async def grade(self, items):
+            return {
+                it.custom_id: JudgeResult(
+                    verdict=JudgeVerdict.FULL_BREACH,
+                    rationale="batch stub", confidence=0.9,
+                )
+                for it in items
+            }
+
+    monkeypatch.setattr(jb_mod, "JudgeBatch", _FakeJudgeBatch)
+
+    stats = await run_reproduction(
+        database_url=live_db_with_seeded_data,
+        primitive_limit=None,
+        n_trials=2,
+        temperature=0.7,
+        concurrency=2,
+        panel=_StubPanel(),  # type: ignore[arg-type]
+        judge=JudgeAgent(model="anthropic/claude-sonnet-4-6"),
+        judge_batch=True,
+    )
+
+    # 2 primitives × 1 config × 2 trials = 4 rows; 1 OK + 1 errored per pair.
+    assert stats.breach_results_persisted == 4
+    assert stats.target_call_errors == 2  # the errored trial per pair → ERROR
+    assert stats.verdict_counts.get("full_breach") == 2  # OK trials → batch verdict
+    assert stats.verdict_counts.get("error") == 2
 
 
 # --------------------------------------------------------------------------- #
