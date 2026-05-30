@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { MatrixHeatmap } from "@/components/matrix-heatmap";
 import { Term } from "@/components/glossary";
@@ -126,16 +127,20 @@ export default async function MatrixPage({
           </div>
         </header>
 
-        {/* Worst-attacker callout */}
+        {/* Worst-attacker callout — links to the full (family × config) breakdown */}
         {worstCell && worstCell.any_breach_rate > 0 && (
-          <section
-            className="rogue-card rogue-card-critical border border-rogue-red/40 rounded-lg p-5 bg-rogue-red/5 animate-rogue-fade-up"
+          <Link
+            href={`/matrix/cell?family=${encodeURIComponent(worstCell.family)}&config=${encodeURIComponent(worstCell.deployment_config_id)}&date=${matrix.target_date}`}
+            className="group block rogue-card rogue-card-critical border border-rogue-red/40 rounded-lg p-5 bg-rogue-red/5 animate-rogue-fade-up transition-colors hover:bg-rogue-red/10 hover:border-rogue-red/60"
             style={{ animationDelay: "0.05s" }}
           >
             <div className="flex items-baseline justify-between gap-4 flex-wrap">
               <div className="space-y-1 min-w-0 flex-1">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-red">
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-red flex items-center gap-2">
                   worst attacker today
+                  <span className="text-muted-foreground normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity">
+                    — see full breakdown →
+                  </span>
                 </p>
                 <p className="text-lg font-bold leading-tight truncate" title={worstCell.title}>
                   {worstCell.title}
@@ -158,7 +163,7 @@ export default async function MatrixPage({
                 </p>
               </div>
             </div>
-          </section>
+          </Link>
         )}
 
         {/* Interactive heatmap (client component) */}
