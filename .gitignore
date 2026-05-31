@@ -106,3 +106,6 @@ scripts/_*
 # real frontend deps live in frontend/package.json)
 /package.json
 /package-lock.json
+
+# Internal marketing/positioning notes — not part of the public repo
+/marketing_claims.md
