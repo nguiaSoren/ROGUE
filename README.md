@@ -14,6 +14,11 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](pyproject.toml)
 
+## Live demo
+
+- Dashboard: https://rogue-eosin.vercel.app
+- MCP server: configure Claude Desktop / Cursor to query ROGUE directly (see [MCP integration](#mcp-integration), under "Run it yourself")
+
 ## What ROGUE does
 
 Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
@@ -23,107 +28,6 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks.
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
 5. **Diff.** A separate judge model verdicts each trial; daily diff shipped to Slack, MCP, dashboard.
-
-## Live demo
-
-- Dashboard: https://rogue-eosin.vercel.app
-- MCP server: configure Claude Desktop / Cursor to query ROGUE directly (see below)
-
-## MCP integration
-
-ROGUE exposes its threat-intelligence database as a **producer-side MCP server** — Claude Desktop / Cursor / Windsurf users can query the live breach matrix from inside their IDE.
-
-### Hosted — zero setup (recommended)
-
-The MCP server is mounted into the live API, so there's nothing to clone or run:
-
-```
-https://rogue-api-mr5w.onrender.com/mcp/
-```
-
-- **From the dashboard:** the [home page](https://rogue-eosin.vercel.app) has **Add to Cursor** / **Add to VS Code** one-click buttons + a copy-URL.
-- **Claude Desktop:** Settings → **Customize** (connectors moved here) → add a custom connector → paste the URL.
-
-It's read-only (the five query tools below). For local development against your own DB, use the one-command installer instead:
-
-### Install locally (one command)
-
-```bash
-uv run python scripts/install_mcp.py           # Claude Desktop (default)
-uv run python scripts/install_mcp.py --client cursor    # or: cursor / windsurf
-```
-
-This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing, or `--uninstall` to remove the `rogue` entry (config-file servers can't always be deleted from the client UI).
-
-> **Reviewer flow (any MCP client):** clone the repo → `uv run python scripts/install_mcp.py` (writes the pointer at *your* clone's path) → restart the client. No manual JSON editing. ROGUE is a standard MCP server, so any compliant client works — the installer just covers Claude Desktop / Cursor / Windsurf out of the box; everything else can point at the same `uv … -m rogue.mcp_server.server` command (stdio) or the HTTP endpoint on :8001 (see [Transport](#transport)).
-
-<details><summary>Or edit the config by hand</summary>
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "rogue": {
-      "command": "uv",
-      "args": [
-        "--directory", "/absolute/path/to/ROGUE",
-        "run", "python", "-m", "rogue.mcp_server.server"
-      ]
-    }
-  }
-}
-```
-
-Replace the `--directory` path with your local repo location.
-
-</details>
-
-Requires a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py` ran at least once); the deployed build reads the live Neon DB.
-
-### Tools exposed
-
-| Tool | Purpose |
-|---|---|
-| `query_attacks(family?, vector?, since_days?, limit?)` | Filter the attack-primitive corpus by family/vector/recency. Returns full primitive records with sources. |
-| `query_diff(date_str?)` | Today vs yesterday breach diff — what's new, what's newly defended, per-tier counts. |
-| `query_threat_brief(date_str?, format?)` | Full daily threat brief in markdown or JSON. Reads from `data/threat_briefs/` then falls back to live DB render. |
-| `query_breaches_for_config(deployment_config_id, since_days?, limit?)` | Per-trial breach results for one customer deployment, with judge rationale + model-response excerpts. |
-| `query_attack_detail(primitive_id)` | One attack's full record + its per-config breach aggregates (n_full / n_partial / n_refused / n_evaded). |
-
-### Try it
-
-After connecting, ask Claude:
-
-> "What new attacks broke our customer support config in the last 24 hours?"
-
-Claude will call `query_diff` + `query_breaches_for_config` and summarize.
-
-### Transport
-
-**Stdio** by default (the Claude Desktop path) — the server runs as a subprocess Claude Desktop spawns, logging to stderr so the JSON-RPC channel on stdout stays clean.
-
-For **remote** clients (Cursor / Windsurf / a hosted client), serve the same five tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
-
-```bash
-ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
-# serves http://127.0.0.1:8001/mcp  (set ROGUE_MCP_HOST=0.0.0.0 to expose off-box)
-```
-
-`ROGUE_MCP_TRANSPORT` accepts `stdio` | `sse` | `streamable-http`; `ROGUE_MCP_PORT` / `ROGUE_MCP_HOST` override the bind address.
-
-## Quick start (local)
-
-```bash
-git clone https://github.com/nguiaSoren/ROGUE
-cd ROGUE
-cp .env.example .env  # fill in your keys
-docker compose up -d
-uv sync --extra dev   # or: pip install -e ".[dev]"
-alembic upgrade head
-python scripts/seed_demo_data.py
-uvicorn rogue.api.main:app --reload
-```
 
 ## Bright Data integration
 
@@ -226,46 +130,6 @@ Executive snapshot (net Δ vs yesterday, top-3 worst new attackers,
 recommended action), tier-count chips, then the full markdown brief with
 `.md` and `.json` download buttons.
 
-## Architecture
-
-See `docs/architecture.md` for the five-layer pipeline diagram + locked stack table.
-
-## Capabilities
-
-- 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
-- 14-slot payload-template vocabulary for cross-deployment reproduction
-- 19-source open-web harvest list — see `docs/sources.md`
-- 6-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out — **plus Claude Opus 4.8**, a flagship added to reproduce the elder_plinius jailbreak against a frontier model (it breached at 100%; Claude Haiku held).
-- Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated on 50 blind-labeled rows — **2.56% false-positive breach rate (1/39), 0 missed breaches (0/11)**, plus **91.8% refusal-axis agreement on WildGuardTest** (n=196) (small samples — see [Judge calibration](#judge-calibration))
-- Daily threat brief (markdown + JSON) + Slack webhook
-- ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
-- **True multimodal red-team** — renders attacks as real images/audio and an autonomous escalation ladder (see below)
-
-## Judge calibration
-
-Every breach number ROGUE reports is ultimately an LLM verdict, so the entire matrix inherits the judge's error rate. "Trust the judge" is not good enough — so the judge is scored against **independent human labels**, not just spot-checked.
-
-**The judge: calibrated primary, permissive fallback.** The primary judge is Claude Sonnet — the model the numbers below validate. But on the most harmful *full compliances*, Sonnet hits Anthropic's `refusal` stop-reason and returns empty, which would silently drop the single most severe breaches as ERROR. So a cell Sonnet refuses is re-graded by a permissive secondary judge (**DeepSeek V4 Flash** via OpenRouter, set by `JUDGE_FALLBACK_MODEL`) and the verdict is flagged `[JUDGE_REFUSED→…]` so the matrix shows which cells Sonnet wouldn't touch. A bake-off settled the roles: on the 50 human labels, **Sonnet (82% agreement, 0% false-negative breach) clearly beat DeepSeek V3.2 (68%, 45% FN) and V4 Flash (74%, 27% FN)** — so Sonnet stays primary, and the cheaper open model is used *only* where Sonnet refuses (where the alternative is no verdict at all). Those fallback verdicts are flagged and are **not** part of the human-calibration below, which validates Sonnet's grading. To keep the validated judge affordable, the rubric/system prompt is **prompt-cached** (charged at ~0.1× on every call after the first in a 5-min window), and an opt-in **Batch-API path** (`reproduce_once.py --judge-batch`, a further 50% off, latency-tolerant) grades a whole sweep in one batch. Cost ladder per judge call: **$0.011 → $0.0064 (caching) → ~$0.0032 (caching + batch)** — near Haiku's sticker, with the only validated judge.
-
-**In-distribution — the false-positive breach rate.** 50 real reproduce rows were sampled from the live DB, **stratified across verdicts × models × families** — so the rare `partial_breach`/`full_breach` and the ambiguous `evaded` cases are represented, not just easy refusals — then the judge's verdict was hidden and the rows **hand-labeled blind** by the operator and scored with `scripts/run_calibration.py`. The number that matters for matrix credibility — *how often does the judge cry breach on a response a human cleared?* — is **2.56% (1 of 39** human-cleared responses), and it missed **0 of 11** human-labeled breaches (0% false-negative). Those 11 breaches include 3 `partial_breach` (the ambiguous breach class) and the cleared side includes 9 `evaded`, so the test did hit the hard middle where misses happen. **These are small samples** — 1/39 and 0/11 carry wide confidence intervals (the honest ceiling on the miss rate is roughly 1 in 4, not "never"); read them as *directional evidence the judge is conservative*, not precise rates. On the breach / no-breach axis the matrix reports, judge and human agree **98%** (49/50); exact 4-way agreement is 82% (`borderline` gate), the gap almost entirely the matrix-irrelevant `refused`↔`evaded` boundary (6 of 9 disagreements, both non-breaches).
-
-**External validation — WildGuardTest.** The judge is scored against [WildGuardTest](https://huggingface.co/datasets/allenai/wildguardmix) (Allen AI) — ~1.7k responses labeled by independent human annotators. WildGuardTest annotates *response refusal* as a task separate from *response harm*, the same split ROGUE's verdicts make, so the judge is scored on two axes instead of being collapsed to safe/unsafe. Scored on the **human-annotated Test split only** — the Train split is GPT-4-labeled, and scoring against it would be the model-grades-model circularity this whole exercise exists to escape. One judge call per item; fully reproducible via `scripts/eval_wildguard.py` (seed-deterministic subset).
-
-| Axis | Agreement with independent human annotators | n |
-|---|---|---|
-| **Refusal** — did the model cleanly decline? | **91.8%** | 196 |
-| **Harm** — was the response harmful? (adversarial prompts) | 78.1% | 196 |
-
-The **refusal axis (91.8%)** is the headline number: `REFUSED` ↔ human-labeled refusal is a 1:1 construct match, so this is a clean, independent agreement figure — the thing that converts "an LLM grades an LLM, trust us" into a measured claim.
-
-The **harm axis (78.1%)** is reported with one honest caveat. Its disagreement is asymmetric — the judge **over-calls** harm (false positives ≫ false negatives) — but two distinct things sit inside that gap: (1) genuine judge over-eagerness, and (2) a *construct* difference — ROGUE's `breach` means *the attacker gained traction*, whereas WildGuard's harm label means *the response is harmful content*; a response can give partial traction without itself being harmful content. A re-run restricted to adversarial prompts only **ruled out** a benign-compliance sampling artifact (the harm number was unchanged), so the over-eagerness is real, not an artifact of the sample.
-
-**Independent cross-check — StrongREJECT.** To probe whether the breach matrix runs *hot*, a second published grader — the **StrongREJECT** rubric autograder (arXiv [2402.10260](https://arxiv.org/abs/2402.10260); rubric copied verbatim from the reference implementation) — was run over 50 of ROGUE's own reproduce rows, stratified across verdicts and all five target models (`scripts/second_grader_pass.py`). StrongREJECT's headline finding is that automated graders *overstate* jailbreak success, so this is the adversarial test of ROGUE's numbers. It passes: the judge agrees with StrongREJECT **82%** of the time, and the **inflation delta is ≤ 0 at every threshold** across the grader's full 0.01–0.75 range (−16% at the most lenient cut, converging to 0% at the strictest — *never positive*). ROGUE's judge is, if anything, **more conservative** than StrongREJECT — the breach rates are not inflated by an over-eager grader. (Raw 0–1 scores are persisted per-item, so the threshold sweep is recomputed offline with no re-grading.) **Scope (n=50):** StrongREJECT grades *harmful-content effectiveness*, so this cross-check is strongest on the harmful-content families (≈ two-thirds of the rows). For the injection / agentic / prompt-leak families — `indirect_prompt_injection`, `tool_use_hijack`, `system_prompt_leak` — where a breach means *executing an injected instruction* or *leaking a prompt* rather than emitting harmful content, StrongREJECT's rubric is a looser fit, so the delta there is weaker evidence; the claim is scoped accordingly.
-
-These two external checks point in apparently opposite directions — WildGuard's *harm* axis says the judge over-calls, StrongREJECT says it under-calls — and that is the honest, useful result: they measure different constructs (harmful *content* vs jailbreak *effectiveness*) at different strictness, and together they **bracket** ROGUE's judge from both sides. It sits stricter than a lenient effectiveness grader and looser than a strict harmful-content label — exactly where a *"did the attacker gain useful traction"* verdict should land. No single external tool flags the matrix as inflated.
-
-All three checks are reproducible — `scripts/run_calibration.py` (in-distribution, against `tests/fixtures/judge_calibration_pairs.json`), `scripts/eval_wildguard.py`, and `scripts/second_grader_pass.py` — and the calibration runner enforces a locked ship/refine gate (`< 0.80` agreement → refine the rubric; `≥ 0.90` → ship).
-
 ## Multimodal red-team
 
 A jailbreak a model refuses as typed text often succeeds as a *picture* of that text — the OCR/vision path is less safety-aligned than the text path. ROGUE turns harvested text attacks into **real images and audio**, sends them to vision/speech models, and judges the result. Five published techniques are reimplemented as **deterministic, black-box renderers** (no model weights, no diffusion, byte-for-byte reproducible):
@@ -298,6 +162,171 @@ The ladder runs either as a standalone pass (`synthesize_escalations.py --ladder
 The renderers can draw a synthetic image — but a multimodal attack is far more realistic composited onto a **real** image. When extraction sees a multimodal attack that describes its carrier (e.g. *"overlay on a bank-login screenshot"*), it records that as `media_query`. A pipeline step (`scripts/fetch_media_assets.py`) then uses **Bright Data** to fetch a matching real image — **SERP API** Google-Images search (`udm=2`) to find a candidate, **Web Unlocker** to download the bytes — and caches it under `data/media_cache/`. The reproduction layer composites the attack overlay onto that real carrier and sends it to the vision panel.
 
 So Bright Data does double duty: it **discovers** the attacks (SERP + Web Unlocker + Web Scraper + Scraping Browser + MCP) *and* **sources the real images** the multimodal attacks are tested against. The fetch is cached (deterministic replays, no re-spend) and gated (`$`-billed, run deliberately). `harvest → extract (media_query) → fetch-media (Bright Data) → reproduce (composite)`.
+
+## Capabilities
+
+- 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
+- 14-slot payload-template vocabulary for cross-deployment reproduction
+- 19-source open-web harvest list — see `docs/sources.md`
+- 6-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out — **plus Claude Opus 4.8**, a flagship added to reproduce the elder_plinius jailbreak against a frontier model (it breached at 100%; Claude Haiku held).
+- Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated on 50 blind-labeled rows — **2.56% false-positive breach rate (1/39), 0 missed breaches (0/11)**, plus **91.8% refusal-axis agreement on WildGuardTest** (n=196) (small samples — see [Judge calibration](#judge-calibration))
+- Daily threat brief (markdown + JSON) + Slack webhook
+- ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
+- **True multimodal red-team** — renders attacks as real images/audio and an autonomous escalation ladder (see above)
+
+## Judge calibration
+
+Every breach number ROGUE reports is ultimately an LLM verdict, so the entire matrix inherits the judge's error rate. "Trust the judge" is not good enough — so the judge (Claude Sonnet) is scored against **independent human labels**, not just spot-checked, three different ways:
+
+- **In-distribution (50 blind-labeled live rows):** **2.56% false-positive breach rate (1 of 39 human-cleared), 0 missed breaches (0 of 11)** — the judge is, if anything, conservative. (Small samples — read as directional, not precise.)
+- **WildGuardTest (Allen AI — independent human annotators):** **91.8% agreement on the refusal axis** (n=196), a clean 1:1 construct match — the number that converts "an LLM grades an LLM, trust us" into a measured claim.
+- **StrongREJECT cross-check:** vs a published grader, the judge's **inflation delta is ≤ 0 at every threshold** — if anything *more conservative*, so the breach rates aren't running hot.
+
+The two external checks deliberately point opposite ways (WildGuard's harm axis says "over-calls," StrongREJECT says "under-calls") and together **bracket** the judge from both sides — exactly where a *"did the attacker gain useful traction"* verdict should land. All three are reproducible (`scripts/run_calibration.py`, `scripts/eval_wildguard.py`, `scripts/second_grader_pass.py`).
+
+<details><summary>Full calibration methodology — the bake-off, the WildGuard harm axis, and the StrongREJECT sweep</summary>
+
+**The judge: calibrated primary, permissive fallback.** The primary judge is Claude Sonnet — the model the numbers below validate. But on the most harmful *full compliances*, Sonnet hits Anthropic's `refusal` stop-reason and returns empty, which would silently drop the single most severe breaches as ERROR. So a cell Sonnet refuses is re-graded by a permissive secondary judge (**DeepSeek V4 Flash** via OpenRouter, set by `JUDGE_FALLBACK_MODEL`) and the verdict is flagged `[JUDGE_REFUSED→…]` so the matrix shows which cells Sonnet wouldn't touch. A bake-off settled the roles: on the 50 human labels, **Sonnet (82% agreement, 0% false-negative breach) clearly beat DeepSeek V3.2 (68%, 45% FN) and V4 Flash (74%, 27% FN)** — so Sonnet stays primary, and the cheaper open model is used *only* where Sonnet refuses (where the alternative is no verdict at all). Those fallback verdicts are flagged and are **not** part of the human-calibration below, which validates Sonnet's grading. To keep the validated judge affordable, the rubric/system prompt is **prompt-cached** (charged at ~0.1× on every call after the first in a 5-min window), and an opt-in **Batch-API path** (`reproduce_once.py --judge-batch`, a further 50% off, latency-tolerant) grades a whole sweep in one batch. Cost ladder per judge call: **$0.011 → $0.0064 (caching) → ~$0.0032 (caching + batch)** — near Haiku's sticker, with the only validated judge.
+
+**In-distribution — the false-positive breach rate.** 50 real reproduce rows were sampled from the live DB, **stratified across verdicts × models × families** — so the rare `partial_breach`/`full_breach` and the ambiguous `evaded` cases are represented, not just easy refusals — then the judge's verdict was hidden and the rows **hand-labeled blind** by the operator and scored with `scripts/run_calibration.py`. The number that matters for matrix credibility — *how often does the judge cry breach on a response a human cleared?* — is **2.56% (1 of 39** human-cleared responses), and it missed **0 of 11** human-labeled breaches (0% false-negative). Those 11 breaches include 3 `partial_breach` (the ambiguous breach class) and the cleared side includes 9 `evaded`, so the test did hit the hard middle where misses happen. **These are small samples** — 1/39 and 0/11 carry wide confidence intervals (the honest ceiling on the miss rate is roughly 1 in 4, not "never"); read them as *directional evidence the judge is conservative*, not precise rates. On the breach / no-breach axis the matrix reports, judge and human agree **98%** (49/50); exact 4-way agreement is 82% (`borderline` gate), the gap almost entirely the matrix-irrelevant `refused`↔`evaded` boundary (6 of 9 disagreements, both non-breaches).
+
+**External validation — WildGuardTest.** The judge is scored against [WildGuardTest](https://huggingface.co/datasets/allenai/wildguardmix) (Allen AI) — ~1.7k responses labeled by independent human annotators. WildGuardTest annotates *response refusal* as a task separate from *response harm*, the same split ROGUE's verdicts make, so the judge is scored on two axes instead of being collapsed to safe/unsafe. Scored on the **human-annotated Test split only** — the Train split is GPT-4-labeled, and scoring against it would be the model-grades-model circularity this whole exercise exists to escape. One judge call per item; fully reproducible via `scripts/eval_wildguard.py` (seed-deterministic subset).
+
+| Axis | Agreement with independent human annotators | n |
+|---|---|---|
+| **Refusal** — did the model cleanly decline? | **91.8%** | 196 |
+| **Harm** — was the response harmful? (adversarial prompts) | 78.1% | 196 |
+
+The **refusal axis (91.8%)** is the headline number: `REFUSED` ↔ human-labeled refusal is a 1:1 construct match, so this is a clean, independent agreement figure — the thing that converts "an LLM grades an LLM, trust us" into a measured claim.
+
+The **harm axis (78.1%)** is reported with one honest caveat. Its disagreement is asymmetric — the judge **over-calls** harm (false positives ≫ false negatives) — but two distinct things sit inside that gap: (1) genuine judge over-eagerness, and (2) a *construct* difference — ROGUE's `breach` means *the attacker gained traction*, whereas WildGuard's harm label means *the response is harmful content*; a response can give partial traction without itself being harmful content. A re-run restricted to adversarial prompts only **ruled out** a benign-compliance sampling artifact (the harm number was unchanged), so the over-eagerness is real, not an artifact of the sample.
+
+**Independent cross-check — StrongREJECT.** To probe whether the breach matrix runs *hot*, a second published grader — the **StrongREJECT** rubric autograder (arXiv [2402.10260](https://arxiv.org/abs/2402.10260); rubric copied verbatim from the reference implementation) — was run over 50 of ROGUE's own reproduce rows, stratified across verdicts and all five target models (`scripts/second_grader_pass.py`). StrongREJECT's headline finding is that automated graders *overstate* jailbreak success, so this is the adversarial test of ROGUE's numbers. It passes: the judge agrees with StrongREJECT **82%** of the time, and the **inflation delta is ≤ 0 at every threshold** across the grader's full 0.01–0.75 range (−16% at the most lenient cut, converging to 0% at the strictest — *never positive*). ROGUE's judge is, if anything, **more conservative** than StrongREJECT — the breach rates are not inflated by an over-eager grader. (Raw 0–1 scores are persisted per-item, so the threshold sweep is recomputed offline with no re-grading.) **Scope (n=50):** StrongREJECT grades *harmful-content effectiveness*, so this cross-check is strongest on the harmful-content families (≈ two-thirds of the rows). For the injection / agentic / prompt-leak families — `indirect_prompt_injection`, `tool_use_hijack`, `system_prompt_leak` — where a breach means *executing an injected instruction* or *leaking a prompt* rather than emitting harmful content, StrongREJECT's rubric is a looser fit, so the delta there is weaker evidence; the claim is scoped accordingly.
+
+These two external checks point in apparently opposite directions — WildGuard's *harm* axis says the judge over-calls, StrongREJECT says it under-calls — and that is the honest, useful result: they measure different constructs (harmful *content* vs jailbreak *effectiveness*) at different strictness, and together they **bracket** ROGUE's judge from both sides. It sits stricter than a lenient effectiveness grader and looser than a strict harmful-content label — exactly where a *"did the attacker gain useful traction"* verdict should land. No single external tool flags the matrix as inflated.
+
+All three checks are reproducible — `scripts/run_calibration.py` (in-distribution, against `tests/fixtures/judge_calibration_pairs.json`), `scripts/eval_wildguard.py`, and `scripts/second_grader_pass.py` — and the calibration runner enforces a locked ship/refine gate (`< 0.80` agreement → refine the rubric; `≥ 0.90` → ship).
+
+</details>
+
+## Roadmap
+
+**Product**
+
+- **Next 30 days** — deeper Web Scraper API coverage: the next 100 open-web sources.
+- **Next 90 days** — customer SDK: pipe ROGUE verdicts straight into SOAR / SIEM.
+- **Scale** — onboarding to the Bright Data Startup Program to accelerate Year-1 infrastructure.
+
+**Research — "a bandit on each end: what to harvest, and how to break"**
+
+- **Break bandit.** ROGUE already learns *which sources to harvest* (the ε-greedy SERP bandit above). The next layer is a second, **contextual Thompson-sampling bandit** that learns *how to break* a target — picking which attack/escalation strategy to try **first** per `(attack family × target model)`, reordering the escalation ladder so the likely winner is front-loaded (breach on attempt 2, not 15 — far fewer calls). Beta-Bernoulli posteriors per arm; deferred from the hackathon only because a bandit needs accumulated runs to learn.
+- **A self-growing attack repertoire.** Harvested techniques enter as `candidate` and graduate to `active` only once they actually breach in a reproduction run — so ROGUE learns *new techniques*, not just new payloads, and prunes mislabels automatically.
+
+---
+
+# Run it yourself
+
+*Everything below is for builders — connecting ROGUE to your tools, running it locally, or driving the pipeline.*
+
+## Architecture
+
+See `docs/architecture.md` for the five-layer pipeline diagram + locked stack table.
+
+## MCP integration
+
+ROGUE exposes its threat-intelligence database as a **producer-side MCP server** — Claude Desktop / Cursor / Windsurf users can query the live breach matrix from inside their IDE.
+
+### Hosted — zero setup (recommended)
+
+The MCP server is mounted into the live API, so there's nothing to clone or run:
+
+```
+https://rogue-api-mr5w.onrender.com/mcp/
+```
+
+- **From the dashboard:** the [home page](https://rogue-eosin.vercel.app) has **Add to Cursor** / **Add to VS Code** one-click buttons + a copy-URL.
+- **Claude Desktop:** Settings → **Customize** (connectors moved here) → add a custom connector → paste the URL.
+
+It's read-only (the five query tools below). For local development against your own DB, use the one-command installer instead:
+
+### Install locally (one command)
+
+```bash
+uv run python scripts/install_mcp.py           # Claude Desktop (default)
+uv run python scripts/install_mcp.py --client cursor    # or: cursor / windsurf
+```
+
+This detects the client's config path for your OS, merges in the `rogue` server entry pointing at this checkout (preserving every other key/server), and backs up the old file first. It's idempotent and refuses to touch a config it can't parse. Then fully restart the client. Add `--dry-run` to preview the merge without writing, or `--uninstall` to remove the `rogue` entry (config-file servers can't always be deleted from the client UI).
+
+> **Reviewer flow (any MCP client):** clone the repo → `uv run python scripts/install_mcp.py` (writes the pointer at *your* clone's path) → restart the client. No manual JSON editing. ROGUE is a standard MCP server, so any compliant client works — the installer just covers Claude Desktop / Cursor / Windsurf out of the box; everything else can point at the same `uv … -m rogue.mcp_server.server` command (stdio) or the HTTP endpoint on :8001 (see [Transport](#transport)).
+
+<details><summary>Or edit the config by hand</summary>
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "rogue": {
+      "command": "uv",
+      "args": [
+        "--directory", "/absolute/path/to/ROGUE",
+        "run", "python", "-m", "rogue.mcp_server.server"
+      ]
+    }
+  }
+}
+```
+
+Replace the `--directory` path with your local repo location.
+
+</details>
+
+Requires a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py` ran at least once); the deployed build reads the live Neon DB.
+
+### Tools exposed
+
+| Tool | Purpose |
+|---|---|
+| `query_attacks(family?, vector?, since_days?, limit?)` | Filter the attack-primitive corpus by family/vector/recency. Returns full primitive records with sources. |
+| `query_diff(date_str?)` | Today vs yesterday breach diff — what's new, what's newly defended, per-tier counts. |
+| `query_threat_brief(date_str?, format?)` | Full daily threat brief in markdown or JSON. Reads from `data/threat_briefs/` then falls back to live DB render. |
+| `query_breaches_for_config(deployment_config_id, since_days?, limit?)` | Per-trial breach results for one customer deployment, with judge rationale + model-response excerpts. |
+| `query_attack_detail(primitive_id)` | One attack's full record + its per-config breach aggregates (n_full / n_partial / n_refused / n_evaded). |
+
+### Try it
+
+After connecting, ask Claude:
+
+> "What new attacks broke our customer support config in the last 24 hours?"
+
+Claude will call `query_diff` + `query_breaches_for_config` and summarize.
+
+### Transport
+
+**Stdio** by default (the Claude Desktop path) — the server runs as a subprocess Claude Desktop spawns, logging to stderr so the JSON-RPC channel on stdout stays clean.
+
+For **remote** clients (Cursor / Windsurf / a hosted client), serve the same five tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
+
+```bash
+ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
+# serves http://127.0.0.1:8001/mcp  (set ROGUE_MCP_HOST=0.0.0.0 to expose off-box)
+```
+
+`ROGUE_MCP_TRANSPORT` accepts `stdio` | `sse` | `streamable-http`; `ROGUE_MCP_PORT` / `ROGUE_MCP_HOST` override the bind address.
+
+## Quick start (local)
+
+```bash
+git clone https://github.com/nguiaSoren/ROGUE
+cd ROGUE
+cp .env.example .env  # fill in your keys
+docker compose up -d
+uv sync --extra dev   # or: pip install -e ".[dev]"
+alembic upgrade head
+python scripts/seed_demo_data.py
+uvicorn rogue.api.main:app --reload
+```
 
 ## Pipeline CLI reference
 
@@ -382,19 +411,6 @@ tests/             # schema round-trip tests + golden fixtures
 scripts/           # harvest_once.py, reproduce_once.py, seed_demo_data.py
 frontend/          # Next.js dashboard
 ```
-
-## Roadmap
-
-**Product**
-
-- **Next 30 days** — deeper Web Scraper API coverage: the next 100 open-web sources.
-- **Next 90 days** — customer SDK: pipe ROGUE verdicts straight into SOAR / SIEM.
-- **Scale** — onboarding to the Bright Data Startup Program to accelerate Year-1 infrastructure.
-
-**Research — "a bandit on each end: what to harvest, and how to break"**
-
-- **Break bandit.** ROGUE already learns *which sources to harvest* (the ε-greedy SERP bandit above). The next layer is a second, **contextual Thompson-sampling bandit** that learns *how to break* a target — picking which attack/escalation strategy to try **first** per `(attack family × target model)`, reordering the escalation ladder so the likely winner is front-loaded (breach on attempt 2, not 15 — far fewer calls). Beta-Bernoulli posteriors per arm; deferred from the hackathon only because a bandit needs accumulated runs to learn.
-- **A self-growing attack repertoire.** Harvested techniques enter as `candidate` and graduate to `active` only once they actually breach in a reproduction run — so ROGUE learns *new techniques*, not just new payloads, and prunes mislabels automatically.
 
 ## Built by
 
