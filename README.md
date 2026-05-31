@@ -20,11 +20,13 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 - **Dashboard:** https://rogue-eosin.vercel.app — live, deployed
 - **MCP server:** configure Claude Desktop / Cursor to query ROGUE directly (see [MCP integration](#mcp-integration), under "Run it yourself")
 
-### 5-minute walkthrough
+### Demo
 
-[![ROGUE — 5-minute walkthrough](https://img.youtube.com/vi/-luwKpfaf2M/maxresdefault.jpg)](https://youtu.be/-luwKpfaf2M)
+A 25-second teaser plays inline below — the full 5-minute walkthrough is on YouTube.
 
-▶ **[Watch the 5-minute demo on YouTube](https://youtu.be/-luwKpfaf2M)**
+https://github.com/user-attachments/assets/c61cd222-0e87-4cd3-b8cd-61636eb80dfd
+
+▶ **[Watch the full 5-minute demo on YouTube](https://youtu.be/-luwKpfaf2M)**
 
 ## What ROGUE does
 
