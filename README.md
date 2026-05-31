@@ -11,13 +11,20 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 > ships a daily diff of which attacks now bypass your guardrails.
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
+[![Video](https://img.shields.io/badge/%E2%96%B6%20demo-5%20min-red)](https://github.com/nguiaSoren/ROGUE/raw/main/assets/rogue-final.mp4)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](pyproject.toml)
 
 ## Live demo
 
-- Dashboard: https://rogue-eosin.vercel.app
-- MCP server: configure Claude Desktop / Cursor to query ROGUE directly (see [MCP integration](#mcp-integration), under "Run it yourself")
+- **Dashboard:** https://rogue-eosin.vercel.app — live, deployed
+- **MCP server:** configure Claude Desktop / Cursor to query ROGUE directly (see [MCP integration](#mcp-integration), under "Run it yourself")
+
+### 5-minute walkthrough
+
+<video src="https://github.com/nguiaSoren/ROGUE/raw/main/assets/rogue-final.mp4" controls width="100%"></video>
+
+> Player not showing on your viewer? [▶ Watch / download the demo (5 min, MP4)](https://github.com/nguiaSoren/ROGUE/raw/main/assets/rogue-final.mp4)
 
 ## What ROGUE does
 
