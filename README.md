@@ -32,6 +32,8 @@ https://github.com/user-attachments/assets/c61cd222-0e87-4cd3-b8cd-61636eb80dfd
 
 ## What ROGUE does
 
+**ROGUE is an autonomous red-team agent for production LLMs.** It continuously discovers brand-new jailbreaks and prompt-injection attacks from the open web, replays each one against *your* actual deployment — your model + system prompt + tools — and alerts you to the ones that break through, shipping a daily threat brief you can also query from your IDE. Think of it as a security guard for your AI that learns this morning's attacks before they reach your users — and the daily open-web harvest runs on just **$0.05–$0.30 of Bright Data**.
+
 Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 1. **Harvest.** 19 open-web sources fetched via 5 Bright Data products.
