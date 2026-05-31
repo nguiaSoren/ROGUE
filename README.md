@@ -6,9 +6,11 @@
 
 Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data × LLM threat intelligence hackathon submission.
 
-> Continuous red-team for production LLM deployments. Harvests new jailbreaks from
-> the open web via Bright Data, reproduces them against your deployment configuration,
-> ships a daily diff of which attacks now bypass your guardrails.
+> ## 🥇 The first continuous open-web red-team you can query over MCP.
+>
+> ROGUE harvests new jailbreaks from the open web **through Bright Data's MCP**, reproduces each one against **your** deployment configuration (model × system prompt × tools), and ships a daily breach diff — then serves it all **back through its own MCP server**, so you can ask Claude / Cursor *"which live attacks breach my config?"* from your IDE.
+>
+> **A two-way MCP loop — harvest *and* distribution — that no other red-team tool closes.**
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
 [![Video](https://img.shields.io/badge/%E2%96%B6%20demo-5%20min-red)](https://youtu.be/-luwKpfaf2M)
