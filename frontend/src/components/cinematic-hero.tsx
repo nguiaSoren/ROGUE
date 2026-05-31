@@ -57,13 +57,13 @@ export function CinematicHero({
         >
           <span className="block">Your LLM is being</span>
           <span className="block">
-            <span className="rogue-word-rotator-wrap inline-flex h-[1em] overflow-hidden align-baseline mr-3 text-rogue-red">
+            <span className="rogue-word-rotator-wrap inline-flex h-[1.2em] overflow-hidden align-baseline mr-3 text-rogue-red leading-[1.2]">
               <span className="rogue-word-rotator">
-                <span className="block h-[1em]">jailbroken.</span>
-                <span className="block h-[1em]">prompt-injected.</span>
-                <span className="block h-[1em]">role-played.</span>
-                <span className="block h-[1em]">escalated.</span>
-                <span className="block h-[1em]">jailbroken.</span>
+                <span className="block h-[1.2em] leading-[1.2]">jailbroken.</span>
+                <span className="block h-[1.2em] leading-[1.2]">prompt-injected.</span>
+                <span className="block h-[1.2em] leading-[1.2]">role-played.</span>
+                <span className="block h-[1.2em] leading-[1.2]">escalated.</span>
+                <span className="block h-[1.2em] leading-[1.2]">jailbroken.</span>
               </span>
             </span>
           </span>
