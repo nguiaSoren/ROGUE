@@ -11,7 +11,6 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 > ships a daily diff of which attacks now bypass your guardrails.
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
-[![Video](https://img.shields.io/badge/video-5min-blue)](#)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](pyproject.toml)
 
@@ -19,7 +18,7 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 
 Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
-1. **Harvest.** 15 open-web sources fetched via 5 Bright Data products.
+1. **Harvest.** 19 open-web sources fetched via 5 Bright Data products.
 2. **Extract.** An LLM agent structures each fetched document into an `AttackPrimitive`.
 3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks.
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
@@ -28,7 +27,6 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 ## Live demo
 
 - Dashboard: https://rogue-eosin.vercel.app
-- Video walkthrough: TODO  <!-- TODO Day 4: YouTube/Loom link -->
 - MCP server: configure Claude Desktop / Cursor to query ROGUE directly (see below)
 
 ## MCP integration
@@ -117,8 +115,8 @@ ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/<you>/rogue
-cd rogue
+git clone https://github.com/nguiaSoren/ROGUE
+cd ROGUE
 cp .env.example .env  # fill in your keys
 docker compose up -d
 uv sync --extra dev   # or: pip install -e ".[dev]"
@@ -195,7 +193,7 @@ page lands the value prop; `/feed`, `/matrix`, `/brief` provide the depth.
 5. **Augmentation Lab (interactive)** — pick a deployment config, toggle
    persona / escalation / mutation switches, watch the estimated breach
    rate animate as stacked colored segments. Uses real `max_delta` /
-   `delta` / `pattern_matching_score` values from the §10.7 API.
+   `delta` / `pattern_matching_score` values from the API.
 6. **Bright Data spotlight** — 4 hero metrics (5 BD products in use, 19
    sources fanned out, novel-attacks-per-BD-$, 2-tier reliability), the
    per-product role breakdown, and the hover-pause sources marquee.
@@ -203,7 +201,7 @@ page lands the value prop; `/feed`, `/matrix`, `/brief` provide the depth.
 
 ### `/feed` — live attack feed
 
-Headline KPIs, the §10.7 augmentation A/B strip, then a 3-column war room:
+Headline KPIs, the augmentation A/B strip, then a 3-column war room:
 left ribbon (hot families + BD-product histogram), center attack list
 (expandable rows with a **▶ play** button that streams the attack as a
 3-phase ATTACKER → MODEL → JUDGE terminal replay), right sidebar with all
@@ -219,8 +217,8 @@ The bandit widget's arm rows each carry a CSS-only hover-card with
 
 15 attack families × 6 deployment configs. Click any red cell to see the
 exact primitive that cracked it, with 95% bootstrap CIs. Column headers
-carry the PAIR avg-iters-to-breach so the matrix and the §10.7
-augmentation story stay tied together visually.
+carry the PAIR avg-iters-to-breach so the matrix and the augmentation
+story stay tied together visually.
 
 ### `/brief` — daily threat brief
 
@@ -236,7 +234,7 @@ See `docs/architecture.md` for the five-layer pipeline diagram + locked stack ta
 
 - 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
 - 14-slot payload-template vocabulary for cross-deployment reproduction
-- 15-source open-web harvest list — see `docs/sources.md`
+- 19-source open-web harvest list — see `docs/sources.md`
 - 6-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out — **plus Claude Opus 4.8**, a flagship added to reproduce the elder_plinius jailbreak against a frontier model (it breached at 100%; Claude Haiku held).
 - Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated on 50 blind-labeled rows — **2.56% false-positive breach rate (1/39), 0 missed breaches (0/11)**, plus **91.8% refusal-axis agreement on WildGuardTest** (n=196) (small samples — see [Judge calibration](#judge-calibration))
 - Daily threat brief (markdown + JSON) + Slack webhook
@@ -295,7 +293,7 @@ Tiers 1–4 need **no planner**, so the ladder keeps working even when the escal
 
 The ladder runs either as a standalone pass (`synthesize_escalations.py --ladder`) or **inline inside reproduce** (`reproduce_once.py --escalate`, off by default): when on, any primitive the whole panel refuses is laddered right after its cells finish, bounded by `--escalate-max-spend`.
 
-### Real-world carriers via Bright Data (§11.8)
+### Real-world carriers via Bright Data
 
 The renderers can draw a synthetic image — but a multimodal attack is far more realistic composited onto a **real** image. When extraction sees a multimodal attack that describes its carrier (e.g. *"overlay on a bank-login screenshot"*), it records that as `media_query`. A pipeline step (`scripts/fetch_media_assets.py`) then uses **Bright Data** to fetch a matching real image — **SERP API** Google-Images search (`udm=2`) to find a candidate, **Web Unlocker** to download the bytes — and caches it under `data/media_cache/`. The reproduction layer composites the attack overlay onto that real carrier and sends it to the vision panel.
 
@@ -363,12 +361,12 @@ uv run python scripts/reproduce_once.py --primitive-limit 50 --judge-batch
 | `--temperature T` | 0.7 | Target-model sampling temperature. |
 | `--concurrency N` | — | Parallel target calls. |
 | `--multimodal-only` | off | Only `multimodal_image` / `multimodal_audio` primitives, rendered as real image/audio (vision/audio configs only). |
-| `--no-fetch-media` | off | Skip the §11.8 real-carrier fetch; render synthetic canvases instead. |
-| `--persona NAME` | off | §10.7 PAP persona wrap (`'Expert Endorsement'`, …, or `random`) — the B side of the A/B. |
+| `--no-fetch-media` | off | Skip the real-carrier fetch; render synthetic canvases instead. |
+| `--persona NAME` | off | PAP persona wrap (`'Expert Endorsement'`, …, or `random`) — the B side of the A/B. |
 | `--synthesized-only` | off | Only `synthesized=True` rows (escalation/mutation children). |
-| `--pair-max-iters N` | 0 | §10.7 PAIR: up to N iterative-attacker refinements per evaded/refused trial. |
+| `--pair-max-iters N` | 0 | PAIR: up to N iterative-attacker refinements per evaded/refused trial. |
 | `--no-iterative` | off | Force `--pair-max-iters=0`. |
-| `--escalate` | off | §10.8 inline auto-ladder for panel-wide refusals (COSTLY; bound with `--escalate-max-spend`). |
+| `--escalate` | off | inline auto-ladder for panel-wide refusals (COSTLY; bound with `--escalate-max-spend`). |
 | `--escalate-max-spend USD` | none | Cap cumulative escalation spend. |
 | `--escalate-n-trials N` | 1 | Trials per ladder variant × config. |
 | `--escalate-planner-model` | Claude+fallback | Override the Tier-5 escalation planner backbone. |
@@ -379,11 +377,10 @@ uv run python scripts/reproduce_once.py --primitive-limit 50 --judge-batch
 
 ```
 src/rogue/         # Python package (schemas/, harvest/, extract/, dedupe/, reproduce/, diff/, mcp_server/, db/, api/)
-docs/              # architecture, schemas, taxonomy, sources, budget — extracted from ROGUE_PLAN.md
+docs/              # architecture, schemas, taxonomy, sources, budget
 tests/             # schema round-trip tests + golden fixtures
 scripts/           # harvest_once.py, reproduce_once.py, seed_demo_data.py
-frontend/          # Next.js dashboard (Day 3 scaffold)
-ROGUE_PLAN.md      # master plan (3800+ lines)
+frontend/          # Next.js dashboard
 ```
 
 ## Built by
