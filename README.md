@@ -383,6 +383,19 @@ scripts/           # harvest_once.py, reproduce_once.py, seed_demo_data.py
 frontend/          # Next.js dashboard
 ```
 
+## Roadmap
+
+**Product**
+
+- **Next 30 days** — deeper Web Scraper API coverage: the next 100 open-web sources.
+- **Next 90 days** — customer SDK: pipe ROGUE verdicts straight into SOAR / SIEM.
+- **Scale** — onboarding to the Bright Data Startup Program to accelerate Year-1 infrastructure.
+
+**Research — "a bandit on each end: what to harvest, and how to break"**
+
+- **Break bandit.** ROGUE already learns *which sources to harvest* (the ε-greedy SERP bandit above). The next layer is a second, **contextual Thompson-sampling bandit** that learns *how to break* a target — picking which attack/escalation strategy to try **first** per `(attack family × target model)`, reordering the escalation ladder so the likely winner is front-loaded (breach on attempt 2, not 15 — far fewer calls). Beta-Bernoulli posteriors per arm; deferred from the hackathon only because a bandit needs accumulated runs to learn.
+- **A self-growing attack repertoire.** Harvested techniques enter as `candidate` and graduate to `active` only once they actually breach in a reproduction run — so ROGUE learns *new techniques*, not just new payloads, and prunes mislabels automatically.
+
 ## Built by
 
 Soren Obounou Nguia — AI Systems Engineer; previously Grand-Prize winner at Yonsei University for LLM security tooling (GPTFuzz optimization), adversarial-ML research at AIM Intelligence (HWARANG red-team series).
