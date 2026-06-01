@@ -39,6 +39,57 @@ type AttackDetailResponse = {
   breaches: BreachDetail[];
 };
 
+// --------------------------------------------------------------------------
+// Shared attack-detail cache, keyed by primitive_id. Shared between the heatmap
+// (hover prefetch) and the drawer (on open), so:
+//   • hovering a cell warms the fetch — by the time it's clicked the detail is
+//     usually already in hand and the drawer opens straight to content;
+//   • re-opening any previously-viewed cell is instant;
+//   • a transient 502/503/504 from a Render cold boot is retried (1.6s/2.4s)
+//     instead of leaving the drawer stuck on "loading primitive..." forever.
+// --------------------------------------------------------------------------
+const detailCache = new Map<string, Promise<AttackDetailResponse>>();
+
+async function fetchAttackDetailWithRetry(
+  url: string,
+): Promise<AttackDetailResponse> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(url);
+      const gateway = r.status === 502 || r.status === 503 || r.status === 504;
+      if (gateway && attempt < 2) {
+        await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+        continue;
+      }
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return (await r.json()) as AttackDetailResponse;
+    } catch (e) {
+      if (attempt < 2) {
+        await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+export function fetchAttackDetail(
+  primitiveId: string,
+): Promise<AttackDetailResponse> {
+  const cached = detailCache.get(primitiveId);
+  if (cached) return cached;
+  const p = fetchAttackDetailWithRetry(`${API_BASE}/api/attacks/${primitiveId}`);
+  // Evict on failure so a later hover/click can retry from scratch.
+  p.catch(() => detailCache.delete(primitiveId));
+  detailCache.set(primitiveId, p);
+  return p;
+}
+
+/** Warm the cache for a cell the user is hovering (fire-and-forget). */
+export function prefetchAttackDetail(primitiveId: string): void {
+  void fetchAttackDetail(primitiveId).catch(() => {});
+}
+
 /**
  * Side-drawer that opens when a matrix cell is clicked.
  *
@@ -64,28 +115,36 @@ export function MatrixCellDrawer({
   // wiping `detail` synchronously inside the effect (which React 19 flags
   // as a cascading-render anti-pattern).
   const [detail, setDetail] = useState<AttackDetailResponse | null>(null);
+  const [errorFor, setErrorFor] = useState<string | null>(null);
   const detailFor = detail?.primitive.primitive_id ?? null;
   const needsFetch = open && cell !== null && detailFor !== cell.primitive_id;
 
   useEffect(() => {
     if (!needsFetch || !cell) return;
-    const ctrl = new AbortController();
-    fetch(`${API_BASE}/api/attacks/${cell.primitive_id}`, {
-      signal: ctrl.signal,
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((data) => setDetail(data as AttackDetailResponse))
+    const id = cell.primitive_id;
+    let cancelled = false;
+    // Goes through the shared cache: a cell hovered before clicking is usually
+    // already loaded, re-opens are instant, and cold-boot 502s are retried.
+    fetchAttackDetail(id)
+      .then((data) => {
+        if (!cancelled) setDetail(data);
+      })
       .catch(() => {
-        /* drawer falls back to "failed to load" via detailFor mismatch */
+        if (!cancelled) setErrorFor(id);
       });
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [needsFetch, cell]);
 
-  const loading = needsFetch;
   const shownDetail =
     detail && cell && detail.primitive.primitive_id === cell.primitive_id
       ? detail
       : null;
+  // Show an error (not an infinite "loading…") if the fetch ultimately failed
+  // for the cell currently on screen.
+  const errored = cell !== null && errorFor === cell.primitive_id && !shownDetail;
+  const loading = needsFetch && !errored;
 
   // Close on Escape.
   useEffect(() => {
@@ -200,6 +259,11 @@ export function MatrixCellDrawer({
           {loading && !shownDetail && (
             <p className="text-xs font-mono text-muted-foreground">
               {"// loading primitive..."}
+            </p>
+          )}
+          {errored && (
+            <p className="text-xs font-mono text-rogue-red">
+              {"// couldn't load this primitive (the API may be waking up) — close and reopen to retry"}
             </p>
           )}
           {shownDetail && (

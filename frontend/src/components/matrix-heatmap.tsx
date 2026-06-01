@@ -7,7 +7,7 @@ import {
   type BreachMatrixResponse,
   type StubbornnessStatsResponse,
 } from "@/lib/api";
-import { MatrixCellDrawer } from "@/components/matrix-drawer";
+import { MatrixCellDrawer, prefetchAttackDetail } from "@/components/matrix-drawer";
 import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
@@ -485,6 +485,10 @@ function HeatmapCell({
     <button
       type="button"
       onClick={onClick}
+      // Warm the attack-detail cache on hover/focus so the drawer usually opens
+      // straight to content instead of showing "loading primitive…".
+      onMouseEnter={() => prefetchAttackDetail(cell.primitive_id)}
+      onFocus={() => prefetchAttackDetail(cell.primitive_id)}
       className={`w-full h-14 flex items-center justify-center ${bg} ${text} font-bold tabular-nums border-r border-border/30 transition-all hover:scale-110 hover:z-10 hover:shadow-[0_0_16px_rgba(255,0,60,0.4)] cursor-pointer relative ${pulseClass} animate-rogue-cell-pop ${
         dimmed ? "opacity-20 saturate-50" : ""
       }`}
