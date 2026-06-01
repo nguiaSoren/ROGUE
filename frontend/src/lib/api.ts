@@ -16,13 +16,42 @@ const API_BASE =
 
 const REVALIDATE_SECONDS = 300;
 
+// The API runs on Render's free tier, which spins the service down when idle
+// and returns a transient 502/503/504 (or drops the connection) for the first
+// request or two while it cold-boots. Those are not real failures — retry them
+// with a short backoff so a cold start never paints the page as "unavailable".
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+const MAX_RETRIES = 2;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const r = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
-  if (!r.ok) {
-    throw new Error(`${path} → ${r.status} ${r.statusText}`);
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const r = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
+      if (GATEWAY_STATUSES.has(r.status) && attempt < MAX_RETRIES) {
+        await sleep(1500 * (attempt + 1)); // 1.5s, then 3s
+        continue;
+      }
+      if (!r.ok) {
+        throw new Error(`${path} → ${r.status} ${r.statusText}`);
+      }
+      return (await r.json()) as T;
+    } catch (e) {
+      // Network-level throw (connection reset during cold boot) — retry too.
+      lastError = e;
+      if (attempt < MAX_RETRIES) {
+        await sleep(1500 * (attempt + 1));
+        continue;
+      }
+      throw e;
+    }
   }
-  return (await r.json()) as T;
+  throw lastError;
 }
 
 // --------------------------------------------------------------------------

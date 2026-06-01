@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { BreachCell, BreachMatrixResponse, StubbornnessStatsResponse } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  api,
+  type BreachCell,
+  type BreachMatrixResponse,
+  type StubbornnessStatsResponse,
+} from "@/lib/api";
 import { MatrixCellDrawer } from "@/components/matrix-drawer";
 import { ProviderLogo } from "@/components/ui/provider-logo";
 
@@ -15,19 +20,40 @@ import { ProviderLogo } from "@/components/ui/provider-logo";
  */
 export function MatrixHeatmap({
   matrix,
-  thisRunAugmented,
-  allTimeBaseline,
-  augmented,
   stubbornness,
 }: {
-  // The four quadrants of the SCOPE × ATTACKER 2×2. `matrix` is the only one
-  // guaranteed present (this-run × baseline); the rest fall back to it.
+  // `matrix` (this-run × baseline) is the only quadrant rendered server-side.
+  // The other three quadrants of the SCOPE × ATTACKER 2×2 are ~768 KB each, so
+  // they're fetched client-side after mount (see effect below) rather than
+  // blocking SSR. Until they arrive, the toggles stay hidden and the grid shows
+  // the baseline; any quadrant that fails to load degrades back to baseline.
   matrix: BreachMatrixResponse;
-  thisRunAugmented?: BreachMatrixResponse | null; // this-run × augmented
-  allTimeBaseline?: BreachMatrixResponse | null; // all-time × baseline
-  augmented?: BreachMatrixResponse | null; // all-time × augmented
   stubbornness: StubbornnessStatsResponse | null;
 }) {
+  const [thisRunAugmented, setThisRunAugmented] =
+    useState<BreachMatrixResponse | null>(null);
+  const [allTimeBaseline, setAllTimeBaseline] =
+    useState<BreachMatrixResponse | null>(null);
+  const [augmented, setAugmented] = useState<BreachMatrixResponse | null>(null);
+
+  // Lazy-load the three heavy quadrants in the background once the grid is up.
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      api.breachMatrix(matrix.target_date, "thisrun_augmented").catch(() => null),
+      api.breachMatrix(undefined, "alltime_baseline").catch(() => null),
+      api.breachMatrix(undefined, "augmented").catch(() => null),
+    ]).then(([tra, atb, aug]) => {
+      if (cancelled) return;
+      setThisRunAugmented(tra);
+      setAllTimeBaseline(atb);
+      setAugmented(aug);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [matrix.target_date]);
+
   const [openCell, setOpenCell] = useState<BreachCell | null>(null);
   const [familyFilter, setFamilyFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<

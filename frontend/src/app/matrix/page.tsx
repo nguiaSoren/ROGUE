@@ -24,24 +24,20 @@ export default async function MatrixPage({
   // that isn't the default "most-data" day). Omitted → the API's default.
   const { date } = await searchParams;
 
-  // The SCOPE × ATTACKER 2×2 needs all four quadrant datasets. Only the
-  // top-left (this-run × baseline) is required; the other three degrade to null
-  // and the heatmap falls back to baseline if a quadrant is unavailable.
+  // The SCOPE × ATTACKER 2×2 needs four quadrant datasets, but only the
+  // top-left (this-run × baseline) gates the headline + initial grid. The other
+  // three quadrants are ~768 KB each and only feed the All-time / +Augmentations
+  // toggles, so SSR no longer blocks on them — `MatrixHeatmap` lazy-loads them
+  // client-side after mount. Keeping the critical path to baseline + stubbornness
+  // takes the cold-start render from minutes to a couple of seconds.
   let matrix: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
-  let thisRunAugmented: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
-  let allTimeBaseline: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
-  let augmented: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let stubbornness: Awaited<ReturnType<typeof api.stubbornnessStats>> | null = null;
   let error: string | null = null;
   try {
-    [matrix, thisRunAugmented, allTimeBaseline, augmented, stubbornness] =
-      await Promise.all([
-        api.breachMatrix(date), // this-run × baseline
-        api.breachMatrix(date, "thisrun_augmented").catch(() => null), // this-run × augmented
-        api.breachMatrix(undefined, "alltime_baseline").catch(() => null), // all-time × baseline
-        api.breachMatrix(undefined, "augmented").catch(() => null), // all-time × augmented
-        api.stubbornnessStats().catch(() => null),
-      ]);
+    [matrix, stubbornness] = await Promise.all([
+      api.breachMatrix(date), // this-run × baseline (the only required fetch)
+      api.stubbornnessStats().catch(() => null),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
@@ -165,15 +161,20 @@ export default async function MatrixPage({
             className="group block rogue-card rogue-card-critical border border-rogue-red/40 rounded-lg p-5 bg-rogue-red/5 animate-rogue-fade-up transition-colors hover:bg-rogue-red/10 hover:border-rogue-red/60"
             style={{ animationDelay: "0.05s" }}
           >
-            <div className="flex items-baseline justify-between gap-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 sm:gap-4">
               <div className="space-y-1 min-w-0 flex-1">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-red flex items-center gap-2">
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-red flex items-center gap-2 flex-wrap">
                   worst attacker today
                   <span className="text-muted-foreground normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity">
                     — see full breakdown →
                   </span>
                 </p>
-                <p className="text-lg font-bold leading-tight truncate" title={headlineCell.title}>
+                {/* break-words lets long titles wrap on phones; sm:truncate keeps
+                    the single-line desktop look. */}
+                <p
+                  className="text-lg font-bold leading-tight break-words sm:truncate"
+                  title={headlineCell.title}
+                >
                   {headlineCell.title}
                 </p>
                 <p className="text-xs font-mono text-muted-foreground">
@@ -185,7 +186,7 @@ export default async function MatrixPage({
                   (n={headlineCell.n_trials})
                 </p>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-left sm:text-right">
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
                   most-vulnerable config
                 </p>
@@ -197,14 +198,10 @@ export default async function MatrixPage({
           </Link>
         )}
 
-        {/* Interactive heatmap (client component) */}
-        <MatrixHeatmap
-          matrix={matrix}
-          thisRunAugmented={thisRunAugmented}
-          allTimeBaseline={allTimeBaseline}
-          augmented={augmented}
-          stubbornness={stubbornness}
-        />
+        {/* Interactive heatmap (client component). The three augmentation /
+            all-time quadrants are fetched client-side inside the component so
+            they don't block this server render. */}
+        <MatrixHeatmap matrix={matrix} stubbornness={stubbornness} />
 
         <Legend />
 
