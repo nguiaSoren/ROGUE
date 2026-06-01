@@ -90,12 +90,15 @@ def test_models_metadata_has_expected_tables() -> None:
     build, migration 0007); ``bandit_state`` (migration 0010) and
     ``fetch_cache`` (§11.7 skip-cache, migration 0011) added 2026-05-29;
     ``primitive_images`` (DB-stored image bytes, migration 0012) added
-    2026-05-30. Add new entries here when migrations add tables.
+    2026-05-30. ``attack_strategies`` (§10.9 self-growing technique library,
+    migration 0013) added 2026-06-01. Add new entries here when migrations
+    add tables.
     """
     from rogue.db.models import Base
 
     assert sorted(Base.metadata.tables.keys()) == [
         "attack_primitives",
+        "attack_strategies",
         "bandit_state",
         "breach_results",
         "bright_data_cost_log",

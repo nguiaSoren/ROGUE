@@ -126,6 +126,10 @@ DEFAULT_CONCURRENCY = 5
 # (~1.5K) + response (~1.5K) ≈ 6K input tokens + ~300 tokens output. With
 # Sonnet ($3/M in + $15/M out), per-call ≈ $0.0225.
 _JUDGE_COST_ESTIMATE_PER_CALL_USD = 0.0225
+# Rough per-target-call estimate for the §10.9 escalation-rotation cost preview
+# (a single target chat completion across the panel's tier; order-of-magnitude,
+# used only for the --dry-run upper-bound, never for accounting).
+_TARGET_COST_ESTIMATE_PER_CALL_USD = 0.01
 
 
 @dataclass
@@ -623,6 +627,7 @@ async def run_reproduction(
     escalate_max_spend: float | None = None,
     escalate_n_trials: int = 1,
     escalate_planner_model: str | None = None,
+    escalate_dry_run: bool = False,
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
     only_unreproduced: bool = False,
@@ -679,12 +684,10 @@ async def run_reproduction(
 
     # §10.8 inline escalation: when --escalate, a primitive the WHOLE panel
     # refused is laddered (image → CoJ → structured → audio → escalation, stop
-    # at first breach) right after its cells finish. Planner is constructed lazily
-    # iff escalate (Claude backbone w/ auto-fallback to Llama on refusal).
-    if escalate and planner is None:
-        planner = EscalationPlanner.from_env(
-            **({"model": escalate_planner_model} if escalate_planner_model else {})
-        )
+    # at first breach) right after its cells finish. The planner is constructed
+    # lazily INSIDE the session block (§10.9 Phase 4) so it can be seeded with the
+    # harvested strategy library (load_strategy_library needs a session). An
+    # injected ``planner`` (tests) is left as-is.
 
     # pool_pre_ping: detect + replace a connection Neon dropped during a long
     # phase (idle SSL timeout) instead of erroring on the next statement.
@@ -883,13 +886,66 @@ async def run_reproduction(
             # §10.8 inline escalation bookkeeping: a primitive is escalated only
             # once ALL its cells finish AND none breached. as_completed yields
             # cells interleaved across primitives, so track per-primitive.
+            escalation_plan = None
+            escalation_now = datetime.now(timezone.utc)
             if escalate:
                 from scripts.synthesize_escalations import (  # noqa: PLC0415
                     DEFAULT_AUDIO_STYLES,
                     DEFAULT_IMAGE_RENDERERS,
                     DEFAULT_STRUCTURED_FORMATS,
+                    ESCALATION_LADDER,
                     run_escalation_ladder_one,
                 )
+                from rogue.reproduce.strategy_library import (  # noqa: PLC0415
+                    load_strategy_library,
+                )
+                from rogue.reproduce.strategy_lifecycle import (  # noqa: PLC0415
+                    build_rotation_plan,
+                    format_rotation_plan,
+                    ladder_config_from_env,
+                )
+
+                # §10.9 Phase 4 — seed the planner with the harvested strategy
+                # library (active + candidate, text/multi_turn) so it can drive
+                # harvested techniques, then assemble the rotation + cost plan.
+                _scope, _cap = ladder_config_from_env()
+                if planner is None:
+                    planner = EscalationPlanner.from_env(
+                        extra_strategies=load_strategy_library(session),
+                        **(
+                            {"model": escalate_planner_model}
+                            if escalate_planner_model
+                            else {}
+                        ),
+                    )
+                escalation_plan = build_rotation_plan(
+                    session,
+                    base_ladder=ESCALATION_LADDER,
+                    cap=_cap,
+                    # Upper bound: any loaded primitive could refuse the whole
+                    # panel and become an EVADE parent.
+                    n_parents_est=len(primitives),
+                    n_configs=len(configs),
+                    n_trials=escalate_n_trials,
+                    target_cost_usd=_TARGET_COST_ESTIMATE_PER_CALL_USD,
+                    judge_cost_usd=_JUDGE_COST_ESTIMATE_PER_CALL_USD,
+                )
+                logger.info(
+                    "escalation rotation plan (scope=%s cap=%d):\n%s",
+                    _scope,
+                    _cap,
+                    format_rotation_plan(escalation_plan),
+                )
+                if escalate_dry_run:
+                    logger.info(
+                        "escalation --dry-run: plan above; NO paid calls made, "
+                        "NO lifecycle writes. Re-run without --dry-run to execute."
+                    )
+                    # Close the (never-awaited) baseline cell coroutines so the
+                    # early return doesn't leak them.
+                    for _c in coros:
+                        _c.close()
+                    return stats
             cells_left = {p.primitive_id: len(configs) for p in primitives}
             prim_breached = {p.primitive_id: False for p in primitives}
             escalation_budget_hit = False
@@ -1037,12 +1093,37 @@ async def run_reproduction(
                                 configs=configs,
                                 n_trials=escalate_n_trials,
                                 temperature=temperature,
+                                strategies=escalation_plan.rotation,
                                 image_renderers=DEFAULT_IMAGE_RENDERERS,
                                 coj_operations=COJ_OPERATIONS,
                                 structured_formats=DEFAULT_STRUCTURED_FORMATS,
                                 audio_styles=DEFAULT_AUDIO_STYLES,
                                 budget_usd=remaining,
                             )
+                            # §10.9 Phase 4 — feed this parent's ladder result back
+                            # into the harvested strategies' lifecycle: the winning
+                            # strategy graduates candidate→active; others tried++/
+                            # supporting; soft-retirement evaluated. ARMS base ids
+                            # are ignored (not lifecycle-tracked).
+                            try:
+                                from rogue.reproduce.strategy_lifecycle import (  # noqa: PLC0415
+                                    apply_ladder_outcome,
+                                )
+
+                                apply_ladder_outcome(
+                                    session,
+                                    attempts=res.attempts,
+                                    winning_strategy=res.winning_strategy,
+                                    harvested_ids=set(escalation_plan.harvested_ids),
+                                    config_id=res.breached_on,
+                                    now=escalation_now,
+                                )
+                            except Exception as exc:  # noqa: BLE001
+                                session.rollback()
+                                logger.warning(
+                                    "strategy lifecycle update failed: parent=%s err=%s",
+                                    pid, exc,
+                                )
                             stats.escalations_run += 1
                             stats.escalation_spend_usd += res.spend_usd
                             stats.estimated_cost_usd += res.spend_usd
@@ -1292,6 +1373,15 @@ def main(argv: list[str] | None = None) -> int:
             "Claude w/ auto-fallback to Llama on refusal."
         ),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "§10.9 escalation preview: build the candidate rotation + cost plan "
+            "from the live DB (real selection queries), print it, and exit BEFORE "
+            "any paid target/judge call or lifecycle write. Requires --escalate."
+        ),
+    )
     parser.add_argument("--run-id", default=None)
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
@@ -1341,6 +1431,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_max_spend=args.escalate_max_spend,
             escalate_n_trials=args.escalate_n_trials,
             escalate_planner_model=args.escalate_planner_model,
+            escalate_dry_run=args.dry_run,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
             primitive_ids=(

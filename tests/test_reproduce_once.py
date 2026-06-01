@@ -741,6 +741,27 @@ async def test_inline_escalation_budget_cap_stops_escalation(
 
 
 @pytest.mark.asyncio
+async def test_escalation_dry_run_previews_and_makes_no_paid_calls(
+    live_db_with_seeded_data,
+) -> None:
+    """--escalate --dry-run builds the rotation plan from the live DB and returns
+    BEFORE the baseline reproduction loop — so nothing is persisted and no target/
+    judge/escalation call is made. A panel/judge that would record work proves it:
+    breach_results_persisted stays 0."""
+    stats = await run_reproduction(
+        database_url=live_db_with_seeded_data,
+        primitive_limit=None, n_trials=1, temperature=0.7, concurrency=2,
+        panel=_RefusingPanel(), judge=_RefusingJudge(),  # type: ignore[arg-type]
+        escalate=True, escalate_dry_run=True,
+        planner=_RefusingPlanner(),  # type: ignore[arg-type]
+    )
+    assert stats.escalations_run == 0
+    assert stats.escalation_spend_usd == 0.0
+    assert stats.breach_results_persisted == 0  # baseline loop never ran
+    assert stats.estimated_cost_usd == 0.0
+
+
+@pytest.mark.asyncio
 async def test_run_reproduction_primitive_limit_picks_highest_score(
     live_db_with_seeded_data,
 ) -> None:

@@ -130,8 +130,10 @@ async def test_anthropic_path_emits_correct_tool_use_payload() -> None:
     tools = kwargs["tools"]
     assert len(tools) == 1
     assert tools[0]["name"] == "extract_attack_primitive"
-    # The input_schema must be the live AttackPrimitive json schema, not a
-    # frozen snapshot — guarantees taxonomy updates flow through.
+    # This agent is the default v3 (technique classifier disabled), so the
+    # input_schema must be the bare, live AttackPrimitive json schema — NOT the
+    # §10.9-widened one (which only ships on prompt v4+). Guarantees taxonomy
+    # updates flow through AND that legacy extraction is byte-for-byte unchanged.
     assert tools[0]["input_schema"] == AttackPrimitive.model_json_schema()
     assert kwargs["tool_choice"] == {
         "type": "tool",

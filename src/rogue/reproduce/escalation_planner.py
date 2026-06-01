@@ -72,8 +72,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from rogue.reproduce.arms_strategies import ARMS_STRATEGIES, multi_turn_strategies
 from rogue.reproduce.llm_cost_log import append_row, log_anthropic_response
+from rogue.reproduce.strategy_library import (
+    StrategyView,
+    arms_views,
+    planner_drivable_ids,
+)
 from rogue.schemas import AttackPrimitive
 
 __all__ = [
@@ -239,14 +243,21 @@ _PLANNER_USER_PROMPT_TEMPLATE = (
 
 
 def _build_planner_messages(
-    primitive: AttackPrimitive, n_turns: int, arms_strategy: str | None = None,
+    primitive: AttackPrimitive,
+    n_turns: int,
+    arms_strategy: str | None = None,
+    *,
+    strategies: dict[str, StrategyView] | None = None,
 ) -> tuple[str, str]:
     """Return ``(system_prompt, user_prompt)`` for the planner call.
 
-    ``arms_strategy`` (one of the ARMS visual-multi-turn strategy ids — crescendo
-    / actor_attack / acronym) seeds the planner with that strategy's directive
-    (§10.8 ARMS #9). The default ``None`` keeps the built-in Crescendo framing.
+    ``arms_strategy`` is a strategy id to seed the plan with — an ARMS
+    visual-multi-turn strategy (crescendo / actor_attack / acronym, §10.8 ARMS #9)
+    OR a harvested text/multi_turn technique id (§10.9 Phase 3a). The default
+    ``None`` keeps the built-in Crescendo framing. ``strategies`` is the resolved
+    library (ARMS ∪ harvested); defaults to the ARMS seeds for back-compat.
     """
+    strategies = strategies if strategies is not None else arms_views()
     objective = (
         primitive.title.strip() or primitive.short_description.strip()[:200]
     )
@@ -259,9 +270,9 @@ def _build_planner_messages(
     )
     system = _PLANNER_SYSTEM_PROMPT.format(n_turns=n_turns)
     if arms_strategy and arms_strategy != "crescendo":
-        strat = ARMS_STRATEGIES[arms_strategy]
+        strat = strategies[arms_strategy]
         system += (
-            f"\n\nARMS STRATEGY OVERRIDE — {strat.name} (arXiv 2510.02677):\n"
+            f"\n\n{strat.override_header}\n"
             f"Principle: {strat.principle}\n"
             f"Apply this instead of plain Crescendo: {strat.directive}\n"
             "Keep the same N-turn JSON output shape; the final turn must still "
@@ -368,6 +379,7 @@ class EscalationPlanner:
         cache_dir: Path = DEFAULT_CACHE_DIR,
         planner_version: str = PLANNER_VERSION,
         fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
+        extra_strategies: dict[str, StrategyView] | None = None,
     ) -> None:
         self.model = model
         self.fallback_model = fallback_model
@@ -375,6 +387,15 @@ class EscalationPlanner:
         self.planner_version = planner_version
         self._anthropic_client: Any | None = None
         self._openrouter_client: Any | None = None
+        # §10.9 Phase 3a — the resolved strategy library the planner drives:
+        # ARMS seeds ∪ any harvested techniques injected by the caller (who owns
+        # the DB session — see strategy_library.load_strategy_library). Defaults
+        # to the ARMS seeds only, so a planner built with no extras behaves
+        # exactly as before.
+        self._strategies: dict[str, StrategyView] = {
+            **arms_views(),
+            **(extra_strategies or {}),
+        }
         cache_dir.mkdir(parents=True, exist_ok=True)
 
     @classmethod
@@ -424,12 +445,13 @@ class EscalationPlanner:
                 "is calibrated for 3-turn Crescendo arcs per §10.7",
             )
         if arms_strategy is not None:
-            valid = {s.id for s in multi_turn_strategies()}
+            valid = planner_drivable_ids(self._strategies)
             if arms_strategy not in valid:
                 raise ValueError(
-                    f"arms_strategy must be a visual-multi-turn strategy "
-                    f"{sorted(valid)} (got {arms_strategy!r}); other ARMS "
-                    "patterns are realized by the renderers, not the planner",
+                    f"arms_strategy must be a planner-drivable strategy "
+                    f"{sorted(valid)} (got {arms_strategy!r}); ARMS renderer "
+                    "patterns and image/audio techniques are realized by the "
+                    "renderers, not the planner",
                 )
 
         key = _cache_key(
@@ -519,7 +541,7 @@ class EscalationPlanner:
             self._anthropic_client = AsyncAnthropic()
 
         system_prompt, user_prompt = _build_planner_messages(
-            primitive, n_turns, arms_strategy,
+            primitive, n_turns, arms_strategy, strategies=self._strategies,
         )
         try:
             response = await self._anthropic_client.messages.create(
@@ -590,7 +612,7 @@ class EscalationPlanner:
             )
 
         system_prompt, user_prompt = _build_planner_messages(
-            primitive, n_turns, arms_strategy,
+            primitive, n_turns, arms_strategy, strategies=self._strategies,
         )
         try:
             response = await self._openrouter_client.chat.completions.create(

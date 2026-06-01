@@ -39,8 +39,11 @@ from rogue.schemas import (
     AttackVector,
     BrightDataProduct,
     JudgeVerdict,
+    Modality,
+    RetireReason,
     Severity,
     SourceType,
+    StrategyStatus,
 )
 
 
@@ -457,10 +460,116 @@ class PrimitiveImage(Base):
     )
 
 
+class AttackStrategy(Base):
+    """ORM twin of ``rogue.schemas.TechniqueSpec`` — one reusable attack *technique*.
+
+    Parallel to ``attack_primitives`` (which stores payload *instances*); this table
+    stores harvested *methods* and is the single source the planner reads strategies
+    from (§10.9 risk-note 3), interchangeable with the hand-written
+    ``reproduce/arms_strategies.py`` entries via the shared ``directive`` field.
+
+    Lifecycle in ``status``: ``candidate`` (harvested, untrusted) → ``active``
+    (graduated: actually breached in a reproduction run, Phase 4 gate) /
+    ``needs_implementation`` (renderer technique whose code a human/sandbox must write).
+    See ROGUE_PLAN.md §10.9.
+    """
+
+    __tablename__ = "attack_strategies"
+
+    # ----- Identity -----
+    technique_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+
+    # ----- Classification -----
+    modality: Mapped[Modality] = mapped_column(
+        SAEnum(Modality, name="attack_strategy_modality", values_callable=_enum_values),
+        index=True,
+    )
+
+    # ----- The method -----
+    principle: Mapped[str] = mapped_column(Text)
+    steps: Mapped[list[str]] = mapped_column(JSON, default=list)
+    params: Mapped[dict] = mapped_column(JSON, default=dict)
+    example: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # ----- Realization -----
+    # The operational prompt fragment the EscalationPlanner injects. NULL until a
+    # text/multi_turn technique is auto-integrated (Phase 3a) or a renderer is built.
+    directive: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # ----- Provenance -----
+    source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # ----- Lifecycle -----
+    status: Mapped[StrategyStatus] = mapped_column(
+        SAEnum(
+            StrategyStatus, name="attack_strategy_status", values_callable=_enum_values
+        ),
+        index=True,
+        default=StrategyStatus.CANDIDATE,
+    )
+    claimed_first_seen: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Storage-only: when the row was harvested. Powers freshness ordering and the
+    # candidate-prune TTL (Phase 4); no Pydantic twin, like discovered_at's role.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    # ----- §10.9 Phase 4 lifecycle (storage-only runtime state) -----
+    # Trial/breach counters drive graduation (winner-only), the least-tried
+    # selection order, and the retirement rules. breach_rate is derived
+    # (n_breaches / n_times_tried), never stored.
+    n_times_tried: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
+    n_breaches: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Weak signal: tried in a ladder that breached on ANOTHER strategy (not the
+    # causal winner). Used for ranking, NOT graduation — see §10.9 attribution.
+    supporting_breach_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
+    # Graduation audit — set once, on the first winning breach.
+    first_breach_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    first_breach_config_id: Mapped[Optional[str]] = mapped_column(
+        String(40), nullable=True
+    )
+    # Recency — power the least-tried selection tiebreak + resurrection latency.
+    last_tried_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_breached_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Retirement (soft, reversible). resurrection_latency = last_breached_at -
+    # retired_at is derived, not stored.
+    retired_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    retire_reason: Mapped[Optional[RetireReason]] = mapped_column(
+        SAEnum(RetireReason, name="strategy_retire_reason", values_callable=_enum_values),
+        nullable=True,
+    )
+    resurrected: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    # Future-proofs the Phase 4b sweep scheduler (daily active / weekly retired
+    # sample / on-new-model retry). NULL until a sweep policy stamps it.
+    next_eligible_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
     "AttackPrimitive",
+    "AttackStrategy",
     "SourceProvenance",
     "BreachResult",
     "PairRefinementStep",

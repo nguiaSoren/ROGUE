@@ -101,7 +101,8 @@ from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.discovery_agent import DiscoveryAgent  # noqa: E402
 from rogue.harvest.fetch_cache import FetchCache, load_snapshot  # noqa: E402
 from rogue.harvest.media_ingest import MediaIngestor  # noqa: E402
-from rogue.schemas import AttackPrimitive, RawDocument  # noqa: E402
+from rogue.reproduce.strategy_library import persist_technique  # noqa: E402
+from rogue.schemas import AttackPrimitive, RawDocument, TechniqueSpec  # noqa: E402
 from rogue.schemas.source_provenance import SourceProvenance  # noqa: E402
 
 logger = logging.getLogger("rogue.scripts.harvest_once")
@@ -244,6 +245,8 @@ class HarvestRunStats:
     new_clusters: int = 0
     duplicates: int = 0
     images_ingested: int = 0
+    # §10.9 — harvested attack *techniques* (methods) routed into attack_strategies.
+    techniques_harvested: int = 0
 
     def summary_line(self) -> str:
         return (
@@ -253,7 +256,8 @@ class HarvestRunStats:
             f"extract_errors={self.extract_errors} "
             f"dedup_errors={self.dedup_errors} "
             f"new_clusters={self.new_clusters} duplicates={self.duplicates} "
-            f"images_ingested={self.images_ingested}"
+            f"images_ingested={self.images_ingested} "
+            f"techniques_harvested={self.techniques_harvested}"
         )
 
 
@@ -411,7 +415,12 @@ async def run_harvest(
     if embed_fn is None:
         embed_fn = _default_openai_embed_fn(embedding_model)
     if extractor is None:
-        extractor = ExtractionAgent(model=extraction_model)
+        # §10.9 Phase 3a — harvest runs the v4 extractor so the 3-way classifier
+        # is active and technique documents are routed into attack_strategies.
+        # (The ExtractionAgent default stays v3 so ad-hoc/test callers and the
+        # live extraction fixtures keep byte-for-byte legacy behaviour; only the
+        # production harvest pipeline opts into v4.)
+        extractor = ExtractionAgent(model=extraction_model, prompt_version="v4")
     # Multimodal ingestion (Feature A) — construct unless explicitly disabled.
     # Reuses the same BD client (Web Unlocker) for image downloads.
     if media_ingestor is None and os.environ.get("HARVEST_INGEST_IMAGES", "1") != "0":
@@ -591,14 +600,16 @@ async def run_harvest(
 
         async def extract_one(
             raw_doc: RawDocument,
-        ) -> tuple[RawDocument, "AttackPrimitive | None | Exception"]:
+        ) -> tuple[RawDocument, "AttackPrimitive | TechniqueSpec | None | Exception"]:
             async with sem:
                 try:
                     images = await _ingest_images(raw_doc)
-                    primitive = await extractor.extract_from_raw_document(
+                    # §10.9 — the 3-way union: a payload (AttackPrimitive), a
+                    # technique (TechniqueSpec), or None (commentary).
+                    result = await extractor.extract_any_from_raw_document(
                         raw_doc, images=images
                     )
-                    return (raw_doc, primitive)
+                    return (raw_doc, result)
                 except Exception as exc:  # noqa: BLE001 - we surface every error
                     return (raw_doc, exc)
 
@@ -649,6 +660,42 @@ async def run_harvest(
                         "extract failed: url=%s err=%s", raw_doc.url, result,
                     )
                     continue
+
+                # §10.9 Phase 3a — a harvested *technique* (a reusable method)
+                # goes into attack_strategies, not the primitive corpus. The
+                # planner picks it up on the next run (text/multi_turn techniques
+                # carry a synthesized directive; image/audio land as
+                # needs_implementation). Isolated per-doc like the primitive path.
+                if isinstance(result, TechniqueSpec):
+                    try:
+                        persist_technique(session, result)
+                        session.commit()
+                        stats.techniques_harvested += 1
+                        logger.info(
+                            "harvested technique: name=%r modality=%s status=%s url=%s",
+                            result.name,
+                            result.modality.value,
+                            result.status.value,
+                            raw_doc.url,
+                        )
+                    except Exception as exc:
+                        stats.extract_errors += 1
+                        session.rollback()
+                        logger.exception(
+                            "technique persist failed: url=%s err=%s", raw_doc.url, exc,
+                        )
+                    cache_records.append(
+                        {
+                            "url": str(raw_doc.url),
+                            "source_type": str(raw_doc.source_type),
+                            "content_hash": raw_doc.archive_hash,
+                            "version_token": raw_doc.metadata.get("version_token"),
+                            "last_status": "technique",
+                            "n_primitives_yielded": 0,
+                        }
+                    )
+                    continue
+
                 primitive = result
                 if primitive is None:
                     stats.skipped_commentary += 1

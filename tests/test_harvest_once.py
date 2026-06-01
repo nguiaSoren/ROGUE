@@ -214,7 +214,7 @@ async def test_run_harvest_end_to_end_with_mocks(live_db, tmp_path) -> None:
     # Injected doubles: DiscoveryAgent (patched at import site), extractor,
     # BD client, and embed_fn (passed positionally so OpenAI is never imported).
     mock_extractor = MagicMock()
-    mock_extractor.extract_from_raw_document = AsyncMock(
+    mock_extractor.extract_any_from_raw_document = AsyncMock(
         side_effect=[primitive_a, primitive_b],
     )
     mock_bd_client = MagicMock()
@@ -298,7 +298,7 @@ async def test_run_harvest_isolates_extract_errors(live_db, tmp_path) -> None:
     )
 
     mock_extractor = MagicMock()
-    mock_extractor.extract_from_raw_document = AsyncMock(
+    mock_extractor.extract_any_from_raw_document = AsyncMock(
         side_effect=[primitive, RuntimeError("extraction blew up")],
     )
 
@@ -337,7 +337,7 @@ async def test_run_harvest_x_handles_adds_x_plugin(live_db, tmp_path) -> None:
     from rogue.harvest.sources import XViaUnlockerPlugin
 
     mock_extractor = MagicMock()
-    mock_extractor.extract_from_raw_document = AsyncMock(return_value=None)
+    mock_extractor.extract_any_from_raw_document = AsyncMock(return_value=None)
     mock_bd_client = MagicMock()
     mock_bd_client.aclose = AsyncMock()
 
@@ -369,7 +369,7 @@ async def test_run_harvest_x_handles_adds_x_plugin(live_db, tmp_path) -> None:
 async def test_run_harvest_no_x_handles_keeps_default_plugins(live_db, tmp_path) -> None:
     """Without --x-handles, plugins=None (DiscoveryAgent uses its default set, no X)."""
     mock_extractor = MagicMock()
-    mock_extractor.extract_from_raw_document = AsyncMock(return_value=None)
+    mock_extractor.extract_any_from_raw_document = AsyncMock(return_value=None)
     mock_bd_client = MagicMock()
     mock_bd_client.aclose = AsyncMock()
 
@@ -398,7 +398,7 @@ async def test_run_harvest_x_only_runs_just_x_and_skips_serp(live_db, tmp_path) 
     from rogue.harvest.sources import XViaUnlockerPlugin
 
     mock_extractor = MagicMock()
-    mock_extractor.extract_from_raw_document = AsyncMock(return_value=None)
+    mock_extractor.extract_any_from_raw_document = AsyncMock(return_value=None)
     mock_bd_client = MagicMock()
     mock_bd_client.aclose = AsyncMock()
 
@@ -455,7 +455,7 @@ async def test_run_harvest_ingests_images_and_passes_to_extractor(
         return primitive
 
     mock_extractor = MagicMock()
-    mock_extractor.extract_from_raw_document = AsyncMock(side_effect=_extract)
+    mock_extractor.extract_any_from_raw_document = AsyncMock(side_effect=_extract)
 
     # Fake ingestor: returns one IngestedImage for the doc.
     ingested = IngestedImage(

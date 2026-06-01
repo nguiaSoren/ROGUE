@@ -44,6 +44,13 @@ from .source_provenance import (
     SourceProvenance,
     SourceType,
 )
+from .technique_spec import (
+    AUTO_INTEGRABLE_MODALITIES,
+    Modality,
+    RetireReason,
+    StrategyStatus,
+    TechniqueSpec,
+)
 
 __all__ = [
     # attack primitive
@@ -70,4 +77,10 @@ __all__ = [
     "SourceProvenance",
     "SourceType",
     "BrightDataProduct",
+    # technique spec (self-growing technique library — §10.9)
+    "TechniqueSpec",
+    "Modality",
+    "StrategyStatus",
+    "RetireReason",
+    "AUTO_INTEGRABLE_MODALITIES",
 ]

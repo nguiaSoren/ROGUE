@@ -111,5 +111,7 @@ def test_cache_key_differs_per_arms_strategy() -> None:
 async def test_plan_rejects_non_multiturn_strategy(tmp_path: Path) -> None:
     """Selecting a renderer-only ARMS strategy (e.g. rule_based) on the planner errors."""
     planner = EscalationPlanner(cache_dir=tmp_path)
-    with pytest.raises(ValueError, match="visual-multi-turn"):
+    # §10.9 Phase 3a generalized the drivable set (ARMS multi-turn ∪ harvested
+    # text/multi_turn techniques), so the error now says "planner-drivable".
+    with pytest.raises(ValueError, match="planner-drivable"):
         await planner.plan(_primitive(), n_turns=3, arms_strategy="rule_based")

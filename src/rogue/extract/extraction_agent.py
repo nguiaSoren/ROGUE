@@ -45,7 +45,14 @@ from tenacity import (
     wait_exponential,
 )
 
-from rogue.schemas import AttackPrimitive, RawDocument
+from rogue.schemas import (
+    AUTO_INTEGRABLE_MODALITIES,
+    AttackPrimitive,
+    Modality,
+    RawDocument,
+    StrategyStatus,
+    TechniqueSpec,
+)
 
 
 # Structured logger for failed extractions. Day-1 §9.4 wires this so the
@@ -330,6 +337,128 @@ def _normalize_extraction_payload(
     return data
 
 
+def _build_extraction_tool_schema() -> dict[str, Any]:
+    """The AttackPrimitive tool schema widened with the §10.9 `kind` discriminator.
+
+    Phase 1 (3-way classifier). The added properties (`kind` + the technique
+    fields) are NOT placed in the schema's ``required`` list, so:
+      - the payload path is the byte-for-byte v3 contract (``kind`` absent ⇒
+        treated as ``payload`` downstream), and
+      - the technique branch omits the payload's required fields the same way the
+        existing ``{"is_attack": false}`` skip already does (the model handles
+        this; Anthropic tool-use does not hard-enforce ``required``).
+
+    Computed once at import (the schema is static).
+    """
+    schema = AttackPrimitive.model_json_schema()
+    props = schema.setdefault("properties", {})
+    props["kind"] = {
+        "type": "string",
+        "enum": ["payload", "technique", "commentary"],
+        "description": (
+            "payload = a specific reusable jailbreak PROMPT (default; emit the "
+            "AttackPrimitive fields); technique = a described reusable METHOD/"
+            "strategy with no single canonical prompt (emit the technique_* fields "
+            "below, NOT the payload fields); commentary = neither."
+        ),
+    }
+    props["technique_name"] = {
+        "type": "string",
+        "description": "kind=technique only: short name of the method.",
+    }
+    props["modality"] = {
+        "type": "string",
+        "enum": [m.value for m in Modality],
+        "description": "kind=technique only: how the method is realized.",
+    }
+    props["principle"] = {
+        "type": "string",
+        "description": "kind=technique only: one line on why the method works.",
+    }
+    props["steps"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "kind=technique only: ordered method steps.",
+    }
+    props["params"] = {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "description": "kind=technique only: tunable knobs, e.g. {'n_turns': '3'}.",
+    }
+    props["example"] = {
+        "type": "string",
+        "description": "kind=technique only: a concrete illustration of the method.",
+    }
+    return schema
+
+
+#: Static tool schema sent to the extraction LLM (payload + technique branches).
+_EXTRACTION_TOOL_SCHEMA: dict[str, Any] = _build_extraction_tool_schema()
+
+
+def _build_technique_or_none(data: Any, *, source_url: str) -> TechniqueSpec | None:
+    """Project a ``kind=technique`` LLM tool-call dict into a `TechniqueSpec`.
+
+    Server-side, like the AttackPrimitive normalizer: the agent assigns the ULID,
+    stamps the harvest-side ``source_url``, and derives ``status`` from modality
+    (image/audio renderer methods land as ``needs_implementation`` — their spec is
+    captured but a human/sandbox still writes the renderer, §10.9 Phase 3b; text/
+    multi_turn methods enter as ``candidate`` for the Phase 4 graduation gate).
+    Returns None (a clean skip, not a raise) on an incomplete or invalid technique.
+    """
+    if not isinstance(data, dict):
+        return None
+    name = data.get("technique_name") or data.get("name")
+    modality_raw = data.get("modality")
+    principle = data.get("principle")
+    if not (name and modality_raw and principle):
+        logger.warning(
+            "technique extraction incomplete (need technique_name+modality+principle); url=%s",
+            source_url,
+        )
+        return None
+    try:
+        modality = Modality(modality_raw)
+    except ValueError:
+        logger.warning(
+            "technique modality %r not in vocab; url=%s", modality_raw, source_url
+        )
+        return None
+
+    steps_raw = data.get("steps")
+    steps = [str(s) for s in steps_raw] if isinstance(steps_raw, list) else []
+    params_raw = data.get("params")
+    params = (
+        {str(k): str(v) for k, v in params_raw.items()}
+        if isinstance(params_raw, dict)
+        else {}
+    )
+    status = (
+        StrategyStatus.CANDIDATE
+        if modality in AUTO_INTEGRABLE_MODALITIES
+        else StrategyStatus.NEEDS_IMPLEMENTATION
+    )
+    try:
+        return TechniqueSpec(
+            technique_id=ulid.new().str,
+            name=str(name)[:200],
+            modality=modality,
+            principle=str(principle),
+            steps=steps,
+            params=params,
+            example=data.get("example"),
+            source_url=source_url,
+            status=status,
+        )
+    except ValidationError as exc:
+        logger.warning(
+            "technique failed Pydantic validation (%d errors); url=%s",
+            exc.error_count(),
+            source_url,
+        )
+        return None
+
+
 def _resolve_image_payload_slots(
     data: Any,
     images: "list[ExtractionImage]",
@@ -419,6 +548,21 @@ class ExtractionAgent:
             )
         self.prompt: str = prompt_path.read_text(encoding="utf-8")
 
+        # §10.9 Phase 1 — the 3-way `kind` classifier (payload/technique/
+        # commentary) activates only on prompt v4+. The widened tool schema is
+        # NOT inert under an older prompt: merely OFFERING the model a
+        # `technique` option reclassifies borderline method-y documents (verified
+        # — copirate-365 flips from payload→technique), changing live payload
+        # extraction. So the tool schema is pinned to the prompt version: v1–v3
+        # get the bare AttackPrimitive schema (byte-for-byte legacy behaviour);
+        # v4+ get the widened schema and the technique branch.
+        self._technique_enabled: bool = prompt_version not in ("v1", "v2", "v3")
+        self._tool_schema: dict[str, Any] = (
+            _EXTRACTION_TOOL_SCHEMA
+            if self._technique_enabled
+            else AttackPrimitive.model_json_schema()
+        )
+
         # Lazy provider client init — constructed on first `extract()` call so
         # importing the agent does not require API keys to be set (useful in
         # tests / static checks).
@@ -462,7 +606,39 @@ class ExtractionAgent:
 
         Returns:
             A validated `AttackPrimitive` if the LLM judges the document an
-            attack disclosure, else `None`.
+            attack disclosure (a *payload*), else `None`. A document the v4
+            classifier labels a *technique* (`kind=technique`) returns `None`
+            here — call :meth:`extract_any` to receive the `TechniqueSpec`. This
+            keeps every existing payload-pipeline caller byte-for-byte unchanged.
+        """
+        out = await self.extract_any(
+            raw_document,
+            source_url,
+            source_type,
+            fetched_at,
+            bright_data_product=bright_data_product,
+            images=images,
+        )
+        return out if not isinstance(out, TechniqueSpec) else None
+
+    async def extract_any(
+        self,
+        raw_document: str,
+        source_url: str,
+        source_type: str,
+        fetched_at: datetime | None = None,
+        *,
+        bright_data_product: str = "web_unlocker",
+        images: "list[ExtractionImage] | None" = None,
+    ) -> AttackPrimitive | TechniqueSpec | None:
+        """3-way extraction (§10.9 Phase 1): the union entry point.
+
+        Same inputs as :meth:`extract`, but returns the full classifier outcome:
+          - ``AttackPrimitive`` — the document is a payload (a specific prompt);
+          - ``TechniqueSpec``   — the document is a technique (a reusable method);
+          - ``None``            — commentary / not-an-attack.
+
+        :meth:`extract` is the back-compat projection of this (technique → None).
         """
         fetched_at = fetched_at or datetime.now(timezone.utc)
 
@@ -499,6 +675,16 @@ class ExtractionAgent:
             raise NotImplementedError(
                 f"provider for {self.model} not wired — Day 1"
             )
+
+        # §10.9 Phase 1 — 3-way branch on the `kind` discriminator. Absent ⇒
+        # "payload" (back-compat: the v3 contract had no `kind`). The OpenAI path
+        # is AttackPrimitive-only (strict response_format), so `kind` only ever
+        # diverges on the Anthropic path — which is the production extractor.
+        kind = str(data.get("kind") or "payload").strip().lower()
+        if kind == "commentary":
+            return None
+        if kind == "technique":
+            return _build_technique_or_none(data, source_url=source_url)
 
         # Post-LLM payload normalization. Consolidated into one place
         # because Haiku-tier models deviate from the AttackPrimitive schema
@@ -570,6 +756,37 @@ class ExtractionAgent:
                 bright_data_product=str(raw_doc.bright_data_product),
                 # Feature A — images already downloaded by the harvest
                 # media-ingest step; None/empty for text-only docs.
+                images=images,
+            )
+        except ValidationError:
+            logger.exception(
+                "extraction validation failed: url=%s source_type=%s archive_hash=%s",
+                raw_doc.url,
+                raw_doc.source_type,
+                raw_doc.archive_hash,
+            )
+            raise
+
+    async def extract_any_from_raw_document(
+        self,
+        raw_doc: RawDocument,
+        images: "list[ExtractionImage] | None" = None,
+    ) -> AttackPrimitive | TechniqueSpec | None:
+        """3-way RawDocument adapter (§10.9 Phase 3a) — :meth:`extract_any` for harvest.
+
+        Identical projection to :meth:`extract_from_raw_document`, but returns the
+        full classifier union so the harvest loop can route a ``TechniqueSpec`` into
+        the ``attack_strategies`` table (via ``strategy_library.persist_technique``)
+        instead of dropping it. Only meaningful when the agent runs prompt v4+
+        (technique-enabled); under v1–v3 it always yields ``AttackPrimitive | None``.
+        """
+        try:
+            return await self.extract_any(
+                raw_document=raw_doc.raw_content,
+                source_url=str(raw_doc.url),
+                source_type=str(raw_doc.source_type),
+                fetched_at=raw_doc.fetched_at,
+                bright_data_product=str(raw_doc.bright_data_product),
                 images=images,
             )
         except ValidationError:
@@ -693,11 +910,24 @@ class ExtractionAgent:
                 {
                     "name": "extract_attack_primitive",
                     "description": (
-                        "Output the extracted AttackPrimitive, or "
-                        '{"is_attack": false, "reason": "..."} if the '
-                        "document is not an attack disclosure."
+                        # v4+ (technique-enabled) gets the 3-way instruction; v1–v3
+                        # keep the original AttackPrimitive-or-skip description so
+                        # legacy extraction behaviour is byte-for-byte unchanged.
+                        (
+                            "Classify the document via `kind`, then output accordingly: "
+                            "kind=payload → the extracted AttackPrimitive fields; "
+                            "kind=technique → the technique_* fields (a reusable method); "
+                            'kind=commentary → {"kind": "commentary", "is_attack": false, '
+                            '"reason": "..."}. Omitting `kind` is treated as payload.'
+                        )
+                        if self._technique_enabled
+                        else (
+                            "Output the extracted AttackPrimitive, or "
+                            '{"is_attack": false, "reason": "..."} if the '
+                            "document is not an attack disclosure."
+                        )
                     ),
-                    "input_schema": AttackPrimitive.model_json_schema(),
+                    "input_schema": self._tool_schema,
                 }
             ],
             tool_choice={"type": "tool", "name": "extract_attack_primitive"},
