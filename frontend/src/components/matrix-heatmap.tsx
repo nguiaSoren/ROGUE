@@ -35,6 +35,11 @@ export function MatrixHeatmap({
   const [allTimeBaseline, setAllTimeBaseline] =
     useState<BreachMatrixResponse | null>(null);
   const [augmented, setAugmented] = useState<BreachMatrixResponse | null>(null);
+  // false until the background quadrant load settles. While false we render the
+  // SCOPE/ATTACKER toggles optimistically (they belong at the top from the very
+  // first paint) and show a "loading" hint if the user flips one before its data
+  // lands; once settled, any quadrant that genuinely has no data hides its toggle.
+  const [augReady, setAugReady] = useState(false);
 
   // Lazy-load the three heavy quadrants in the background once the grid is up.
   useEffect(() => {
@@ -48,6 +53,7 @@ export function MatrixHeatmap({
       setThisRunAugmented(tra);
       setAllTimeBaseline(atb);
       setAugmented(aug);
+      setAugReady(true);
     });
     return () => {
       cancelled = true;
@@ -66,8 +72,15 @@ export function MatrixHeatmap({
   const [scope, setScope] = useState<"this-run" | "all-time">("this-run");
   const [showAugmented, setShowAugmented] = useState(false);
 
-  const hasAugment = Boolean(thisRunAugmented || augmented);
-  const hasAllTime = Boolean(allTimeBaseline || augmented);
+  // Show both toggle groups from the first paint. Before the background load
+  // settles we assume the data exists (it does in the deployed corpus); after it
+  // settles, hide whichever axis truly has no data.
+  const hasAugment = !augReady || Boolean(thisRunAugmented || augmented);
+  const hasAllTime = !augReady || Boolean(allTimeBaseline || augmented);
+  // True when the selected quadrant needs data that hasn't loaded yet, so the
+  // grid is still showing the baseline fallback under an all-time/augmented label.
+  const augPending =
+    !augReady && (scope === "all-time" || showAugmented);
 
   // Active dataset = the quadrant for (scope, attacker). Any missing quadrant
   // degrades gracefully back toward the always-present this-run baseline.
@@ -225,6 +238,9 @@ export function MatrixHeatmap({
             {showAugmented
               ? "worst-case across persona-wrap + PAIR refinement — how hot each cell gets once the attacker adapts"
               : "raw harvested prompt, N=5 trials per cell — no adaptation"}
+            {augPending && (
+              <span className="text-rogue-green animate-pulse"> · loading…</span>
+            )}
           </span>
         </section>
       )}
