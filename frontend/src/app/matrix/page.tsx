@@ -7,35 +7,36 @@ import { plainifyRate } from "@/lib/plain-numbers";
 /**
  * /matrix — Breach Matrix heatmap.
  *
- * Server-rendered shell: fetches the matrix + stubbornness data in parallel,
- * computes top-level headline stats (worst cell, critical-cell count, worst
- * attacker across the whole matrix), then hands the grid off to the client
- * `MatrixHeatmap` for cell-click → side-drawer interaction.
+ * Statically prerendered + ISR (5-min revalidate), like /brief and /feed, so
+ * it's served from Vercel's CDN instead of re-rendering on every request. This
+ * page used to read `?date=` from searchParams, which forced per-request
+ * dynamic rendering (the `ƒ` route) — the reason /matrix lagged behind the
+ * other pages. The `?date=` run-day override is now handled client-side inside
+ * `MatrixHeatmap` (it's a debug/power-user param, never set by internal nav),
+ * which keeps this server render fully static. See ROGUE_PLAN.md STATUS note
+ * "Post-deadline frontend perf — 2026-06-01".
+ *
+ * Renders the headline stats + grid shell from the DEFAULT (most-data) day,
+ * then hands the grid off to the client `MatrixHeatmap` for cell-click → drawer
+ * interaction and the SCOPE × ATTACKER quadrant toggles.
  *
  * Column headers carry the §10.7 PAIR avg-iters-to-breach so the matrix
  * and the augmentation A/B story stay tied together visually.
  */
-export default async function MatrixPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ date?: string }>;
-}) {
-  // ?date=YYYY-MM-DD pins a specific run day (e.g. a fresh harvest's reproduce
-  // that isn't the default "most-data" day). Omitted → the API's default.
-  const { date } = await searchParams;
+export const revalidate = 300; // ISR — match REVALIDATE_SECONDS in lib/api.ts
 
+export default async function MatrixPage() {
   // The SCOPE × ATTACKER 2×2 needs four quadrant datasets, but only the
   // top-left (this-run × baseline) gates the headline + initial grid. The other
   // three quadrants are ~768 KB each and only feed the All-time / +Augmentations
-  // toggles, so SSR no longer blocks on them — `MatrixHeatmap` lazy-loads them
-  // client-side after mount. Keeping the critical path to baseline + stubbornness
-  // takes the cold-start render from minutes to a couple of seconds.
+  // toggles, so this render no longer blocks on them — `MatrixHeatmap`
+  // lazy-loads them client-side after mount.
   let matrix: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
   let stubbornness: Awaited<ReturnType<typeof api.stubbornnessStats>> | null = null;
   let error: string | null = null;
   try {
     [matrix, stubbornness] = await Promise.all([
-      api.breachMatrix(date), // this-run × baseline (the only required fetch)
+      api.breachMatrix(), // default (most-data) day × baseline — the required fetch
       api.stubbornnessStats().catch(() => null),
     ]);
   } catch (e) {

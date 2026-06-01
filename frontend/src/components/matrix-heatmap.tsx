@@ -41,11 +41,44 @@ export function MatrixHeatmap({
   // lands; once settled, any quadrant that genuinely has no data hides its toggle.
   const [augReady, setAugReady] = useState(false);
 
+  // ?date=YYYY-MM-DD pins a non-default run day. The page is statically rendered
+  // for the default (most-data) day, so this override is read client-side from
+  // the URL (via window.location, NOT useSearchParams — that would deopt the
+  // static page to client-side rendering). It's a debug/power-user param that
+  // internal navigation never sets; when present it swaps the this-run baseline
+  // grid. The headline stats above the grid reflect the default day — see
+  // ROGUE_PLAN.md STATUS "Post-deadline frontend perf — 2026-06-01".
+  const [dateMatrix, setDateMatrix] = useState<BreachMatrixResponse | null>(null);
+  useEffect(() => {
+    const date = new URLSearchParams(window.location.search).get("date");
+    // No pinned date (the common path) or it equals the default day → nothing to
+    // fetch; leave the default-day baseline in place. (No synchronous reset here:
+    // a pinned ?date= should survive an ISR default-day change, and React 19
+    // flags setState in the effect body as a cascading-render anti-pattern.)
+    if (!date || date === matrix.target_date) return;
+    let cancelled = false;
+    api
+      .breachMatrix(date)
+      .then((m) => {
+        if (!cancelled) setDateMatrix(m);
+      })
+      .catch(() => {
+        /* fall back to the default-day baseline */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [matrix.target_date]);
+
+  // The effective this-run baseline: the pinned day if ?date= overrode it, else
+  // the statically-rendered default day.
+  const baseline = dateMatrix ?? matrix;
+
   // Lazy-load the three heavy quadrants in the background once the grid is up.
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      api.breachMatrix(matrix.target_date, "thisrun_augmented").catch(() => null),
+      api.breachMatrix(baseline.target_date, "thisrun_augmented").catch(() => null),
       api.breachMatrix(undefined, "alltime_baseline").catch(() => null),
       api.breachMatrix(undefined, "augmented").catch(() => null),
     ]).then(([tra, atb, aug]) => {
@@ -58,7 +91,7 @@ export function MatrixHeatmap({
     return () => {
       cancelled = true;
     };
-  }, [matrix.target_date]);
+  }, [baseline.target_date]);
 
   const [openCell, setOpenCell] = useState<BreachCell | null>(null);
   const [familyFilter, setFamilyFilter] = useState<string | null>(null);
@@ -87,11 +120,11 @@ export function MatrixHeatmap({
   const active = useMemo(() => {
     if (scope === "all-time") {
       return showAugmented
-        ? augmented ?? allTimeBaseline ?? matrix
-        : allTimeBaseline ?? matrix;
+        ? augmented ?? allTimeBaseline ?? baseline
+        : allTimeBaseline ?? baseline;
     }
-    return showAugmented ? thisRunAugmented ?? matrix : matrix;
-  }, [scope, showAugmented, matrix, thisRunAugmented, allTimeBaseline, augmented]);
+    return showAugmented ? thisRunAugmented ?? baseline : baseline;
+  }, [scope, showAugmented, baseline, thisRunAugmented, allTimeBaseline, augmented]);
 
   // Pre-compute the worst-rate cell per (family × config) so the click
   // handler can yank the canonical primitive for the cell quickly.
@@ -411,7 +444,7 @@ export function MatrixHeatmap({
       <MatrixCellDrawer
         open={openCell !== null}
         cell={openCell}
-        date={matrix.target_date}
+        date={baseline.target_date}
         onClose={() => setOpenCell(null)}
       />
     </>
