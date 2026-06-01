@@ -15,31 +15,21 @@ import { BriefDownloads } from "@/components/brief-downloads";
  * the same disk artifact so values cannot disagree.
  */
 export default async function BriefPage() {
-  const [markdownResult, jsonResult] = await Promise.allSettled([
+  // The markdown brief is the critical fetch — do NOT swallow its failure. If it
+  // throws (API mid-restart / cold Neon), let it propagate so Next + Vercel keep
+  // serving the last-good static brief instead of caching a "brief unavailable"
+  // page for the full ISR window. The JSON form (exec snapshot) is non-critical.
+  const [briefMarkdown, briefJsonRes] = await Promise.all([
     api.brief(undefined, "markdown"),
-    api.brief(undefined, "json"),
+    api.brief(undefined, "json").catch(() => null),
   ]);
-
-  const briefMarkdown =
-    markdownResult.status === "fulfilled" ? markdownResult.value : null;
-  const briefJsonRes = jsonResult.status === "fulfilled" ? jsonResult.value : null;
   const briefJson = (briefJsonRes?.json ?? null) as BriefJson | null;
 
+  // Successful fetch but no markdown payload is an anomaly (the brief is always
+  // generable from the matrix) — throw so we keep the last-good brief rather
+  // than caching an empty one.
   if (!briefMarkdown?.markdown) {
-    return (
-      <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-        <div className="max-w-4xl mx-auto px-6 py-10 space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Threat Brief</h1>
-          <div className="border border-rogue-red/40 rounded-lg p-6 font-mono text-sm text-rogue-red bg-rogue-red/5">
-            {`// brief unavailable: ${
-              markdownResult.status === "rejected"
-                ? String(markdownResult.reason)
-                : "no markdown payload"
-            }`}
-          </div>
-        </div>
-      </main>
-    );
+    throw new Error("brief markdown payload empty");
   }
 
   const summary = briefJson?.summary;

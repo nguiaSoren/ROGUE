@@ -31,30 +31,16 @@ export default async function MatrixPage() {
   // three quadrants are ~768 KB each and only feed the All-time / +Augmentations
   // toggles, so this render no longer blocks on them — `MatrixHeatmap`
   // lazy-loads them client-side after mount.
-  let matrix: Awaited<ReturnType<typeof api.breachMatrix>> | null = null;
-  let stubbornness: Awaited<ReturnType<typeof api.stubbornnessStats>> | null = null;
-  let error: string | null = null;
-  try {
-    [matrix, stubbornness] = await Promise.all([
-      api.breachMatrix(), // default (most-data) day × baseline — the required fetch
-      api.stubbornnessStats().catch(() => null),
-    ]);
-  } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
-  }
-
-  if (error || !matrix) {
-    return (
-      <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-        <div className="max-w-7xl mx-auto px-6 py-10 space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Breach Matrix</h1>
-          <div className="border border-rogue-red/40 rounded-lg p-6 font-mono text-sm text-rogue-red bg-rogue-red/5">
-            {`// matrix unavailable: ${error ?? "no data"}`}
-          </div>
-        </div>
-      </main>
-    );
-  }
+  //
+  // No try/catch on the baseline fetch ON PURPOSE: if it fails (API mid-restart
+  // / cold Neon), we let it throw so Next + Vercel keep serving the last-good
+  // statically-generated page instead of caching an error. A degraded "matrix
+  // unavailable" render would otherwise get cached for the full ISR window.
+  // Stubbornness is non-critical → degrades to null.
+  const [matrix, stubbornness] = await Promise.all([
+    api.breachMatrix(), // default (most-data) day × baseline — the required fetch
+    api.stubbornnessStats().catch(() => null),
+  ]);
 
   // Headline-driving stats.
   const allRates = matrix.cells.map((c) => c.any_breach_rate);

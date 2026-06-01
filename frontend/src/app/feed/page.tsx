@@ -19,8 +19,26 @@ import { StubbornnessWidget } from "@/components/stubbornness-widget";
  * Spec: ROGUE_PLAN §11.1.
  */
 export default async function FeedPage() {
+  // `attacks` is the critical dataset (the feed list + KPIs). Fetch it WITHOUT
+  // allSettled so a failure throws and propagates: Next + Vercel then keep
+  // serving the last-good static feed instead of caching an empty one (an
+  // allSettled-degraded empty render would otherwise be cached for the full ISR
+  // window — the "feed is all empty" symptom). The 7 secondary widgets stay in
+  // allSettled and degrade to null individually.
+  const [attacks, secondary] = await Promise.all([
+    api.attacks({ since_days: 7, limit: 50 }),
+    Promise.allSettled([
+      api.health(),
+      api.banditStats(),
+      api.brief(undefined, "json"),
+      api.personaStats(),
+      api.escalationStats(),
+      api.mutationStats(),
+      api.stubbornnessStats(),
+    ]),
+  ]);
+
   const [
-    attacksResult,
     healthResult,
     banditResult,
     briefResult,
@@ -28,18 +46,8 @@ export default async function FeedPage() {
     escalationResult,
     mutationResult,
     stubbornnessResult,
-  ] = await Promise.allSettled([
-    api.attacks({ since_days: 7, limit: 50 }),
-    api.health(),
-    api.banditStats(),
-    api.brief(undefined, "json"),
-    api.personaStats(),
-    api.escalationStats(),
-    api.mutationStats(),
-    api.stubbornnessStats(),
-  ]);
+  ] = secondary;
 
-  const attacks = attacksResult.status === "fulfilled" ? attacksResult.value : null;
   const health = healthResult.status === "fulfilled" ? healthResult.value : null;
   const bandit = banditResult.status === "fulfilled" ? banditResult.value : null;
   const brief = briefResult.status === "fulfilled" ? briefResult.value : null;
