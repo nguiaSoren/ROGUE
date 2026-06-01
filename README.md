@@ -14,6 +14,7 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
 [![Video](https://img.shields.io/badge/%E2%96%B6%20demo-5%20min-red)](https://youtu.be/-luwKpfaf2M)
+[![Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-gated-yellow)](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](pyproject.toml)
 
@@ -21,6 +22,7 @@ Real-time Open-web Generation of jailbreak Updates & Evaluation — Bright Data 
 
 - **Dashboard:** https://rogue-eosin.vercel.app — live, deployed
 - **MCP server:** configure Claude Desktop / Cursor to query ROGUE directly (see [MCP integration](#mcp-integration), under "Run it yourself")
+- **Dataset:** [358 LLM attack primitives across 15 families](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05) on HuggingFace, MIT-licensed. **Access-gated** — to keep working jailbreaks out of casual hands, download requires agreeing to defensive-research-only terms, so the corpus reaches researchers and guardrail builders rather than the next attacker.
 
 ### Demo
 
