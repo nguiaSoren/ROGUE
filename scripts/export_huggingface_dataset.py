@@ -246,6 +246,22 @@ language: [en]
 tags: [llm-security, jailbreak, prompt-injection, red-team, threat-intelligence]
 pretty_name: ROGUE Attacks {period}
 size_categories: [n<1K]
+extra_gated_heading: "Request access to ROGUE Attacks"
+extra_gated_prompt: >-
+  This dataset contains real LLM jailbreak and prompt-injection attack
+  primitives harvested from the open web. Access is granted for DEFENSIVE
+  security research only (red-teaming your own deployments, building
+  guardrails, academic study). By requesting access you agree to the terms
+  below. Your submitted details are recorded so the maintainer knows who
+  holds the data.
+extra_gated_fields:
+  Name: text
+  Affiliation / Organization: text
+  Email: text
+  Intended use: text
+  I will use this dataset only for defensive security research: checkbox
+  I will not redistribute the raw attack payloads: checkbox
+extra_gated_button_content: "Request access"
 ---
 
 # ROGUE Attacks {period}

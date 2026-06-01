@@ -257,13 +257,18 @@ def test_build_dataset_readme_has_yaml_frontmatter() -> None:
     # Front-matter must be the FIRST line + close on its own line.
     lines = md.split("\n")
     assert lines[0] == "---"
-    # Second `---` closes the front-matter — find it within the first 15 lines.
+    # Second `---` closes the front-matter — find the next bare `---` line.
     closing = next(
-        (i for i, line in enumerate(lines[1:15], start=1) if line == "---"),
+        (i for i, line in enumerate(lines[1:40], start=1) if line == "---"),
         None,
     )
     assert closing is not None, "YAML front-matter never closes"
-    assert "license: mit" in "\n".join(lines[:closing])
+    front_matter = "\n".join(lines[:closing])
+    assert "license: mit" in front_matter
+    # Gating: the card must carry the access-request form so the dataset
+    # uploads as gated (HF auto-enables gating when extra_gated_fields exists).
+    assert "extra_gated_fields:" in front_matter
+    assert "extra_gated_prompt:" in front_matter
 
 
 # =========================================================================== #
