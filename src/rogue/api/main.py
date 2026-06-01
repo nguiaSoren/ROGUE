@@ -78,18 +78,38 @@ _engine = None
 _SessionLocal = None
 
 
-def get_session() -> Iterator[Session]:
-    """FastAPI dependency that yields a Session for the request lifetime.
+def _session_factory() -> "sessionmaker":
+    """Lazy-init the engine + session-maker, returning the session factory.
 
-    Engine + session-maker are lazy-init on first request so importing this
-    module remains zero-IO (FastAPI test clients can import without Postgres).
+    Engine init is deferred to first request so importing this module stays
+    zero-IO (FastAPI test clients can import without Postgres).
+
+    Pool hardening (added after the 2026-06-01 outage): Neon free drops idle
+    server-side connections (and a regional incident drops them en masse).
+    Without ``pool_pre_ping`` SQLAlchemy hands out — and counts — those dead
+    connections until they error, which combined with a leaked SSE connection
+    exhausted the default 5+10 pool → every query hit a 30s checkout timeout →
+    Render 502'd the whole API. ``pool_pre_ping`` validates/replaces a dead
+    connection on checkout; ``pool_recycle`` retires connections before Neon's
+    idle timeout; ``pool_timeout`` fails fast (a clean error the frontend
+    retries) instead of a 30s hang that the platform turns into a 502.
     """
     global _engine, _SessionLocal
     if _engine is None:
-        _engine = create_engine(_database_url())
+        _engine = create_engine(
+            _database_url(),
+            pool_pre_ping=True,
+            pool_recycle=300,
+            pool_timeout=10,
+        )
         _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)
     assert _SessionLocal is not None
-    db = _SessionLocal()
+    return _SessionLocal
+
+
+def get_session() -> Iterator[Session]:
+    """FastAPI dependency that yields a Session for the request lifetime."""
+    db = _session_factory()()
     try:
         yield db
     finally:
@@ -833,8 +853,13 @@ async def sse_feed(
     import asyncio as _aio
 
     async def gen():
-        # Initial snapshot.
-        for db in get_session():
+        # Initial snapshot. CRITICAL: scope the DB session to JUST this fetch
+        # via a context manager so the pooled connection is returned the instant
+        # the snapshot is built — never held for the (15-60s+) stream lifetime.
+        # The old `for db in get_session(): ... break` left the connection's
+        # release to GC and kept it checked out through the heartbeat loop; under
+        # the frontend's reconnect churn that leaked the pool dry (2026-06-01).
+        with _session_factory()() as db:
             cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
             stmt = (
                 select(AttackPrimitiveORM)
@@ -849,12 +874,12 @@ async def sse_feed(
                 "primitives": [_primitive_to_dict(p) for p in rows],
                 "now": datetime.now(timezone.utc).isoformat(),
             }
-            yield f"event: snapshot\ndata: {json.dumps(payload)}\n\n"
-            break
+        # Connection already back in the pool before we start streaming.
+        yield f"event: snapshot\ndata: {json.dumps(payload)}\n\n"
 
         # Keepalive heartbeats. The frontend reconnects on disconnect, so each
         # connection lives 15-60s; this loop just keeps it open until the
-        # client closes.
+        # client closes. It holds NO DB connection.
         while True:
             await _aio.sleep(15)
             yield f": heartbeat {datetime.now(timezone.utc).isoformat()}\n\n"
