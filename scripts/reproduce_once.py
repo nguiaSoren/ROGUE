@@ -1362,9 +1362,13 @@ def main(argv: list[str] | None = None) -> int:
     # spend, no-op when NEON_DATABASE_URL is unset / already on Neon.
     from rogue.db.image_cache import maybe_cache_images
     from rogue.db.neon_sync import maybe_auto_sync
+    from rogue.notify import revalidate_frontend
 
     maybe_cache_images(args.database_url)
     maybe_auto_sync(args.database_url)
+    # New breaches are in Neon now — tell the frontend to regenerate the cached
+    # dashboard pages immediately (no-op if the revalidate env vars are unset).
+    revalidate_frontend()
     return 0
 
 
