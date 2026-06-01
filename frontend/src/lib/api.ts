@@ -22,6 +22,10 @@ const REVALIDATE_SECONDS = 300;
 // with a short backoff so a cold start never paints the page as "unavailable".
 const GATEWAY_STATUSES = new Set([502, 503, 504]);
 const MAX_RETRIES = 2;
+// Cap each attempt so a Render cold boot that HOLDS the socket (instead of
+// returning a clean 502) can't hang the request forever — it aborts and the
+// loop retries / surfaces an error instead.
+const ATTEMPT_TIMEOUT_MS = 12_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,7 +36,10 @@ async function apiGet<T>(path: string): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const r = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
+      const r = await fetch(url, {
+        next: { revalidate: REVALIDATE_SECONDS },
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      });
       if (GATEWAY_STATUSES.has(r.status) && attempt < MAX_RETRIES) {
         await sleep(1500 * (attempt + 1)); // 1.5s, then 3s
         continue;

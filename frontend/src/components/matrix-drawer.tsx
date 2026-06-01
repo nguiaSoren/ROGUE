@@ -55,7 +55,10 @@ async function fetchAttackDetailWithRetry(
 ): Promise<AttackDetailResponse> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const r = await fetch(url);
+      // Per-attempt timeout: a Render cold boot can HOLD the socket instead of
+      // returning a clean 502, which would otherwise hang the drawer on
+      // "loading primitive…" indefinitely. Abort at 12s and let the loop retry.
+      const r = await fetch(url, { signal: AbortSignal.timeout(12_000) });
       const gateway = r.status === 502 || r.status === 503 || r.status === 504;
       if (gateway && attempt < 2) {
         await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));

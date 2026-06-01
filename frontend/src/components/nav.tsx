@@ -24,7 +24,12 @@ export function Nav() {
   useEffect(() => {
     let alive = true;
     const pingHealth = () => {
-      fetch(`${API_BASE}/api/health`, { cache: "no-store" })
+      // 8s timeout (< the 15s ping interval) so a held socket during a Render
+      // cold boot resolves to "down" instead of leaving the status dot stale.
+      fetch(`${API_BASE}/api/health`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      })
         .then((r) => r.json())
         .then((d: { db?: string }) => {
           if (alive) setDbUp(d.db === "up");
