@@ -257,7 +257,7 @@ def _default_report_date(db: Session) -> date | None:
 # --------------------------------------------------------------------------- #
 
 
-@app.get("/api/livez")
+@app.api_route("/api/livez", methods=["GET", "HEAD"])
 def livez() -> dict[str, str]:
     """Liveness probe — returns 200 WITHOUT touching the database.
 
@@ -276,10 +276,16 @@ def livez() -> dict[str, str]:
 # --------------------------------------------------------------------------- #
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health() -> dict[str, Any]:
     """Readiness check — returns DB status + counts for the dashboard freshness
-    banner. NOT for Render's health check (it queries Neon); use /api/livez."""
+    banner. NOT for Render's health check (it queries Neon); use /api/livez.
+
+    Accepts HEAD as well as GET: UptimeRobot's free plan only sends HEAD, and a
+    GET-only route returned 405 → the monitor flapped "down" for days AND its
+    pings never ran this handler, so Neon kept cold-suspending. With HEAD allowed
+    the handler runs (body discarded), the monitor sees 200, and the 5-min ping
+    keeps Neon warm."""
     try:
         # Pull the session manually here so health doesn't error when DB
         # is briefly down — return `db: down` instead of 500.
