@@ -253,13 +253,33 @@ def _default_report_date(db: Session) -> date | None:
 
 
 # --------------------------------------------------------------------------- #
+# 0. GET /api/livez — pure liveness probe (no DB)
+# --------------------------------------------------------------------------- #
+
+
+@app.get("/api/livez")
+def livez() -> dict[str, str]:
+    """Liveness probe — returns 200 WITHOUT touching the database.
+
+    **Point Render's "Health Check Path" at this, NOT /api/health.** /api/health
+    runs COUNT(*) queries against Neon, which auto-suspends on the free tier;
+    when Neon is cold those queries can exceed Render's health-check timeout, so
+    Render declares the instance unhealthy and restarts it — the recurring
+    "connection reset by peer" alert + churn. Liveness should only prove the web
+    process is accepting requests, which is all this does (no DB, no I/O).
+    """
+    return {"status": "ok"}
+
+
+# --------------------------------------------------------------------------- #
 # 1. GET /api/health
 # --------------------------------------------------------------------------- #
 
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    """Liveness check. Returns counts so the dashboard can show a freshness banner."""
+    """Readiness check — returns DB status + counts for the dashboard freshness
+    banner. NOT for Render's health check (it queries Neon); use /api/livez."""
     try:
         # Pull the session manually here so health doesn't error when DB
         # is briefly down — return `db: down` instead of 500.
