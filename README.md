@@ -60,7 +60,7 @@ ROGUE uses 5 Bright Data products end-to-end:
 
 The discovery layer doesn't just *call* Bright Data SERP — it learns to use it
 better over time. An ε-greedy multi-armed bandit (`src/rogue/harvest/bandit.py`)
-maintains 36 candidate SERP queries across the 19 sources and picks the 10
+maintains 39 candidate SERP queries across the 19 sources and picks the 10
 highest-yield queries per daily harvest, where **yield = novel canonical attack
 primitives per dollar of Bright Data spend**.
 
@@ -178,6 +178,25 @@ The renderers can draw a synthetic image — but a multimodal attack is far more
 
 So Bright Data does double duty: it **discovers** the attacks (SERP + Web Unlocker + Web Scraper + Scraping Browser + MCP) *and* **sources the real images** the multimodal attacks are tested against. The fetch is cached (deterministic replays, no re-spend) and gated (`$`-billed, run deliberately). `harvest → extract (media_query) → fetch-media (Bright Data) → reproduce (composite)`.
 
+## Self-growing attack repertoire
+
+ROGUE harvests **two different things** from the open web, and now automates both:
+
+- **Attack PAYLOADS** — a *specific* jailbreak prompt. Always automated: harvest → extract → `AttackPrimitive` → reproduce. This is the breach matrix.
+- **Attack TECHNIQUES** — a *reusable method* ("escalate over N turns", "render the request as an image so the text filter never sees it"). Previously a human read the paper and hand-wrote a strategy; now ROGUE learns the **methods** itself, not just new payloads.
+
+`harvest → 3-way classify → route → graduate/retire → drive`. Proven end-to-end **live in production** (2026-06-02): a single harvest classified **24 techniques** from ~1,800 docs and one — *"Social-Engineering Attack via Deceptive Web Content"* — walked the full path `candidate → tried → breached (Claude Haiku 4.5) → active`.
+
+**1 — 3-way extraction classifier `{payload, technique, commentary}`.** The extraction agent (prompt `extraction_v4.md`, gated so v1–v3 payload extraction is byte-for-byte unchanged) labels a document as a specific prompt, a described method, or neither.
+
+**2 — technique lifecycle.** Text / multi-turn techniques (no new code needed) become **planner directives** — synthesized deterministically from the method's principle + steps — and enter as `candidate` in the `attack_strategies` table (live on Neon). Image / audio techniques (need a renderer) **park as `needs_implementation`** — captured, not lost.
+
+**3 — graduation, retirement, resurrection (behaviorally proven, not just structural).** A `candidate` graduates to `active` only when it is the **winning** strategy of a real escalation (winner-only attribution — no co-breach inflation), recording a first-breach audit. Never-winners **soft-retire** (reversible) on two rules — evidence (`n_times_tried ≥ 5 ∧ 0 breaches ∧ tested across > 7 days` — so 5 fast retries can't retire it) and staleness (TTL). A retired technique that later breaches a new config/model **resurrects** (`active`, with measurable latency) — jailbreak effectiveness is non-stationary, so dead attacks are kept, not pruned.
+
+**4 — governed renderer capabilities (the executable half).** Image / audio techniques are **executable artifacts, not transforms**, so each renderer carries a capability manifest (sandbox policy, `network:false`, determinism contract, artifact schema, provenance hash, approval state) and moves through a strict lifecycle: `harvested → spec_validated → synthesized → sandbox_verified → deterministic → human_approved → active`. The load-bearing invariant is **structural, not developer discipline**: a `synthesized` (LLM-generated) renderer can *never* reach `active` without passing sandbox → determinism → human approval. Ships human-written renderers first; LLM renderer-synthesis plugs into the `synthesized`/`sandbox_verified` states later, under that governance.
+
+**5 — adaptive-orchestration groundwork.** Live telemetry surfaced a scheduler bias: the Tier-1 image renderers absorb most escalation breaches *before* the Tier-5 harvested candidates ever execute (greedy early-stop starves exploration). So exploration is now a tunable **scheduler policy** — `--candidate-quota N` reserves N guaranteed candidate attempts before early-stop (`--candidate-probe` = all), and every ladder attempt is logged to `ladder_attempts` (entity × depth × outcome, tagged with the quota). That's the control surface + reward log the §10.10 break-bandit will optimize over — quota *is* the proto-bandit. A one-command A/B (`scripts/candidate_quota_ab.py`) measures the reserved slot's value.
+
 ## Capabilities
 
 - 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
@@ -188,6 +207,7 @@ So Bright Data does double duty: it **discovers** the attacks (SERP + Web Unlock
 - Daily threat brief (markdown + JSON) + Slack webhook
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
 - **True multimodal red-team** — renders attacks as real images/audio and an autonomous escalation ladder (see above)
+- **Self-growing repertoire** — harvests reusable attack *techniques* (not just payloads), classifies + routes them, and graduates / soft-retires / resurrects them on live breach evidence; governed executable-renderer registry + adaptive-orchestration groundwork (see above)
 
 ## Judge calibration
 
@@ -226,16 +246,20 @@ All three checks are reproducible — `scripts/run_calibration.py` (in-distribut
 
 ## Roadmap
 
-**Product**
+**Product — short-term (next 30–90 days)**
 
-- **Next 30 days** — deeper Web Scraper API coverage: the next 100 open-web sources.
-- **Next 90 days** — customer SDK: pipe ROGUE verdicts straight into SOAR / SIEM.
-- **Scale** — onboarding to the Bright Data Startup Program to accelerate Year-1 infrastructure.
+- **Expand source coverage.** Deeper Web Scraper API integration brings the next 100 open-web sources online — a higher discovery rate and fewer blind spots.
+- **Customer SDK.** Pipe ROGUE verdicts straight into the workflows your team already runs — a drop-in SDK that lands breaches in your **SOAR / SIEM** (Splunk, Palo Alto Cortex), no glue code.
+- **Bright Data Startup Program.** Onboarding to the Startup Program accelerates Year-1 infrastructure and cuts scaling costs for users.
 
 **Research — "a bandit on each end: what to harvest, and how to break"**
 
-- **Break bandit.** ROGUE already learns *which sources to harvest* (the ε-greedy SERP bandit above). The next layer is a second, **contextual Thompson-sampling bandit** that learns *how to break* a target — picking which attack/escalation strategy to try **first** per `(attack family × target model)`, reordering the escalation ladder so the likely winner is front-loaded (breach on attempt 2, not 15 — far fewer calls). Beta-Bernoulli posteriors per arm; deferred from the hackathon only because a bandit needs accumulated runs to learn.
-- **A self-growing attack repertoire.** Harvested techniques enter as `candidate` and graduate to `active` only once they actually breach in a reproduction run — so ROGUE learns *new techniques*, not just new payloads, and prunes mislabels automatically.
+- **Self-growing attack repertoire — ✅ shipped (see [above](#self-growing-attack-repertoire)).** Harvested *techniques* enter as `candidate` and graduate to `active` only once they win a reproduction — so ROGUE learns *new techniques*, not just new payloads, soft-retires never-winners, and resurrects them when defenses drift. Proven live: 24 techniques harvested, 1 graduated in prod. Next: promote renderer LLM-synthesis (3b-v2) inside the governed lifecycle.
+- **Break bandit — groundwork in place.** ROGUE already learns *which sources to harvest* (the ε-greedy SERP bandit above). The next layer is a second, **contextual Thompson-sampling bandit** that learns *how to break* — which escalation strategy to try **first** per `(attack family × target model)`, front-loading the likely winner. The control surface (`candidate_attempt_quota` — exploration budget as scheduler policy) and the reward log (`ladder_attempts` — every attempt by entity × depth × outcome × policy) are **already built and instrumented in prod**; the bandit is now "just" adaptive quota allocation over that substrate. Beta-Bernoulli posteriors per arm; deferred only because a bandit needs accumulated runs to learn.
+
+**Enterprise (long-term)**
+
+- **Enterprise features.** Role-based access control (RBAC), audit logs, and compliance reporting (SOC 2, ISO 27001) for security teams that need them.
 
 ---
 
@@ -262,7 +286,7 @@ https://rogue-api-mr5w.onrender.com/mcp/
 - **From the dashboard:** the [home page](https://rogue-eosin.vercel.app) has **Add to Cursor** / **Add to VS Code** one-click buttons + a copy-URL.
 - **Claude Desktop:** Settings → **Customize** (connectors moved here) → add a custom connector → paste the URL.
 
-It's read-only (the five query tools below). For local development against your own DB, use the one-command installer instead:
+It's read-only (the six query tools below). For local development against your own DB, use the one-command installer instead:
 
 ### Install locally (one command)
 
@@ -308,6 +332,7 @@ Requires a populated DB (`scripts/harvest_once.py` + `scripts/reproduce_once.py`
 | `query_threat_brief(date_str?, format?)` | Full daily threat brief in markdown or JSON. Reads from `data/threat_briefs/` then falls back to live DB render. |
 | `query_breaches_for_config(deployment_config_id, since_days?, limit?)` | Per-trial breach results for one customer deployment, with judge rationale + model-response excerpts. |
 | `query_attack_detail(primitive_id)` | One attack's full record + its per-config breach aggregates (n_full / n_partial / n_refused / n_evaded). |
+| `query_worst_attacks(model_family?, limit?)` | Highest-breach-rate attacks all-time — optionally narrowed to the model closest to yours. The fast "am I exposed?" answer; assistants pass their own model identity to see what would hit a model like them. |
 
 ### Try it
 
@@ -321,7 +346,7 @@ Claude will call `query_diff` + `query_breaches_for_config` and summarize.
 
 **Stdio** by default (the Claude Desktop path) — the server runs as a subprocess Claude Desktop spawns, logging to stderr so the JSON-RPC channel on stdout stays clean.
 
-For **remote** clients (Cursor / Windsurf / a hosted client), serve the same five tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
+For **remote** clients (Cursor / Windsurf / a hosted client), serve the same six tools over HTTP on a dedicated port (8001, alongside the FastAPI dashboard on 8000):
 
 ```bash
 ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
@@ -411,11 +436,16 @@ uv run python scripts/reproduce_once.py --primitive-limit 50 --judge-batch
 | `--pair-max-iters N` | 0 | PAIR: up to N iterative-attacker refinements per evaded/refused trial. |
 | `--no-iterative` | off | Force `--pair-max-iters=0`. |
 | `--escalate` | off | inline auto-ladder for panel-wide refusals (COSTLY; bound with `--escalate-max-spend`). |
-| `--escalate-max-spend USD` | none | Cap cumulative escalation spend. |
+| `--escalate-max-spend USD` | none | Cap cumulative escalation spend (hard circuit-breaker). |
 | `--escalate-n-trials N` | 1 | Trials per ladder variant × config. |
 | `--escalate-planner-model` | Claude+fallback | Override the Tier-5 escalation planner backbone. |
-| `--judge-batch` | off | Grade via the Anthropic **Batch API** (50% off + caching, latency-tolerant; baseline-only). |
+| `--dry-run` | off | §10.9 escalation **preview**: build the candidate rotation + cost plan from the live DB (real queries), print it, exit **before** any paid call or lifecycle write. Requires `--escalate`. |
+| `--candidate-quota N` | 0 | §10.9 candidate-evaluation quota (**scheduler policy**): reserve N guaranteed harvested-candidate attempts before early-stop, so the Tier-1 image dominance can't fully starve them. `0` = today's pure early-stop (clean A/B baseline). |
+| `--candidate-probe` | off | Sugar for `--candidate-quota = ALL` rotation candidates (the full instrumented-evaluation "probe"). |
+| `--judge-batch` | off | Grade via the Anthropic **Batch API** (50% off + caching, latency-tolerant; baseline-only — **disables** escalation). |
 | `--database-url` | `$DATABASE_URL` or local | Target SQLAlchemy URL. |
+
+**`scripts/candidate_quota_ab.py`** — §10.9 candidate-quota A/B. `run` does both arms (quota=0 vs 1, same parents) then prints the comparison from `ladder_attempts`; `analyze` re-prints it (free, read-only). The empirical baseline for the §10.10 break-bandit.
 
 ## Repository layout
 
