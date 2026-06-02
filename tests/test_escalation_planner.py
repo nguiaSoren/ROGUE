@@ -312,6 +312,21 @@ def test_render_multi_turn_passes_when_all_required_slots_populated() -> None:
     assert out[1]["content"] == "Now go deeper into specifics."
 
 
+def test_render_multi_turn_tolerates_braced_slot_requirement_names() -> None:
+    """§10.9 fix: the planner often emits slot_requirements in braced form
+    ('{trigger_phrase}'); render must strip braces so a populated bare-key default
+    ('trigger_phrase') isn't falsely reported missing (the escalation render_error class)."""
+    primitive = _make_single_turn_primitive(
+        multi_turn_sequence=["Use {trigger_phrase} then {target_topic}."],
+        requires_multi_turn=True,
+        slot_requirements={"0": ["{trigger_phrase}", "{target_topic}"]},  # braced
+        payload_template="Use {trigger_phrase} then {target_topic}.",
+    )
+    resolved = {"trigger_phrase": "override now", "target_topic": "history"}  # bare keys
+    out = render_multi_turn(primitive, resolved)
+    assert out[0]["content"] == "Use override now then history."
+
+
 def test_render_multi_turn_empty_string_counts_as_missing() -> None:
     """Empty values are functionally equivalent to missing — render must reject."""
     primitive = _make_single_turn_primitive(

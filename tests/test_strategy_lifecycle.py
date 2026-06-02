@@ -47,7 +47,8 @@ def _row(**over):
         status=StrategyStatus.CANDIDATE,
     )
     # Column defaults only apply on INSERT flush; set them for in-memory use.
-    r.n_times_tried = 0
+    r.n_attempts_total = 0
+    r.n_valid_trials = 0
     r.n_breaches = 0
     r.supporting_breach_count = 0
     r.resurrected = False
@@ -71,9 +72,9 @@ def _row(**over):
 
 def test_winning_trial_graduates_candidate_to_active() -> None:
     r = _row()
-    record_trial(r, won=True, ladder_breached=True, config_id="cfg1", now=BASE)
+    record_trial(r, won=True, valid=True, ladder_breached=True, config_id="cfg1", now=BASE)
     assert r.status is StrategyStatus.ACTIVE
-    assert r.n_times_tried == 1 and r.n_breaches == 1
+    assert r.n_attempts_total == 1 and r.n_valid_trials == 1 and r.n_breaches == 1
     assert r.last_tried_at == BASE and r.last_breached_at == BASE
     assert r.first_breach_at == BASE and r.first_breach_config_id == "cfg1"
     assert r.supporting_breach_count == 0
@@ -81,24 +82,34 @@ def test_winning_trial_graduates_candidate_to_active() -> None:
 
 def test_non_winner_in_breaching_ladder_is_supporting_only() -> None:
     r = _row()
-    record_trial(r, won=False, ladder_breached=True, now=BASE)
+    record_trial(r, won=False, valid=True, ladder_breached=True, now=BASE)
     assert r.status is StrategyStatus.CANDIDATE  # NOT graduated
-    assert r.n_times_tried == 1 and r.n_breaches == 0
+    assert r.n_attempts_total == 1 and r.n_valid_trials == 1 and r.n_breaches == 0
     assert r.supporting_breach_count == 1
 
 
 def test_non_winner_in_failed_ladder_just_counts_the_trial() -> None:
     r = _row()
-    record_trial(r, won=False, ladder_breached=False, now=BASE)
+    record_trial(r, won=False, valid=True, ladder_breached=False, now=BASE)
     assert r.status is StrategyStatus.CANDIDATE
-    assert r.n_times_tried == 1 and r.supporting_breach_count == 0
+    assert r.n_attempts_total == 1 and r.supporting_breach_count == 0
+
+
+def test_blocked_attempt_counts_total_but_not_valid() -> None:
+    # refused / render_error: reached the candidate but was NOT a semantic test.
+    r = _row()
+    record_trial(r, won=False, valid=False, ladder_breached=False, now=BASE)
+    assert r.n_attempts_total == 1 and r.n_valid_trials == 0  # blocked, not tested
+    assert r.supporting_breach_count == 0
+    record_trial(r, won=False, valid=False, ladder_breached=True, now=BASE)
+    assert r.supporting_breach_count == 0  # blocked attempts don't earn "supporting"
 
 
 def test_first_breach_audit_is_set_once() -> None:
     r = _row()
-    record_trial(r, won=True, ladder_breached=True, config_id="cfg1", now=BASE)
+    record_trial(r, won=True, valid=True, ladder_breached=True, config_id="cfg1", now=BASE)
     later = BASE + timedelta(days=1)
-    record_trial(r, won=True, ladder_breached=True, config_id="cfg2", now=later)
+    record_trial(r, won=True, valid=True, ladder_breached=True, config_id="cfg2", now=later)
     assert r.n_breaches == 2
     assert r.first_breach_at == BASE and r.first_breach_config_id == "cfg1"  # unchanged
     assert r.last_breached_at == later  # tracks the latest
@@ -109,32 +120,42 @@ def test_first_breach_audit_is_set_once() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_rule_a_retires_after_trials_with_time_diversity() -> None:
-    r = _row(n_times_tried=5, last_tried_at=BASE + timedelta(days=8))
+def test_rule_a_retires_after_valid_trials_with_time_diversity() -> None:
+    r = _row(n_valid_trials=5, last_tried_at=BASE + timedelta(days=8))
     retire, reason = evaluate_retirement(r, now=BASE + timedelta(days=8))
     assert retire is True and reason is RetireReason.NEVER_BREACHED_N_RUNS
 
 
+def test_rule_a_does_not_retire_on_blocked_attempts() -> None:
+    # 20 attempts but ZERO valid trials (all planner-refused/render_error) — the
+    # candidate was never actually tested, so it MUST NOT retire (the correctness fix).
+    r = _row(
+        n_attempts_total=20, n_valid_trials=0, last_tried_at=BASE + timedelta(days=8)
+    )
+    retire, reason = evaluate_retirement(r, now=BASE + timedelta(days=8))
+    assert retire is False and reason is None
+
+
 def test_rule_a_does_not_retire_on_fast_retries() -> None:
-    # 5 trials but all within an hour — weak evidence, must NOT retire.
-    r = _row(n_times_tried=5, last_tried_at=BASE + timedelta(hours=1))
+    # 5 valid trials but all within an hour — weak evidence, must NOT retire.
+    r = _row(n_valid_trials=5, last_tried_at=BASE + timedelta(hours=1))
     retire, reason = evaluate_retirement(r, now=BASE + timedelta(hours=1))
     assert retire is False and reason is None
 
 
 def test_rule_b_retires_stale_never_breached() -> None:
-    r = _row(created_at=BASE - timedelta(days=40), n_times_tried=0)
+    r = _row(created_at=BASE - timedelta(days=40), n_valid_trials=0)
     retire, reason = evaluate_retirement(r, now=BASE)
     assert retire is True and reason is RetireReason.EXPIRED_TTL
 
 
 def test_breached_candidate_never_retires() -> None:
-    r = _row(n_times_tried=9, n_breaches=1, last_tried_at=BASE + timedelta(days=30))
+    r = _row(n_valid_trials=9, n_breaches=1, last_tried_at=BASE + timedelta(days=30))
     assert evaluate_retirement(r, now=BASE + timedelta(days=30)) == (False, None)
 
 
 def test_apply_retirement_sets_soft_fields() -> None:
-    r = _row(n_times_tried=5, last_tried_at=BASE + timedelta(days=8))
+    r = _row(n_valid_trials=5, last_tried_at=BASE + timedelta(days=8))
     assert apply_retirement(r, now=BASE + timedelta(days=8)) is True
     assert r.status is StrategyStatus.RETIRED
     assert r.retired_at == BASE + timedelta(days=8)
@@ -152,7 +173,7 @@ def test_retired_strategy_resurrects_on_breach() -> None:
         status=StrategyStatus.RETIRED,
         retired_at=retired_at,
         retire_reason=RetireReason.NEVER_BREACHED_N_RUNS,
-        n_times_tried=5,
+        n_attempts_total=5,
     )
     breach_at = BASE + timedelta(days=50)
     graduate(r, config_id="newmodel-cfg", now=breach_at)
@@ -312,9 +333,9 @@ def test_log_ladder_attempts_quota_mode_no_early_stop(db_session) -> None:
 
 
 def test_select_candidates_least_tried_first(db_session) -> None:
-    _add(db_session, "test-a", n_times_tried=3)
-    _add(db_session, "test-b", n_times_tried=0)
-    _add(db_session, "test-c", n_times_tried=1)
+    _add(db_session, "test-a", n_attempts_total=3)
+    _add(db_session, "test-b", n_attempts_total=0)
+    _add(db_session, "test-c", n_attempts_total=1)
     db_session.commit()
 
     picked = select_candidates(db_session, k=2)
@@ -363,9 +384,9 @@ def test_ladder_config_env_override(monkeypatch) -> None:
 
 def test_build_rotation_includes_active_always_and_capped_candidates(db_session) -> None:
     _add(db_session, "test-active1", status=StrategyStatus.ACTIVE)
-    _add(db_session, "test-cand1", n_times_tried=0)
-    _add(db_session, "test-cand2", n_times_tried=1)
-    _add(db_session, "test-cand3", n_times_tried=2)
+    _add(db_session, "test-cand1", n_attempts_total=0)
+    _add(db_session, "test-cand2", n_attempts_total=1)
+    _add(db_session, "test-cand3", n_attempts_total=2)
     db_session.commit()
 
     base = ("crescendo", "actor_attack", "acronym")
@@ -380,8 +401,8 @@ def test_build_rotation_includes_active_always_and_capped_candidates(db_session)
 
 def test_build_rotation_plan_counts_and_cost(db_session) -> None:
     _add(db_session, "test-active1", status=StrategyStatus.ACTIVE)
-    _add(db_session, "test-cand1", n_times_tried=0)
-    _add(db_session, "test-cand2", n_times_tried=1)
+    _add(db_session, "test-cand1", n_attempts_total=0)
+    _add(db_session, "test-cand2", n_attempts_total=1)
     db_session.commit()
 
     base = ("crescendo", "actor_attack", "acronym")
@@ -408,8 +429,8 @@ def test_build_rotation_plan_counts_and_cost(db_session) -> None:
 
 
 def test_apply_ladder_outcome_graduates_winner_and_counts_rest(db_session) -> None:
-    _add(db_session, "test-w", n_times_tried=0)  # will win
-    _add(db_session, "test-l", n_times_tried=0)  # tried-but-lost (before winner)
+    _add(db_session, "test-w", n_attempts_total=0)  # will win
+    _add(db_session, "test-l", n_attempts_total=0)  # tried-but-lost (before winner)
     db_session.commit()
 
     # Ladder tried 'test-l' (no_breach) then 'test-w' (breach).
@@ -429,5 +450,25 @@ def test_apply_ladder_outcome_graduates_winner_and_counts_rest(db_session) -> No
     assert winner.status is StrategyStatus.ACTIVE
     assert winner.n_breaches == 1 and winner.first_breach_config_id == "cfg-X"
     assert loser.status is StrategyStatus.CANDIDATE
-    assert loser.n_times_tried == 1
+    assert loser.n_attempts_total == 1 and loser.n_valid_trials == 1  # no_breach = valid
     assert loser.supporting_breach_count == 1  # in a ladder that breached elsewhere
+
+
+def test_apply_ladder_outcome_blocked_attempt_not_a_valid_trial(db_session) -> None:
+    _add(db_session, "test-blocked")
+    db_session.commit()
+    # The candidate was reached but planner-refused / render-errored — NOT a test.
+    apply_ladder_outcome(
+        db_session,
+        attempts=[("test-blocked", "refused"), ("image:mml:wr", "breach")],
+        winning_strategy="image:mml:wr",
+        harvested_ids={"test-blocked"},
+        config_id="cfg-Y",
+        now=BASE,
+    )
+    db_session.expire_all()
+    from rogue.db.models import AttackStrategy as ORM
+
+    row = db_session.get(ORM, "test-blocked")
+    assert row.n_attempts_total == 1  # the orchestration reached it...
+    assert row.n_valid_trials == 0  # ...but it was never validly tested → no retirement credit

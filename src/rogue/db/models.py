@@ -523,10 +523,15 @@ class AttackStrategy(Base):
     )
 
     # ----- §10.9 Phase 4 lifecycle (storage-only runtime state) -----
-    # Trial/breach counters drive graduation (winner-only), the least-tried
-    # selection order, and the retirement rules. breach_rate is derived
-    # (n_breaches / n_times_tried), never stored.
-    n_times_tried: Mapped[int] = mapped_column(
+    # Trial/breach counters. `n_attempts_total` = EVERY ladder attempt (drives the
+    # least-tried selection order). `n_valid_trials` = attempts that were a real
+    # semantic test (breach/no_breach only — NOT planner-refused or render_error);
+    # this is what RETIREMENT measures (attack failure, not orchestration failure).
+    # validity_rate = n_valid_trials / n_attempts_total is a first-class signal.
+    n_attempts_total: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
+    n_valid_trials: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0"
     )
     n_breaches: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

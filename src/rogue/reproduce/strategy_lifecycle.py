@@ -157,21 +157,29 @@ def record_trial(
     row: "AttackStrategy",
     *,
     won: bool,
+    valid: bool,
     ladder_breached: bool,
     config_id: Optional[str] = None,
     now: datetime,
 ) -> None:
-    """Record one ladder trial of ``row`` and apply graduation.
+    """Record one ladder attempt of ``row`` and apply graduation.
 
     ``won`` — ``row`` was the terminal winning strategy (it caused the breach).
+    ``valid`` — the attempt was a real semantic test (breach/no_breach), NOT an
+    orchestration failure (planner-refused / render_error). Every attempt advances
+    ``n_attempts_total`` (selection ordering); only valid ones advance
+    ``n_valid_trials`` (what retirement measures — attack failure, not orchestration
+    failure). A win is always valid.
     ``ladder_breached`` — the ladder run breached on *some* strategy (used only to
     increment the weak ``supporting_breach_count`` when ``row`` was NOT the winner).
     """
-    row.n_times_tried += 1
+    row.n_attempts_total += 1
+    if valid:
+        row.n_valid_trials += 1
     row.last_tried_at = now
     if won:
         graduate(row, config_id=config_id, now=now)
-    elif ladder_breached:
+    elif ladder_breached and valid:
         row.supporting_breach_count += 1
 
 
@@ -191,9 +199,12 @@ def evaluate_retirement(
     if row.status != StrategyStatus.CANDIDATE or row.n_breaches > 0:
         return (False, None)
     created = row.created_at
-    # Rule A — evidence-based: enough trials AND enough elapsed time.
+    # Rule A — evidence-based: enough VALID trials (not blocked orchestration
+    # attempts) AND enough elapsed time. A candidate that was only ever
+    # planner-refused / render-errored never accrues valid trials → never retires
+    # on Rule A (it was never actually tested — orchestration failure ≠ attack failure).
     if (
-        row.n_times_tried >= min_trials
+        row.n_valid_trials >= min_trials
         and row.last_tried_at is not None
         and created is not None
         and row.last_tried_at > created + timedelta(days=min_age_days)
@@ -242,7 +253,7 @@ def select_candidates(
             AttackStrategy.modality.in_(tuple(AUTO_INTEGRABLE_MODALITIES)),
         )
         .order_by(
-            AttackStrategy.n_times_tried.asc(),
+            AttackStrategy.n_attempts_total.asc(),
             nulls_first(AttackStrategy.last_tried_at.asc()),
             AttackStrategy.created_at.asc(),
         )
@@ -415,7 +426,7 @@ def format_rotation_plan(plan: RotationPlan) -> str:
         f"    active harvested:       {len(plan.active_ids)} [{active}]\n"
         f"    candidates selected:    {len(plan.candidate_ids)} [{cand}]\n"
         f"    EVADE parents (est):    {plan.n_parents_est}\n"
-        "  selected by: least-tried-first (n_times_tried ASC)\n"
+        "  selected by: least-tried-first (n_attempts_total ASC)\n"
         "  estimated ADDED escalation cost (UPPER BOUND — short-circuits at first breach):\n"
         f"    target calls: {plan.est_target_calls}  (= {plan.n_new_strategies} new "
         f"× {plan.n_parents_est} parents × {plan.n_configs} configs × {plan.n_trials} trials)\n"
@@ -454,6 +465,10 @@ def apply_ladder_outcome(
         record_trial(
             row,
             won=(outcome == "breach"),
+            # A real semantic test, not an orchestration failure. refused (planner
+            # declined) / render_error (slot/render failure) reached the candidate
+            # tier but never actually tested it → not a valid trial.
+            valid=(outcome in ("breach", "no_breach")),
             ladder_breached=ladder_breached,
             config_id=config_id,
             now=now,

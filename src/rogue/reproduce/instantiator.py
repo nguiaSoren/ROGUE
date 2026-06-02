@@ -304,7 +304,12 @@ def render_multi_turn(
         required_for_turn = requirements.get(str(turn_idx), [])
         missing: list[str] = []
         for slot_name in required_for_turn:
-            value = resolved_slots.get(slot_name, "")
+            # Tolerate both the braced form the planner often emits ('{trigger_phrase}')
+            # and the bare slot-dict key ('trigger_phrase') — strip braces before lookup
+            # so a populated default isn't reported missing (the §10.9 escalation
+            # render_error class was entirely this brace mismatch).
+            key = slot_name.strip("{} ")
+            value = resolved_slots.get(key, "")
             if not value:
                 missing.append(slot_name)
         if missing:
