@@ -386,6 +386,7 @@ class EscalationPlanner:
         planner_version: str = PLANNER_VERSION,
         fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
         extra_strategies: dict[str, StrategyView] | None = None,
+        use_templates: bool = True,
     ) -> None:
         # Resolve at construction (after dotenv): explicit arg > ROGUE_ESCALATION_PLANNER
         # env > the permissive Mistral default. Reading env here (not at import) means
@@ -393,6 +394,9 @@ class EscalationPlanner:
         self.model = model or os.environ.get(
             "ROGUE_ESCALATION_PLANNER", DEFAULT_PLANNER_MODEL
         )
+        # §10.9 Step 2 — deterministic template-first is on by default. Disable
+        # (force freeform model authoring) to A/B grammar efficacy vs freeform.
+        self.use_templates = use_templates
         self.fallback_model = fallback_model
         self.cache_dir = cache_dir
         self.planner_version = planner_version
@@ -470,7 +474,7 @@ class EscalationPlanner:
         # skeleton whose slots the render layer fills — no model call, no refusal
         # surface, reproducible. No grammar match ⇒ fall through to the model path
         # (the freeform permissive planner is the last-resort fallback).
-        template = select_template(arms_strategy, self._strategies)
+        template = select_template(arms_strategy, self._strategies) if self.use_templates else None
         if template is not None:
             objective = (
                 primitive.title.strip() or primitive.short_description.strip()[:200]

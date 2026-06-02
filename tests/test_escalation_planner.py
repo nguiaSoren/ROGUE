@@ -217,6 +217,31 @@ async def test_plan_uses_deterministic_template_with_no_model_call(tmp_path: Pat
 
 
 @pytest.mark.asyncio
+async def test_use_templates_false_forces_freeform_model(tmp_path: Path) -> None:
+    """--no-templates path: with templates disabled, even crescendo takes the model
+    path (for A/B-ing grammar efficacy vs freeform)."""
+    planner = EscalationPlanner(
+        model="claude-haiku-4-5", cache_dir=tmp_path, use_templates=False
+    )
+    called = {"n": 0}
+
+    async def _stub(prim, n, arms_strategy=None, model=None):
+        called["n"] += 1
+        return EscalationPlan(
+            objective=prim.title,
+            turns=[f"turn {i}" for i in range(n)],
+            slot_requirements={str(i): [] for i in range(n)},
+            rationale="freeform",
+            planner_model=planner.model,
+        )
+
+    planner._call_anthropic = _stub  # type: ignore[assignment]
+    plan = await planner.plan(_make_single_turn_primitive(), n_turns=3)  # crescendo
+    assert called["n"] == 1  # the model WAS called (template bypassed)
+    assert plan.planner_model == "claude-haiku-4-5"  # not template:*
+
+
+@pytest.mark.asyncio
 async def test_plan_rejects_out_of_range_n_turns(tmp_path: Path) -> None:
     planner = EscalationPlanner(cache_dir=tmp_path / "cache")
     parent = _make_single_turn_primitive()

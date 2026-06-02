@@ -630,6 +630,7 @@ async def run_reproduction(
     escalate_dry_run: bool = False,
     escalate_candidate_probe: bool = False,
     escalate_candidate_quota: int = 0,
+    escalate_no_templates: bool = False,
     run_id: str = "adhoc",
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
@@ -939,6 +940,7 @@ async def run_reproduction(
                 if planner is None:
                     planner = EscalationPlanner.from_env(
                         extra_strategies=load_strategy_library(session),
+                        use_templates=not escalate_no_templates,
                         **(
                             {"model": escalate_planner_model}
                             if escalate_planner_model
@@ -1473,6 +1475,15 @@ def main(argv: list[str] | None = None) -> int:
             "'probe' / instrumented-evaluation mode). Overrides --candidate-quota."
         ),
     )
+    parser.add_argument(
+        "--no-templates",
+        action="store_true",
+        help=(
+            "§10.9 disable deterministic grammar templates (force the freeform model "
+            "planner). For A/B-ing grammar efficacy vs freeform — templates are the "
+            "default primary path."
+        ),
+    )
     parser.add_argument("--run-id", default=None)
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
@@ -1525,6 +1536,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_dry_run=args.dry_run,
             escalate_candidate_probe=args.candidate_probe,
             escalate_candidate_quota=args.candidate_quota,
+            escalate_no_templates=args.no_templates,
             run_id=run_id,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
