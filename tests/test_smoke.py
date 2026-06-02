@@ -91,8 +91,9 @@ def test_models_metadata_has_expected_tables() -> None:
     ``fetch_cache`` (§11.7 skip-cache, migration 0011) added 2026-05-29;
     ``primitive_images`` (DB-stored image bytes, migration 0012) added
     2026-05-30. ``attack_strategies`` (§10.9 self-growing technique library,
-    migration 0013) added 2026-06-01. Add new entries here when migrations
-    add tables.
+    migration 0013) added 2026-06-01. ``renderer_capabilities`` (§10.9 Phase 3b
+    governed renderer lifecycle, migration 0015) added 2026-06-02. Add new
+    entries here when migrations add tables.
     """
     from rogue.db.models import Base
 
@@ -106,6 +107,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "fetch_cache",
         "pair_refinement_steps",
         "primitive_images",
+        "renderer_capabilities",
         "source_provenances",
     ]
 

@@ -44,6 +44,13 @@ from .source_provenance import (
     SourceProvenance,
     SourceType,
 )
+from .renderer_manifest import (
+    LIFECYCLE_ORDER,
+    SYNTHESIS_ONLY_STATES,
+    RendererManifest,
+    RendererOrigin,
+    RendererStatus,
+)
 from .technique_spec import (
     AUTO_INTEGRABLE_MODALITIES,
     Modality,
@@ -83,4 +90,10 @@ __all__ = [
     "StrategyStatus",
     "RetireReason",
     "AUTO_INTEGRABLE_MODALITIES",
+    # renderer manifest (executable capability governance — §10.9 Phase 3b)
+    "RendererManifest",
+    "RendererStatus",
+    "RendererOrigin",
+    "LIFECYCLE_ORDER",
+    "SYNTHESIS_ONLY_STATES",
 ]

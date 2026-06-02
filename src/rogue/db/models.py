@@ -40,6 +40,8 @@ from rogue.schemas import (
     BrightDataProduct,
     JudgeVerdict,
     Modality,
+    RendererOrigin,
+    RendererStatus,
     RetireReason,
     Severity,
     SourceType,
@@ -565,11 +567,70 @@ class AttackStrategy(Base):
     )
 
 
+class RendererCapability(Base):
+    """ORM twin of ``rogue.schemas.RendererManifest`` — a governed renderer capability.
+
+    The executable counterpart to ``attack_strategies``: that table stores *what*
+    multimodal method to use; this stores *the renderer that operationalizes it*,
+    with its safety manifest + lifecycle state. A row reaches ``status='active'``
+    (and thus the reproduce ladder's renderer tiers) only after the §10.9 Phase 3b
+    lifecycle — and a ``synthesized`` renderer can never skip sandbox/determinism/
+    approval to get there (enforced in ``reproduce/renderer_registry.py``).
+    """
+
+    __tablename__ = "renderer_capabilities"
+
+    renderer_id: Mapped[str] = mapped_column(String(60), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    # The harvested technique this implements; NULL for pre-§10.9 static renderers.
+    technique_id: Mapped[Optional[str]] = mapped_column(
+        String(40),
+        ForeignKey("attack_strategies.technique_id"),
+        nullable=True,
+        index=True,
+    )
+    modality: Mapped[str] = mapped_column(String(10))  # "image" | "audio"
+    origin: Mapped[RendererOrigin] = mapped_column(
+        SAEnum(RendererOrigin, name="renderer_origin", values_callable=_enum_values),
+        index=True,
+    )
+
+    # ----- Capability contract (manifest) -----
+    entrypoint: Mapped[str] = mapped_column(Text)
+    artifact_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    network_allowed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    deterministic: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    sandbox_policy: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    provenance_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    resource_limits: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    # ----- Lifecycle -----
+    status: Mapped[RendererStatus] = mapped_column(
+        SAEnum(RendererStatus, name="renderer_status", values_callable=_enum_values),
+        index=True,
+        default=RendererStatus.HARVESTED,
+    )
+    approved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
     "AttackPrimitive",
     "AttackStrategy",
+    "RendererCapability",
     "SourceProvenance",
     "BreachResult",
     "PairRefinementStep",
