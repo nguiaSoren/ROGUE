@@ -904,6 +904,27 @@ async def run_reproduction(
                     format_rotation_plan,
                     ladder_config_from_env,
                 )
+                from rogue.reproduce.renderer_registry import (  # noqa: PLC0415
+                    active_dynamic_strategies,
+                )
+
+                # §10.9 Phase 3b-v1 — merge any ACTIVE harvested renderers into the
+                # ladder's renderer tiers. Empty until a harvested renderer is
+                # activated, so this is a zero-change default for today's runs.
+                image_renderers_tier = DEFAULT_IMAGE_RENDERERS + active_dynamic_strategies(
+                    session, "image"
+                )
+                audio_styles_tier = DEFAULT_AUDIO_STYLES + active_dynamic_strategies(
+                    session, "audio"
+                )
+                if len(image_renderers_tier) > len(DEFAULT_IMAGE_RENDERERS) or len(
+                    audio_styles_tier
+                ) > len(DEFAULT_AUDIO_STYLES):
+                    logger.info(
+                        "escalation renderer tiers incl. harvested: image=%s audio=%s",
+                        image_renderers_tier,
+                        audio_styles_tier,
+                    )
 
                 # §10.9 Phase 4 — seed the planner with the harvested strategy
                 # library (active + candidate, text/multi_turn) so it can drive
@@ -1094,10 +1115,10 @@ async def run_reproduction(
                                 n_trials=escalate_n_trials,
                                 temperature=temperature,
                                 strategies=escalation_plan.rotation,
-                                image_renderers=DEFAULT_IMAGE_RENDERERS,
+                                image_renderers=image_renderers_tier,
                                 coj_operations=COJ_OPERATIONS,
                                 structured_formats=DEFAULT_STRUCTURED_FORMATS,
-                                audio_styles=DEFAULT_AUDIO_STYLES,
+                                audio_styles=audio_styles_tier,
                                 budget_usd=remaining,
                             )
                             # §10.9 Phase 4 — feed this parent's ladder result back

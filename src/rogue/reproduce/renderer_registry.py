@@ -49,9 +49,11 @@ __all__ = [
     "transition",
     "approve",
     "activate",
+    "activate_with_cascade",
     "reject",
     "register_renderer",
     "active_renderers",
+    "active_dynamic_strategies",
     "backlog",
     "seed_static_renderers",
     "STATIC_RENDERERS",
@@ -129,6 +131,61 @@ def activate(row: "RendererCapability") -> None:
     transition(row, RendererStatus.ACTIVE)
 
 
+def activate_with_cascade(
+    session: "Session", row: "RendererCapability", *, now: Optional[datetime] = None
+) -> None:
+    """Activate a renderer AND flip the technique it implements out of the backlog.
+
+    The §10.9 Phase 3b-v1 loop closure: when a renderer for a parked image/audio
+    technique goes ``active``, the linked ``attack_strategies`` row leaves
+    ``needs_implementation`` and becomes ``active`` (it is now operational). Static
+    renderers (no ``technique_id``) just activate. ``now`` stamps the technique's
+    first-active moment for parity with the lifecycle audit.
+    """
+    activate(row)
+    if row.technique_id is None:
+        return
+    from rogue.db.models import AttackStrategy
+
+    tech = session.get(AttackStrategy, row.technique_id)
+    if tech is not None and tech.status is StrategyStatus.NEEDS_IMPLEMENTATION:
+        tech.status = StrategyStatus.ACTIVE
+        if tech.first_breach_at is None:
+            # No breach yet — but it's now a usable capability. Record the moment
+            # it became operational via its renderer (distinct from a breach).
+            tech.last_tried_at = tech.last_tried_at or now
+
+
+def active_dynamic_strategies(
+    session: "Session", modality: str
+) -> tuple[str, ...]:
+    """Ladder strategy strings contributed by *harvested* active renderers.
+
+    Only renderers that implement a harvested technique (``technique_id`` set) are
+    returned — the static shipped renderers are already in the ladder's default
+    tier, so including them would double-count. Empty until a harvested renderer is
+    activated (so merging this into the tier is a zero-change, cost-safe default).
+    """
+    from rogue.db.models import RendererCapability
+
+    rows = (
+        session.query(RendererCapability)
+        .filter(
+            RendererCapability.status == RendererStatus.ACTIVE,
+            RendererCapability.modality == modality,
+            RendererCapability.technique_id.isnot(None),
+        )
+        .order_by(RendererCapability.renderer_id.asc())
+        .all()
+    )
+    out: list[str] = []
+    for r in rows:
+        for s in r.ladder_strategies or []:
+            if s not in out:
+                out.append(s)
+    return tuple(out)
+
+
 def reject(row: "RendererCapability") -> None:
     """Terminally reject a renderer (failed validation/review). Kept for provenance."""
     transition(row, RendererStatus.REJECTED)
@@ -148,6 +205,7 @@ def register_renderer(
         origin=manifest.origin,
         entrypoint=manifest.entrypoint,
         artifact_types=list(manifest.artifact_types),
+        ladder_strategies=list(manifest.ladder_strategies),
         network_allowed=manifest.network_allowed,
         deterministic=manifest.deterministic,
         sandbox_policy=manifest.sandbox_policy,
@@ -214,6 +272,7 @@ STATIC_RENDERERS: tuple[RendererManifest, ...] = (
         origin=RendererOrigin.HUMAN,
         entrypoint=f"{_R}.typographic:render_typographic_image",
         artifact_types=["png"],
+        ladder_strategies=["typographic"],
         deterministic=True,
         sandbox_policy="none",
         status=RendererStatus.ACTIVE,
@@ -226,6 +285,7 @@ STATIC_RENDERERS: tuple[RendererManifest, ...] = (
         origin=RendererOrigin.HUMAN,
         entrypoint=f"{_R}.mml:render_mml",
         artifact_types=["png"],
+        ladder_strategies=["mml:wr", "mml:base64"],
         deterministic=True,
         sandbox_policy="none",
         status=RendererStatus.ACTIVE,
@@ -238,6 +298,7 @@ STATIC_RENDERERS: tuple[RendererManifest, ...] = (
         origin=RendererOrigin.HUMAN,
         entrypoint=f"{_R}.vpi:render_vpi_overlay",
         artifact_types=["png"],
+        ladder_strategies=["vpi:lowcontrast"],
         deterministic=True,
         sandbox_policy="none",
         status=RendererStatus.ACTIVE,
@@ -250,6 +311,7 @@ STATIC_RENDERERS: tuple[RendererManifest, ...] = (
         origin=RendererOrigin.HUMAN,
         entrypoint=f"{_R}.ocr:render_ocr_image",
         artifact_types=["png"],
+        ladder_strategies=["ocr:white_on_white"],
         deterministic=True,
         sandbox_policy="none",
         status=RendererStatus.ACTIVE,
@@ -262,6 +324,7 @@ STATIC_RENDERERS: tuple[RendererManifest, ...] = (
         origin=RendererOrigin.HUMAN,
         entrypoint=f"{_R}.exif:render_exif_injection",
         artifact_types=["png", "jpg"],
+        ladder_strategies=["exif"],
         deterministic=True,
         sandbox_policy="none",
         status=RendererStatus.ACTIVE,

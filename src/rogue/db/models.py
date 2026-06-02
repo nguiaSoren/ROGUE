@@ -598,6 +598,9 @@ class RendererCapability(Base):
     # ----- Capability contract (manifest) -----
     entrypoint: Mapped[str] = mapped_column(Text)
     artifact_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Ladder identifier(s) (image_strategy / audio-style strings) this renderer
+    # contributes to the reproduce ladder tier when active (§10.9 Phase 3b-v1).
+    ladder_strategies: Mapped[list[str]] = mapped_column(JSON, default=list)
     network_allowed: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )

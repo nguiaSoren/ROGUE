@@ -16,6 +16,8 @@ from rogue.reproduce.renderer_registry import (
     STATIC_RENDERERS,
     InvalidTransition,
     activate,
+    activate_with_cascade,
+    active_dynamic_strategies,
     active_renderers,
     approve,
     backlog,
@@ -175,6 +177,12 @@ def db_session():
                 conn.execute(text("DROP TYPE IF EXISTS renderer_origin"))
     if made_strat:
         AttackStrategy.__table__.drop(bind=engine, checkfirst=True)
+        # Drop the enum types too — Table.drop leaves them, orphaning the types
+        # and breaking the next alembic `upgrade head` (CREATE TYPE → DuplicateObject).
+        if engine.dialect.name == "postgresql":
+            with engine.begin() as conn:
+                conn.execute(text("DROP TYPE IF EXISTS attack_strategy_status"))
+                conn.execute(text("DROP TYPE IF EXISTS attack_strategy_modality"))
     engine.dispose()
 
 
@@ -231,6 +239,91 @@ def test_backlog_lists_unimplemented_image_audio_techniques(db_session) -> None:
     )
     db_session.commit()
     assert "test-tech-img" not in [t.technique_id for t in backlog(db_session)]
+
+
+def test_activate_with_cascade_flips_linked_technique(db_session) -> None:
+    """Activating a renderer for a parked technique closes the 3b-v1 loop: the
+    technique leaves needs_implementation and becomes operational (active)."""
+    from rogue.reproduce.strategy_library import persist_technique
+
+    persist_technique(
+        db_session,
+        TechniqueSpec(
+            technique_id="test-tech-cascade",
+            name="t",
+            modality=Modality.IMAGE,
+            principle="p",
+            status=StrategyStatus.NEEDS_IMPLEMENTATION,
+        ),
+    )
+    row = register_renderer(
+        db_session,
+        _manifest(
+            "test-rend-cascade",
+            technique_id="test-tech-cascade",
+            status=S.HUMAN_APPROVED,
+            ladder_strategies=["foo:bar"],
+        ),
+    )
+    db_session.commit()
+
+    activate_with_cascade(db_session, row, now=NOW)
+    db_session.commit()
+    db_session.expire_all()
+
+    from rogue.db.models import AttackStrategy as Strat
+    from rogue.db.models import RendererCapability as Rend
+
+    assert db_session.get(Rend, "test-rend-cascade").status is S.ACTIVE
+    assert db_session.get(Strat, "test-tech-cascade").status is StrategyStatus.ACTIVE
+
+
+def test_active_dynamic_strategies_only_returns_harvested(db_session) -> None:
+    """The dynamic tier merge yields strategies from ACTIVE *harvested* renderers
+    (technique_id set) only — static renderers (already in the default tier) and
+    non-active renderers are excluded."""
+    from rogue.reproduce.strategy_library import persist_technique
+
+    for tid in ("test-some-tech", "test-tech-t2"):  # satisfy the renderer FK
+        persist_technique(
+            db_session,
+            TechniqueSpec(
+                technique_id=tid,
+                name="t",
+                modality=Modality.IMAGE,
+                principle="p",
+                status=StrategyStatus.NEEDS_IMPLEMENTATION,
+            ),
+        )
+    register_renderer(
+        db_session,
+        _manifest(
+            "test-dyn",
+            modality="image",
+            technique_id="test-some-tech",
+            ladder_strategies=["smuggle:v1"],
+            status=S.ACTIVE,
+        ),
+    )
+    register_renderer(  # static-style (no technique_id) → excluded
+        db_session,
+        _manifest(
+            "test-static", modality="image", ladder_strategies=["typographic"]
+        ),
+    )
+    register_renderer(  # harvested but not active → excluded
+        db_session,
+        _manifest(
+            "test-pending",
+            modality="image",
+            technique_id="test-tech-t2",
+            ladder_strategies=["other:v1"],
+            status=S.HUMAN_APPROVED,
+        ),
+    )
+    db_session.commit()
+    assert active_dynamic_strategies(db_session, "image") == ("smuggle:v1",)
+    assert active_dynamic_strategies(db_session, "audio") == ()
 
 
 def test_seed_static_renderers_is_idempotent(db_session) -> None:

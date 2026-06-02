@@ -109,6 +109,11 @@ class RendererManifest(BaseModel):
     artifact_types: list[str] = Field(
         default_factory=list, description="e.g. ['png'] or ['wav']"
     )
+    # The ladder identifier(s) this renderer contributes — the image_strategy /
+    # audio-style string(s) instantiator.render() dispatches on (e.g. ['typographic'],
+    # ['mml:wr','mml:base64']). When the renderer is `active`, these are merged into
+    # the reproduce ladder's renderer tier (§10.9 Phase 3b-v1).
+    ladder_strategies: list[str] = Field(default_factory=list)
     network_allowed: bool = Field(
         False, description="renderers MUST NOT need network; True requires justification"
     )
