@@ -54,7 +54,77 @@ __all__ = [
     "RotationPlan",
     "build_rotation_plan",
     "format_rotation_plan",
+    "log_ladder_attempts",
 ]
+
+# ARMS planner-tier strategy ids (Tier 5, not lifecycle-tracked harvested candidates).
+_ARMS_BASE_IDS: frozenset[str] = frozenset({"crescendo", "actor_attack", "acronym"})
+
+
+def _classify_ladder_entity(
+    label: str, candidate_ids: "frozenset[str] | set[str]"
+) -> tuple[str, int]:
+    """Map a ladder attempt label → ``(entity_type, ladder_depth)`` (tier 1..5)."""
+    if label in candidate_ids:
+        return ("candidate", 5)
+    if label.startswith("image:"):
+        return ("renderer", 1)
+    if label.startswith("coj:"):
+        return ("coj", 2)
+    if label.startswith("structured:"):
+        return ("structured", 3)
+    if label.startswith("audio:"):
+        return ("renderer", 4)
+    if label in _ARMS_BASE_IDS:
+        return ("base", 5)
+    return ("meta", 5)  # "budget"/unknown markers
+
+
+def log_ladder_attempts(
+    session: "Session",
+    *,
+    run_id: str,
+    parent_id: str,
+    attempts: list[tuple[str, str]],
+    winning_strategy: Optional[str],
+    breached_on: Optional[str],
+    candidate_ids: "frozenset[str] | set[str]",
+    quota: int,
+    now: datetime,
+) -> None:
+    """Append the orchestration trace for one parent's ladder to ``ladder_attempts``.
+
+    Derived from the ``LadderResult`` (attempts + winning_strategy + breached_on) +
+    the scheduler policy (``quota``). ``stopped_run`` marks the attempt that
+    early-stopped the ladder — only meaningful at quota=0 (quota>0 suppresses
+    early-stop). Telemetry-only; never raises into the caller's transaction.
+    """
+    from rogue.db.models import LadderAttempt
+
+    rows = []
+    for idx, (label, outcome) in enumerate(attempts):
+        etype, depth = _classify_ladder_entity(label, candidate_ids)
+        breached = outcome == "breach"
+        is_winner = breached and label == winning_strategy
+        rows.append(
+            LadderAttempt(
+                run_id=run_id,
+                parent_id=parent_id,
+                attempt_index=idx,
+                ladder_depth=depth,
+                entity_type=etype,
+                entity_id=label,
+                technique_id=(label if label in candidate_ids else None),
+                candidate_attempt_quota=quota,
+                config_id=breached_on if is_winner else None,
+                outcome=outcome,
+                breached=breached,
+                # Early-stop only happens at quota=0 (quota>0 suppresses it).
+                stopped_run=bool(quota == 0 and is_winner),
+                created_at=now,
+            )
+        )
+    session.add_all(rows)
 
 # Retirement thresholds (env-overridable). Defaults from answers.md.
 MIN_TRIALS: int = int(os.environ.get("STRATEGY_MIN_TRIALS", "5"))

@@ -630,6 +630,7 @@ async def run_reproduction(
     escalate_dry_run: bool = False,
     escalate_candidate_probe: bool = False,
     escalate_candidate_quota: int = 0,
+    run_id: str = "adhoc",
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
     only_unreproduced: bool = False,
@@ -909,6 +910,9 @@ async def run_reproduction(
                 from rogue.reproduce.renderer_registry import (  # noqa: PLC0415
                     active_dynamic_strategies,
                 )
+                from rogue.reproduce.strategy_lifecycle import (  # noqa: PLC0415
+                    log_ladder_attempts,
+                )
 
                 # §10.9 Phase 3b-v1 — merge any ACTIVE harvested renderers into the
                 # ladder's renderer tiers. Empty until a harvested renderer is
@@ -952,6 +956,14 @@ async def run_reproduction(
                     n_trials=escalate_n_trials,
                     target_cost_usd=_TARGET_COST_ESTIMATE_PER_CALL_USD,
                     judge_cost_usd=_JUDGE_COST_ESTIMATE_PER_CALL_USD,
+                )
+                # §10.9 effective candidate-attempt quota (scheduler policy) — reused
+                # for the ladder call AND the ladder_attempts telemetry tag.
+                # --candidate-probe is sugar for "all rotation candidates".
+                _effective_quota = (
+                    len(escalation_plan.candidate_ids)
+                    if escalate_candidate_probe
+                    else escalate_candidate_quota
                 )
                 logger.info(
                     "escalation rotation plan (scope=%s cap=%d):\n%s",
@@ -1126,11 +1138,7 @@ async def run_reproduction(
                                 # reserve exploration for harvested candidates so the
                                 # Tier-1 image early-stop bias can't fully starve them.
                                 # --candidate-probe is sugar for "all candidates".
-                                candidate_attempt_quota=(
-                                    len(escalation_plan.candidate_ids)
-                                    if escalate_candidate_probe
-                                    else escalate_candidate_quota
-                                ),
+                                candidate_attempt_quota=_effective_quota,
                                 candidate_ids=frozenset(
                                     escalation_plan.candidate_ids
                                 ),
@@ -1157,6 +1165,30 @@ async def run_reproduction(
                                 session.rollback()
                                 logger.warning(
                                     "strategy lifecycle update failed: parent=%s err=%s",
+                                    pid, exc,
+                                )
+                            # §10.9 orchestration trace — log EVERY ladder attempt
+                            # (renderer/coj/base/candidate) tagged with the scheduler
+                            # policy, for A/B segmentation + the §10.10 bandit substrate.
+                            try:
+                                log_ladder_attempts(
+                                    session,
+                                    run_id=run_id,
+                                    parent_id=pid,
+                                    attempts=res.attempts,
+                                    winning_strategy=res.winning_strategy,
+                                    breached_on=res.breached_on,
+                                    candidate_ids=frozenset(
+                                        escalation_plan.candidate_ids
+                                    ),
+                                    quota=_effective_quota,
+                                    now=escalation_now,
+                                )
+                                session.commit()
+                            except Exception as exc:  # noqa: BLE001
+                                session.rollback()
+                                logger.warning(
+                                    "ladder_attempts logging failed: parent=%s err=%s",
                                     pid, exc,
                                 )
                             stats.escalations_run += 1
@@ -1493,6 +1525,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_dry_run=args.dry_run,
             escalate_candidate_probe=args.candidate_probe,
             escalate_candidate_quota=args.candidate_quota,
+            run_id=run_id,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
             primitive_ids=(

@@ -92,8 +92,9 @@ def test_models_metadata_has_expected_tables() -> None:
     ``primitive_images`` (DB-stored image bytes, migration 0012) added
     2026-05-30. ``attack_strategies`` (§10.9 self-growing technique library,
     migration 0013) added 2026-06-01. ``renderer_capabilities`` (§10.9 Phase 3b
-    governed renderer lifecycle, migration 0015) added 2026-06-02. Add new
-    entries here when migrations add tables.
+    governed renderer lifecycle, migration 0015) added 2026-06-02.
+    ``ladder_attempts`` (§10.9 orchestration-trace telemetry, migration 0017)
+    added 2026-06-02. Add new entries here when migrations add tables.
     """
     from rogue.db.models import Base
 
@@ -105,6 +106,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "bright_data_cost_log",
         "deployment_configs",
         "fetch_cache",
+        "ladder_attempts",
         "pair_refinement_steps",
         "primitive_images",
         "renderer_capabilities",

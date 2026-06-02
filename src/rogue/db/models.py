@@ -20,6 +20,7 @@ from typing import Optional, get_args
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -628,12 +629,55 @@ class RendererCapability(Base):
     )
 
 
+class LadderAttempt(Base):
+    """Orchestration-trace telemetry — one row per escalation-ladder attempt (§10.9).
+
+    Instruments the *ladder as a learning object*: every tier attempt (renderer /
+    coj / base ARMS / harvested candidate) is logged with the scheduler policy
+    (``candidate_attempt_quota``) in effect, so A/B telemetry can be segmented by
+    policy and the future §10.10 break-bandit can learn renderer dominance, depth
+    curves, starvation frequency, and exploration economics. Append-only; not synced
+    to the dashboard (analytics-only).
+    """
+
+    __tablename__ = "ladder_attempts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(40), index=True)
+    parent_id: Mapped[str] = mapped_column(String(40), index=True)
+    attempt_index: Mapped[int] = mapped_column(Integer)
+    ladder_depth: Mapped[int] = mapped_column(Integer)  # tier 1..5
+    entity_type: Mapped[str] = mapped_column(String(20), index=True)
+    entity_id: Mapped[str] = mapped_column(String(60))
+    # Soft reference to attack_strategies.technique_id (no hard FK — append-only log).
+    technique_id: Mapped[Optional[str]] = mapped_column(
+        String(40), nullable=True, index=True
+    )
+    candidate_attempt_quota: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
+    config_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    outcome: Mapped[str] = mapped_column(String(20))
+    breached: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    stopped_run: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
     "AttackPrimitive",
     "AttackStrategy",
     "RendererCapability",
+    "LadderAttempt",
     "SourceProvenance",
     "BreachResult",
     "PairRefinementStep",

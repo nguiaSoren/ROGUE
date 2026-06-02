@@ -21,9 +21,11 @@ from rogue.reproduce.strategy_lifecycle import (
     format_rotation_plan,
     graduate,
     ladder_config_from_env,
+    log_ladder_attempts,
     record_trial,
     select_candidates,
 )
+from rogue.reproduce.strategy_lifecycle import _classify_ladder_entity
 from rogue.schemas import Modality, RetireReason, StrategyStatus
 
 DEFAULT_TEST_DB = (
@@ -174,6 +176,7 @@ def db_session():
     from sqlalchemy.orm import sessionmaker
 
     from rogue.db.models import AttackStrategy as ORM
+    from rogue.db.models import LadderAttempt
 
     url = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DB)
     try:
@@ -185,10 +188,14 @@ def db_session():
 
     created_here = not inspect(engine).has_table("attack_strategies")
     ORM.__table__.create(bind=engine, checkfirst=True)
+    LadderAttempt.__table__.create(bind=engine, checkfirst=True)
     Session = sessionmaker(bind=engine)
     session = Session()
 
     def _clean() -> None:
+        session.query(LadderAttempt).filter(
+            LadderAttempt.run_id.like("test-%")
+        ).delete(synchronize_session=False)
         session.query(ORM).filter(ORM.technique_id.like("test-%")).delete(
             synchronize_session=False
         )
@@ -199,6 +206,7 @@ def db_session():
     _clean()
     session.close()
     if created_here:
+        LadderAttempt.__table__.drop(bind=engine, checkfirst=True)
         ORM.__table__.drop(bind=engine, checkfirst=True)
         if engine.dialect.name == "postgresql":
             with engine.begin() as conn:
@@ -222,6 +230,85 @@ def _add(session, tid, **over):
     )
     session.add(row)
     return row
+
+
+# --------------------------------------------------------------------------- #
+# Orchestration-trace logging (ladder_attempts)
+# --------------------------------------------------------------------------- #
+
+
+def test_classify_ladder_entity() -> None:
+    cands = frozenset({"01TECH"})
+    assert _classify_ladder_entity("image:mml:wr", cands) == ("renderer", 1)
+    assert _classify_ladder_entity("coj:reorder", cands) == ("coj", 2)
+    assert _classify_ladder_entity("structured:csv", cands) == ("structured", 3)
+    assert _classify_ladder_entity("audio:noisy", cands) == ("renderer", 4)
+    assert _classify_ladder_entity("crescendo", cands) == ("base", 5)
+    assert _classify_ladder_entity("01TECH", cands) == ("candidate", 5)
+    assert _classify_ladder_entity("budget", cands) == ("meta", 5)
+
+
+def test_log_ladder_attempts_writes_orchestration_trace(db_session) -> None:
+    from rogue.db.models import LadderAttempt
+
+    _add(db_session, "test-tech-trace", status=StrategyStatus.CANDIDATE)
+    db_session.commit()
+
+    # An image breach (quota=0 → early-stop), a base no_breach, a candidate no_breach.
+    log_ladder_attempts(
+        db_session,
+        run_id="test-run-1",
+        parent_id="parentX",
+        attempts=[
+            ("image:mml:wr", "breach"),
+            ("crescendo", "no_breach"),
+            ("test-tech-trace", "no_breach"),
+        ],
+        winning_strategy="image:mml:wr",
+        breached_on="openai/gpt-5.4-nano",
+        candidate_ids=frozenset({"test-tech-trace"}),
+        quota=0,
+        now=BASE,
+    )
+    db_session.commit()
+
+    rows = (
+        db_session.query(LadderAttempt)
+        .filter(LadderAttempt.run_id == "test-run-1")
+        .order_by(LadderAttempt.attempt_index)
+        .all()
+    )
+    assert len(rows) == 3
+    img, base, cand = rows
+    assert (img.entity_type, img.ladder_depth, img.breached) == ("renderer", 1, True)
+    assert img.stopped_run is True  # quota=0 winner early-stopped the ladder
+    assert img.config_id == "openai/gpt-5.4-nano"
+    assert (base.entity_type, base.breached, base.stopped_run) == ("base", False, False)
+    assert cand.entity_type == "candidate" and cand.technique_id == "test-tech-trace"
+    assert cand.candidate_attempt_quota == 0
+
+
+def test_log_ladder_attempts_quota_mode_no_early_stop(db_session) -> None:
+    from rogue.db.models import LadderAttempt
+
+    # quota>0: even the winning breach did NOT early-stop (suppression on).
+    log_ladder_attempts(
+        db_session,
+        run_id="test-run-2",
+        parent_id="parentY",
+        attempts=[("image:mml:wr", "breach")],
+        winning_strategy="image:mml:wr",
+        breached_on="m",
+        candidate_ids=frozenset(),
+        quota=1,
+        now=BASE,
+    )
+    db_session.commit()
+    row = db_session.query(LadderAttempt).filter(
+        LadderAttempt.run_id == "test-run-2"
+    ).one()
+    assert row.breached is True and row.stopped_run is False  # quota suppressed early-stop
+    assert row.candidate_attempt_quota == 1
 
 
 def test_select_candidates_least_tried_first(db_session) -> None:
