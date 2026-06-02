@@ -629,6 +629,7 @@ async def run_reproduction(
     escalate_planner_model: str | None = None,
     escalate_dry_run: bool = False,
     escalate_candidate_probe: bool = False,
+    escalate_candidate_quota: int = 0,
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
     only_unreproduced: bool = False,
@@ -1121,11 +1122,16 @@ async def run_reproduction(
                                 structured_formats=DEFAULT_STRUCTURED_FORMATS,
                                 audio_styles=audio_styles_tier,
                                 budget_usd=remaining,
-                                # §10.9 instrumented eval: guarantee the harvested
-                                # candidates are attempted (defeats the Tier-1
-                                # image-renderer early-stop bias).
-                                candidate_probe=escalate_candidate_probe,
-                                probe_candidate_ids=frozenset(
+                                # §10.9 candidate-evaluation quota (scheduler policy):
+                                # reserve exploration for harvested candidates so the
+                                # Tier-1 image early-stop bias can't fully starve them.
+                                # --candidate-probe is sugar for "all candidates".
+                                candidate_attempt_quota=(
+                                    len(escalation_plan.candidate_ids)
+                                    if escalate_candidate_probe
+                                    else escalate_candidate_quota
+                                ),
+                                candidate_ids=frozenset(
                                     escalation_plan.candidate_ids
                                 ),
                             )
@@ -1412,16 +1418,27 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--candidate-quota",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "§10.9 candidate-evaluation quota (scheduler policy, default 0 = today's "
+            "pure early-stop). N>0 reserves exploration: the ladder suppresses "
+            "early-stop until N harvested candidates have been attempted (then resumes), "
+            "so candidates get a fair shot at being tried + graduating despite the "
+            "Tier-1 image-renderer dominance. Default 0 keeps a clean A/B baseline — "
+            "run the same sweep with 0 vs 1 to measure the reserved slot's value. "
+            "Costs more per parent (runs more tiers); pair with --primitive-limit + "
+            "--escalate-max-spend. Requires --escalate."
+        ),
+    )
+    parser.add_argument(
         "--candidate-probe",
         action="store_true",
         help=(
-            "§10.9 instrumented-evaluation mode: in the escalation ladder, keep the "
-            "tiers competing in order BUT suppress early-stop until every harvested "
-            "candidate in the rotation has been attempted (or the budget is hit). "
-            "Defeats the Tier-1 image-renderer early-stop bias that starves candidate "
-            "evaluation, so candidates can actually be tried + graduate. Costs more "
-            "per parent (runs more tiers) — pair with a small --primitive-limit and "
-            "--escalate-max-spend. Requires --escalate."
+            "§10.9 sugar for --candidate-quota = ALL rotation candidates (the full "
+            "'probe' / instrumented-evaluation mode). Overrides --candidate-quota."
         ),
     )
     parser.add_argument("--run-id", default=None)
@@ -1475,6 +1492,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_planner_model=args.escalate_planner_model,
             escalate_dry_run=args.dry_run,
             escalate_candidate_probe=args.candidate_probe,
+            escalate_candidate_quota=args.candidate_quota,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
             primitive_ids=(

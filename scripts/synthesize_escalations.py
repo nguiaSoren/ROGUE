@@ -511,21 +511,24 @@ async def run_escalation_ladder_one(
     structured_formats: tuple[str, ...] = (),
     audio_styles: tuple[str, ...] = (),
     budget_usd: float | None = None,
-    candidate_probe: bool = False,
-    probe_candidate_ids: frozenset[str] = frozenset(),
+    candidate_attempt_quota: int = 0,
+    candidate_ids: frozenset[str] = frozenset(),
 ) -> LadderResult:
     """Auto-ladder: try transforms in order until one breaches, then STOP.
 
-    **§10.9 instrumented-evaluation mode (``candidate_probe``):** the normal ladder
-    stops at the first breach, which (empirically) lets the Tier-1 image renderers
-    absorb most successes before the Tier-5 harvested candidates ever execute — a
-    scheduler/early-stop bias that *starves* candidate evaluation. In probe mode the
-    tiers still run in order and compete normally, but the early-stop is suppressed
-    until every id in ``probe_candidate_ids`` has been *attempted* (or the budget is
-    hit). The first breach is still recorded as ``winning_strategy``; the ``attempts``
-    list captures every tier's outcome incl. the candidates, so a candidate that
-    breaches graduates via ``apply_ladder_outcome``. This does NOT disable renderers
-    — it guarantees a candidate-evaluation quota so the lifecycle can be exercised.
+    **§10.9 candidate-evaluation quota (``candidate_attempt_quota``) — scheduler
+    policy, not candidate policy.** The normal ladder (quota ``0``) stops at the
+    first breach, which (empirically) lets the Tier-1 image renderers absorb most
+    successes before the Tier-5 harvested candidates ever execute — an early-stop /
+    exploration-vs-exploitation bias that *starves* candidate evaluation. A quota
+    ``N > 0`` reserves exploration budget: the tiers still run in order and compete
+    normally, but the early-stop is suppressed until ``N`` harvested ``candidate_ids``
+    have been *attempted* (or the budget is hit), after which early-stop resumes.
+    ``N = len(candidate_ids)`` is the full "probe" (try them all). The first breach is
+    still recorded as ``winning_strategy``; ``attempts`` captures every tier incl. the
+    candidates, so a candidate that breaches graduates via ``apply_ladder_outcome``.
+    This does NOT disable renderers — it's an allocation knob the future adaptive
+    scheduler (§10.10 break-bandit) will learn to set per context.
 
 
     Planner-free tiers run first (cheap, deterministic, work even when the planner
@@ -567,27 +570,39 @@ async def run_escalation_ladder_one(
     def _over_budget() -> bool:
         return budget_usd is not None and spend >= budget_usd
 
-    # §10.9 candidate-probe state. `probe_first` holds the first breach (winner,
-    # for stats) so we can keep instrumenting without losing it. `probe_attempted`
-    # tracks which probe candidates have actually executed (the quota).
+    # §10.9 candidate-quota state. `probe_first` holds the first breach (winner, for
+    # stats) so we can keep allocating exploration without losing it. `probe_attempted`
+    # tracks which harvested candidates have actually executed (toward the quota).
     probe_first: tuple | None = None
     probe_attempted: set[str] = set()
 
+    def _quota_met() -> bool:
+        # Met when the quota is satisfied OR there are no more candidates to attempt.
+        if candidate_attempt_quota <= 0:
+            return True
+        return len(probe_attempted) >= min(candidate_attempt_quota, len(candidate_ids))
+
     def _breach_or_continue(label: str, breached_on: str, child) -> LadderResult | None:
-        """Normal mode → the LadderResult to return on this breach. Probe mode →
-        record the breach (+ first winner) and return None so the ladder keeps going."""
+        """Normal early-stop → the LadderResult to return on this breach. While the
+        candidate quota is unmet → record the breach (+ first winner) and return None
+        so the ladder keeps allocating exploration toward the candidates."""
         nonlocal probe_first
         attempts.append((label, "breach"))
-        if not candidate_probe:
+        if _quota_met():
+            # Finalize. Always credit the FIRST breach as winning_strategy (stable
+            # breach-matrix semantics) — even if this breach is the quota-completer.
+            # The candidate still graduates: its "breach" is in `attempts`.
+            if probe_first is not None:
+                w_label, w_on, w_child = probe_first
+                return LadderResult(
+                    parent.primitive_id, w_label, w_on, attempts, w_child, spend_usd=spend
+                )
             return LadderResult(
                 parent.primitive_id, label, breached_on, attempts, child, spend_usd=spend
             )
         if probe_first is None:
             probe_first = (label, breached_on, child)
         return None
-
-    def _probe_quota_met() -> bool:
-        return bool(probe_candidate_ids) and probe_candidate_ids <= probe_attempted
 
     # ---- Tier 1: the refused payload AS AN IMAGE (no planner needed) ----
     if image_renderers and not _over_budget():
@@ -689,11 +704,11 @@ async def run_escalation_ladder_one(
         attempts.append(("budget", "stopped"))
         return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
     for strat in strategies:
-        # Probe mode: stop once every probe candidate has been attempted, or the
-        # budget is hit (normal mode is unaffected — it early-returns on breach).
-        if candidate_probe and (_probe_quota_met() or _over_budget()):
+        # Quota mode: stop once the candidate-attempt quota is satisfied, or the
+        # budget is hit (quota=0 is unaffected — it early-returns on breach).
+        if candidate_attempt_quota > 0 and (_quota_met() or _over_budget()):
             break
-        is_probe_cand = strat in probe_candidate_ids
+        is_probe_cand = strat in candidate_ids
         plan = await planner.plan(parent, n_turns=n_turns, arms_strategy=strat)
         if plan is None:
             attempts.append((strat, "refused"))
@@ -730,8 +745,8 @@ async def run_escalation_ladder_one(
                 return _res
         else:
             attempts.append((strat, "no_breach"))
-    # Probe mode preserved the first breach (if any) as the winner for stats.
-    if candidate_probe and probe_first is not None:
+    # Quota mode preserved the first breach (if any) as the winner for stats.
+    if candidate_attempt_quota > 0 and probe_first is not None:
         label, breached_on, child = probe_first
         return LadderResult(
             parent.primitive_id, label, breached_on, attempts, child, spend_usd=spend

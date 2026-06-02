@@ -363,7 +363,7 @@ async def test_candidate_probe_continues_past_image_breach_to_try_candidate() ->
     res = await run_escalation_ladder_one(
         _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
         n_trials=1, image_renderers=("mml:wr",), strategies=("crescendo", "cand1"),
-        candidate_probe=True, probe_candidate_ids=frozenset({"cand1"}),
+        candidate_attempt_quota=1, candidate_ids=frozenset({"cand1"}),
     )
     assert ("image:mml:wr", "breach") in res.attempts  # recorded...
     assert "cand1" in planner.planned                  # ...but candidate WAS tried
@@ -372,16 +372,34 @@ async def test_candidate_probe_continues_past_image_breach_to_try_candidate() ->
 
 
 @pytest.mark.asyncio
-async def test_candidate_probe_stops_once_quota_met() -> None:
-    """Probe stops once every probe candidate is attempted — it doesn't keep trying
+async def test_candidate_quota_stops_once_met() -> None:
+    """The quota stops once N candidates are attempted — it doesn't keep trying
     non-candidate strategies that sit after them."""
     planner = _FakePlanner()
     judge = _FakeJudge([JudgeVerdict.REFUSED, JudgeVerdict.REFUSED])
     res = await run_escalation_ladder_one(
         _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
         n_trials=1, strategies=("cand1", "crescendo"),
-        candidate_probe=True, probe_candidate_ids=frozenset({"cand1"}),
+        candidate_attempt_quota=1, candidate_ids=frozenset({"cand1"}),
     )
     assert "cand1" in planner.planned
-    assert "crescendo" not in planner.planned  # quota met after cand1 → stop
+    assert "crescendo" not in planner.planned  # quota of 1 met after cand1 → stop
     assert res.winning_strategy is None  # nothing breached
+
+
+@pytest.mark.asyncio
+async def test_candidate_quota_reserves_exactly_n_attempts() -> None:
+    """quota=1 with two candidates: only the first candidate is reserved/attempted,
+    the second is left to the normal early-stop economy."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.FULL_BREACH])  # image breaches at Tier 1
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, image_renderers=("mml:wr",),
+        strategies=("cand1", "cand2"),
+        candidate_attempt_quota=1, candidate_ids=frozenset({"cand1", "cand2"}),
+    )
+    # Image breach didn't stop the ladder (quota unmet), one candidate was reserved...
+    assert ("image:mml:wr", "breach") in res.attempts
+    assert len(planner.planned) == 1  # exactly N=1 candidate attempted, not both
+    assert res.winning_strategy == "image:mml:wr"
