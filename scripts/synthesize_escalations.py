@@ -511,8 +511,22 @@ async def run_escalation_ladder_one(
     structured_formats: tuple[str, ...] = (),
     audio_styles: tuple[str, ...] = (),
     budget_usd: float | None = None,
+    candidate_probe: bool = False,
+    probe_candidate_ids: frozenset[str] = frozenset(),
 ) -> LadderResult:
     """Auto-ladder: try transforms in order until one breaches, then STOP.
+
+    **§10.9 instrumented-evaluation mode (``candidate_probe``):** the normal ladder
+    stops at the first breach, which (empirically) lets the Tier-1 image renderers
+    absorb most successes before the Tier-5 harvested candidates ever execute — a
+    scheduler/early-stop bias that *starves* candidate evaluation. In probe mode the
+    tiers still run in order and compete normally, but the early-stop is suppressed
+    until every id in ``probe_candidate_ids`` has been *attempted* (or the budget is
+    hit). The first breach is still recorded as ``winning_strategy``; the ``attempts``
+    list captures every tier's outcome incl. the candidates, so a candidate that
+    breaches graduates via ``apply_ladder_outcome``. This does NOT disable renderers
+    — it guarantees a candidate-evaluation quota so the lifecycle can be exercised.
+
 
     Planner-free tiers run first (cheap, deterministic, work even when the planner
     refuses); the planner tier is last.
@@ -553,6 +567,28 @@ async def run_escalation_ladder_one(
     def _over_budget() -> bool:
         return budget_usd is not None and spend >= budget_usd
 
+    # §10.9 candidate-probe state. `probe_first` holds the first breach (winner,
+    # for stats) so we can keep instrumenting without losing it. `probe_attempted`
+    # tracks which probe candidates have actually executed (the quota).
+    probe_first: tuple | None = None
+    probe_attempted: set[str] = set()
+
+    def _breach_or_continue(label: str, breached_on: str, child) -> LadderResult | None:
+        """Normal mode → the LadderResult to return on this breach. Probe mode →
+        record the breach (+ first winner) and return None so the ladder keeps going."""
+        nonlocal probe_first
+        attempts.append((label, "breach"))
+        if not candidate_probe:
+            return LadderResult(
+                parent.primitive_id, label, breached_on, attempts, child, spend_usd=spend
+            )
+        if probe_first is None:
+            probe_first = (label, breached_on, child)
+        return None
+
+    def _probe_quota_met() -> bool:
+        return bool(probe_candidate_ids) and probe_candidate_ids <= probe_attempted
+
     # ---- Tier 1: the refused payload AS AN IMAGE (no planner needed) ----
     if image_renderers and not _over_budget():
         vision_configs = [c for c in configs if supports_image(c.target_model)]
@@ -571,10 +607,11 @@ async def run_escalation_ladder_one(
                 continue
             spend += s
             if breached_on is not None:
-                attempts.append((label, "breach"))
-                return LadderResult(parent.primitive_id, label, breached_on, attempts,
-                                    None, spend_usd=spend)
-            attempts.append((label, "no_breach"))
+                _res = _breach_or_continue(label, breached_on, None)
+                if _res is not None:
+                    return _res
+            else:
+                attempts.append((label, "no_breach"))
 
     # ---- Tier 2: Chain-of-Jailbreak edit-step decomposition (NO planner) ----
     if not _over_budget():
@@ -594,10 +631,11 @@ async def run_escalation_ladder_one(
                 continue
             spend += s
             if breached_on is not None:
-                attempts.append((label, "breach"))
-                return LadderResult(parent.primitive_id, label, breached_on, attempts,
-                                    child_orm, spend_usd=spend)
-            attempts.append((label, "no_breach"))
+                _res = _breach_or_continue(label, breached_on, child_orm)
+                if _res is not None:
+                    return _res
+            else:
+                attempts.append((label, "no_breach"))
 
     # ---- Tier 3: structured-data injection (#12, text, NO planner) ----
     if not _over_budget():
@@ -616,10 +654,11 @@ async def run_escalation_ladder_one(
                 continue
             spend += s
             if breached_on is not None:
-                attempts.append((label, "breach"))
-                return LadderResult(parent.primitive_id, label, breached_on, attempts,
-                                    None, spend_usd=spend)
-            attempts.append((label, "no_breach"))
+                _res = _breach_or_continue(label, breached_on, None)
+                if _res is not None:
+                    return _res
+            else:
+                attempts.append((label, "no_breach"))
 
     # ---- Tier 4: audio acoustic styles (#6, NO planner) ----
     audio_configs = [c for c in configs if supports_audio(c.target_model)]
@@ -639,19 +678,27 @@ async def run_escalation_ladder_one(
                 continue
             spend += s
             if breached_on is not None:
-                attempts.append((label, "breach"))
-                return LadderResult(parent.primitive_id, label, breached_on, attempts,
-                                    None, spend_usd=spend)
-            attempts.append((label, "no_breach"))
+                _res = _breach_or_continue(label, breached_on, None)
+                if _res is not None:
+                    return _res
+            else:
+                attempts.append((label, "no_breach"))
 
     # ---- Tier 5: multi-turn escalation (planner-driven) ----
     if _over_budget():
         attempts.append(("budget", "stopped"))
         return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
     for strat in strategies:
+        # Probe mode: stop once every probe candidate has been attempted, or the
+        # budget is hit (normal mode is unaffected — it early-returns on breach).
+        if candidate_probe and (_probe_quota_met() or _over_budget()):
+            break
+        is_probe_cand = strat in probe_candidate_ids
         plan = await planner.plan(parent, n_turns=n_turns, arms_strategy=strat)
         if plan is None:
             attempts.append((strat, "refused"))
+            if is_probe_cand:
+                probe_attempted.add(strat)
             continue
         child_orm = _build_synthesized_primitive(
             parent, plan, arms_strategy=strat, image_strategy=image_strategy,
@@ -671,15 +718,24 @@ async def run_escalation_ladder_one(
                 parent.primitive_id, strat, exc,
             )
             attempts.append((strat, "render_error"))
+            if is_probe_cand:
+                probe_attempted.add(strat)
             continue
         spend += s
+        if is_probe_cand:
+            probe_attempted.add(strat)
         if breached_on is not None:
-            attempts.append((strat, "breach"))
-            return LadderResult(
-                parent.primitive_id, strat, breached_on, attempts, child_orm,
-                spend_usd=spend,
-            )
-        attempts.append((strat, "no_breach"))
+            _res = _breach_or_continue(strat, breached_on, child_orm)
+            if _res is not None:
+                return _res
+        else:
+            attempts.append((strat, "no_breach"))
+    # Probe mode preserved the first breach (if any) as the winner for stats.
+    if candidate_probe and probe_first is not None:
+        label, breached_on, child = probe_first
+        return LadderResult(
+            parent.primitive_id, label, breached_on, attempts, child, spend_usd=spend
+        )
     return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
 
 

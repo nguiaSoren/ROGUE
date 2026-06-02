@@ -329,3 +329,59 @@ async def test_ladder_survives_unrenderable_plan() -> None:
 
     assert res.attempts[0] == ("crescendo", "render_error")  # caught, not crashed
     assert res.winning_strategy == "actor_attack"  # ladder advanced
+
+
+# --------------------------------------------------------------------------- #
+# §10.9 candidate-probe (instrumented-evaluation mode)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_normal_mode_image_breach_starves_the_candidate() -> None:
+    """Baseline (the bias we're fixing): a Tier-1 image breach short-circuits, so a
+    harvested candidate sitting in Tier 5 is NEVER attempted."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.FULL_BREACH])  # image breaches immediately
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, image_renderers=("mml:wr",), strategies=("crescendo", "cand1"),
+    )
+    assert res.attempts == [("image:mml:wr", "breach")]
+    assert planner.planned == []  # candidate never reached
+
+
+@pytest.mark.asyncio
+async def test_candidate_probe_continues_past_image_breach_to_try_candidate() -> None:
+    """Probe mode: the image breach is recorded but does NOT stop the ladder — it
+    keeps going until the harvested candidate is attempted (and breaches here)."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([
+        JudgeVerdict.FULL_BREACH,  # image:mml:wr breaches (Tier 1)
+        JudgeVerdict.REFUSED,      # crescendo (Tier 5) no breach
+        JudgeVerdict.FULL_BREACH,  # cand1 (Tier 5 candidate) breaches
+    ])
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, image_renderers=("mml:wr",), strategies=("crescendo", "cand1"),
+        candidate_probe=True, probe_candidate_ids=frozenset({"cand1"}),
+    )
+    assert ("image:mml:wr", "breach") in res.attempts  # recorded...
+    assert "cand1" in planner.planned                  # ...but candidate WAS tried
+    assert ("cand1", "breach") in res.attempts         # and it breached
+    assert res.winning_strategy == "image:mml:wr"      # first breach kept for stats
+
+
+@pytest.mark.asyncio
+async def test_candidate_probe_stops_once_quota_met() -> None:
+    """Probe stops once every probe candidate is attempted — it doesn't keep trying
+    non-candidate strategies that sit after them."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.REFUSED, JudgeVerdict.REFUSED])
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, strategies=("cand1", "crescendo"),
+        candidate_probe=True, probe_candidate_ids=frozenset({"cand1"}),
+    )
+    assert "cand1" in planner.planned
+    assert "crescendo" not in planner.planned  # quota met after cand1 → stop
+    assert res.winning_strategy is None  # nothing breached
