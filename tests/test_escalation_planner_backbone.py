@@ -76,7 +76,8 @@ async def test_plan_routes_to_openrouter_for_non_claude_model(tmp_path: Path) ->
     planner._openrouter_client = MagicMock()
     planner._openrouter_client.chat.completions.create = AsyncMock(return_value=resp)
 
-    plan = await planner.plan(_primitive(), n_turns=3)
+    # actor_attack has no deterministic grammar → exercises the model (OpenRouter) path.
+    plan = await planner.plan(_primitive(), n_turns=3, arms_strategy="actor_attack")
 
     assert plan is not None
     assert len(plan.turns) == 3

@@ -78,6 +78,7 @@ from rogue.reproduce.strategy_library import (
     arms_views,
     planner_drivable_ids,
 )
+from rogue.reproduce.strategy_templates import select_template
 from rogue.schemas import AttackPrimitive
 
 __all__ = [
@@ -463,6 +464,24 @@ class EscalationPlanner:
                     "patterns and image/audio techniques are realized by the "
                     "renderers, not the planner",
                 )
+
+        # §10.9 Step 2 — deterministic template-first (LLM-as-parameterizer). If a
+        # known grammar matches the strategy, instantiate it: a versioned turn
+        # skeleton whose slots the render layer fills — no model call, no refusal
+        # surface, reproducible. No grammar match ⇒ fall through to the model path
+        # (the freeform permissive planner is the last-resort fallback).
+        template = select_template(arms_strategy, self._strategies)
+        if template is not None:
+            objective = (
+                primitive.title.strip() or primitive.short_description.strip()[:200]
+            )
+            return EscalationPlan(
+                objective=objective,
+                turns=list(template.turn_templates),
+                slot_requirements=template.slot_requirements(),
+                rationale=f"deterministic grammar — {template.description}",
+                planner_model=template.source_tag,
+            )
 
         key = _cache_key(
             primitive.primitive_id, n_turns, self.model, self.planner_version,

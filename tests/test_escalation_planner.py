@@ -202,6 +202,21 @@ def test_cache_key_differs_for_different_inputs() -> None:
 
 
 @pytest.mark.asyncio
+async def test_plan_uses_deterministic_template_with_no_model_call(tmp_path: Path) -> None:
+    """§10.9 Step 2: a strategy with a known grammar is instantiated deterministically
+    — no provider client is touched (LLM-as-parameterizer), and the turn slots stay
+    as {placeholders} for the render layer to fill."""
+    planner = EscalationPlanner(cache_dir=tmp_path)
+    # No anthropic/openrouter client set: if plan() hit the model it would raise.
+    plan = await planner.plan(_make_single_turn_primitive(), n_turns=3)  # None → crescendo
+    assert plan is not None
+    assert plan.planner_model == "template:crescendo:v1"  # template-sourced (telemetry)
+    assert len(plan.turns) == 3
+    assert "{target_topic}" in plan.turns[0]  # slot shape preserved, not pre-filled
+    assert plan.slot_requirements["2"] == ["target_behavior"]
+
+
+@pytest.mark.asyncio
 async def test_plan_rejects_out_of_range_n_turns(tmp_path: Path) -> None:
     planner = EscalationPlanner(cache_dir=tmp_path / "cache")
     parent = _make_single_turn_primitive()
@@ -231,8 +246,10 @@ async def test_plan_caches_after_first_call(tmp_path: Path) -> None:
 
     planner._call_anthropic = _stub_call  # type: ignore[assignment]
 
-    p1 = await planner.plan(parent, n_turns=3)
-    p2 = await planner.plan(parent, n_turns=3)
+    # Use actor_attack — it has no deterministic grammar, so plan() takes the
+    # (cacheable) MODEL path this test exercises (crescendo now templates → no model).
+    p1 = await planner.plan(parent, n_turns=3, arms_strategy="actor_attack")
+    p2 = await planner.plan(parent, n_turns=3, arms_strategy="actor_attack")
     assert p1 is not None and p2 is not None
     assert p1.turns == p2.turns
     assert call_count["n"] == 1, "second call should be a cache hit"
@@ -255,8 +272,9 @@ async def test_plan_caches_refusal_so_reruns_dont_respend_budget(
 
     planner._call_anthropic = _refusing_stub  # type: ignore[assignment]
 
-    out1 = await planner.plan(parent, n_turns=3)
-    out2 = await planner.plan(parent, n_turns=3)
+    # actor_attack → no grammar → the model path (which can refuse + cache the refusal).
+    out1 = await planner.plan(parent, n_turns=3, arms_strategy="actor_attack")
+    out2 = await planner.plan(parent, n_turns=3, arms_strategy="actor_attack")
     assert out1 is None and out2 is None
     assert call_count["n"] == 1, "refusal must be cached"
 
