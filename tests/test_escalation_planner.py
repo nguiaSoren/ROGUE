@@ -213,7 +213,8 @@ async def test_plan_rejects_out_of_range_n_turns(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_plan_caches_after_first_call(tmp_path: Path) -> None:
-    planner = EscalationPlanner(cache_dir=tmp_path / "cache")
+    # Pin Claude so plan() routes to the stubbed _call_anthropic (default is now Mistral).
+    planner = EscalationPlanner(model="claude-haiku-4-5", cache_dir=tmp_path / "cache")
     parent = _make_single_turn_primitive()
 
     call_count = {"n": 0}
@@ -241,7 +242,9 @@ async def test_plan_caches_after_first_call(tmp_path: Path) -> None:
 async def test_plan_caches_refusal_so_reruns_dont_respend_budget(
     tmp_path: Path,
 ) -> None:
-    planner = EscalationPlanner(cache_dir=tmp_path / "cache", fallback_model=None)
+    planner = EscalationPlanner(
+        model="claude-haiku-4-5", cache_dir=tmp_path / "cache", fallback_model=None
+    )
     parent = _make_single_turn_primitive()
 
     call_count = {"n": 0}
@@ -529,7 +532,8 @@ async def test_run_synthesis_persists_synthesized_child(
     from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
     from scripts.synthesize_escalations import run_synthesis
 
-    planner = EscalationPlanner(cache_dir=tmp_path / "esc_cache")
+    # Pin Claude so plan() routes to the stubbed _call_anthropic (default is now Mistral).
+    planner = EscalationPlanner(model="claude-haiku-4-5", cache_dir=tmp_path / "esc_cache")
 
     async def _stub_call(prim, n, arms_strategy=None, model=None):
         return EscalationPlan(

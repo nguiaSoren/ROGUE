@@ -97,14 +97,19 @@ DEFAULT_CACHE_DIR = Path("data/escalation_cache")
 
 # Claude Haiku 4.5 is sufficient for in-context plan generation. The
 # Crescendo paper used GPT-4-class models; Haiku 4.5 (claimed
-# parity-with-Sonnet-3.5-on-most-benchmarks) handles the planning fine and
-# stays inside the §10.7 ~$15 disciplined budget. For demo-shown primitives
-# specifically, override at call time to claude-sonnet-4-6 (cost +~$1).
-DEFAULT_PLANNER_MODEL = "claude-haiku-4-5"
-# Auto-fallback backbone: when the (aligned) primary refuses to AUTHOR an
-# escalation, the planner automatically retries with this less-aligned
-# OpenRouter model — no manual flag (the framework is autonomous). Set to None
-# to disable. Needs OPENROUTER_API_KEY.
+# Default escalation planner. PROMOTED to a permissive Mistral backbone 2026-06-02
+# after a controlled experiment: the aligned planner (claude-haiku-4-5) REFUSED to
+# author escalation plans for harvested jailbreak directives, capping candidate
+# evaluation at ~22% validity (mostly planner-refused); switching ONLY the planner
+# to mistralai/mistral-small-2603 took candidate validity 22% → 100% and graduated a
+# technique (VERA) the aligned planner made unreachable. Architecture: SAFE judge +
+# PERMISSIVE planner + SAFE target — the planner authors the attacks the defensive
+# red-team needs to test against. Override via ``ROGUE_ESCALATION_PLANNER`` env, or
+# ``--escalate-planner-model`` per run. Resolved at __init__ (after dotenv load).
+DEFAULT_PLANNER_MODEL = "mistralai/mistral-small-2603"
+# Auto-fallback backbone: when the primary refuses to AUTHOR an escalation, retry
+# with this OpenRouter model. (Largely vestigial now the primary is permissive —
+# if Mistral refuses, this won't do better — but kept as a no-op safety net.)
 DEFAULT_FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct"
 
 # Bumps invalidate the cache. Bump when the prompt template changes in a
@@ -375,13 +380,18 @@ class EscalationPlanner:
     def __init__(
         self,
         *,
-        model: str = DEFAULT_PLANNER_MODEL,
+        model: str | None = None,
         cache_dir: Path = DEFAULT_CACHE_DIR,
         planner_version: str = PLANNER_VERSION,
         fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
         extra_strategies: dict[str, StrategyView] | None = None,
     ) -> None:
-        self.model = model
+        # Resolve at construction (after dotenv): explicit arg > ROGUE_ESCALATION_PLANNER
+        # env > the permissive Mistral default. Reading env here (not at import) means
+        # a .env value set by the script's load_dotenv() is honored.
+        self.model = model or os.environ.get(
+            "ROGUE_ESCALATION_PLANNER", DEFAULT_PLANNER_MODEL
+        )
         self.fallback_model = fallback_model
         self.cache_dir = cache_dir
         self.planner_version = planner_version

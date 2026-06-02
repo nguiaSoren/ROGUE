@@ -39,8 +39,15 @@ def _plan_json() -> str:
     )
 
 
-def test_routing_predicate() -> None:
-    assert EscalationPlanner().model.startswith("claude")  # default = Anthropic path
+def test_routing_predicate(monkeypatch) -> None:
+    # Default is now the permissive Mistral backbone (OpenRouter path) — promoted
+    # 2026-06-02 after the 22%→100% planner-validity experiment.
+    monkeypatch.delenv("ROGUE_ESCALATION_PLANNER", raising=False)
+    default = EscalationPlanner()
+    assert default.model.startswith("mistralai/")
+    assert not (default.model.startswith("claude") or default.model.startswith("anthropic/"))
+    # An explicit Claude model still routes to the Anthropic path.
+    assert EscalationPlanner(model="claude-haiku-4-5").model.startswith("claude")
     llama = EscalationPlanner(model="meta-llama/llama-3.1-8b-instruct")
     assert not (llama.model.startswith("claude") or llama.model.startswith("anthropic/"))
 
