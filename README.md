@@ -187,6 +187,8 @@ ROGUE harvests **two different things** from the open web, and now automates bot
 
 `harvest → 3-way classify → route → graduate/retire → drive`. Proven end-to-end **live in production** (2026-06-02): a single harvest classified **24 techniques** from ~1,800 docs and one — *"Social-Engineering Attack via Deceptive Web Content"* — walked the full path `candidate → tried → breached (Claude Haiku 4.5) → active`.
 
+**The arc (how the seven pieces below came to be).** This system wasn't designed top-down — it was driven by live telemetry: *harvest → graduate a technique in prod → discover that image renderers starve the harvested candidates → instrument that (the quota knob + the `ladder_attempts` trace) → discover the real ceiling is the **planner refusing to author attacks** → prove it with a controlled experiment (candidate validity 22% → 100% by changing only the planner) → and structurally remove the dependency* (a permissive planner *and* deterministic grammars that own the attack structure). The result: ROGUE's growth no longer depends on "which model will author a jailbreak this month" — it depends on a versioned grammar library ROGUE owns.
+
 **1 — 3-way extraction classifier `{payload, technique, commentary}`.** The extraction agent (prompt `extraction_v4.md`, gated so v1–v3 payload extraction is byte-for-byte unchanged) labels a document as a specific prompt, a described method, or neither.
 
 **2 — technique lifecycle.** Text / multi-turn techniques (no new code needed) become **planner directives** — synthesized deterministically from the method's principle + steps — and enter as `candidate` in the `attack_strategies` table (live on Neon). Image / audio techniques (need a renderer) **park as `needs_implementation`** — captured, not lost.
