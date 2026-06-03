@@ -531,11 +531,22 @@ def apply_ladder_outcome(
 ) -> None:
     """Feed one parent's ladder result back into the harvested strategies' lifecycle.
 
-    ``attempts`` is the ladder's ``(strategy_id, outcome)`` list (outcome
-    ``"breach"`` for the winner). For every harvested strategy that was actually
-    tried: record the trial (winner → graduate; non-winner in a breaching ladder →
-    supporting), then evaluate soft retirement. ARMS base-ladder ids are skipped.
-    Commits once at the end.
+    ``attempts`` is the ladder's ``(strategy_id, outcome)`` list. For every harvested
+    strategy that was actually tried, ``record_trial`` is called with
+    ``won=(outcome == "breach")`` — so **any harvested strategy whose OWN outcome was
+    breach graduates**, not only the single ladder "winner". This is mode-adaptive by
+    construction, NOT a special case:
+      - early-stop ladders (``candidate_quota=0``): the ladder stops at the first
+        breach, so only the winner ever *runs* → only the winner can breach →
+        effectively winner-only graduation.
+      - quota / growth-sweep ladders (``candidate_quota>0``): early-stop is
+        suppressed, so *every reached candidate runs*, and *each one that breaches
+        graduates* (verified live 2026-06-03: all 3 selected candidates breached
+        under quota=3 → all 3 graduated).
+    A non-winner in a ladder that breached elsewhere → ``supporting_breach_count``.
+    Then soft retirement is evaluated. ARMS base-ladder ids are skipped. Commits once.
+    Note: the per-sweep graduation ceiling is the candidate *selection* cap K (see
+    ``select_candidates``), NOT this attribution rule.
     """
     from rogue.db.models import AttackStrategy
 
