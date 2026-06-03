@@ -78,7 +78,13 @@ from rogue.reproduce.strategy_library import (
     arms_views,
     planner_drivable_ids,
 )
-from rogue.reproduce.strategy_templates import select_template
+from rogue.reproduce.slot_fill import (
+    SLOT_FILL_VERSION,
+    build_slot_fill_messages,
+    fillable_slots,
+    validate_slot_values,
+)
+from rogue.reproduce.strategy_templates import StrategyTemplate, select_template
 from rogue.schemas import AttackPrimitive
 
 __all__ = [
@@ -125,6 +131,15 @@ _PLAN_MAX_TOKENS = 2048
 # A wrap shorter than this is almost certainly a refusal stub.
 _MIN_USEFUL_PLAN_CHARS = 100
 
+# Per-request network timeout + bounded retries for ALL planner/slot-fill provider
+# calls. Added 2026-06-03 after a paid A/B hung ~8h: an un-timed-out OpenRouter
+# request stalled the whole sweep. A hard per-request ceiling + finite retries means
+# a wedged provider call fails fast (and the planner degrades — refusal → None,
+# slot-fill → {}) instead of hanging the run forever. The provider SDKs apply this
+# timeout per attempt and back off between the (bounded) retries.
+_REQUEST_TIMEOUT_S = 90.0
+_MAX_RETRIES = 2
+
 
 # ----- Output schema -----
 
@@ -150,6 +165,12 @@ class EscalationPlan(BaseModel):
         for the dashboard chain view and for auditing planner quality.
       planner_model: the model that produced this plan; persisted so a
         future model swap can be diffed against the previous results.
+      slot_values: §10.9 Step 3 — model-authored SEMANTIC slot values from the
+        slot-fill parameterizer tier (empty for pure-template / freeform plans).
+        These flow into the synthesized primitive's ``payload_slots`` and are
+        resolved at render time with the standard precedence; the model never
+        touches ``turns``. Every entry has already passed
+        ``slot_fill.validate_slot_values`` before reaching this field.
     """
 
     objective: str = Field(..., min_length=10, max_length=500)
@@ -157,6 +178,25 @@ class EscalationPlan(BaseModel):
     slot_requirements: dict[str, list[str]] = Field(default_factory=dict)
     rationale: str = Field(..., max_length=1_000)
     planner_model: str = Field(..., min_length=3, max_length=80)
+    slot_values: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("slot_values")
+    @classmethod
+    def slot_values_are_bounded_strings(
+        cls, v: dict[str, str],
+    ) -> dict[str, str]:
+        """Defense in depth — slot-fill already gates these, but a plan can be
+        reconstructed from cache/JSON, so re-assert the structural invariant
+        (string values, no nested placeholders that could break rendering)."""
+        for key, value in v.items():
+            if not isinstance(value, str):
+                raise ValueError(f"slot_values[{key!r}] is not a string")
+            if "{" in value or "}" in value:
+                raise ValueError(
+                    f"slot_values[{key!r}] contains a curly brace — nested "
+                    "placeholders are rejected (render-injection guard)",
+                )
+        return v
 
     @field_validator("slot_requirements")
     @classmethod
@@ -387,6 +427,8 @@ class EscalationPlanner:
         fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
         extra_strategies: dict[str, StrategyView] | None = None,
         use_templates: bool = True,
+        slot_fill: bool = False,
+        slot_fill_model: str | None = None,
     ) -> None:
         # Resolve at construction (after dotenv): explicit arg > ROGUE_ESCALATION_PLANNER
         # env > the permissive Mistral default. Reading env here (not at import) means
@@ -397,6 +439,14 @@ class EscalationPlanner:
         # §10.9 Step 2 — deterministic template-first is on by default. Disable
         # (force freeform model authoring) to A/B grammar efficacy vs freeform.
         self.use_templates = use_templates
+        # §10.9 Step 3 — the slot-fill middle tier (LLM-as-parameterizer). When on,
+        # a matched template's SEMANTIC slots are filled by the model with concrete,
+        # objective-specific values (gated by slot_fill.validate_slot_values); the
+        # turn skeleton stays fixed. Off by default — opt in to close the template↔
+        # freeform breach gap without surrendering template reliability. The model
+        # used is the same permissive backbone unless overridden.
+        self.slot_fill = slot_fill
+        self.slot_fill_model = slot_fill_model or self.model
         self.fallback_model = fallback_model
         self.cache_dir = cache_dir
         self.planner_version = planner_version
@@ -479,12 +529,31 @@ class EscalationPlanner:
             objective = (
                 primitive.title.strip() or primitive.short_description.strip()[:200]
             )
+            # §10.9 Step 3 — slot-fill middle tier. The model fills SEMANTIC slot
+            # values (objective-specific, creative); the turn skeleton is fixed.
+            # `_fill_slots` is total — it returns {} on any refusal/parse/validation
+            # failure, so this path degrades to the pure deterministic template and
+            # can never reduce validity or orchestration reliability.
+            slot_values: dict[str, str] = {}
+            if self.slot_fill:
+                slot_values = await self._fill_slots(template, objective)
+            tag = (
+                f"{template.source_tag}+slotfill" if slot_values
+                else template.source_tag
+            )
+            rationale = (
+                f"deterministic grammar + slot-fill ({len(slot_values)} slots) — "
+                f"{template.description}"
+                if slot_values
+                else f"deterministic grammar — {template.description}"
+            )
             return EscalationPlan(
                 objective=objective,
                 turns=list(template.turn_templates),
                 slot_requirements=template.slot_requirements(),
-                rationale=f"deterministic grammar — {template.description}",
-                planner_model=template.source_tag,
+                rationale=rationale,
+                planner_model=tag,
+                slot_values=slot_values,
             )
 
         key = _cache_key(
@@ -561,23 +630,169 @@ class EscalationPlanner:
             return await self._call_anthropic(primitive, n_turns, arms_strategy, model)
         return await self._call_openrouter(primitive, n_turns, arms_strategy, model)
 
+    # ----- Provider clients (lazy, timed-out) -----
+
+    def _get_anthropic_client(self) -> Any:
+        """Lazily build the Anthropic client with a hard per-request timeout +
+        bounded retries (see ``_REQUEST_TIMEOUT_S``). Single construction site so
+        every planner/slot-fill Anthropic call is wedge-proof, not just some."""
+        if self._anthropic_client is None:
+            from anthropic import AsyncAnthropic  # noqa: PLC0415
+
+            self._anthropic_client = AsyncAnthropic(
+                timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES,
+            )
+        return self._anthropic_client
+
+    def _get_openrouter_client(self) -> Any:
+        """Lazily build the OpenRouter (OpenAI-compatible) client with the same
+        timeout + retry ceiling — this is the backbone whose un-timed-out call
+        hung the 2026-06-03 paid run for ~8h."""
+        if self._openrouter_client is None:
+            import os  # noqa: PLC0415
+
+            from openai import AsyncOpenAI  # noqa: PLC0415
+
+            self._openrouter_client = AsyncOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=os.environ.get("OPENROUTER_API_KEY"),
+                timeout=_REQUEST_TIMEOUT_S,
+                max_retries=_MAX_RETRIES,
+            )
+        return self._openrouter_client
+
+    # ----- §10.9 Step 3: slot-fill parameterizer -----
+
+    async def _fill_slots(
+        self, template: StrategyTemplate, objective: str,
+    ) -> dict[str, str]:
+        """Ask the model for SEMANTIC slot values for ``template``; return only the
+        validated subset. TOTAL by contract — any refusal / parse / validation
+        failure (or an empty template) yields ``{}``, degrading the plan to the
+        pure deterministic template. Never raises into ``plan()``.
+        """
+        slots = fillable_slots(template)
+        if not slots:
+            return {}
+        # Lazy import keeps the planner's import surface light + dodges any cycle.
+        from rogue.reproduce.instantiator import _SLOT_DEFAULTS  # noqa: PLC0415
+
+        try:
+            system, user = build_slot_fill_messages(template, objective, _SLOT_DEFAULTS)
+            raw = await self._raw_complete(
+                system, user, self.slot_fill_model, subject_id=template.source_tag,
+            )
+            if not raw:
+                return {}
+            text = raw.strip()
+            if text.startswith("```"):
+                text = text.strip("`")
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError as exc:
+                _log.warning(
+                    "slot-fill returned invalid JSON for %s: %s\nraw[:300]=%r",
+                    template.source_tag, exc, text[:300],
+                )
+                return {}
+            validated, dropped = validate_slot_values(payload, template)
+            if dropped:
+                _log.info(
+                    "slot-fill dropped %d/%d values for %s: %s",
+                    len(dropped), len(slots), template.source_tag, dropped,
+                )
+            _log.debug(
+                "slot-fill %s [%s]: filled %s",
+                template.source_tag, SLOT_FILL_VERSION, sorted(validated),
+            )
+            return validated
+        except Exception as exc:  # never let slot-fill break a run — degrade to template
+            _log.warning(
+                "slot-fill failed for %s (%s) — falling back to template defaults",
+                template.source_tag, exc,
+            )
+            return {}
+
+    async def _raw_complete(
+        self, system: str, user: str, model: str, *, subject_id: str,
+    ) -> str:
+        """One text completion via the right backbone for ``model``; returns the
+        raw response text ("" on API refusal). Cost is logged with module
+        ``slot_fill`` so planner vs parameterizer spend can be separated.
+        """
+        if model.startswith("claude") or model.startswith("anthropic/"):
+            from anthropic import APIStatusError, BadRequestError  # noqa: PLC0415
+
+            client = self._get_anthropic_client()
+            try:
+                response = await client.messages.create(
+                    model=model,
+                    max_tokens=_PLAN_MAX_TOKENS,
+                    temperature=0.9,
+                    system=system,
+                    messages=[{"role": "user", "content": user}],
+                )
+            except (BadRequestError, APIStatusError) as exc:
+                _log.warning("slot-fill refused by API for %s: %s", subject_id, exc)
+                return ""
+            parts = [
+                getattr(b, "text", "")
+                for b in (getattr(response, "content", []) or [])
+                if getattr(b, "type", None) == "text"
+            ]
+            raw = "".join(parts)
+            log_anthropic_response(
+                response, module="slot_fill", operation="fill", model=model,
+                subject_id=subject_id, refused=not raw.strip(),
+                notes=f"version={SLOT_FILL_VERSION}",
+            )
+            return raw
+
+        from openai import APIStatusError, BadRequestError  # noqa: PLC0415
+
+        client = self._get_openrouter_client()
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                max_tokens=_PLAN_MAX_TOKENS,
+                temperature=0.9,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+        except (BadRequestError, APIStatusError) as exc:
+            _log.warning("slot-fill (openrouter) refused by API for %s: %s", subject_id, exc)
+            return ""
+        choice = response.choices[0] if response.choices else None
+        raw = (getattr(getattr(choice, "message", None), "content", None) or "") if choice else ""
+        usage = getattr(response, "usage", None)
+        append_row(
+            module="slot_fill", operation="fill", model=model, subject_id=subject_id,
+            input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0,
+            output_tokens=int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0,
+            refused=not raw.strip(), notes=f"version={SLOT_FILL_VERSION}",
+        )
+        return raw
+
     async def _call_anthropic(
         self, primitive: AttackPrimitive, n_turns: int,
         arms_strategy: str | None = None, model: str | None = None,
     ) -> EscalationPlan | None:
         """Single planner call via Anthropic. Returns EscalationPlan or None."""
         from anthropic import APIStatusError, BadRequestError  # noqa: PLC0415
-        from anthropic import AsyncAnthropic  # noqa: PLC0415
 
         model = model or self.model
-        if self._anthropic_client is None:
-            self._anthropic_client = AsyncAnthropic()
+        client = self._get_anthropic_client()
 
         system_prompt, user_prompt = _build_planner_messages(
             primitive, n_turns, arms_strategy, strategies=self._strategies,
         )
         try:
-            response = await self._anthropic_client.messages.create(
+            response = await client.messages.create(
                 model=model,
                 max_tokens=_PLAN_MAX_TOKENS,
                 temperature=0.9,
@@ -633,22 +848,16 @@ class EscalationPlanner:
         will actually author escalation scripts — Claude refuses to. Same
         parse/validate path as the Anthropic backbone (`_parse_plan_payload`).
         """
-        import os  # noqa: PLC0415
-
-        from openai import APIStatusError, AsyncOpenAI, BadRequestError  # noqa: PLC0415
+        from openai import APIStatusError, BadRequestError  # noqa: PLC0415
 
         model = model or self.model
-        if self._openrouter_client is None:
-            self._openrouter_client = AsyncOpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=os.environ.get("OPENROUTER_API_KEY"),
-            )
+        client = self._get_openrouter_client()
 
         system_prompt, user_prompt = _build_planner_messages(
             primitive, n_turns, arms_strategy, strategies=self._strategies,
         )
         try:
-            response = await self._openrouter_client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model,
                 max_tokens=_PLAN_MAX_TOKENS,
                 temperature=0.9,

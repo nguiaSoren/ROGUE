@@ -5,9 +5,10 @@ The load-bearing open question after structured planning shipped: grammars *solv
 the planner-refusal bottleneck (validity 22%→100%), but do they *preserve attack
 effectiveness*? Templates are now the primary path, so this is a regression check.
 
-Runs the SAME escalation sweep two ways — Arm A: deterministic templates (default);
-Arm B: ``--no-templates`` (freeform model) — holding parents / quota / planner-model
-fixed, then compares the metrics from the ``ladder_attempts`` trace + the run logs:
+Runs the SAME escalation sweep three ways — Arm A: deterministic templates (default);
+Arm B: template + model SEMANTIC slot-fill (``--slot-fill``, §10.9 Step 3); Arm C:
+``--no-templates`` (freeform model) — holding parents / quota / planner-model fixed,
+then compares the metrics from the ``ladder_attempts`` trace + the run logs:
 
     validity_rate · breach_rate · orchestration_failures (refused/render_error) ·
     attempts · avg ladder depth · cost/run
@@ -54,10 +55,12 @@ def _db_url() -> str:
     return url
 
 
-async def _arm(*, no_templates: bool, run_id: str, limit: int, max_spend: float) -> None:
+async def _arm(
+    *, no_templates: bool, slot_fill: bool, run_id: str, limit: int, max_spend: float,
+) -> None:
     from scripts.reproduce_once import run_reproduction
 
-    label = "freeform" if no_templates else "templates"
+    label = "freeform" if no_templates else ("slotfill" if slot_fill else "templates")
     print(f"\n>>> grammar A/B arm: {label}  run_id={run_id}  "
           f"(limit={limit}, max-spend=${max_spend})", flush=True)
     await run_reproduction(
@@ -67,22 +70,73 @@ async def _arm(*, no_templates: bool, run_id: str, limit: int, max_spend: float)
         temperature=0.7,
         concurrency=5,
         escalate=True,
-        escalate_candidate_quota=1,  # force candidate evaluation in both arms
+        escalate_candidate_quota=1,  # force candidate evaluation in every arm
         escalate_no_templates=no_templates,
+        escalate_slot_fill=slot_fill,
         escalate_max_spend=max_spend,
         run_id=run_id,
     )
 
 
+def _run_arm_guarded(label: str, timeout_s: float, **arm_kwargs: object) -> bool:
+    """Run ONE arm with a hard wall-clock cap + total exception isolation.
+
+    Returns True on clean completion. A timeout, a provider hang, an arm-level
+    exception, or a Ctrl-C on this arm is logged and SWALLOWED so the sweep moves
+    on to the next arm and still reaches the final analysis. This is the lesson
+    from the 2026-06-03 run that hung ~8h on one un-timed-out request: no single
+    arm may be able to stall the whole experiment, and partial data must survive.
+    """
+    async def _capped() -> None:
+        await asyncio.wait_for(_arm(**arm_kwargs), timeout=timeout_s)  # type: ignore[arg-type]
+
+    try:
+        asyncio.run(_capped())
+        return True
+    except asyncio.TimeoutError:
+        logging.error("arm %s exceeded %.0fs wall-clock — aborting this arm, "
+                      "continuing to the next", label, timeout_s)
+    except KeyboardInterrupt:
+        logging.warning("arm %s interrupted (Ctrl-C) — continuing to analysis", label)
+    except Exception as exc:  # one arm's failure must not sink the run
+        logging.error("arm %s failed: %s — continuing to the next", label, exc)
+    return False
+
+
 def run(args: argparse.Namespace) -> None:
     stamp = f"grameff_{int(time.time())}"
-    # Templates arm first, then freeform — same parents (deterministic --limit selection).
-    asyncio.run(_arm(no_templates=False, run_id=f"{stamp}_tmpl",
-                     limit=args.limit, max_spend=args.max_spend))
-    asyncio.run(_arm(no_templates=True, run_id=f"{stamp}_free",
-                     limit=args.limit, max_spend=args.max_spend))
-    print(f"\n>>> both arms done. comparison (tag {stamp}):")
-    analyze(argparse.Namespace(tag=stamp))
+    # Three arms, same parents (deterministic --limit selection):
+    #   tmpl  — pure deterministic template (no model on the planner path)
+    #   slot  — template skeleton + model-filled SEMANTIC slots (§10.9 Step 3)
+    #   free  — freeform model authoring (no template)
+    # slot-fill is the middle tier: it should recover freeform's breach lift while
+    # keeping the template's validity / orchestration reliability.
+    arms: list[tuple[str, dict[str, object]]] = [
+        ("templates", dict(no_templates=False, slot_fill=False, run_id=f"{stamp}_tmpl")),
+    ]
+    if not args.skip_slot_fill:
+        arms.append(
+            ("slotfill", dict(no_templates=False, slot_fill=True, run_id=f"{stamp}_slot")),
+        )
+    arms.append(
+        ("freeform", dict(no_templates=True, slot_fill=False, run_id=f"{stamp}_free")),
+    )
+
+    completed: list[str] = []
+    try:
+        for label, kw in arms:
+            ok = _run_arm_guarded(
+                label, args.arm_timeout,
+                limit=args.limit, max_spend=args.max_spend, **kw,
+            )
+            if ok:
+                completed.append(label)
+    finally:
+        # ALWAYS analyze what landed — even on interrupt or per-arm failure, the
+        # paid attempts that did complete are reported instead of lost.
+        print(f"\n>>> arms attempted ({len(completed)}/{len(arms)} clean: "
+              f"{completed or 'none'}). comparison (tag {stamp}):")
+        analyze(argparse.Namespace(tag=stamp))
 
 
 # Per-arm aggregates from ladder_attempts. Tier-5 entities (base/candidate) are the
@@ -90,6 +144,7 @@ def run(args: argparse.Namespace) -> None:
 _METRICS_SQL = """
 WITH arm AS (
   SELECT CASE WHEN run_id LIKE '%_tmpl' THEN 'templates'
+              WHEN run_id LIKE '%_slot' THEN 'slotfill'
               WHEN run_id LIKE '%_free' THEN 'freeform' ELSE run_id END AS arm,
          *
   FROM ladder_attempts
@@ -138,9 +193,14 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    pr = sub.add_parser("run", help="run BOTH arms then analyze (SPENDS MONEY)")
+    pr = sub.add_parser("run", help="run ALL arms then analyze (SPENDS MONEY)")
     pr.add_argument("--limit", type=int, default=12)
     pr.add_argument("--max-spend", type=float, default=8.0)
+    pr.add_argument("--skip-slot-fill", action="store_true",
+                    help="run only templates + freeform (the original 2-arm A/B)")
+    pr.add_argument("--arm-timeout", type=float, default=3600.0,
+                    help="hard wall-clock cap per arm in seconds (default 3600=1h); "
+                         "a hung arm is aborted and the sweep continues")
     pr.set_defaults(func=run)
     pa = sub.add_parser("analyze", help="print the comparison from ladder_attempts (FREE)")
     pa.add_argument("--tag", default=None, help="restrict to one A/B (e.g. grameff_1733200000)")

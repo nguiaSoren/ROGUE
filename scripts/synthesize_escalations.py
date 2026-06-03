@@ -272,7 +272,10 @@ def _build_synthesized_primitive(
     ARMS visual multi-turn escalation. ``None`` ⇒ a text-only escalation.
     """
     primitive_id = ulid.new().str
-    slots = dict(parent.payload_slots or {})
+    # Precedence: parent slots < slot-fill (model-authored, §10.9 Step 3) — the
+    # parameterizer's objective-specific semantic values override the parent's
+    # generic ones, but at render time customer_slot_overrides still win over both.
+    slots = {**(parent.payload_slots or {}), **(plan.slot_values or {})}
     if image_strategy:
         slots["image_strategy"] = image_strategy
     # Don't put the parent's family into secondaries when it's already

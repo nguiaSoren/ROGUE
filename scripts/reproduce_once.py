@@ -631,6 +631,7 @@ async def run_reproduction(
     escalate_candidate_probe: bool = False,
     escalate_candidate_quota: int = 0,
     escalate_no_templates: bool = False,
+    escalate_slot_fill: bool = False,
     run_id: str = "adhoc",
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
@@ -941,6 +942,7 @@ async def run_reproduction(
                     planner = EscalationPlanner.from_env(
                         extra_strategies=load_strategy_library(session),
                         use_templates=not escalate_no_templates,
+                        slot_fill=escalate_slot_fill,
                         **(
                             {"model": escalate_planner_model}
                             if escalate_planner_model
@@ -1484,6 +1486,16 @@ def main(argv: list[str] | None = None) -> int:
             "default primary path."
         ),
     )
+    parser.add_argument(
+        "--slot-fill",
+        action="store_true",
+        help=(
+            "§10.9 Step 3 enable the slot-fill middle tier — the model fills a "
+            "matched template's SEMANTIC slot values (objective-specific) while the "
+            "turn skeleton stays fixed. Closes the template↔freeform breach gap; "
+            "degrades to the pure template on any failure. No-op without templates."
+        ),
+    )
     parser.add_argument("--run-id", default=None)
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
@@ -1537,6 +1549,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_candidate_probe=args.candidate_probe,
             escalate_candidate_quota=args.candidate_quota,
             escalate_no_templates=args.no_templates,
+            escalate_slot_fill=args.slot_fill,
             run_id=run_id,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
