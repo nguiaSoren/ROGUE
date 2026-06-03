@@ -246,6 +246,14 @@ _TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (
     httpx.RemoteProtocolError,
 )
 
+# Hard per-request network timeout + bounded retries for EVERY target provider
+# client. Added 2026-06-03 before a paid sweep: an un-timed-out OpenRouter request
+# stalled an earlier run ~8h. With a ceiling, a wedged target call raises a
+# (retryable) timeout instead of hanging the whole sweep. Mirrors the escalation
+# planner's hardening — the panel hits the same OpenAI-compat endpoints.
+_REQUEST_TIMEOUT_S = 90.0
+_MAX_RETRIES = 2
+
 
 def _is_retryable(exc: BaseException) -> bool:
     """Retry on (a) network transients, (b) provider RateLimitError, (c) 5xx/429
@@ -573,7 +581,10 @@ class TargetPanel:
 
         client = getattr(self, client_attr)
         if client is None:
-            client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+            client = AsyncOpenAI(
+                base_url=base_url, api_key=api_key,
+                timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES,
+            )
             setattr(self, client_attr, client)
 
         return await client.chat.completions.create(
@@ -749,7 +760,9 @@ class TargetPanel:
         from anthropic import AsyncAnthropic  # noqa: PLC0415
 
         if self._anthropic_client is None:
-            self._anthropic_client = AsyncAnthropic()
+            self._anthropic_client = AsyncAnthropic(
+                timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES,
+            )
 
         return await self._anthropic_client.messages.create(
             model=model,

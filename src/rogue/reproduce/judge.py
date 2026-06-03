@@ -194,6 +194,14 @@ class _JudgeResultRaw(BaseModel):
         return v
 
 
+# Hard per-request network timeout + bounded retries for every judge provider call.
+# Added 2026-06-03 before a paid sweep — a wedged judge call must fail fast (graded
+# as ERROR for that cell) rather than hang the sweep, as an un-timed-out OpenRouter
+# request did for ~8h. Mirrors the planner/panel hardening.
+_REQUEST_TIMEOUT_S = 90.0
+_MAX_RETRIES = 2
+
+
 class JudgeAgent:
     """LLM-driven safety judge: (RenderedAttack, response, primitive) -> JudgeResult.
 
@@ -473,7 +481,9 @@ class JudgeAgent:
         from anthropic import AsyncAnthropic
 
         if self._anthropic_client is None:
-            self._anthropic_client = AsyncAnthropic()
+            self._anthropic_client = AsyncAnthropic(
+                timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES,
+            )
 
         response = await self._anthropic_client.messages.create(
             **self.anthropic_grade_kwargs(user_message)
@@ -528,6 +538,8 @@ class JudgeAgent:
             self._openrouter_client = AsyncOpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=os.environ.get("OPENROUTER_API_KEY"),
+                timeout=_REQUEST_TIMEOUT_S,
+                max_retries=_MAX_RETRIES,
             )
 
         completion = await self._openrouter_client.chat.completions.create(
@@ -568,7 +580,9 @@ class JudgeAgent:
         from openai import AsyncOpenAI
 
         if self._openai_client is None:
-            self._openai_client = AsyncOpenAI()
+            self._openai_client = AsyncOpenAI(
+                timeout=_REQUEST_TIMEOUT_S, max_retries=_MAX_RETRIES,
+            )
 
         bare_model = self.model.split("/", 1)[1]
 
