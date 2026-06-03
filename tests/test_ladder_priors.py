@@ -27,6 +27,7 @@ from rogue.reproduce.ladder_priors import (
     FRESHNESS_TAU_DAYS,
     FRESHNESS_WEIGHT,
     BreachStat,
+    ContextStat,
     StrategyValue,
     ladder_order_mode,
     order_by_prior,
@@ -163,6 +164,15 @@ def test_value_score_demotes_high_breach_low_validity():
     breaks_but_blocked = StrategyValue("a", breaches=9, valid_trials=10, attempts_total=100)  # 0.83 breach, 0.10 validity
     reliable = StrategyValue("b", breaches=4, valid_trials=10, attempts_total=11)  # 0.42 breach, 0.85 validity
     assert reliable.value_score(NOW) > breaks_but_blocked.value_score(NOW)
+
+
+def test_context_stat_breach_rate_is_laplace_smoothed():
+    # (target_model × family) contextual prior — same Laplace family as the others.
+    # The `contextual_breach_rates` join is validated against live breach_results.
+    c = ContextStat("mistralai/mistral-small-2603", "training_data_extraction", 70, 75)
+    assert c.breach_rate == pytest.approx((70 + ALPHA) / (75 + ALPHA + BETA))
+    unseen = ContextStat("anthropic/claude-opus-4-8", "dan_persona", 0, 0)
+    assert unseen.breach_rate == 0.5  # cold-start prior, consistent with the rest
 
 
 def test_order_by_value_demotes_proven_unviable_keeps_unseen_eager():

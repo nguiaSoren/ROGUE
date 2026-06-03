@@ -56,9 +56,11 @@ __all__ = [
     "BreachStat",
     "StrategyValue",
     "ReachStat",
+    "ContextStat",
     "strategy_breach_rates",
     "strategy_values",
     "strategy_reachability",
+    "contextual_breach_rates",
     "order_by_prior",
     "order_by_value",
     "ladder_order_mode",
@@ -350,6 +352,76 @@ class ReachStat:
         """Fraction of eligible appearances lost specifically to early-stop — the
         rich-get-richer / reorder-loser signal (distinct from budget cutoff)."""
         return self.early_stopped / self.eligible if self.eligible else 0.0
+
+
+@dataclass(frozen=True)
+class ContextStat:
+    """§10.10 — a CONTEXTUAL (target_model × attack_family) breach prior, sourced from
+    the full ``breach_results`` matrix (not the short-circuiting ladder, which can't
+    give per-model rates). This is the spec's warm-prior and the "per-model technique-
+    effectiveness map": e.g. encoding-family attacks breach Mistral far more than
+    Claude. Globally-greedy ordering can't see this; a contextual scheduler can.
+
+    Keyed by (target_model × family) because that's the dimension ``breach_results``
+    covers at full sample — per-(strategy × model) for the ladder's transform tiers is
+    NOT cleanly measurable (the ladder stops at the first breaching model and renderer
+    variants don't persist), so it'd need probe telemetry, not this table.
+    """
+
+    target_model: str
+    family: str
+    breaches: int
+    trials: int
+
+    @property
+    def breach_rate(self) -> float:
+        return (self.breaches + ALPHA) / (self.trials + ALPHA + BETA)
+
+
+def contextual_breach_rates(
+    session: "Session", *, target_model: str | None = None,
+) -> dict[tuple[str, str], "ContextStat"]:
+    """Per-(target_model × attack_family) breach rate over the ``breach_results``
+    matrix — the contextual prior + effectiveness map. ``target_model`` optionally
+    scopes to one model. Breach = verdict ∈ {partial_breach, full_breach}.
+    """
+    from sqlalchemy import case, func
+
+    from rogue.db.models import AttackPrimitive, BreachResult, DeploymentConfig
+    from rogue.schemas import JudgeVerdict
+
+    breached = BreachResult.verdict.in_(
+        [JudgeVerdict.PARTIAL_BREACH, JudgeVerdict.FULL_BREACH]
+    )
+    q = (
+        session.query(
+            DeploymentConfig.target_model.label("model"),
+            AttackPrimitive.family.label("family"),
+            func.count().label("trials"),
+            func.sum(case((breached, 1), else_=0)).label("breaches"),
+        )
+        .join(
+            DeploymentConfig,
+            DeploymentConfig.config_id == BreachResult.deployment_config_id,
+        )
+        .join(
+            AttackPrimitive,
+            AttackPrimitive.primitive_id == BreachResult.primitive_id,
+        )
+        .group_by(DeploymentConfig.target_model, AttackPrimitive.family)
+    )
+    if target_model is not None:
+        q = q.filter(DeploymentConfig.target_model == target_model)
+    out: dict[tuple[str, str], ContextStat] = {}
+    for row in q.all():
+        fam = getattr(row.family, "value", None) or str(row.family)
+        out[(row.model, fam)] = ContextStat(
+            target_model=row.model,
+            family=fam,
+            breaches=int(row.breaches or 0),
+            trials=int(row.trials or 0),
+        )
+    return out
 
 
 def strategy_reachability(

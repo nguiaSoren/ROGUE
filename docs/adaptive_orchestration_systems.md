@@ -68,8 +68,16 @@ in the instrumentation required to do so honestly.
   hides viability (a strategy that breaks hard but rarely *runs*).
 - **Allocation quality is the real frontier.** Hence the scheduler reframe from "what
   breaches most?" to "what is worth evaluation budget right now?" (EV = effectiveness ×
-  viability × freshness × exploration). Open: **reachability** (available-but-skipped) is
-  not yet measurable without logging rotation-membership.
+  viability × freshness × exploration). Then **reachability** ("what could have run but
+  didn't") — logged as of migration 0019 — turns "outcomes" telemetry into "opportunities"
+  telemetry, the precondition for honest allocation analysis.
+- **Per-model technique-effectiveness map (contextual signal).** From 9,192 `breach_results`
+  rows: per-model breach rates span **1.4% (Claude Opus) → 48.6% (Mistral Small)**, and the
+  `(model × family)` matrix is sharp — e.g. `mistral × training_data_extraction = 0.92`,
+  `gemini × training_data_extraction = 0.81`, vs the aligned models far lower. This is both
+  the bandit's warm-prior and a standalone threat-intel artifact. *Methodological caveat for
+  the paper:* per-`(strategy × model)` is NOT measurable from the short-circuiting ladder —
+  a genuine instrumentation limit worth stating, not hiding.
 
 ## Figures to draw (TODO)
 
