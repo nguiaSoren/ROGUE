@@ -26,7 +26,16 @@ Extracted from ROGUE_PLAN.md §5. The list is built so that 5+ can break complet
 
 ## Per-source SERP discovery queries
 
-Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool 45 (39 original + 6 multimodal arms added 2026-06-03 per the §1b finding); DiscoveryAgent picks ~10 per daily run based on recent yield.
+Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool 52 (39 original + 6 multimodal arms 2026-06-03 §1b + 7 source-expansion arms 2026-06-04); DiscoveryAgent picks ~10 per daily run based on recent yield.
+
+**Source expansion (2026-06-04, startup-track / post-deadline)** — new sources complementing arXiv at different pipeline stages; Web Unlocker fetches all as HTML, the yield-per-dollar bandit cold-starts them. (Discord/BASI deferred — needs Scraping-Browser + auth.)
+- `site:openreview.net "jailbreak" OR "prompt injection" after:{date}` *(OpenReview — ICLR/NeurIPS/ACL submissions + review threads, often months pre-arXiv; reviewer threads carry attack constructions the camera-ready strips)*
+- `site:openreview.net "adversarial" ("language model" OR "LLM") after:{date}`
+- `site:aclanthology.org (jailbreak OR "prompt injection" OR "adversarial attack") ("LLM" OR "language model")` *(ACL Anthology — peer-reviewed NLP-security; un-dated backfill, bandit deprioritizes once deduped)*
+- `site:github.com/NVIDIA/garak probes (jailbreak OR injection OR encoding OR dan)` *(garak — NVIDIA red-team framework; probe files = structured attack primitives)*
+- `site:huggingface.co/datasets (jailbreak OR "red team" OR adversarial OR "prompt injection")` *(HF datasets — published attack corpora, AdvBench / JailbreakBench style)*
+- `site:github.com/advisories ("prompt injection" OR "LLM" OR "AI agent" OR "model context protocol") after:{date}` *(GitHub Advisory DB — OWASP/MITRE-aligned deployment-config / tool-surface CVEs)*
+- `site:huntr.com ("prompt injection" OR "LLM" OR jailbreak OR "AI agent")` *(Protect AI huntr — disclosed prompt-injection / agent-exfiltration issues against real LLM products)*
 
 **#1 r/ChatGPTJailbreak**
 - `site:reddit.com/r/ChatGPTJailbreak after:{date}`

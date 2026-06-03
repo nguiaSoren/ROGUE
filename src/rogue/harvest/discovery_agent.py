@@ -244,6 +244,36 @@ def default_bandit_arms() -> list:
         'site:arxiv.org audio jailbreak "language model" after:{date}'))
     pool.append(QueryArm("github_multimodal_jb",
         'site:github.com (multimodal OR VLM OR "vision-language") jailbreak updated:>{date}'))
+    # Source expansion (added 2026-06-04, startup-track / post-deadline). New SOURCES
+    # complementing arXiv at different pipeline stages / yield profiles:
+    #   OpenReview — ICLR/NeurIPS/ACL submissions + REVIEW THREADS, often months
+    #     pre-arXiv; reviewer threads carry concrete attack constructions the camera-
+    #     ready strips out (with after:{date} for the rolling review cycle).
+    #   ACL Anthology — peer-reviewed NLP-security papers that sometimes never reach
+    #     arXiv (un-dated = one-time backfill; the bandit deprioritizes once deduped).
+    #   garak probes — NVIDIA's red-team framework's probe files = structured attack
+    #     primitives, ideal for the extraction LLM (we tracked the X account, not the repo).
+    #   HF datasets — published attack corpora (AdvBench / JailbreakBench style), a
+    #     different route than the model-card discussions Source #9 already hits.
+    #   CVE/advisory feeds (GitHub Advisory DB + Protect AI huntr) — prompt-injection /
+    #     agent-tool-exfiltration issues filed against real LLM products → OWASP/MITRE-
+    #     aligned deployment-config attacks that pure-prompt sources miss.
+    # (Discord/BASI deferred — needs Scraping-Browser + auth.) Web Unlocker fetches all
+    # as HTML; the bandit cold-starts them and reallocates by novel-per-dollar yield.
+    pool.append(QueryArm("openreview_jailbreak",
+        'site:openreview.net "jailbreak" OR "prompt injection" after:{date}'))
+    pool.append(QueryArm("openreview_adversarial_llm",
+        'site:openreview.net "adversarial" ("language model" OR "LLM") after:{date}'))
+    pool.append(QueryArm("acl_anthology_security",
+        'site:aclanthology.org (jailbreak OR "prompt injection" OR "adversarial attack") ("LLM" OR "language model")'))
+    pool.append(QueryArm("garak_probes",
+        'site:github.com/NVIDIA/garak probes (jailbreak OR injection OR encoding OR dan)'))
+    pool.append(QueryArm("hf_datasets_redteam",
+        'site:huggingface.co/datasets (jailbreak OR "red team" OR adversarial OR "prompt injection")'))
+    pool.append(QueryArm("github_advisory_llm",
+        'site:github.com/advisories ("prompt injection" OR "LLM" OR "AI agent" OR "model context protocol") after:{date}'))
+    pool.append(QueryArm("huntr_llm_disclosures",
+        'site:huntr.com ("prompt injection" OR "LLM" OR jailbreak OR "AI agent")'))
     return pool
 
 
