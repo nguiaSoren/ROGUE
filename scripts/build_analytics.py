@@ -35,13 +35,21 @@ BREACH = "('full_breach','partial_breach')"
 _ARX = re.compile(r"arxiv\.org/(?:abs|pdf|html)/(\d{2})(\d{2})\.", re.I)
 
 
+_DOMAIN_LABEL = {  # friendly names for the raw hosts people wouldn't recognise
+    "githubusercontent": "github",
+    "embracethered": "embracethered.com (blog)",
+}
+
+
 def _domain(url: str) -> str:
     if not url:
         return "unknown"
-    if "arxiv" in url:
+    # doi.org/10.48550/arXiv.* IS arXiv (linked via DOI) — merge, don't show "doi".
+    if "arxiv" in url.lower() or "10.48550" in url:
         return "arxiv"
     m = re.search(r"https?://(?:www\.)?([^/]+)", url)
-    return (m.group(1).split(".")[-2] if m and "." in m.group(1) else (m.group(1) if m else "unknown"))
+    host = (m.group(1).split(".")[-2] if m and "." in m.group(1) else (m.group(1) if m else "unknown"))
+    return _DOMAIN_LABEL.get(host, host)
 
 
 def capability(c) -> dict:
@@ -145,6 +153,47 @@ def allocation(c) -> dict:
     }
 
 
+def research_metrics(c) -> dict:
+    """Derived from ladder_rotation_membership — the §10.10 research dataset:
+    opportunity cost, early-stop bias, exploration efficiency, scheduler quality."""
+    n = c.execute(text("SELECT count(*) FROM ladder_rotation_membership")).scalar()
+    if not n:
+        return {"note": "no ladder_rotation_membership rows yet"}
+    # opportunity cost: eligible strategies starved by early-stop = shots never taken.
+    starved = c.execute(text("""SELECT count(*) FROM ladder_rotation_membership
+        WHERE eligible AND NOT executed AND skipped_reason='early_stop'""")).scalar()
+    elig = c.execute(text("SELECT count(*) FROM ladder_rotation_membership WHERE eligible")).scalar()
+    # early-stop bias: fraction of LADDERS that stopped with eligible work still unrun.
+    early_stop_bias = c.execute(text("""
+        WITH per_ladder AS (
+          SELECT run_id, parent_id,
+                 bool_or(eligible AND NOT executed AND skipped_reason='early_stop') AS starved
+          FROM ladder_rotation_membership GROUP BY run_id, parent_id)
+        SELECT avg(starved::int)::float FROM per_ladder""")).scalar()
+    # exploration efficiency: distinct strategies ever executed ÷ distinct ever eligible
+    # (coverage of the strategy space — low means the ladder keeps re-trying the same few).
+    exec_d = c.execute(text("SELECT count(DISTINCT strategy_id) FROM ladder_rotation_membership WHERE executed")).scalar()
+    elig_d = c.execute(text("SELECT count(DISTINCT strategy_id) FROM ladder_rotation_membership WHERE eligible")).scalar()
+    # scheduler allocation quality: do winners land EARLY? 1 = winner always first in its
+    # rotation, 0 = always last. Averaged over ladders that breached (rotation size>1).
+    quality = c.execute(text("""
+        WITH w AS (
+          SELECT run_id, parent_id,
+                 min(rank) FILTER (WHERE outcome='breach') AS wrank, max(rank) AS maxrank
+          FROM ladder_rotation_membership GROUP BY run_id, parent_id
+          HAVING count(*) FILTER (WHERE outcome='breach')>0 AND max(rank)>1)
+        SELECT avg(1 - (wrank-1.0)/(maxrank-1))::float FROM w""")).scalar()
+    return {
+        "opportunity_cost_starved_shots": int(starved),
+        "opportunity_cost_pct_of_eligible": round(starved / elig, 3) if elig else None,
+        "early_stop_bias": round(float(early_stop_bias), 3) if early_stop_bias is not None else None,
+        "exploration_efficiency": round(exec_d / elig_d, 3) if elig_d else None,
+        "scheduler_allocation_quality": round(float(quality), 3) if quality is not None else None,
+        "_note": "starved/quality are aggregates over ALL runs (mostly canonical mode); "
+                 "growth-mode runs drive starvation→~0 (see §10.10). Slice by run for fairness.",
+    }
+
+
 def cost(c, grad: int) -> dict:
     spend = c.execute(text("SELECT coalesce(sum(cost_usd),0) FROM breach_results")).scalar()
     breaches = c.execute(text(f"SELECT count(*) FROM breach_results WHERE verdict IN {BREACH}")).scalar()
@@ -165,13 +214,15 @@ def main() -> int:
             "discovery": discovery(c),
             "contextual": contextual(c),
             "allocation": allocation(c),
+            "research": research_metrics(c),
             "cost": cost(c, cap["graduated"]),
         }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(rep, indent=2, default=str))
 
     # ---- readable summary ----
-    cap, disc, ctx, alloc, cst = (rep[k] for k in ("capability", "discovery", "contextual", "allocation", "cost"))
+    cap, disc, ctx, alloc, res, cst = (rep[k] for k in
+                                       ("capability", "discovery", "contextual", "allocation", "research", "cost"))
     print("\n" + "=" * 70 + "\nROGUE ANALYTICS\n" + "=" * 70)
     print(f"\nCAPABILITY  strategies={cap['strategies_total']}  graduated={cap['graduated']} "
           f"({100*(cap['graduation_rate'] or 0):.0f}%)  validity={cap['validity_rate']}  "
@@ -188,6 +239,11 @@ def main() -> int:
     print(f"  biggest family×model spreads: {ctx['biggest_spreads']}")
     print(f"\nALLOCATION  reachability={alloc.get('reachability')}  starvation={alloc.get('starvation_rate')}  "
           f"avg_rank_of_winner={alloc.get('avg_rank_of_winner')}  avg_depth={alloc.get('avg_ladder_depth')}")
+    print(f"\nRESEARCH  opportunity_cost={res.get('opportunity_cost_starved_shots')} starved shots "
+          f"({100*(res.get('opportunity_cost_pct_of_eligible') or 0):.0f}% of eligible)  "
+          f"early_stop_bias={res.get('early_stop_bias')}")
+    print(f"  exploration_efficiency={res.get('exploration_efficiency')}  "
+          f"scheduler_allocation_quality={res.get('scheduler_allocation_quality')}")
     print(f"\nCOST  total=${cst['total_breach_spend_usd']}  per_breach=${cst['cost_per_breach_usd']}  "
           f"per_graduation=${cst['cost_per_graduation_usd']}")
     print(f"\nwrote {OUT.relative_to(_ROOT)}")
