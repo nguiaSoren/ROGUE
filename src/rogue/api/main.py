@@ -488,7 +488,7 @@ def attack_image(
 
 
 def _matrix_worst_rows(db: Session, *, date: Any = None, baseline_only: bool = False) -> list[Any]:
-    """Worst-case (primitive × config) breach rows aggregated from raw trials.
+    """Worst-offending primitive per (family × config) cell, from raw trials.
 
     The grid takes MAX(any_breach_rate) over techniques per cell. Two optional
     filters drive the SCOPE × ATTACKER 2×2:
@@ -498,6 +498,14 @@ def _matrix_worst_rows(db: Session, *, date: Any = None, baseline_only: bool = F
     * ``baseline_only`` → ATTACKER=baseline (only raw single-shot trials: no
       persona-wrap, no PAIR). ``False`` → ATTACKER=augmented (all techniques,
       worst kept = baseline / persona / PAIR).
+
+    Returns exactly ONE row per (family × config) — the single worst-offending
+    primitive in that cell, which is all the grid renders. (The full per-primitive
+    list is served separately by ``/api/breaches/cell`` when the user opens
+    "see all breaching primitives in this cell".) Collapsing here keeps the
+    all-time payload ~20× smaller (≈1745 → ≈90 rows) so the heavy quadrant fetch
+    finishes well under the client timeout instead of aborting and silently
+    falling back to the this-run grid.
     """
     filters: list[str] = []
     params: dict[str, Any] = {}
@@ -540,19 +548,27 @@ def _matrix_worst_rows(db: Session, *, date: Any = None, baseline_only: bool = F
                     primitive_id, deployment_config_id, n_judged, any_rate, full_rate, avg_conf
                 FROM ranked
                 ORDER BY primitive_id, deployment_config_id, any_rate DESC
+            ),
+            joined AS (
+                SELECT
+                    w.primitive_id,
+                    w.deployment_config_id,
+                    w.n_judged AS n_trials,
+                    w.any_rate AS any_breach_rate,
+                    w.full_rate AS full_breach_rate,
+                    w.avg_conf AS avg_confidence,
+                    ap.title, ap.family, ap.vector,
+                    dc.name AS config_name, dc.target_model
+                FROM worst w
+                JOIN attack_primitives ap ON ap.primitive_id = w.primitive_id
+                JOIN deployment_configs dc ON dc.config_id = w.deployment_config_id
             )
-            SELECT
-                w.primitive_id,
-                w.deployment_config_id,
-                w.n_judged AS n_trials,
-                w.any_rate AS any_breach_rate,
-                w.full_rate AS full_breach_rate,
-                w.avg_conf AS avg_confidence,
-                ap.title, ap.family, ap.vector,
-                dc.name AS config_name, dc.target_model
-            FROM worst w
-            JOIN attack_primitives ap ON ap.primitive_id = w.primitive_id
-            JOIN deployment_configs dc ON dc.config_id = w.deployment_config_id
+            -- Collapse each (family × config) cell to its single worst-offending
+            -- primitive — the only row the grid renders. Same tie-break the
+            -- frontend uses: highest any-breach, then full-breach.
+            SELECT DISTINCT ON (family, deployment_config_id) *
+            FROM joined
+            ORDER BY family, deployment_config_id, any_breach_rate DESC, full_breach_rate DESC
             """
         ),
         params,
@@ -575,7 +591,7 @@ def breach_matrix(
     * ``thisrun_augmented`` → this-run × augmented. That day's worst-case per cell
       across baseline / persona / PAIR.
     * ``alltime_baseline`` → all-time × baseline. Every run day's raw single-shot
-      breaches merged, worst kept per (primitive × config) — no augmentation mixed in.
+      breaches merged, worst kept per (family × config) — no augmentation mixed in.
     * ``augmented`` → all-time × augmented. The highest breach rate any technique
       reached, all days merged. "How bad it gets once the attacker adapts."
 
