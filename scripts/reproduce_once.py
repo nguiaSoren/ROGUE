@@ -944,27 +944,35 @@ async def run_reproduction(
                 from rogue.reproduce.ladder_priors import (  # noqa: PLC0415
                     ladder_order_mode,
                     order_by_prior,
+                    order_by_value,
                     strategy_breach_rates,
+                    strategy_values,
                 )
 
                 _ladder_mode = ladder_order_mode()
-                _ladder_rates = strategy_breach_rates(session)
-                image_renderers_tier = order_by_prior(
-                    image_renderers_tier, _ladder_rates,
-                    mode=_ladder_mode, label_prefix="image:",
-                )
-                coj_tier = order_by_prior(
-                    COJ_OPERATIONS, _ladder_rates,
-                    mode=_ladder_mode, label_prefix="coj:",
-                )
-                structured_tier = order_by_prior(
-                    DEFAULT_STRUCTURED_FORMATS, _ladder_rates,
-                    mode=_ladder_mode, label_prefix="structured:",
-                )
-                audio_styles_tier = order_by_prior(
-                    audio_styles_tier, _ladder_rates,
-                    mode=_ladder_mode, label_prefix="audio:",
-                )
+                # canonical/discovery/fixed score by breach rate; viability (§10.10
+                # Phase 2) scores by the EV heuristic (effectiveness × validity ×
+                # freshness × exploration) — "what's worth budget?", not "what
+                # breaches most?". One stats read per sweep, then a per-tier reorder.
+                if _ladder_mode == "viability":
+                    _vals = strategy_values(session)
+
+                    def _reorder(els, prefix):
+                        return order_by_value(
+                            els, _vals, now=escalation_now, label_prefix=prefix,
+                        )
+                else:
+                    _rates = strategy_breach_rates(session)
+
+                    def _reorder(els, prefix):
+                        return order_by_prior(
+                            els, _rates, mode=_ladder_mode, label_prefix=prefix,
+                        )
+
+                image_renderers_tier = _reorder(image_renderers_tier, "image:")
+                coj_tier = _reorder(COJ_OPERATIONS, "coj:")
+                structured_tier = _reorder(DEFAULT_STRUCTURED_FORMATS, "structured:")
+                audio_styles_tier = _reorder(audio_styles_tier, "audio:")
                 logger.info(
                     "§10.10 ladder reorder [mode=%s]: image=%s coj=%s "
                     "structured=%s audio=%s",

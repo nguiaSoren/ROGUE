@@ -17,17 +17,22 @@ from __future__ import annotations
 import math
 import os
 import socket
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from rogue.reproduce.ladder_priors import (
     ALPHA,
     BETA,
+    FRESHNESS_TAU_DAYS,
+    FRESHNESS_WEIGHT,
     BreachStat,
+    StrategyValue,
     ladder_order_mode,
     order_by_prior,
+    order_by_value,
     strategy_breach_rates,
+    strategy_values,
 )
 
 DEFAULT_TEST_DB = "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue_test"
@@ -121,6 +126,61 @@ def test_discovery_front_loads_the_unseen():
     assert out.index("ocr:white_on_white") == len(out) - 1  # loser still last
 
 
+def test_viability_is_a_valid_mode(monkeypatch):
+    monkeypatch.setenv("ROGUE_LADDER_ORDER", "viability")
+    assert ladder_order_mode() == "viability"
+
+
+# --------------------------------------------------------------------------- #
+# §10.10 Phase 2 — StrategyValue + the expected-value (viability) score
+# --------------------------------------------------------------------------- #
+
+
+def test_validity_rate_separates_viable_from_blocked():
+    # Same breaches, but one strategy is mostly refused/render-errored.
+    viable = StrategyValue("a", breaches=4, valid_trials=8, attempts_total=10)
+    blocked = StrategyValue("b", breaches=4, valid_trials=4, attempts_total=20)
+    assert viable.validity_rate == pytest.approx((8 + ALPHA) / (10 + ALPHA + BETA))
+    assert blocked.validity_rate < viable.validity_rate  # 16 orch-failures drag it down
+
+
+def test_freshness_bonus_rises_with_staleness():
+    fresh = StrategyValue("x", 1, 1, 1, last_tried_at=NOW)
+    stale = StrategyValue("x", 1, 1, 1, last_tried_at=NOW - timedelta(days=FRESHNESS_TAU_DAYS * 2))
+    unseen = StrategyValue("x", 0, 0, 0, last_tried_at=None)
+    assert fresh.freshness_bonus(NOW) == pytest.approx(1.0)
+    assert stale.freshness_bonus(NOW) == pytest.approx(1.0 + FRESHNESS_WEIGHT)  # capped
+    assert unseen.freshness_bonus(NOW) == pytest.approx(1.0 + FRESHNESS_WEIGHT)  # max boost
+
+
+def test_exploration_bonus_decays_with_evidence():
+    assert StrategyValue("x", 0, 0, 0).exploration_bonus > StrategyValue("x", 50, 100, 100).exploration_bonus
+
+
+def test_value_score_demotes_high_breach_low_validity():
+    # THE viability insight: a strategy that breaks hard but almost never runs
+    # (planner refuses it) scores BELOW a moderate strategy that reliably runs.
+    breaks_but_blocked = StrategyValue("a", breaches=9, valid_trials=10, attempts_total=100)  # 0.83 breach, 0.10 validity
+    reliable = StrategyValue("b", breaches=4, valid_trials=10, attempts_total=11)  # 0.42 breach, 0.85 validity
+    assert reliable.value_score(NOW) > breaks_but_blocked.value_score(NOW)
+
+
+def test_order_by_value_demotes_proven_unviable_keeps_unseen_eager():
+    values = {
+        # high breach, terrible validity — should sink despite breaching.
+        "image:mml:wr": StrategyValue("image:mml:wr", 9, 10, 100, last_tried_at=NOW),
+        # moderate breach, high validity, fresh — should win.
+        "image:typographic": StrategyValue("image:typographic", 4, 10, 11, last_tried_at=NOW),
+    }
+    # ocr is unseen (absent) → fair 0.5/0.5 prior + full bonuses → tried eagerly.
+    out = order_by_value(
+        ("mml:wr", "typographic", "ocr:white_on_white"),
+        values, now=NOW, label_prefix="image:",
+    )
+    assert out.index("typographic") < out.index("mml:wr")  # viable beats blocked
+    assert out.index("ocr:white_on_white") < out.index("mml:wr")  # unseen beats blocked
+
+
 # --------------------------------------------------------------------------- #
 # strategy_breach_rates — DB aggregation (skips cleanly without Postgres)
 # --------------------------------------------------------------------------- #
@@ -185,3 +245,21 @@ def test_strategy_breach_rates_counts_valid_trials_only(db_session):
     assert stat.breaches == 2
     assert stat.trials == 3  # refused excluded from valid trials
     assert stat.smoothed_rate == pytest.approx((2 + ALPHA) / (3 + ALPHA + BETA))
+
+
+def test_strategy_values_surfaces_attempts_and_freshness(db_session):
+    # 1 breach, 1 no_breach (valid) + 2 refused (orch failures, counted in attempts).
+    _attempt(db_session, label="coj:delete_then_insert", outcome="breach", breached=True)
+    _attempt(db_session, label="coj:delete_then_insert", outcome="no_breach", breached=False)
+    _attempt(db_session, label="coj:delete_then_insert", outcome="refused", breached=False)
+    _attempt(db_session, label="coj:delete_then_insert", outcome="render_error", breached=False)
+    db_session.commit()
+
+    vals = strategy_values(db_session)
+    sv = vals["coj:delete_then_insert"]
+    assert sv.breaches == 1
+    assert sv.valid_trials == 2          # breach + no_breach
+    assert sv.attempts_total == 4        # incl. the 2 orchestration failures
+    assert sv.last_tried_at is not None  # max(created_at) surfaced for freshness
+    # validity_rate reflects the orchestration drag (2 valid of 4 attempts, smoothed).
+    assert sv.validity_rate == pytest.approx((2 + ALPHA) / (4 + ALPHA + BETA))
