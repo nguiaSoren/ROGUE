@@ -997,8 +997,16 @@ def main(argv: list[str] | None = None) -> int:
     # can change, so the 3b-v2 trigger time series builds itself (no cron).
     # Best-effort: a tracking failure must never fail a successful harvest.
     try:
+        import sys as _sys
         from datetime import datetime, timezone
+        from pathlib import Path as _Path
 
+        # When run as `python scripts/harvest_once.py`, sys.path[0] is scripts/,
+        # not the repo root — so `from scripts.track_backlog` fails. Put the repo
+        # root on the path so the namespace import resolves.
+        _root = str(_Path(__file__).resolve().parent.parent)
+        if _root not in _sys.path:
+            _sys.path.insert(0, _root)
         from scripts.track_backlog import snapshot
         c = snapshot(args.database_url, run_id=run_id,
                      ts=datetime.now(timezone.utc).isoformat())

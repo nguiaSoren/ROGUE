@@ -56,6 +56,9 @@ MAPPINGS = [
      "audio", "wav", "acoustic best-of-N (vary acoustic properties) → styled audio renderer"),
     ("01KT6YRC6VXH75Q0WY49VDWP5C", "styled_audio", f"{_R}.audio_styles:render_styled_audio",
      "audio", "wav", "multilingual/multi-accent audio → styled audio renderer (accent variation)"),
+    # added from the 120d harvest (campaign120d, 2026-06-04)
+    ("01KT7BFHFNNH2WNCRF1YQH06HS", "vpi_overlay", f"{_R}.vpi:render_vpi_overlay",
+     "image", "png", "image-based prompt injection (text in natural image) → vpi overlay renderer"),
 ]
 
 
