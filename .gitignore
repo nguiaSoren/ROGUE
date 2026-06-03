@@ -115,3 +115,4 @@ scripts/_*
 # Local-only research/working docs (WIP; not for the public repo)
 docs/adaptive_orchestration_systems.md
 docs/scheduler_allocation_study.md
+docs/adaptive_orchestration_paper.md
