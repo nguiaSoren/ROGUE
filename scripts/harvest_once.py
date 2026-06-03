@@ -385,6 +385,7 @@ async def run_harvest(
     x_handles: list[str] | None = None,
     x_only: bool = False,
     multimodal_only: bool = False,
+    harvest_run_id: str | None = None,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
 
@@ -690,7 +691,12 @@ async def run_harvest(
                 # needs_implementation). Isolated per-doc like the primitive path.
                 if isinstance(result, TechniqueSpec):
                     try:
-                        persist_technique(session, result)
+                        from rogue.harvest.source_date import derive_source_date
+                        _src_date, _ = derive_source_date(raw_doc)
+                        persist_technique(
+                            session, result,
+                            source_date=_src_date, harvest_run_id=harvest_run_id,
+                        )
                         session.commit()
                         stats.techniques_harvested += 1
                         logger.info(
@@ -970,6 +976,7 @@ def main(argv: list[str] | None = None) -> int:
             x_handles=x_handles,
             x_only=args.x_only,
             multimodal_only=args.multimodal_only,
+            harvest_run_id=run_id,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

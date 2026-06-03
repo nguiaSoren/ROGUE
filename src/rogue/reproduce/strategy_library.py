@@ -30,6 +30,8 @@ from rogue.schemas import (
 )
 
 if TYPE_CHECKING:  # avoid a hard import cycle at module load
+    from datetime import datetime
+
     from sqlalchemy.orm import Session
 
 __all__ = [
@@ -183,6 +185,8 @@ def persist_technique(
     spec: TechniqueSpec,
     *,
     synthesize_directive: bool = True,
+    source_date: "datetime | None" = None,
+    harvest_run_id: str | None = None,
 ):
     """Insert a harvested `TechniqueSpec` as an ``attack_strategies`` row.
 
@@ -191,6 +195,12 @@ def persist_technique(
     (§10.9 Phase 3a). Image/audio techniques are stored as-is (``status`` already
     ``needs_implementation`` from extraction) with no directive — their renderer is
     Phase 3b work. Returns the persisted ORM row.
+
+    ``source_date`` (when the attack was first disclosed, from
+    ``harvest.source_date.derive_source_date``) populates ``claimed_first_seen``
+    when the extractor didn't supply one; ``harvest_run_id`` records the
+    discovering run (migration 0020) — both power campaign telemetry (discovery
+    rate, backlog growth, time-to-graduation/implementation).
     """
     from rogue.db.models import AttackStrategy
 
@@ -209,7 +219,8 @@ def persist_technique(
         directive=directive,
         source_url=spec.source_url,
         status=spec.status,
-        claimed_first_seen=spec.claimed_first_seen,
+        claimed_first_seen=spec.claimed_first_seen or source_date,
+        harvest_run_id=harvest_run_id,
     )
     session.add(row)
     return row

@@ -514,6 +514,12 @@ class AttackStrategy(Base):
     claimed_first_seen: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Provenance (migration 0020): the harvest run that discovered this technique,
+    # so discovery-rate / per-run-yield / time-to-graduation become measurable.
+    # Nullable — pre-0020 rows stay NULL (run unknown).
+    harvest_run_id: Mapped[Optional[str]] = mapped_column(
+        String(40), nullable=True, index=True
+    )
     # Storage-only: when the row was harvested. Powers freshness ordering and the
     # candidate-prune TTL (Phase 4); no Pydantic twin, like discovered_at's role.
     created_at: Mapped[datetime] = mapped_column(
