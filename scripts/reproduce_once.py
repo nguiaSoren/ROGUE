@@ -944,22 +944,34 @@ async def run_reproduction(
                 from rogue.reproduce.ladder_priors import (  # noqa: PLC0415
                     ladder_order_mode,
                     order_by_prior,
+                    order_by_starvation,
                     order_by_value,
                     strategy_breach_rates,
+                    strategy_reachability,
                     strategy_values,
                 )
 
                 _ladder_mode = ladder_order_mode()
-                # canonical/discovery/fixed score by breach rate; viability (§10.10
-                # Phase 2) scores by the EV heuristic (effectiveness × validity ×
-                # freshness × exploration) — "what's worth budget?", not "what
-                # breaches most?". One stats read per sweep, then a per-tier reorder.
+                # canonical/discovery/fixed → breach-rate score; viability (Phase 2) →
+                # EV (effectiveness × validity × freshness × exploration); starvation
+                # (Phase 2.2) → EV × (1 + W·starvation), surfacing starved high-value
+                # strategies without penalising strong reachable ones. One stats read
+                # per sweep, then a per-tier reorder.
                 if _ladder_mode == "viability":
                     _vals = strategy_values(session)
 
                     def _reorder(els, prefix):
                         return order_by_value(
                             els, _vals, now=escalation_now, label_prefix=prefix,
+                        )
+                elif _ladder_mode == "starvation":
+                    _vals = strategy_values(session)
+                    _reach = strategy_reachability(session)
+
+                    def _reorder(els, prefix):
+                        return order_by_starvation(
+                            els, _vals, _reach,
+                            now=escalation_now, label_prefix=prefix,
                         )
                 else:
                     _rates = strategy_breach_rates(session)

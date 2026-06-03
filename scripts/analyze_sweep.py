@@ -173,28 +173,46 @@ def winner_model_vs_contextual(session, run_id: str | None) -> None:
 
 
 # 6 ─────────────────────────────────────────────────────────────────────────
+def _num(line: str, key: str) -> float | None:
+    """Pull the number after ``key`` (handles ``key=$1.23``, ``key=8``, ``key=12]``)."""
+    import re
+    m = re.search(re.escape(key) + r"=\$?([0-9.]+)", line)
+    return float(m.group(1)) if m else None
+
+
 def cost_per_breach(session, run_id: str | None, log_path: str | None) -> None:
-    _h("6. COST-PER-BREACH  (did adaptive allocation buy more breaches/$?)")
-    where = "WHERE run_id = :rid" if run_id else ""
-    breaches = session.execute(text(
-        f"SELECT count(*) FROM ladder_attempts {where} AND breached"
-        if run_id else "SELECT count(*) FROM ladder_attempts WHERE breached"
-    ), {"rid": run_id} if run_id else {}).scalar()
-    est = None
+    _h("6. COST-PER-BREACH  (baseline vs escalation — NOT conflated)")
+    # The `done:` summary line is authoritative: est_cost, escalation_spend,
+    # escalation_breaches, and the baseline verdict mix all in one place.
+    done = None
     if log_path and Path(log_path).exists():
         for line in reversed(Path(log_path).read_text(errors="ignore").splitlines()):
-            if "est_cost=$" in line:
-                est = line.split("est_cost=$", 1)[1].split()[0]
+            if "done:" in line and "escalation_spend" in line:
+                done = line
                 break
-    print(f"  ladder breaches (run): {breaches}")
-    if est:
-        try:
-            cpb = float(est) / breaches if breaches else float("inf")
-            print(f"  est_cost: ${est}   →   cost-per-breach ≈ ${cpb:.2f}")
-        except ValueError:
-            print(f"  est_cost: ${est} (from {log_path})")
-    else:
-        print("  est_cost: parse the sweep log's final '[progress] … est_cost=$…' line.")
+    if not done:
+        print("  no `done:` summary line found in the log — run to completion first.")
+        return
+    total = _num(done, "est_cost")
+    esc_spend = _num(done, "escalation_spend")
+    esc_breaches = _num(done, "escalation_breaches")
+    full = _num(done, "full_breach") or 0
+    partial = _num(done, "partial_breach") or 0
+    base_breaches = full + partial          # baseline any-breach cells
+    base_spend = (total - esc_spend) if (total and esc_spend is not None) else None
+
+    print("  ── ESCALATION (the adaptive-allocation layer) ──")
+    if esc_spend is not None and esc_breaches:
+        print(f"    spend ${esc_spend:.2f} / {esc_breaches:.0f} breaches "
+              f"= ${esc_spend / esc_breaches:.2f} per escalation breach")
+    print("  ── BASELINE (full reproduction matrix) ──")
+    if base_spend is not None and base_breaches:
+        print(f"    spend ${base_spend:.2f} / {base_breaches:.0f} breaches "
+              f"(full+partial) = ${base_spend / base_breaches:.2f} per baseline breach")
+    print(f"  ── TOTAL ${total:.2f} across {base_breaches:.0f} baseline + "
+          f"{esc_breaches:.0f} escalation breaches ──")
+    print("  (escalation cost-per-breach is the metric to watch across reorder modes; "
+          "baseline cost is fixed sweep overhead.)")
 
 
 def main() -> int:

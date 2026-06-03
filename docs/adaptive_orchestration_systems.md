@@ -79,6 +79,53 @@ in the instrumentation required to do so honestly.
   the paper:* per-`(strategy × model)` is NOT measurable from the short-circuiting ladder —
   a genuine instrumentation limit worth stating, not hiding.
 
+## Results — first Phase-2 sweep (2026-06-03, run `sweep_p2_1780457963`)
+
+40 primitives × 6 configs × 5 trials (1,200 baseline cells) + inline escalation
+(`ROGUE_LADDER_ORDER=canonical`, `candidate_quota=0`, escalation capped at $25).
+Total $30.27; 8 EVADE parents escalated, 8/8 breached. The headline is a **measured
+efficiency↔growth tradeoff**, not a point result.
+
+**What greedy reorder bought (efficiency):**
+- **rank-of-winner median 0** (min 0 / mean 3.2 / max 21) — the winner was tried
+  *first* in most ladders. The reorder front-loaded `image:mml:wr` (the historical
+  top winner) and it broke immediately.
+- escalation cost **$2.80 for 8 breaches** (≈$0.35/breach); very low ladder work.
+
+**What it sacrificed (growth) — now measurable for the first time:**
+- **85% of all eligible strategy-appearances were `early_stop`-starved** (only 15%
+  executed). By tier: planner **7% reachability / 93% starvation**, audio/structured
+  0.12, coj 0.17, image 0.40.
+- **6 high-value / low-reachability strategies** ("invisible candidates"): a harvested
+  technique at value 0.68 / reach 0.12, `image:mml:base64` at 0.60 / 0.25, and **three
+  candidates at value ≈0.50 / reachability 0.00 / starvation 1.00** — not weak, *never
+  reached*.
+- **0 new graduations**: candidates got 24 attempts but only 6 valid trials (starved /
+  refused), so none could win → none graduated. Efficiency-vs-growth, same story.
+
+**Allocation bias (winner attribution vs the unbiased matrix) — the sharp finding:**
+the ladder's winner-model distribution is nearly *inverted* from true vulnerability,
+because the short-circuit credits the first-breaching model in config order, not the
+most vulnerable one:
+
+| model | ladder win-share | unbiased breach% (breach_results) | Δ |
+|---|---|---|---|
+| gpt-5.4-nano | 62% | 11% | **+51** |
+| mistral-small | 12% | 49% | **−37** |
+| gemini-flash-lite | 0% | 29% | −29 |
+| llama-3.1-8b | 25% | 16% | +9 |
+
+This is a clean, generalizable systems metric: *short-circuit winner attribution is
+unreliable for per-model conclusions; only the full matrix is.*
+
+**Interpretation.** Greedy reorder is a *correct* optimizer of its objective (wasted
+ladder work) — and the reachability telemetry shows that objective is in tension with
+repertoire growth. The next increment (Phase 2.2) treats reachability as *exploration
+pressure* (`value × (1 + starvation_bonus)`), not a multiplier, so strong performers
+keep their rank but the monopoly that starves invisible high-value candidates breaks.
+*(Caveat: this run used `candidate_quota=0` — the unmitigated worst case for candidate
+reachability; the quota is the existing cross-tier counter-lever.)*
+
 ## Figures to draw (TODO)
 
 - The orchestration pipeline (harvest → lifecycle → ladder → judge → brief).

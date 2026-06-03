@@ -26,12 +26,16 @@ from rogue.reproduce.ladder_priors import (
     BETA,
     FRESHNESS_TAU_DAYS,
     FRESHNESS_WEIGHT,
+    STARVATION_WEIGHT,
     BreachStat,
     ContextStat,
+    ReachStat,
     StrategyValue,
     ladder_order_mode,
     order_by_prior,
+    order_by_starvation,
     order_by_value,
+    starvation_adjusted_score,
     strategy_breach_rates,
     strategy_values,
     winning_model_distribution,
@@ -174,6 +178,46 @@ def test_context_stat_breach_rate_is_laplace_smoothed():
     assert c.breach_rate == pytest.approx((70 + ALPHA) / (75 + ALPHA + BETA))
     unseen = ContextStat("anthropic/claude-opus-4-8", "dan_persona", 0, 0)
     assert unseen.breach_rate == 0.5  # cold-start prior, consistent with the rest
+
+
+def test_starvation_is_a_valid_mode(monkeypatch):
+    monkeypatch.setenv("ROGUE_LADDER_ORDER", "starvation")
+    assert ladder_order_mode() == "starvation"
+
+
+def test_starvation_score_boosts_only_the_starved():
+    sv = StrategyValue("x", breaches=2, valid_trials=4, attempts_total=4, last_tried_at=NOW)
+    base = sv.value_score(NOW)
+    not_starved = ReachStat("x", eligible=8, executed=8, early_stopped=0, budgeted=0)
+    fully_starved = ReachStat("x", eligible=8, executed=0, early_stopped=8, budgeted=0)
+    # No reachability data, or 0 starvation → unchanged (a monopolist isn't penalised).
+    assert starvation_adjusted_score(sv, None, NOW) == pytest.approx(base)
+    assert starvation_adjusted_score(sv, not_starved, NOW) == pytest.approx(base)
+    # Fully starved → boosted by exactly (1 + W)× — capped because starvation_rate ≤ 1.
+    assert starvation_adjusted_score(sv, fully_starved, NOW) == pytest.approx(
+        base * (1.0 + STARVATION_WEIGHT)
+    )
+
+
+def test_order_by_starvation_surfaces_invisible_high_value():
+    # THE Phase-2.2 fix: a lower-value but FULLY-STARVED strategy (reach 0 — the
+    # "invisible candidate") is surfaced ahead of the higher-value MONOPOLIST that
+    # never starves — and the monopolist isn't penalised, it just loses the monopoly.
+    values = {
+        "image:mml:wr": StrategyValue("image:mml:wr", 8, 8, 8, last_tried_at=NOW),
+        "image:mml:base64": StrategyValue("image:mml:base64", 2, 4, 4, last_tried_at=NOW),
+    }
+    reach = {
+        "image:mml:wr": ReachStat("image:mml:wr", 8, 8, 0, 0),        # starv 0
+        "image:mml:base64": ReachStat("image:mml:base64", 8, 0, 8, 0),  # starv 1
+    }
+    # Plain value order: monopolist first (it is genuinely higher value).
+    assert order_by_value(("mml:wr", "mml:base64"), values, now=NOW,
+                          label_prefix="image:")[0] == "mml:wr"
+    # Starvation-aware: the invisible high-value strategy surfaces first.
+    out = order_by_starvation(("mml:wr", "mml:base64"), values, reach,
+                              now=NOW, label_prefix="image:")
+    assert out[0] == "mml:base64"
 
 
 def test_order_by_value_demotes_proven_unviable_keeps_unseen_eager():

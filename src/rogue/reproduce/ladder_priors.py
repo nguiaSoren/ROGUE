@@ -62,8 +62,10 @@ __all__ = [
     "strategy_reachability",
     "contextual_breach_rates",
     "winning_model_distribution",
+    "starvation_adjusted_score",
     "order_by_prior",
     "order_by_value",
+    "order_by_starvation",
     "ladder_order_mode",
     "LADDER_ORDER_ENV",
 ]
@@ -83,7 +85,7 @@ DISCOVERY_C = float(os.environ.get("ROGUE_LADDER_DISCOVERY_C", "0.5"))
 # operative increment; ``fixed`` restores the legacy hand-coded order for ablation;
 # ``viability`` is §10.10 Phase 2 (the EV-weighted heuristic scheduler).
 LADDER_ORDER_ENV = "ROGUE_LADDER_ORDER"
-_VALID_MODES = ("canonical", "discovery", "viability", "fixed")
+_VALID_MODES = ("canonical", "discovery", "viability", "starvation", "fixed")
 
 # §10.10 Phase 2 — viability-aware allocation weights. The scheduler stops asking
 # "what breaches most?" and asks "what is worth spending evaluation budget on now?"
@@ -94,6 +96,17 @@ _VALID_MODES = ("canonical", "discovery", "viability", "fixed")
 FRESHNESS_TAU_DAYS = float(os.environ.get("ROGUE_LADDER_FRESHNESS_TAU_DAYS", "14"))
 FRESHNESS_WEIGHT = float(os.environ.get("ROGUE_LADDER_FRESHNESS_WEIGHT", "0.5"))
 EXPLORE_WEIGHT = float(os.environ.get("ROGUE_LADDER_EXPLORE_WEIGHT", "0.5"))
+
+# §10.10 Phase 2.2 — starvation-aware exploration pressure. The first sweep showed
+# greedy reorder entrenches the renderer monopoly (planner tier 7% reachability; 3
+# high-value candidates reached 0% of the time). The fix is NOT `value × reachability`
+# — that REINFORCES incumbents (high reach → more wins → higher value → more reach,
+# a second rich-get-richer loop). Instead reachability enters as a BOOST on the
+# *starved*: a strategy keeps its rank on merit, and a starved high-value one is
+# surfaced. bonus = W × starvation_rate, and starvation_rate ∈ [0,1], so the boost is
+# inherently capped at (1 + W)×. mml:wr (starv 0) is unchanged — it loses its monopoly
+# only because starved peers rise, never because it is penalised for being good.
+STARVATION_WEIGHT = float(os.environ.get("ROGUE_LADDER_STARVATION_WEIGHT", "1.0"))
 
 
 @dataclass(frozen=True)
@@ -325,6 +338,40 @@ def order_by_value(
         key = f"{label_prefix}{e}"
         sv = values.get(key, StrategyValue(key, 0, 0, 0))
         return sv.value_score(now)
+
+    return _stable_order(elements, _score)
+
+
+def starvation_adjusted_score(
+    sv: "StrategyValue", rs: "ReachStat | None", now: datetime,
+) -> float:
+    """§10.10 Phase 2.2 — EV with starvation as exploration pressure (capped boost).
+
+    ``value_score × (1 + W × starvation_rate)``. A non-starved strategy (``rs`` None,
+    or starvation 0 like a monopolist renderer) is unchanged; a starved high-value one
+    is boosted up to ``(1 + W)×``. Deliberately NOT ``value × reachability`` — see
+    ``STARVATION_WEIGHT``."""
+    starv = rs.starvation_rate if rs is not None else 0.0
+    return sv.value_score(now) * (1.0 + STARVATION_WEIGHT * starv)
+
+
+def order_by_starvation(
+    elements: "tuple[str, ...] | list[str]",
+    values: dict[str, "StrategyValue"],
+    reach: dict[str, "ReachStat"],
+    *,
+    now: datetime,
+    label_prefix: str = "",
+) -> tuple[str, ...]:
+    """§10.10 Phase 2.2 — reorder by the starvation-adjusted EV, surfacing starved
+    high-value strategies without penalising strong reachable ones. Joins the value
+    layer (``ladder_attempts``) with the reachability layer (``ladder_rotation_
+    membership``) by full label; an element absent from either gets neutral defaults.
+    """
+    def _score(e: str) -> float:
+        key = f"{label_prefix}{e}"
+        sv = values.get(key, StrategyValue(key, 0, 0, 0))
+        return starvation_adjusted_score(sv, reach.get(key), now)
 
     return _stable_order(elements, _score)
 
