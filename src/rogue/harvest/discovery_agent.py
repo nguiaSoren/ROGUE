@@ -223,6 +223,26 @@ def default_bandit_arms() -> list:
         'site:arxiv.org "X-Teaming" OR "multi-turn adversarial" after:{date}'))
     pool.append(QueryArm("github_multiturn_jb",
         'site:github.com (Crescendo OR ActorAttack OR "X-Teaming") jailbreak updated:>{date}'))
+    # Multimodal / vision-language / audio attack discovery (added 2026-06-03 per
+    # the #1b harvest-modality-bias finding: the pre-existing pool had ZERO
+    # multimodal-targeted queries, so vision/VLM/audio attack papers entered only
+    # incidentally via generic "adversarial"/"jailbreak" terms. A 5-query SERP
+    # probe surfaced 21 unique multimodal-attack arXiv papers, 0 of them harvested.
+    # These arms close that vocabulary gap; they feed the existing classify→
+    # render-gate path unchanged. Vocabulary chosen from the probe's productive
+    # queries (see scripts/confirm_multimodal_gap.py).
+    pool.append(QueryArm("arxiv_vlm_jailbreak",
+        'site:arxiv.org "vision-language" jailbreak after:{date}'))
+    pool.append(QueryArm("arxiv_multimodal_jailbreak",
+        'site:arxiv.org multimodal jailbreak (LLM OR VLM) after:{date}'))
+    pool.append(QueryArm("arxiv_crossmodal_attack",
+        'site:arxiv.org "cross-modal" jailbreak OR attack after:{date}'))
+    pool.append(QueryArm("arxiv_typographic_vlm",
+        'site:arxiv.org typographic attack (VLM OR "vision language") after:{date}'))
+    pool.append(QueryArm("arxiv_audio_jailbreak",
+        'site:arxiv.org audio jailbreak "language model" after:{date}'))
+    pool.append(QueryArm("github_multimodal_jb",
+        'site:github.com (multimodal OR VLM OR "vision-language") jailbreak updated:>{date}'))
     return pool
 
 

@@ -9,7 +9,7 @@ Extracted from ROGUE_PLAN.md §5. The list is built so that 5+ can break complet
 | 1 | r/ChatGPTJailbreak | reddit.com/r/ChatGPTJailbreak/new | **Web Scraper API (Reddit pre-built)** | Fastest-moving public jailbreak community |
 | 2 | r/LocalLLaMA | reddit.com/r/LocalLLaMA (jailbreak/inject flair) | **Web Scraper API (Reddit pre-built)** | Open-source model attack discussion |
 | 3 | r/PromptEngineering | reddit.com/r/PromptEngineering | **Web Scraper API (Reddit pre-built)** | Adjacent, sometimes surfaces attacks |
-| 4 | arXiv cs.CR + cs.CL | arxiv.org/list/cs.CR/new, cs.CL/new | Web Unlocker (HTML listing + abstract pages) | Where real research lands first |
+| 4 | arXiv cs.CR + cs.CL (+ cs.AI, cs.LG, cs.CV, cs.MM) | arxiv.org/list/{cs.CR,cs.CL,cs.AI,cs.LG,cs.CV,cs.MM}/new | Web Unlocker (HTML listing + abstract pages) | Where real research lands first (cs.CV/cs.MM added 2026-06-03 for multimodal attack coverage — §1b finding) |
 | 5 | GitHub trending (last 7d) | github.com/search?q=prompt-injection&s=updated | SERP API → Web Unlocker for READMEs | Public PoC repos |
 | 6 | HuggingFace community discussions | huggingface.co (model card discussions) | **Web Scraper API (HF pre-built)** + Web Unlocker fallback | Model-specific exploits |
 | 7 | Simon Willison's blog | simonwillison.net (prompt-injection tag) | Web Unlocker | High-signal curated commentary |
@@ -26,7 +26,7 @@ Extracted from ROGUE_PLAN.md §5. The list is built so that 5+ can break complet
 
 ## Per-source SERP discovery queries
 
-Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool 39; DiscoveryAgent picks ~10 per daily run based on recent yield.
+Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool 45 (39 original + 6 multimodal arms added 2026-06-03 per the §1b finding); DiscoveryAgent picks ~10 per daily run based on recent yield.
 
 **#1 r/ChatGPTJailbreak**
 - `site:reddit.com/r/ChatGPTJailbreak after:{date}`
@@ -45,6 +45,11 @@ Every source has at least one targeted query. `{date}` is `today - 14 days` for 
 - `site:arxiv.org "jailbreak" "LLM" after:{date}`
 - `site:arxiv.org "adversarial" "language model" after:{date}`
 - `site:arxiv.org "red team" "LLM" after:{date}`
+- `site:arxiv.org "vision-language" jailbreak after:{date}` *(multimodal, 2026-06-03)*
+- `site:arxiv.org multimodal jailbreak (LLM OR VLM) after:{date}` *(multimodal, 2026-06-03)*
+- `site:arxiv.org "cross-modal" jailbreak OR attack after:{date}` *(multimodal, 2026-06-03)*
+- `site:arxiv.org typographic attack (VLM OR "vision language") after:{date}` *(multimodal, 2026-06-03)*
+- `site:arxiv.org audio jailbreak "language model" after:{date}` *(multimodal, 2026-06-03)*
 
 **#5 GitHub**
 - `site:github.com prompt-injection updated:>{date}`

@@ -42,6 +42,13 @@ DEFAULT_LISTINGS = [
     # categories — Day-2+ work; tracked on the §STATUS bullet list.
     "https://arxiv.org/list/cs.AI/new",  # Artificial Intelligence (broad)
     "https://arxiv.org/list/cs.LG/new",  # Machine Learning (training-time attacks, weight abliteration)
+    # Multimodal (added 2026-06-03 per the #1b harvest-modality-bias finding):
+    # vision-language / VLM / cross-modal / typographic / audio jailbreak papers
+    # concentrate in cs.CV + cs.MM and were NOT being pulled — a 5-query SERP probe
+    # found 21 such arXiv papers, 0 harvested. Same downstream commentary-filter
+    # drops non-attack abstracts. (Confirmed gap; see scripts/confirm_multimodal_gap.py.)
+    "https://arxiv.org/list/cs.CV/new",  # Computer Vision (vision-language attacks)
+    "https://arxiv.org/list/cs.MM/new",  # Multimedia (audio / cross-modal attacks)
 ]
 
 # Match the listing page's `<a href="/abs/2605.18239">` style links. Catches
