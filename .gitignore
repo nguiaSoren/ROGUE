@@ -111,3 +111,6 @@ scripts/_*
 
 # Internal marketing/positioning notes — not part of the public repo
 /marketing_claims.md
+
+# Local-only research/working docs (WIP; not for the public repo)
+docs/adaptive_orchestration_systems.md
