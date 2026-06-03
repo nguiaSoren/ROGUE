@@ -385,6 +385,7 @@ async def run_harvest(
     x_handles: list[str] | None = None,
     x_only: bool = False,
     multimodal_only: bool = False,
+    source_expansion_only: bool = False,
     harvest_run_id: str | None = None,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
@@ -443,21 +444,30 @@ async def run_harvest(
         # the count of NEW canonical primitives it surfaced + the dedup-attributed
         # cost, then `to_disk` so tomorrow's run learns from today's yield.
         from rogue.harvest.bandit import EpsilonGreedyBandit
-        from rogue.harvest.discovery_agent import MULTIMODAL_ARM_IDS, default_bandit_arms
+        from rogue.harvest.discovery_agent import (
+            MULTIMODAL_ARM_IDS,
+            SOURCE_EXPANSION_ARM_IDS,
+            default_bandit_arms,
+        )
         bandit_arms = default_bandit_arms()
+        # Focused harvest: restrict the SERP phase to a named arm subset, with an
+        # ISOLATED bandit state file so the main pool (and the /api/bandit/stats DB
+        # mirror) is never clobbered by a partial `to_disk`. Subsets are cold-start,
+        # so nothing learned is lost — used to validate new arms in isolation.
+        _restrict_ids, _restrict_label = None, ""
         if multimodal_only:
-            # Restrict the SERP phase to the 6 multimodal arms and use an
-            # ISOLATED bandit state file so the main 45-arm state (and the DB
-            # mirror behind /api/bandit/stats) is never clobbered by a partial
-            # `to_disk`. The multimodal arms are cold-start anyway, so nothing
-            # learned is lost. (#1b focused harvest.)
-            bandit_arms = [a for a in bandit_arms if a.arm_id in MULTIMODAL_ARM_IDS]
+            _restrict_ids, _restrict_label = MULTIMODAL_ARM_IDS, "multimodal"
+        elif source_expansion_only:
+            _restrict_ids, _restrict_label = SOURCE_EXPANSION_ARM_IDS, "source_expansion"
+        _focused = _restrict_ids is not None
+        if _focused:
+            bandit_arms = [a for a in bandit_arms if a.arm_id in _restrict_ids]
             BANDIT_STATE_PATH = bandit_state_path or Path(
-                "data/discovery_bandit_multimodal.json"
+                f"data/discovery_bandit_{_restrict_label}.json"
             )
             logger.info(
-                "MULTIMODAL-ONLY harvest: %d SERP arms, plugins skipped, "
-                "isolated bandit state", len(bandit_arms),
+                "%s-ONLY harvest: %d SERP arms, plugins skipped, isolated bandit state",
+                _restrict_label.upper(), len(bandit_arms),
             )
         else:
             BANDIT_STATE_PATH = bandit_state_path or Path("data/discovery_bandit.json")
@@ -473,11 +483,12 @@ async def run_harvest(
         # Feature-C link following apply to them like any source).
         plugins = None
         agent_bandit = bandit
-        if multimodal_only:
-            # SERP-only: run just the 6 multimodal arms, skip ALL plugins —
-            # crucially the cs.CV/cs.MM /new listing crawl, which over a 21-day
-            # window is high-volume + unfiltered (the expensive, low-precision
-            # path). The SERP arms target attack papers directly (high precision).
+        if _focused:
+            # SERP-only: run just the restricted arm subset, skip ALL plugins —
+            # crucially the broad listing crawls (e.g. cs.CV/cs.MM /new), which over
+            # a multi-week window are high-volume + unfiltered. The SERP arms target
+            # attack disclosures directly (high precision), so a focused run is fast
+            # and isolates the subset's yield.
             plugins = []
         elif x_only:
             # Harvest ONLY X (skip the other 9 plugins + the bandit SERP
@@ -861,11 +872,12 @@ async def run_harvest(
                 len(bandit.arms), n_arms,
             )
             # Mirror the state into the DB so /api/bandit/stats is live (no
-            # redeploy). SKIP in multimodal-only mode — that run holds only the
-            # 6-arm subset, so mirroring would overwrite the live 45-arm view.
-            if multimodal_only:
+            # redeploy). SKIP in any focused run — it holds only an arm subset, so
+            # mirroring would overwrite the live full-pool view.
+            if _focused:
                 logger.info(
-                    "bandit: DB mirror skipped (multimodal-only 6-arm subset)"
+                    "bandit: DB mirror skipped (%s focused %d-arm subset)",
+                    _restrict_label, len(bandit.arms),
                 )
             else:
                 try:
@@ -946,6 +958,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--source-expansion-only",
+        action="store_true",
+        help=(
+            "Harvest ONLY the 7 source-expansion SERP arms (OpenReview, ACL "
+            "Anthology, garak, HF datasets, GitHub Advisory, huntr), skipping ALL "
+            "plugins. Focused validation of the new sources; isolated bandit state "
+            "so the main pool + /api/bandit/stats are untouched. (2026-06-04.)"
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
         help="Override for the per-run correlation id (default: a fresh UUID).",
@@ -976,6 +998,7 @@ def main(argv: list[str] | None = None) -> int:
             x_handles=x_handles,
             x_only=args.x_only,
             multimodal_only=args.multimodal_only,
+            source_expansion_only=args.source_expansion_only,
             harvest_run_id=run_id,
         )
     )

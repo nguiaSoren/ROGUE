@@ -70,6 +70,7 @@ __all__ = [
     "DAY1_HANDPICKED_QUERIES",
     "DiscoveryAgent",
     "MULTIMODAL_ARM_IDS",
+    "SOURCE_EXPANSION_ARM_IDS",
     "PluginRunReport",
     "default_plugins",
     "default_bandit_arms",
@@ -287,6 +288,20 @@ MULTIMODAL_ARM_IDS: frozenset[str] = frozenset({
     "arxiv_typographic_vlm",
     "arxiv_audio_jailbreak",
     "github_multimodal_jb",
+})
+
+# The arm_ids of the source-expansion block — the subset `harvest_once.py
+# --source-expansion-only` restricts to (added 2026-06-04, startup-track). Lets a
+# focused harvest validate the new sources in isolation before they compete in the
+# full pool. Kept next to the arms so the two never drift.
+SOURCE_EXPANSION_ARM_IDS: frozenset[str] = frozenset({
+    "openreview_jailbreak",
+    "openreview_adversarial_llm",
+    "acl_anthology_security",
+    "garak_probes",
+    "hf_datasets_redteam",
+    "github_advisory_llm",
+    "huntr_llm_disclosures",
 })
 
 
