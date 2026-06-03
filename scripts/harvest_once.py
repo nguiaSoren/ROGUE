@@ -995,8 +995,10 @@ def main(argv: list[str] | None = None) -> int:
         from scripts.track_backlog import snapshot
         c = snapshot(args.database_url, run_id=run_id,
                      ts=datetime.now(timezone.utc).isoformat())
-        logger.info("backlog snapshot: needs_implementation=%d (audio=%d image=%d)",
-                    c["needs_implementation"], c["audio"], c["image"])
+        logger.info("backlog snapshot: needs_implementation=%d (audio=%d image=%d) "
+                    "discoverable=%d testable=%d actionable=%d",
+                    c["needs_implementation"], c["audio"], c["image"],
+                    c["discoverable"], c["testable"], c["actionable"])
     except Exception as exc:  # noqa: BLE001 — tracking is non-critical
         logger.warning("backlog snapshot skipped: %s", exc)
     return 0
