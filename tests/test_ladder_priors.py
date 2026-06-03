@@ -34,6 +34,7 @@ from rogue.reproduce.ladder_priors import (
     order_by_value,
     strategy_breach_rates,
     strategy_values,
+    winning_model_distribution,
 )
 
 DEFAULT_TEST_DB = "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue_test"
@@ -255,6 +256,36 @@ def test_strategy_breach_rates_counts_valid_trials_only(db_session):
     assert stat.breaches == 2
     assert stat.trials == 3  # refused excluded from valid trials
     assert stat.smoothed_rate == pytest.approx((2 + ALPHA) / (3 + ALPHA + BETA))
+
+
+def test_winning_model_distribution_reads_winner_rows(db_session):
+    from rogue.db.models import LadderAttempt
+
+    # config_id on winner (breached) rows holds the winning TARGET_MODEL (misnomer).
+    def _win(model):
+        return LadderAttempt(
+            run_id="test-prior-win", parent_id="p", attempt_index=0, ladder_depth=1,
+            entity_type="base", entity_id="crescendo", candidate_attempt_quota=0,
+            config_id=model, outcome="breach", breached=True, stopped_run=True,
+            created_at=NOW,
+        )
+
+    db_session.add_all([
+        _win("mistralai/mistral-small-2603"),
+        _win("mistralai/mistral-small-2603"),
+        _win("openai/gpt-5.4-nano"),
+        # a non-winner row (config_id NULL) must NOT be counted.
+        LadderAttempt(
+            run_id="test-prior-win", parent_id="p", attempt_index=1, ladder_depth=1,
+            entity_type="base", entity_id="acronym", candidate_attempt_quota=0,
+            config_id=None, outcome="no_breach", breached=False, stopped_run=False,
+            created_at=NOW,
+        ),
+    ])
+    db_session.commit()
+
+    dist = winning_model_distribution(db_session, run_id="test-prior-win")
+    assert dist == {"mistralai/mistral-small-2603": 2, "openai/gpt-5.4-nano": 1}
 
 
 def test_strategy_values_surfaces_attempts_and_freshness(db_session):

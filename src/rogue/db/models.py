@@ -661,6 +661,10 @@ class LadderAttempt(Base):
     candidate_attempt_quota: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0"
     )
+    # MISNOMER (legacy): on winner rows this holds the winning **target_model**
+    # string (e.g. "anthropic/claude-haiku-4-5"), NOT a deployment-config id —
+    # ``_strategy_breaches`` returns ``config.target_model`` as ``breached_on``.
+    # Kept as-is to avoid a rename migration; ``winning_model_distribution`` reads it.
     config_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     outcome: Mapped[str] = mapped_column(String(20))
     breached: Mapped[bool] = mapped_column(

@@ -61,6 +61,7 @@ __all__ = [
     "strategy_values",
     "strategy_reachability",
     "contextual_breach_rates",
+    "winning_model_distribution",
     "order_by_prior",
     "order_by_value",
     "ladder_order_mode",
@@ -422,6 +423,38 @@ def contextual_breach_rates(
             trials=int(row.trials or 0),
         )
     return out
+
+
+def winning_model_distribution(
+    session: "Session", *, run_id: str | None = None,
+) -> dict[str, int]:
+    """Which target model produced each ladder's WINNING breach, counted.
+
+    This is the "who won first" signal — and it is **order-biased** by design:
+    ``_strategy_breaches`` short-circuits at the first breaching (config × trial), so
+    a model tried earlier in the panel gets disproportionate winner credit. The
+    *unbiased* "who would succeed if reached" answer is ``contextual_breach_rates``
+    (sourced from the full ``breach_results`` matrix). Comparing the two surfaces the
+    early-stop attribution bias directly.
+
+    Reads from already-logged data: ``ladder_attempts.config_id`` stores the winning
+    **target_model** on winner rows (the column name is a legacy misnomer — see the
+    model docstring). No new telemetry; this just makes the distribution first-class.
+    """
+    from sqlalchemy import func
+
+    from rogue.db.models import LadderAttempt
+
+    q = (
+        session.query(
+            LadderAttempt.config_id.label("model"), func.count().label("n"),
+        )
+        .filter(LadderAttempt.breached.is_(True), LadderAttempt.config_id.isnot(None))
+        .group_by(LadderAttempt.config_id)
+    )
+    if run_id is not None:
+        q = q.filter(LadderAttempt.run_id == run_id)
+    return {r.model: int(r.n) for r in q.all() if r.model}
 
 
 def strategy_reachability(
