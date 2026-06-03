@@ -386,6 +386,7 @@ async def run_harvest(
     x_only: bool = False,
     multimodal_only: bool = False,
     source_expansion_only: bool = False,
+    restrict_arm_ids: "frozenset[str] | None" = None,
     harvest_run_id: str | None = None,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
@@ -455,7 +456,9 @@ async def run_harvest(
         # mirror) is never clobbered by a partial `to_disk`. Subsets are cold-start,
         # so nothing learned is lost — used to validate new arms in isolation.
         _restrict_ids, _restrict_label = None, ""
-        if multimodal_only:
+        if restrict_arm_ids:
+            _restrict_ids, _restrict_label = frozenset(restrict_arm_ids), "custom"
+        elif multimodal_only:
             _restrict_ids, _restrict_label = MULTIMODAL_ARM_IDS, "multimodal"
         elif source_expansion_only:
             _restrict_ids, _restrict_label = SOURCE_EXPANSION_ARM_IDS, "source_expansion"
@@ -968,6 +971,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--only-arms",
+        default=None,
+        help=(
+            "Comma-separated bandit arm_ids to run EXCLUSIVELY (SERP-only, plugins "
+            "skipped, isolated bandit state). For validating specific arms in "
+            "isolation, e.g. --only-arms github_advisory_llm,huntr_llm_disclosures."
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
         help="Override for the per-run correlation id (default: a fresh UUID).",
@@ -999,6 +1011,10 @@ def main(argv: list[str] | None = None) -> int:
             x_only=args.x_only,
             multimodal_only=args.multimodal_only,
             source_expansion_only=args.source_expansion_only,
+            restrict_arm_ids=(
+                frozenset(s.strip() for s in args.only_arms.split(",") if s.strip())
+                if args.only_arms else None
+            ),
             harvest_run_id=run_id,
         )
     )
