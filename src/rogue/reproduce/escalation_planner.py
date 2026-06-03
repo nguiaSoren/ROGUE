@@ -427,7 +427,7 @@ class EscalationPlanner:
         fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
         extra_strategies: dict[str, StrategyView] | None = None,
         use_templates: bool = True,
-        slot_fill: bool = False,
+        slot_fill: bool | None = None,
         slot_fill_model: str | None = None,
     ) -> None:
         # Resolve at construction (after dotenv): explicit arg > ROGUE_ESCALATION_PLANNER
@@ -442,9 +442,19 @@ class EscalationPlanner:
         # §10.9 Step 3 — the slot-fill middle tier (LLM-as-parameterizer). When on,
         # a matched template's SEMANTIC slots are filled by the model with concrete,
         # objective-specific values (gated by slot_fill.validate_slot_values); the
-        # turn skeleton stays fixed. Off by default — opt in to close the template↔
-        # freeform breach gap without surrendering template reliability. The model
-        # used is the same permissive backbone unless overridden.
+        # turn skeleton stays fixed. DEFAULT-ON (2026-06-03): _fill_slots is total —
+        # worst case it returns {} and collapses to pure-template behavior — so it
+        # cannot make the planner less reliable (proven: 1.00 validity / 0 orch-
+        # failures in the A/B), while giving the cleaner structure/semantics/validation
+        # decomposition + the future ensemble/contextual-routing insertion point.
+        # Resolution mirrors `model`: explicit arg wins, else ROGUE_ESCALATION_SLOT_FILL
+        # env (default on). The env kill-switch lets the unit suite stay network-free
+        # (tests/conftest.py sets it 0) while production defaults on. Ablate per run
+        # via `--no-slot-fill` / slot_fill=False.
+        if slot_fill is None:
+            slot_fill = os.environ.get(
+                "ROGUE_ESCALATION_SLOT_FILL", "1",
+            ).strip().lower() not in ("0", "false", "no", "off", "")
         self.slot_fill = slot_fill
         self.slot_fill_model = slot_fill_model or self.model
         self.fallback_model = fallback_model

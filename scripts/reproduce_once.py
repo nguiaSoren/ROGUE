@@ -631,7 +631,7 @@ async def run_reproduction(
     escalate_candidate_probe: bool = False,
     escalate_candidate_quota: int = 0,
     escalate_no_templates: bool = False,
-    escalate_slot_fill: bool = False,
+    escalate_slot_fill: bool = True,
     run_id: str = "adhoc",
     planner: EscalationPlanner | None = None,
     judge_batch: bool = False,
@@ -934,6 +934,44 @@ async def run_reproduction(
                         audio_styles_tier,
                     )
 
+                # §10.10 Step 1 — greedy ladder reorder. Sort each deterministic
+                # transform tier by its Laplace-smoothed historical breach rate so the
+                # likely winner is tried EARLY (breach on attempt 2, not 15), cutting
+                # wasted ladder work. Changes evaluation PRIORITY only — the ladder
+                # execution loop is untouched. Mode via ROGUE_LADDER_ORDER (canonical
+                # exploit-argmax default / discovery UCB-explore / fixed=legacy order).
+                # Computed once per sweep (deterministic within a telemetry snapshot).
+                from rogue.reproduce.ladder_priors import (  # noqa: PLC0415
+                    ladder_order_mode,
+                    order_by_prior,
+                    strategy_breach_rates,
+                )
+
+                _ladder_mode = ladder_order_mode()
+                _ladder_rates = strategy_breach_rates(session)
+                image_renderers_tier = order_by_prior(
+                    image_renderers_tier, _ladder_rates,
+                    mode=_ladder_mode, label_prefix="image:",
+                )
+                coj_tier = order_by_prior(
+                    COJ_OPERATIONS, _ladder_rates,
+                    mode=_ladder_mode, label_prefix="coj:",
+                )
+                structured_tier = order_by_prior(
+                    DEFAULT_STRUCTURED_FORMATS, _ladder_rates,
+                    mode=_ladder_mode, label_prefix="structured:",
+                )
+                audio_styles_tier = order_by_prior(
+                    audio_styles_tier, _ladder_rates,
+                    mode=_ladder_mode, label_prefix="audio:",
+                )
+                logger.info(
+                    "§10.10 ladder reorder [mode=%s]: image=%s coj=%s "
+                    "structured=%s audio=%s",
+                    _ladder_mode, image_renderers_tier, coj_tier,
+                    structured_tier, audio_styles_tier,
+                )
+
                 # §10.9 Phase 4 — seed the planner with the harvested strategy
                 # library (active + candidate, text/multi_turn) so it can drive
                 # harvested techniques, then assemble the rotation + cost plan.
@@ -1134,8 +1172,8 @@ async def run_reproduction(
                                 temperature=temperature,
                                 strategies=escalation_plan.rotation,
                                 image_renderers=image_renderers_tier,
-                                coj_operations=COJ_OPERATIONS,
-                                structured_formats=DEFAULT_STRUCTURED_FORMATS,
+                                coj_operations=coj_tier,
+                                structured_formats=structured_tier,
                                 audio_styles=audio_styles_tier,
                                 budget_usd=remaining,
                                 # §10.9 candidate-evaluation quota (scheduler policy):
@@ -1147,6 +1185,26 @@ async def run_reproduction(
                                     escalation_plan.candidate_ids
                                 ),
                             )
+                            # §10.10 rank-of-winner KPI — how deep in the ladder the
+                            # winner sat. This is the reorder's payoff metric: lower
+                            # rank = less wasted ladder work avoided (latency + cost +
+                            # throughput, all at once). Derivable from attempt_index in
+                            # ladder_attempts; logged here for at-a-glance run summaries.
+                            if res.winning_strategy is not None:
+                                _rank = next(
+                                    (
+                                        i for i, (lbl, out) in enumerate(res.attempts)
+                                        if out == "breach" and lbl == res.winning_strategy
+                                    ),
+                                    None,
+                                )
+                                logger.info(
+                                    "§10.10 rank-of-winner parent=%s mode=%s "
+                                    "winner=%s rank=%s/%d",
+                                    pid, _ladder_mode, res.winning_strategy,
+                                    _rank, len(res.attempts),
+                                )
+
                             # §10.9 Phase 4 — feed this parent's ladder result back
                             # into the harvested strategies' lifecycle: the winning
                             # strategy graduates candidate→active; others tried++/
@@ -1487,13 +1545,13 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--slot-fill",
+        "--no-slot-fill",
         action="store_true",
         help=(
-            "§10.9 Step 3 enable the slot-fill middle tier — the model fills a "
-            "matched template's SEMANTIC slot values (objective-specific) while the "
-            "turn skeleton stays fixed. Closes the template↔freeform breach gap; "
-            "degrades to the pure template on any failure. No-op without templates."
+            "§10.9 Step 3 DISABLE the slot-fill middle tier (default-on). Slot-fill "
+            "has the model fill a matched template's SEMANTIC slot values while the "
+            "turn skeleton stays fixed; it degrades to the pure template on any "
+            "failure, so it can't reduce reliability. Pass this for ablation/research."
         ),
     )
     parser.add_argument("--run-id", default=None)
@@ -1549,7 +1607,7 @@ def main(argv: list[str] | None = None) -> int:
             escalate_candidate_probe=args.candidate_probe,
             escalate_candidate_quota=args.candidate_quota,
             escalate_no_templates=args.no_templates,
-            escalate_slot_fill=args.slot_fill,
+            escalate_slot_fill=not args.no_slot_fill,
             run_id=run_id,
             judge_batch=args.judge_batch,
             only_unreproduced=args.only_unreproduced,
