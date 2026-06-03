@@ -86,14 +86,21 @@ def supports_image(target_model: str) -> bool:
     return target_model in _IMAGE_CAPABLE_MODELS
 
 
-# Audio(speech)-capable panel models, verified 2026-05-29 (Step 0b). Only Gemini
-# 3.1 Flash-Lite accepts audio today — via the OpenRouter OpenAI-compat route, as
-# an `input_audio` block. Claude takes no audio; `gpt-5.4-nano` via
-# chat-completions takes no audio (would need `gpt-4o-audio-preview`). Unknown
-# models default to NOT capable (fail-safe), same as the image gate.
+# Audio(speech)-capable panel models. Verified 2026-05-29 (Step 0b: Gemini), then
+# the audio panel was broadened 1→3 on 2026-06-04 (#1b follow-up — the multimodal
+# harvest parked 5 audio techniques against a single audio target, so measuring
+# audio breach/graduation needed more than one endpoint). All accept an
+# OpenAI-compat `input_audio` block:
+#   - google/gemini-3.1-flash-lite       — via OpenRouter (the original, proven route)
+#   - mistralai/voxtral-small-24b-2507   — via OpenRouter (same route as Gemini)
+#   - openai/gpt-audio-mini              — via OpenAI DIRECT (api.openai.com, native audio)
+# Claude takes no audio (no Anthropic audio-input model exists on OpenRouter).
+# Unknown models default to NOT capable (fail-safe), same as the image gate.
 _AUDIO_CAPABLE_MODELS: frozenset[str] = frozenset(
     {
         "google/gemini-3.1-flash-lite",
+        "mistralai/voxtral-small-24b-2507",
+        "openai/gpt-audio-mini",
     }
 )
 
@@ -199,6 +206,9 @@ _PRICE_PER_MILLION: dict[str, tuple[float, float]] = {
     "meta-llama/llama-3.1-8b-instruct": (0.02, 0.05),  # OpenRouter — locked 2026-05-26 as the canonical Llama slot (Groq dev-tier upgrade gated; OpenRouter is also cheaper at $0.02/$0.05 vs Groq's $0.05/$0.08, so this isn't just a fallback — it's the strictly-better choice. "Instruct" is the upstream Meta name; Groq's "Instant" suffix was Groq-branding for their inference-stack optimization, not a different fine-tune). Pricing verified from OpenRouter model page.
     "mistralai/mistral-small-2603": (0.15, 0.60),  # Mistral Small 4 via OpenRouter — verified 2026-05-25 ($0.15/$0.60). Pinned from `-latest` to the explicit 2026-03-17 release because vendor `-latest` tags can re-point mid-quarter.
     "google/gemini-3.1-flash-lite": (0.25, 1.50),
+    # Audio panel expansion (2026-06-04, #1b follow-up) — OpenRouter/OpenAI verified prices:
+    "mistralai/voxtral-small-24b-2507": (0.10, 0.30),  # Mistral Voxtral (audio) via OpenRouter
+    "openai/gpt-audio-mini": (0.60, 2.40),  # OpenAI gpt-audio-mini (audio) via OpenAI direct
     # Stretch (Day 4 if budget permits):
     "openai/gpt-5.4": (2.50, 15.00),
     "anthropic/claude-sonnet-4-6": (3.00, 15.00),
