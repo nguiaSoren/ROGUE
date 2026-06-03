@@ -69,6 +69,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "DAY1_HANDPICKED_QUERIES",
     "DiscoveryAgent",
+    "MULTIMODAL_ARM_IDS",
     "PluginRunReport",
     "default_plugins",
     "default_bandit_arms",
@@ -244,6 +245,19 @@ def default_bandit_arms() -> list:
     pool.append(QueryArm("github_multimodal_jb",
         'site:github.com (multimodal OR VLM OR "vision-language") jailbreak updated:>{date}'))
     return pool
+
+
+# The arm_ids of the multimodal block above — the subset `harvest_once.py
+# --multimodal-only` restricts the SERP phase to (added 2026-06-03, #1b finding).
+# Kept next to the arms so the two never drift.
+MULTIMODAL_ARM_IDS: frozenset[str] = frozenset({
+    "arxiv_vlm_jailbreak",
+    "arxiv_multimodal_jailbreak",
+    "arxiv_crossmodal_attack",
+    "arxiv_typographic_vlm",
+    "arxiv_audio_jailbreak",
+    "github_multimodal_jb",
+})
 
 
 # --------------------------------------------------------------------------- #

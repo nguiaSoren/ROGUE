@@ -384,6 +384,7 @@ async def run_harvest(
     media_ingestor: MediaIngestor | None = None,
     x_handles: list[str] | None = None,
     x_only: bool = False,
+    multimodal_only: bool = False,
 ) -> HarvestRunStats:
     """End-to-end Day-1 daily run. Returns per-run counters for the logs.
 
@@ -441,9 +442,24 @@ async def run_harvest(
         # the count of NEW canonical primitives it surfaced + the dedup-attributed
         # cost, then `to_disk` so tomorrow's run learns from today's yield.
         from rogue.harvest.bandit import EpsilonGreedyBandit
-        from rogue.harvest.discovery_agent import default_bandit_arms
-        BANDIT_STATE_PATH = bandit_state_path or Path("data/discovery_bandit.json")
+        from rogue.harvest.discovery_agent import MULTIMODAL_ARM_IDS, default_bandit_arms
         bandit_arms = default_bandit_arms()
+        if multimodal_only:
+            # Restrict the SERP phase to the 6 multimodal arms and use an
+            # ISOLATED bandit state file so the main 45-arm state (and the DB
+            # mirror behind /api/bandit/stats) is never clobbered by a partial
+            # `to_disk`. The multimodal arms are cold-start anyway, so nothing
+            # learned is lost. (#1b focused harvest.)
+            bandit_arms = [a for a in bandit_arms if a.arm_id in MULTIMODAL_ARM_IDS]
+            BANDIT_STATE_PATH = bandit_state_path or Path(
+                "data/discovery_bandit_multimodal.json"
+            )
+            logger.info(
+                "MULTIMODAL-ONLY harvest: %d SERP arms, plugins skipped, "
+                "isolated bandit state", len(bandit_arms),
+            )
+        else:
+            BANDIT_STATE_PATH = bandit_state_path or Path("data/discovery_bandit.json")
         bandit = EpsilonGreedyBandit.from_disk(bandit_arms, BANDIT_STATE_PATH)
 
         # --- Layer 1: HARVEST ---
@@ -456,7 +472,13 @@ async def run_harvest(
         # Feature-C link following apply to them like any source).
         plugins = None
         agent_bandit = bandit
-        if x_only:
+        if multimodal_only:
+            # SERP-only: run just the 6 multimodal arms, skip ALL plugins —
+            # crucially the cs.CV/cs.MM /new listing crawl, which over a 21-day
+            # window is high-volume + unfiltered (the expensive, low-precision
+            # path). The SERP arms target attack papers directly (high precision).
+            plugins = []
+        elif x_only:
             # Harvest ONLY X (skip the other 9 plugins + the bandit SERP
             # discovery phase). Link-following stays on so Pliny's outbound
             # links are still followed (Feature C). Fast/cheap focused run.
@@ -832,17 +854,24 @@ async def run_harvest(
                 "bandit: persisted %d arms (%d picked this run)",
                 len(bandit.arms), n_arms,
             )
-            # Mirror the state into the DB so /api/bandit/stats is live (no redeploy).
-            try:
-                from rogue.db.bandit_state import save_bandit_state
-
-                with SessionLocal() as bandit_session:
-                    save_bandit_state(bandit_session, bandit.to_dict())
-                logger.info("bandit: mirrored state to DB (bandit_state row)")
-            except Exception as exc:  # never let DB-mirroring break the harvest
-                logger.warning(
-                    "bandit: DB mirror failed (file still written): %s", exc
+            # Mirror the state into the DB so /api/bandit/stats is live (no
+            # redeploy). SKIP in multimodal-only mode — that run holds only the
+            # 6-arm subset, so mirroring would overwrite the live 45-arm view.
+            if multimodal_only:
+                logger.info(
+                    "bandit: DB mirror skipped (multimodal-only 6-arm subset)"
                 )
+            else:
+                try:
+                    from rogue.db.bandit_state import save_bandit_state
+
+                    with SessionLocal() as bandit_session:
+                        save_bandit_state(bandit_session, bandit.to_dict())
+                    logger.info("bandit: mirrored state to DB (bandit_state row)")
+                except Exception as exc:  # never let DB-mirroring break the harvest
+                    logger.warning(
+                        "bandit: DB mirror failed (file still written): %s", exc
+                    )
         except Exception as exc:  # noqa: BLE001 - bandit failure must not block harvest
             logger.warning("bandit: persist failed (%s) — state may be stale", exc)
     finally:
@@ -900,6 +929,17 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--multimodal-only",
+        action="store_true",
+        help=(
+            "Harvest ONLY the 6 multimodal SERP arms (vision-language / "
+            "multimodal / cross-modal / typographic-VLM / audio + github), "
+            "skipping ALL plugins (incl. the broad cs.CV/cs.MM listing crawl). "
+            "Focused, cheap multimodal probe; uses an isolated bandit state file "
+            "so the main 45-arm pool + /api/bandit/stats are untouched. (#1b.)"
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
         help="Override for the per-run correlation id (default: a fresh UUID).",
@@ -929,6 +969,7 @@ def main(argv: list[str] | None = None) -> int:
             embedding_model=args.embedding_model,
             x_handles=x_handles,
             x_only=args.x_only,
+            multimodal_only=args.multimodal_only,
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())
