@@ -985,6 +985,20 @@ def main(argv: list[str] | None = None) -> int:
     # New primitives are in Neon now — regenerate the cached dashboard pages
     # immediately (no-op if the revalidate env vars are unset).
     revalidate_frontend()
+
+    # Append a backlog snapshot — this is the only moment needs_implementation
+    # can change, so the 3b-v2 trigger time series builds itself (no cron).
+    # Best-effort: a tracking failure must never fail a successful harvest.
+    try:
+        from datetime import datetime, timezone
+
+        from scripts.track_backlog import snapshot
+        c = snapshot(args.database_url, run_id=run_id,
+                     ts=datetime.now(timezone.utc).isoformat())
+        logger.info("backlog snapshot: needs_implementation=%d (audio=%d image=%d)",
+                    c["needs_implementation"], c["audio"], c["image"])
+    except Exception as exc:  # noqa: BLE001 — tracking is non-critical
+        logger.warning("backlog snapshot skipped: %s", exc)
     return 0
 
 
