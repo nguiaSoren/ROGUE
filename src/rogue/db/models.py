@@ -676,6 +676,45 @@ class LadderAttempt(Base):
     )
 
 
+class LadderRotationMembership(Base):
+    """§10.10 Phase 2.1 — REACHABILITY telemetry: one row per (ladder × eligible
+    strategy), whether or not it ran.
+
+    ``ladder_attempts`` only logs strategies that *executed*, so a missing row is
+    ambiguous — it could mean the strategy was never eligible, was starved by
+    early-stop, lost the reorder, or the ladder hit budget. This table records the
+    FULL eligible rotation for each ladder (one ladder = one (run_id, parent_id)
+    sweep), with each strategy's ``rank``, whether it was ``eligible`` (its tier
+    runnable given the configs), whether it ``executed``, and — if not — the
+    ``skipped_reason`` (early_stop / budget / no_compatible_config / not_reached).
+
+    This is what makes **reachability** measurable (executed ÷ eligible), and with
+    it: starvation frequency, opportunity cost, reorder efficiency, and "high-value
+    but never reached". Append-only analytics log; reconstructed post-hoc from the
+    ``LadderResult`` so the ladder execution path stays untouched.
+    """
+
+    __tablename__ = "ladder_rotation_membership"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(40), index=True)
+    parent_id: Mapped[str] = mapped_column(String(40), index=True)
+    strategy_id: Mapped[str] = mapped_column(String(60), index=True)
+    tier: Mapped[str] = mapped_column(String(20))  # image|coj|structured|audio|planner
+    rank: Mapped[int] = mapped_column(Integer)  # position in the eligible rotation
+    eligible: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    executed: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    outcome: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # NULL iff executed; else early_stop|budget|no_compatible_config|not_reached
+    skipped_reason: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    config_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -683,6 +722,7 @@ __all__ = [
     "AttackStrategy",
     "RendererCapability",
     "LadderAttempt",
+    "LadderRotationMembership",
     "SourceProvenance",
     "BreachResult",
     "PairRefinementStep",

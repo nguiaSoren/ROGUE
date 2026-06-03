@@ -55,6 +55,8 @@ __all__ = [
     "build_rotation_plan",
     "format_rotation_plan",
     "log_ladder_attempts",
+    "build_rotation_membership",
+    "log_rotation_membership",
 ]
 
 # ARMS planner-tier strategy ids (Tier 5, not lifecycle-tracked harvested candidates).
@@ -125,6 +127,89 @@ def log_ladder_attempts(
             )
         )
     session.add_all(rows)
+
+
+def build_rotation_membership(
+    *,
+    run_id: str,
+    parent_id: str,
+    rotation: "list[tuple[str, str]]",
+    attempts: "list[tuple[str, str]]",
+    winning_strategy: Optional[str],
+    breached_on: Optional[str],
+    audio_eligible: bool,
+    now: datetime,
+) -> list:
+    """§10.10 Phase 2.1 — reconstruct the REACHABILITY trace for one ladder.
+
+    Post-hoc (the ladder execution path is untouched): given the full ordered
+    eligible ``rotation`` (``[(label, tier), …]``) the ladder was handed, plus what
+    actually ran (``attempts`` = ``[(label, outcome), …]`` from the ``LadderResult``)
+    and how it ended, classify EVERY eligible strategy as executed-or-skipped (and
+    why). Returns ``LadderRotationMembership`` rows (not yet added to the session).
+
+    Skip reasons:
+      - ``no_compatible_config`` — its tier wasn't runnable (today only audio is
+        config-gated: it needs an audio-capable config).
+      - ``early_stop`` — a breach earlier in the rotation ended the ladder before it.
+      - ``budget`` — the per-parent spend cap stopped the ladder before it.
+      - ``not_reached`` — eligible + before the stop boundary but produced no attempt
+        (e.g. a candidate-quota break in the planner tier). Honest catch-all.
+    """
+    from rogue.db.models import LadderRotationMembership
+
+    executed = {lbl: out for (lbl, out) in attempts if out != "stopped"}
+    budget_stopped = any(out == "stopped" for (_, out) in attempts)
+    ranked = [(lbl, tier, i) for i, (lbl, tier) in enumerate(rotation)]
+    winner_rank = (
+        next((r for (lbl, _t, r) in ranked if lbl == winning_strategy), None)
+        if winning_strategy is not None
+        else None
+    )
+    last_exec_rank = max(
+        (r for (lbl, _t, r) in ranked if lbl in executed), default=-1
+    )
+
+    rows = []
+    for label, tier, rank in ranked:
+        is_exec = label in executed
+        eligible = not (tier == "audio" and not audio_eligible)
+        if is_exec:
+            reason = None
+        elif not eligible:
+            reason = "no_compatible_config"
+        elif winner_rank is not None and rank > winner_rank:
+            reason = "early_stop"
+        elif budget_stopped and rank > last_exec_rank:
+            reason = "budget"
+        else:
+            reason = "not_reached"
+        rows.append(
+            LadderRotationMembership(
+                run_id=run_id,
+                parent_id=parent_id,
+                strategy_id=label,
+                tier=tier,
+                rank=rank,
+                eligible=eligible,
+                executed=is_exec,
+                outcome=executed.get(label),
+                skipped_reason=reason,
+                config_id=(
+                    breached_on if (is_exec and label == winning_strategy) else None
+                ),
+                created_at=now,
+            )
+        )
+    return rows
+
+
+def log_rotation_membership(session: "Session", rows: list) -> None:
+    """Append reachability rows. Telemetry-only — never raises into the caller's
+    transaction (mirrors ``log_ladder_attempts``)."""
+    if rows:
+        session.add_all(rows)
+
 
 # Retirement thresholds (env-overridable). Defaults from answers.md.
 MIN_TRIALS: int = int(os.environ.get("STRATEGY_MIN_TRIALS", "5"))

@@ -55,8 +55,10 @@ if TYPE_CHECKING:
 __all__ = [
     "BreachStat",
     "StrategyValue",
+    "ReachStat",
     "strategy_breach_rates",
     "strategy_values",
+    "strategy_reachability",
     "order_by_prior",
     "order_by_value",
     "ladder_order_mode",
@@ -322,3 +324,70 @@ def order_by_value(
         return sv.value_score(now)
 
     return _stable_order(elements, _score)
+
+
+@dataclass(frozen=True)
+class ReachStat:
+    """§10.10 Phase 2.1 — per-strategy reachability over `ladder_rotation_membership`.
+
+    The signal `strategy_values` could NOT see: of the ladders where a strategy was
+    *eligible*, how often did it actually run vs get skipped (and why). `reachability`
+    low ⇒ the strategy is starved (early-stopped past / lost the reorder) even though
+    it was a legitimate candidate — "high value but never reached"."""
+
+    strategy_id: str
+    eligible: int
+    executed: int
+    early_stopped: int
+    budgeted: int
+
+    @property
+    def reachability(self) -> float:
+        return self.executed / self.eligible if self.eligible else 0.0
+
+    @property
+    def starvation_rate(self) -> float:
+        """Fraction of eligible appearances lost specifically to early-stop — the
+        rich-get-richer / reorder-loser signal (distinct from budget cutoff)."""
+        return self.early_stopped / self.eligible if self.eligible else 0.0
+
+
+def strategy_reachability(
+    session: "Session", *, config_id: str | None = None,
+) -> dict[str, "ReachStat"]:
+    """Aggregate `ladder_rotation_membership` into per-strategy reachability stats.
+
+    Only rows where the strategy was ``eligible`` count toward the denominator (an
+    ineligible appearance — e.g. audio with no audio-config — is not "starvation").
+    ``config_id`` optionally scopes to the winner config of each ladder.
+    """
+    from sqlalchemy import case, func
+
+    from rogue.db.models import LadderRotationMembership as M
+
+    early = (M.skipped_reason == "early_stop")
+    budget = (M.skipped_reason == "budget")
+    q = (
+        session.query(
+            M.strategy_id.label("sid"),
+            func.sum(case((M.eligible, 1), else_=0)).label("eligible"),
+            func.sum(case(((M.eligible & M.executed), 1), else_=0)).label("executed"),
+            func.sum(case((early, 1), else_=0)).label("early_stopped"),
+            func.sum(case((budget, 1), else_=0)).label("budgeted"),
+        )
+        .group_by(M.strategy_id)
+    )
+    if config_id is not None:
+        q = q.filter(M.config_id == config_id)
+    out: dict[str, ReachStat] = {}
+    for row in q.all():
+        if row.sid is None:
+            continue
+        out[row.sid] = ReachStat(
+            strategy_id=row.sid,
+            eligible=int(row.eligible or 0),
+            executed=int(row.executed or 0),
+            early_stopped=int(row.early_stopped or 0),
+            budgeted=int(row.budgeted or 0),
+        )
+    return out

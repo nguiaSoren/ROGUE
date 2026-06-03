@@ -1261,6 +1261,51 @@ async def run_reproduction(
                                     "ladder_attempts logging failed: parent=%s err=%s",
                                     pid, exc,
                                 )
+                            # §10.10 Phase 2.1 — REACHABILITY trace. Reconstruct the
+                            # full eligible rotation (every strategy the ladder COULD
+                            # have tried, in reordered order) + whether each executed
+                            # or was skipped (and why), so "no ladder_attempts row" is
+                            # no longer ambiguous. Post-hoc from the LadderResult — the
+                            # ladder path is untouched.
+                            try:
+                                from rogue.reproduce.strategy_lifecycle import (  # noqa: PLC0415
+                                    build_rotation_membership,
+                                    log_rotation_membership,
+                                )
+                                from rogue.reproduce.target_panel import (  # noqa: PLC0415
+                                    supports_audio,
+                                )
+
+                                _rotation = (
+                                    [(f"image:{r}", "image") for r in image_renderers_tier]
+                                    + [(f"coj:{o}", "coj") for o in coj_tier]
+                                    + [(f"structured:{f}", "structured") for f in structured_tier]
+                                    + [(f"audio:{s}", "audio") for s in audio_styles_tier]
+                                    + [(s, "planner") for s in escalation_plan.rotation]
+                                )
+                                _audio_eligible = any(
+                                    supports_audio(c.target_model) for c in configs
+                                )
+                                log_rotation_membership(
+                                    session,
+                                    build_rotation_membership(
+                                        run_id=run_id,
+                                        parent_id=pid,
+                                        rotation=_rotation,
+                                        attempts=res.attempts,
+                                        winning_strategy=res.winning_strategy,
+                                        breached_on=res.breached_on,
+                                        audio_eligible=_audio_eligible,
+                                        now=escalation_now,
+                                    ),
+                                )
+                                session.commit()
+                            except Exception as exc:  # noqa: BLE001
+                                session.rollback()
+                                logger.warning(
+                                    "rotation_membership logging failed: parent=%s err=%s",
+                                    pid, exc,
+                                )
                             stats.escalations_run += 1
                             stats.escalation_spend_usd += res.spend_usd
                             stats.estimated_cost_usd += res.spend_usd

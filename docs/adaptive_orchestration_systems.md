@@ -81,6 +81,8 @@ in the instrumentation required to do so honestly.
 ## Open data needs
 
 - Paid before/after runs for rank-of-winner + call-count deltas.
-- Rotation-membership logging to measure reachability.
+- ~~Rotation-membership logging to measure reachability.~~ **Done (2026-06-03, migration 0019 +
+  `ladder_rotation_membership`)** — `reachability` + `starvation_rate` are now queryable
+  (`ladder_priors.strategy_reachability`); needs a paid sweep to *populate* the table.
 - Repeated A/B runs (or a paired design) to resolve sub-noise effects.
 - Honest cost accounting (the Mistral $0 price-log gap).
