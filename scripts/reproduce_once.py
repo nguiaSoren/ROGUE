@@ -1702,6 +1702,22 @@ def main(argv: list[str] | None = None) -> int:
     # New breaches are in Neon now — tell the frontend to regenerate the cached
     # dashboard pages immediately (no-op if the revalidate env vars are unset).
     revalidate_frontend()
+
+    # Refresh the analytics snapshot — this run changed breach_results / telemetry,
+    # so the /analytics report layer should reflect it. Auto-publishes to the live
+    # site only if ROGUE_AUTO_PUBLISH_ANALYTICS=1 (else regenerate the local JSON).
+    try:
+        import sys as _sys
+        from datetime import datetime as _dt
+        from datetime import timezone as _tz
+        from pathlib import Path as _P
+        _r = str(_P(__file__).resolve().parent.parent)
+        if _r not in _sys.path:
+            _sys.path.insert(0, _r)
+        from scripts.build_analytics import refresh_and_maybe_publish
+        logger.info(refresh_and_maybe_publish(args.database_url, ts=_dt.now(_tz.utc).isoformat()))
+    except Exception as exc:  # noqa: BLE001 — non-critical
+        logger.warning("analytics refresh skipped: %s", exc)
     return 0
 
 

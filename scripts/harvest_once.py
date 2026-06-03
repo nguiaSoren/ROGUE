@@ -1016,6 +1016,18 @@ def main(argv: list[str] | None = None) -> int:
                     c["discoverable"], c["testable"], c["actionable"])
     except Exception as exc:  # noqa: BLE001 — tracking is non-critical
         logger.warning("backlog snapshot skipped: %s", exc)
+
+    # Refresh the analytics snapshot (data/analytics.json) — the harvest changed
+    # the corpus, so the /analytics report layer should reflect it. Auto-publishes
+    # to the live site only if ROGUE_AUTO_PUBLISH_ANALYTICS=1 (else regenerate-only).
+    try:
+        from datetime import datetime, timezone
+
+        from scripts.build_analytics import refresh_and_maybe_publish
+        logger.info(refresh_and_maybe_publish(
+            args.database_url, ts=datetime.now(timezone.utc).isoformat()))
+    except Exception as exc:  # noqa: BLE001 — non-critical
+        logger.warning("analytics refresh skipped: %s", exc)
     return 0
 
 

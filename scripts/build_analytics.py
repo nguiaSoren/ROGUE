@@ -204,12 +204,16 @@ def cost(c, grad: int) -> dict:
     }
 
 
-def main() -> int:
+def regenerate(database_url: str | None = None, ts: str | None = None) -> dict:
+    """Query live Neon → write data/analytics.json. Returns the report dict. No
+    printing — safe to call from a harvest/reproduce end-hook. ``ts`` (the caller's
+    UTC clock) stamps generated_at; falls back to now() for the CLI path."""
     load_dotenv(str(_ROOT / ".env"))
-    e = create_engine(os.environ["DATABASE_URL"])
+    e = create_engine(database_url or os.environ["DATABASE_URL"])
     with e.connect() as c:
         cap = capability(c)
         rep = {
+            "generated_at": ts,
             "capability": cap,
             "discovery": discovery(c),
             "contextual": contextual(c),
@@ -219,6 +223,33 @@ def main() -> int:
         }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(rep, indent=2, default=str))
+    return rep
+
+
+def refresh_and_maybe_publish(database_url: str | None = None, ts: str | None = None) -> str:
+    """harvest/reproduce end-hook: refresh the analytics snapshot, and — only if
+    ROGUE_AUTO_PUBLISH_ANALYTICS=1 — publish it live (vercel --prod, git-free).
+    Best-effort: returns a status string, never raises into the caller. Default
+    (flag unset) just regenerates the local JSON — no surprise deploys."""
+    import subprocess
+    try:
+        if os.environ.get("ROGUE_AUTO_PUBLISH_ANALYTICS") == "1":
+            # publish.sh regenerates + bundles + deploys (so no double-query here)
+            r = subprocess.run([str(_ROOT / "scripts" / "publish_analytics.sh")],
+                               capture_output=True, text=True, timeout=600)
+            return f"analytics: regenerated + auto-published (vercel exit={r.returncode})"
+        rep = regenerate(database_url, ts=ts)
+        return (f"analytics: regenerated data/analytics.json "
+                f"(graduated={rep['capability']['graduated']}, "
+                f"cost/grad=${rep['cost'].get('cost_per_graduation_usd')}) "
+                f"— set ROGUE_AUTO_PUBLISH_ANALYTICS=1 to also push it live")
+    except Exception as exc:  # noqa: BLE001 — analytics refresh must never fail a run
+        return f"analytics refresh skipped: {exc}"
+
+
+def main() -> int:
+    import datetime
+    rep = regenerate(ts=datetime.datetime.now(datetime.timezone.utc).isoformat())
 
     # ---- readable summary ----
     cap, disc, ctx, alloc, res, cst = (rep[k] for k in
