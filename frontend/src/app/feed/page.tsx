@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { AttackRow } from "@/components/attack-row";
+import { FeedStream } from "@/components/feed-stream";
 import { AugmentationStrip } from "@/components/augmentation-strip";
 import { BanditWidget } from "@/components/bandit-widget";
 import { CountUp } from "@/components/count-up";
@@ -65,32 +65,6 @@ export default async function FeedPage() {
   const newBreachesToday =
     (briefSummary?.new_critical ?? 0) + (briefSummary?.new_high ?? 0);
 
-  // Family histogram for the left ribbon — "what's hot today" at a glance.
-  const familyCounts: { family: string; n: number }[] = [];
-  if (attacks?.attacks) {
-    const m = new Map<string, number>();
-    for (const a of attacks.attacks) {
-      m.set(a.family, (m.get(a.family) ?? 0) + 1);
-    }
-    Array.from(m.entries())
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 8)
-      .forEach(([family, n]) => familyCounts.push({ family, n }));
-  }
-
-  // Bright Data product histogram — which product surfaced the most.
-  const productCounts: { product: string; n: number }[] = [];
-  if (attacks?.attacks) {
-    const m = new Map<string, number>();
-    for (const a of attacks.attacks) {
-      const p = a.sources?.[0]?.bright_data_product;
-      if (p) m.set(p, (m.get(p) ?? 0) + 1);
-    }
-    Array.from(m.entries())
-      .sort(([, a], [, b]) => b - a)
-      .forEach(([product, n]) => productCounts.push({ product, n }));
-  }
-
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
       <div className="max-w-7xl mx-auto px-6 py-10 space-y-8">
@@ -102,7 +76,7 @@ export default async function FeedPage() {
           </p>
           <h1 className="text-4xl font-bold tracking-tight">Live Feed</h1>
           <p className="text-sm text-muted-foreground">
-            Newest attack primitives surfaced from the open web — last 7 days.
+            Newest attack primitives surfaced from the open web.
           </p>
         </header>
 
@@ -148,44 +122,9 @@ export default async function FeedPage() {
 
         {/* 3-column war room */}
         <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_300px] gap-6">
-          {/* LEFT — intel ribbon: families + products distribution */}
-          <aside className="space-y-4 lg:order-1">
-            <IntelRibbon
-              title="hot families · 7d"
-              data={familyCounts.map((f) => ({ label: f.family, value: f.n }))}
-              accent="var(--rogue-green)"
-              empty="no recent attacks"
-            />
-            <IntelRibbon
-              title="by Bright Data product"
-              data={productCounts.map((p) => ({ label: p.product, value: p.n }))}
-              accent="#22d3ee"
-              empty="no provenance yet"
-            />
-          </aside>
-
-          {/* CENTER — attack list */}
-          <section className="space-y-2 lg:order-2 min-w-0">
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                newest attacks — click row to expand
-              </h2>
-              <p className="font-mono text-[10px] text-muted-foreground">
-                {attacks?.attacks?.length ?? 0} shown
-              </p>
-            </div>
-            {attacks?.attacks?.length ? (
-              <ul className="space-y-2">
-                {attacks.attacks.map((a, i) => (
-                  <AttackRow key={a.primitive_id} attack={a} index={i} />
-                ))}
-              </ul>
-            ) : (
-              <div className="border border-border rounded-lg p-6 font-mono text-sm text-muted-foreground">
-                {"// no attacks in last 7d. Run scripts/harvest_once.py to seed."}
-              </div>
-            )}
-          </section>
+          {/* LEFT intel ribbons + CENTER attack list — client-side so the time
+              window (today / 7 days / all time) re-scopes without reloading. */}
+          <FeedStream initialAttacks={attacks} />
 
           {/* RIGHT — augmentation sidebar */}
           <aside className="space-y-4 lg:order-3">
@@ -230,66 +169,6 @@ function KpiTile({
         {value !== null ? <CountUp value={value} /> : "—"}
       </p>
       <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-    </div>
-  );
-}
-
-function IntelRibbon({
-  title,
-  data,
-  accent,
-  empty,
-}: {
-  title: string;
-  data: { label: string; value: number }[];
-  accent: string;
-  empty: string;
-}) {
-  const peak = data.length > 0 ? Math.max(...data.map((d) => d.value)) : 1;
-  return (
-    <div className="rogue-card border border-border rounded-lg p-4 bg-card/40 backdrop-blur-sm space-y-3">
-      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-        {title}
-      </p>
-      {data.length === 0 ? (
-        <p className="text-[11px] font-mono text-muted-foreground">
-          {`// ${empty}`}
-        </p>
-      ) : (
-        <ul className="space-y-1.5">
-          {data.map((d) => {
-            const pct = (d.value / peak) * 100;
-            return (
-              <li
-                key={d.label}
-                className="text-[11px] font-mono space-y-0.5"
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span
-                    className="truncate text-foreground"
-                    title={d.label}
-                  >
-                    {d.label}
-                  </span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {d.value}
-                  </span>
-                </div>
-                <span className="block h-1 bg-card/60 rounded-sm overflow-hidden">
-                  <span
-                    className="block h-full rounded-sm transition-all duration-700 ease-out"
-                    style={{
-                      width: `${pct}%`,
-                      background: accent,
-                      boxShadow: `0 0 6px ${accent}88`,
-                    }}
-                  />
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </div>
   );
 }
