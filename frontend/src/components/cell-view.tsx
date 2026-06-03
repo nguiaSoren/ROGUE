@@ -19,14 +19,16 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
  * page shell + loading.tsx render instantly regardless of API state.
  */
 type Scope = "this-run" | "all-time";
+type Attacker = "baseline" | "augmented";
 
 async function fetchCell(
   family: string,
   config: string,
   date: string | undefined,
   scope: Scope,
+  attacker: Attacker,
 ): Promise<BreachCellResponse> {
-  const q = new URLSearchParams({ family, config, scope });
+  const q = new URLSearchParams({ family, config, scope, attacker });
   // `date` only narrows the this-run scope; all-time merges every day.
   if (date && scope === "this-run") q.set("date", date);
   const url = `${API_BASE}/api/breaches/cell?${q.toString()}`;
@@ -62,22 +64,25 @@ export function CellView({
   config,
   date,
   initialScope,
+  initialAttacker,
 }: {
   family: string;
   config: string;
   date?: string;
   initialScope: Scope;
+  initialAttacker: Attacker;
 }) {
-  // SCOPE mirrors the matrix toggle: the page opens in whatever scope you
-  // clicked from (so an all-time cell that breached on another day doesn't open
-  // empty), and the toggle lets you flip to the other scope in place.
+  // SCOPE × ATTACKER mirror the matrix 2×2: the page opens in whatever quadrant
+  // you clicked from (so a cell that's red all-time / augmented but empty in this
+  // run's baseline doesn't open empty), and the toggles flip either axis in place.
   const [scope, setScope] = useState<Scope>(initialScope);
+  const [attacker, setAttacker] = useState<Attacker>(initialAttacker);
   const [state, setState] = useState<State>({ status: "loading" });
   const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetchCell(family, config, date, scope)
+    fetchCell(family, config, date, scope, attacker)
       .then((data) => {
         if (!cancelled) setState({ status: "ok", data });
       })
@@ -87,11 +92,17 @@ export function CellView({
     return () => {
       cancelled = true;
     };
-  }, [family, config, date, scope, retryNonce]);
+  }, [family, config, date, scope, attacker, retryNonce]);
 
   function flipScope(next: Scope) {
     if (next === scope) return;
     setScope(next);
+    setState({ status: "loading" });
+  }
+
+  function flipAttacker(next: Attacker) {
+    if (next === attacker) return;
+    setAttacker(next);
     setState({ status: "loading" });
   }
 
@@ -145,9 +156,13 @@ export function CellView({
       <header className="space-y-2 animate-rogue-fade-up">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-            /matrix/cell · {scope === "all-time" ? "all-time" : data.target_date}
+            /matrix/cell · {scope === "all-time" ? "all-time" : data.target_date} ·{" "}
+            {attacker === "augmented" ? "+augmentations" : "baseline"}
           </p>
-          <ScopeToggle scope={scope} onChange={flipScope} />
+          <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+            <ScopeToggle scope={scope} onChange={flipScope} />
+            <AttackerToggle attacker={attacker} onChange={flipAttacker} />
+          </div>
         </div>
         <h1 className="text-3xl font-bold tracking-tight">{data.family}</h1>
         <p className="text-sm text-muted-foreground inline-flex items-center gap-1.5 font-mono">
@@ -160,8 +175,11 @@ export function CellView({
         <p className="text-sm text-muted-foreground">
           <span className="text-foreground">{data.n_primitives}</span> breaching{" "}
           {data.n_primitives === 1 ? "primitive" : "primitives"} (&gt;0% any-breach),
-          worst-first ·{" "}
-          {scope === "all-time" ? "every run day merged" : "this run's day"}.
+          worst-first · {scope === "all-time" ? "every run day merged" : "this run's day"} ·{" "}
+          {attacker === "augmented"
+            ? "worst across baseline / persona / PAIR"
+            : "raw single-shot"}
+          .
         </p>
         <Link
           href="/matrix"
@@ -174,20 +192,33 @@ export function CellView({
       <div className="mt-8">
         {data.primitives.length === 0 ? (
           <div className="border border-border rounded-lg p-6 font-mono text-sm text-muted-foreground">
-            {scope === "this-run" ? (
+            {`// no breaching primitives in ${
+              scope === "all-time" ? "all-time" : "this run's day"
+            } · ${attacker === "augmented" ? "+augmentations" : "baseline"} for this cell.`}
+            {(scope === "this-run" || attacker === "baseline") && (
               <>
-                {"// no breaching primitives in this run's day for this cell — "}
-                <button
-                  type="button"
-                  onClick={() => flipScope("all-time")}
-                  className="text-rogue-green hover:underline"
-                >
-                  try all-time
-                </button>
-                {" (the breach may be from another run day)."}
+                {" Try "}
+                {scope === "this-run" && (
+                  <button
+                    type="button"
+                    onClick={() => flipScope("all-time")}
+                    className="text-rogue-green hover:underline"
+                  >
+                    all-time
+                  </button>
+                )}
+                {scope === "this-run" && attacker === "baseline" && " or "}
+                {attacker === "baseline" && (
+                  <button
+                    type="button"
+                    onClick={() => flipAttacker("augmented")}
+                    className="text-orange-300 hover:underline"
+                  >
+                    + augmentations
+                  </button>
+                )}
+                .
               </>
-            ) : (
-              "// no breaching primitives in this cell."
             )}
           </div>
         ) : (
@@ -232,6 +263,46 @@ function ScopeToggle({
           }`}
         >
           All-time
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AttackerToggle({
+  attacker,
+  onChange,
+}: {
+  attacker: Attacker;
+  onChange: (next: Attacker) => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-2">
+      <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+        attacker:
+      </span>
+      <div className="inline-flex rounded-md border border-border overflow-hidden font-mono text-[10px] uppercase tracking-wider">
+        <button
+          type="button"
+          onClick={() => onChange("baseline")}
+          className={`px-3 py-1.5 transition-colors ${
+            attacker === "baseline"
+              ? "bg-rogue-green/15 text-rogue-green"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Baseline
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange("augmented")}
+          className={`px-3 py-1.5 border-l border-border transition-colors ${
+            attacker === "augmented"
+              ? "bg-rogue-red/15 text-rogue-red"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          + Augmentations
         </button>
       </div>
     </div>

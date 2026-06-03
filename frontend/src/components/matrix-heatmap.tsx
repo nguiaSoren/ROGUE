@@ -446,6 +446,7 @@ export function MatrixHeatmap({
         cell={openCell}
         date={baseline.target_date}
         scope={scope}
+        attacker={showAugmented ? "augmented" : "baseline"}
         onClose={() => setOpenCell(null)}
       />
     </>

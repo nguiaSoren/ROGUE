@@ -24,10 +24,12 @@ export default async function CellPage({
     config?: string;
     date?: string;
     scope?: string;
+    attacker?: string;
   }>;
 }) {
-  const { family, config, date, scope } = await searchParams;
+  const { family, config, date, scope, attacker } = await searchParams;
   const initialScope = scope === "all-time" ? "all-time" : "this-run";
+  const initialAttacker = attacker === "augmented" ? "augmented" : "baseline";
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
@@ -42,6 +44,7 @@ export default async function CellPage({
             config={config}
             date={date}
             initialScope={initialScope}
+            initialAttacker={initialAttacker}
           />
         )}
       </div>

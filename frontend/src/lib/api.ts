@@ -107,6 +107,9 @@ export type CellPrimitive = AttackPrimitive & {
   full_breach_rate: number;
   avg_confidence: number | null;
   refused: boolean;
+  /** Worst-breaching technique for this primitive in the requested ATTACKER
+   *  scope — "baseline" (raw), or "persona"/"pair" when augmentation won. */
+  technique?: "baseline" | "persona" | "pair";
   histogram: {
     full_breach: number;
     partial_breach: number;
@@ -121,6 +124,9 @@ export type BreachCellResponse = {
   target_date: string;
   /** Which SCOPE the cell was resolved at — "this-run" (one day) or "all-time". */
   scope?: "this-run" | "all-time";
+  /** Which ATTACKER layer — "baseline" (raw single-shot) or "augmented"
+   *  (worst across baseline / persona-wrap / PAIR). */
+  attacker?: "baseline" | "augmented";
   family: string;
   config_id: string;
   config_name: string;

@@ -705,6 +705,7 @@ def breach_cell(
     config_id: str = Query(..., alias="config"),
     date_str: str | None = Query(None, alias="date"),
     scope: str = Query("this-run", alias="scope"),
+    attacker: str = Query("baseline", alias="attacker"),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """All primitives with any-breach > 0 in one (family × config) cell.
@@ -714,37 +715,54 @@ def breach_cell(
     detail the drawer shows — payload, provenance, image flag, CI, and the
     verdict histogram — so the dashboard can render a dedicated cell page.
 
-    ``scope`` mirrors the matrix SCOPE toggle so the drill-down matches the grid
-    you clicked from (otherwise a cell that's red all-time but breached on a day
-    other than ``date`` would open to an empty page):
+    ``scope`` × ``attacker`` mirror the matrix 2×2 so the drill-down matches the
+    grid quadrant you clicked from (otherwise a cell that's red in, say, the
+    all-time / augmented quadrant but empty on ``date`` in baseline would open to
+    an empty page):
 
-    * ``this-run`` (default) → the per-day grid via the ``breach_matrix`` view,
-      with the day's verdict histogram.
-    * ``all-time`` → baseline single-shot trials merged across every run day,
-      worst kept per primitive, with the all-time histogram. ``date`` is ignored.
+    * SCOPE   — ``this-run`` (one day, via ``date``) vs ``all-time`` (every day
+      merged; ``date`` ignored).
+    * ATTACKER — ``baseline`` (raw single-shot only) vs ``augmented`` (worst kept
+      across baseline / persona-wrap / PAIR per primitive).
 
-    Both scopes are the BASELINE (single-shot) layer — augmented (persona/PAIR)
-    drill-down is not yet exposed here.
+    this-run × baseline is served from the ``breach_matrix`` view (matches that
+    grid cell exactly); the other three quadrants aggregate raw ``breach_results``
+    the same way ``_matrix_worst_rows`` builds the grid, so the per-primitive
+    rates line up with the cell you clicked. In augmented mode each primitive also
+    carries the winning ``technique``.
     """
     from rogue.diff.bootstrap import bootstrap_ci
 
     all_time = scope == "all-time"
+    augmented = attacker == "augmented"
 
     if date_str and date_str != "today":
         target = _parse_date(date_str)
     else:
         target = _default_report_date(db) or _parse_date(date_str)
 
-    if all_time:
-        # Merge every run day's baseline trials, worst kept per primitive. One
-        # query carries both the rate columns (read as ``r``) and the verdict
-        # histogram (read as ``h``) — the same row object serves both below.
+    if all_time or augmented:
+        # The 3 non-(this-run × baseline) quadrants. Worst technique per primitive
+        # over raw trials, scoped by SCOPE (date) and ATTACKER (technique). One
+        # query carries both the rate columns (read as ``r``) and the worst
+        # technique's verdict histogram (read as ``h``) — same row serves both.
+        date_filter = "" if all_time else "AND br.ran_at::date = :d"
+        technique_filter = (
+            ""
+            if augmented
+            else "AND br.persona_used IS NULL AND br.pair_attacker_total_cost_usd IS NULL"
+        )
         rows = db.execute(
             text(
-                """
-                WITH agg AS (
+                f"""
+                WITH per_tech AS (
                     SELECT
                         br.primitive_id,
+                        CASE
+                            WHEN br.pair_attacker_total_cost_usd IS NOT NULL THEN 'pair'
+                            WHEN br.persona_used IS NOT NULL THEN 'persona'
+                            ELSE 'baseline'
+                        END AS technique,
                         COUNT(*) FILTER (WHERE br.verdict != 'error') AS n_trials,
                         COUNT(*) FILTER (WHERE br.verdict IN ('partial_breach','full_breach')) AS n_breach,
                         COUNT(*) FILTER (WHERE br.verdict = 'full_breach')    AS n_full,
@@ -759,22 +777,28 @@ def breach_cell(
                     JOIN attack_primitives ap ON ap.primitive_id = br.primitive_id
                     WHERE ap.family = :fam
                       AND br.deployment_config_id = :cfg
-                      AND br.persona_used IS NULL
-                      AND br.pair_attacker_total_cost_usd IS NULL
-                    GROUP BY br.primitive_id
+                      {date_filter}
+                      {technique_filter}
+                    GROUP BY br.primitive_id, technique
+                ),
+                ranked AS (
+                    SELECT *,
+                        n_breach::float / NULLIF(n_trials, 0) AS any_breach_rate,
+                        n_full::float   / NULLIF(n_trials, 0) AS full_breach_rate
+                    FROM per_tech
+                    WHERE n_trials > 0
+                ),
+                worst AS (
+                    SELECT DISTINCT ON (primitive_id) *
+                    FROM ranked
+                    ORDER BY primitive_id, any_breach_rate DESC, full_breach_rate DESC
                 )
-                SELECT
-                    primitive_id, n_trials,
-                    n_breach::float / NULLIF(n_trials, 0) AS any_breach_rate,
-                    n_full::float   / NULLIF(n_trials, 0) AS full_breach_rate,
-                    avg_confidence, refused,
-                    n_full, n_partial, n_evaded, n_refused, n_error, last_ran_at
-                FROM agg
+                SELECT * FROM worst
                 WHERE n_breach > 0
                 ORDER BY any_breach_rate DESC, full_breach_rate DESC
                 """
             ),
-            {"fam": family, "cfg": config_id},
+            {"fam": family, "cfg": config_id} | ({} if all_time else {"d": target}),
         ).all()
         hist = {r.primitive_id: r for r in rows}
     else:
@@ -847,6 +871,9 @@ def breach_cell(
                 "full_breach_rate": float(r.full_breach_rate or 0.0),
                 "avg_confidence": float(r.avg_confidence) if r.avg_confidence is not None else None,
                 "refused": bool(r.refused),
+                # Which technique breached worst — 'baseline' for the view path,
+                # 'baseline'/'persona'/'pair' in the augmented quadrants.
+                "technique": getattr(r, "technique", "baseline"),
                 "histogram": {
                     "full_breach": int(h.n_full) if h else 0,
                     "partial_breach": int(h.n_partial) if h else 0,
@@ -861,6 +888,7 @@ def breach_cell(
     return {
         "target_date": target.isoformat(),
         "scope": scope,
+        "attacker": attacker,
         "family": family,
         "config_id": config_id,
         "config_name": config.name if config else config_id,

@@ -42,11 +42,25 @@ function CellCard({ p, rank }: { p: CellPrimitive; rank: number }) {
           <p className="text-sm text-muted-foreground leading-relaxed">
             {p.short_description}
           </p>
-          {p.refused && (
-            <span className="inline-flex items-center gap-1 rounded border border-rogue-red/30 bg-rogue-red/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rogue-red">
-              judge refused → fallback
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(p.technique === "persona" || p.technique === "pair") && (
+              <span
+                className="inline-flex items-center gap-1 rounded border border-orange-500/40 bg-orange-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-orange-300"
+                title={
+                  p.technique === "pair"
+                    ? "Only breached after PAIR iterative refinement — not single-shot"
+                    : "Only breached after persona-wrap — not single-shot"
+                }
+              >
+                via {p.technique === "pair" ? "PAIR" : "persona"}
+              </span>
+            )}
+            {p.refused && (
+              <span className="inline-flex items-center gap-1 rounded border border-rogue-red/30 bg-rogue-red/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rogue-red">
+                judge refused → fallback
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-right shrink-0">
           <p className={`text-3xl font-bold tabular-nums ${rateTint}`}>

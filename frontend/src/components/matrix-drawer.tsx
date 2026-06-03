@@ -106,6 +106,7 @@ export function MatrixCellDrawer({
   cell,
   date,
   scope,
+  attacker,
   onClose,
 }: {
   open: boolean;
@@ -116,6 +117,9 @@ export function MatrixCellDrawer({
    *  scope you clicked from (an all-time cell that breached on another day would
    *  otherwise open to an empty day-scoped page). */
   scope?: "this-run" | "all-time";
+  /** Matrix ATTACKER toggle — same idea on the other axis, so an augmented-only
+   *  breach doesn't open to an empty baseline page. */
+  attacker?: "baseline" | "augmented";
   onClose: () => void;
 }) {
   // Track which primitive_id the current `detail` was fetched for. If the
@@ -259,7 +263,7 @@ export function MatrixCellDrawer({
               cell.deployment_config_id,
             )}${date ? `&date=${encodeURIComponent(date)}` : ""}${
               scope ? `&scope=${scope}` : ""
-            }`}
+            }${attacker ? `&attacker=${attacker}` : ""}`}
             className="block rounded-md border border-rogue-green/30 bg-rogue-green/5 px-4 py-2.5 text-xs font-mono text-rogue-green hover:bg-rogue-green/10 transition-colors"
           >
             see all breaching primitives in this cell →
