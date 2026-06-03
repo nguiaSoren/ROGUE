@@ -121,3 +121,5 @@ docs/figs/
 scripts/paper_figs.py
 scripts/export_paper_data.py
 docs/RESEARCH_TODO.md
+# contingent roadmap (build-if-trigger), not implemented system
+docs/3b_v2_renderer_design.md
