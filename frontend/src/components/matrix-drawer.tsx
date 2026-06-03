@@ -105,12 +105,17 @@ export function MatrixCellDrawer({
   open,
   cell,
   date,
+  scope,
   onClose,
 }: {
   open: boolean;
   cell: BreachCell | null;
   /** Matrix run-date — threads into the "see all primitives" cell-page link. */
   date?: string;
+  /** Matrix SCOPE toggle — threaded through so the cell page opens in the same
+   *  scope you clicked from (an all-time cell that breached on another day would
+   *  otherwise open to an empty day-scoped page). */
+  scope?: "this-run" | "all-time";
   onClose: () => void;
 }) {
   // Track which primitive_id the current `detail` was fetched for. If the
@@ -252,7 +257,9 @@ export function MatrixCellDrawer({
           <Link
             href={`/matrix/cell?family=${encodeURIComponent(cell.family)}&config=${encodeURIComponent(
               cell.deployment_config_id,
-            )}${date ? `&date=${encodeURIComponent(date)}` : ""}`}
+            )}${date ? `&date=${encodeURIComponent(date)}` : ""}${
+              scope ? `&scope=${scope}` : ""
+            }`}
             className="block rounded-md border border-rogue-green/30 bg-rogue-green/5 px-4 py-2.5 text-xs font-mono text-rogue-green hover:bg-rogue-green/10 transition-colors"
           >
             see all breaching primitives in this cell →

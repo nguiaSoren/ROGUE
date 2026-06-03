@@ -18,13 +18,17 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
  * timeout, and show a "waking up — retry" state instead of a dead error. The
  * page shell + loading.tsx render instantly regardless of API state.
  */
+type Scope = "this-run" | "all-time";
+
 async function fetchCell(
   family: string,
   config: string,
   date: string | undefined,
+  scope: Scope,
 ): Promise<BreachCellResponse> {
-  const q = new URLSearchParams({ family, config });
-  if (date) q.set("date", date);
+  const q = new URLSearchParams({ family, config, scope });
+  // `date` only narrows the this-run scope; all-time merges every day.
+  if (date && scope === "this-run") q.set("date", date);
   const url = `${API_BASE}/api/breaches/cell?${q.toString()}`;
   // Patient retry (1s/2s/3s) so a free-tier cold boot is ridden out rather than
   // shown as an error; each attempt is timeout-capped so a held socket can't hang.
@@ -57,17 +61,23 @@ export function CellView({
   family,
   config,
   date,
+  initialScope,
 }: {
   family: string;
   config: string;
   date?: string;
+  initialScope: Scope;
 }) {
+  // SCOPE mirrors the matrix toggle: the page opens in whatever scope you
+  // clicked from (so an all-time cell that breached on another day doesn't open
+  // empty), and the toggle lets you flip to the other scope in place.
+  const [scope, setScope] = useState<Scope>(initialScope);
   const [state, setState] = useState<State>({ status: "loading" });
   const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetchCell(family, config, date)
+    fetchCell(family, config, date, scope)
       .then((data) => {
         if (!cancelled) setState({ status: "ok", data });
       })
@@ -77,7 +87,13 @@ export function CellView({
     return () => {
       cancelled = true;
     };
-  }, [family, config, date, retryNonce]);
+  }, [family, config, date, scope, retryNonce]);
+
+  function flipScope(next: Scope) {
+    if (next === scope) return;
+    setScope(next);
+    setState({ status: "loading" });
+  }
 
   if (state.status === "loading") {
     return (
@@ -127,9 +143,12 @@ export function CellView({
   return (
     <>
       <header className="space-y-2 animate-rogue-fade-up">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-          /matrix/cell · {data.target_date}
-        </p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+            /matrix/cell · {scope === "all-time" ? "all-time" : data.target_date}
+          </p>
+          <ScopeToggle scope={scope} onChange={flipScope} />
+        </div>
         <h1 className="text-3xl font-bold tracking-tight">{data.family}</h1>
         <p className="text-sm text-muted-foreground inline-flex items-center gap-1.5 font-mono">
           {data.target_model && (
@@ -141,7 +160,8 @@ export function CellView({
         <p className="text-sm text-muted-foreground">
           <span className="text-foreground">{data.n_primitives}</span> breaching{" "}
           {data.n_primitives === 1 ? "primitive" : "primitives"} (&gt;0% any-breach),
-          worst-first.
+          worst-first ·{" "}
+          {scope === "all-time" ? "every run day merged" : "this run's day"}.
         </p>
         <Link
           href="/matrix"
@@ -152,8 +172,68 @@ export function CellView({
       </header>
 
       <div className="mt-8">
-        <CellPrimitiveList primitives={data.primitives} />
+        {data.primitives.length === 0 ? (
+          <div className="border border-border rounded-lg p-6 font-mono text-sm text-muted-foreground">
+            {scope === "this-run" ? (
+              <>
+                {"// no breaching primitives in this run's day for this cell — "}
+                <button
+                  type="button"
+                  onClick={() => flipScope("all-time")}
+                  className="text-rogue-green hover:underline"
+                >
+                  try all-time
+                </button>
+                {" (the breach may be from another run day)."}
+              </>
+            ) : (
+              "// no breaching primitives in this cell."
+            )}
+          </div>
+        ) : (
+          <CellPrimitiveList primitives={data.primitives} />
+        )}
       </div>
     </>
+  );
+}
+
+function ScopeToggle({
+  scope,
+  onChange,
+}: {
+  scope: Scope;
+  onChange: (next: Scope) => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-2">
+      <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+        scope:
+      </span>
+      <div className="inline-flex rounded-md border border-border overflow-hidden font-mono text-[10px] uppercase tracking-wider">
+        <button
+          type="button"
+          onClick={() => onChange("this-run")}
+          className={`px-3 py-1.5 transition-colors ${
+            scope === "this-run"
+              ? "bg-rogue-green/15 text-rogue-green"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          This run
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange("all-time")}
+          className={`px-3 py-1.5 border-l border-border transition-colors ${
+            scope === "all-time"
+              ? "bg-rogue-green/15 text-rogue-green"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          All-time
+        </button>
+      </div>
+    </div>
   );
 }

@@ -445,6 +445,7 @@ export function MatrixHeatmap({
         open={openCell !== null}
         cell={openCell}
         date={baseline.target_date}
+        scope={scope}
         onClose={() => setOpenCell(null)}
       />
     </>

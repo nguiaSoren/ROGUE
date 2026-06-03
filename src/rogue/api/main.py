@@ -704,6 +704,7 @@ def breach_cell(
     family: str = Query(...),
     config_id: str = Query(..., alias="config"),
     date_str: str | None = Query(None, alias="date"),
+    scope: str = Query("this-run", alias="scope"),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """All primitives with any-breach > 0 in one (family × config) cell.
@@ -712,59 +713,116 @@ def breach_cell(
     this returns the FULL list (sorted worst-first) with the same per-primitive
     detail the drawer shows — payload, provenance, image flag, CI, and the
     verdict histogram — so the dashboard can render a dedicated cell page.
+
+    ``scope`` mirrors the matrix SCOPE toggle so the drill-down matches the grid
+    you clicked from (otherwise a cell that's red all-time but breached on a day
+    other than ``date`` would open to an empty page):
+
+    * ``this-run`` (default) → the per-day grid via the ``breach_matrix`` view,
+      with the day's verdict histogram.
+    * ``all-time`` → baseline single-shot trials merged across every run day,
+      worst kept per primitive, with the all-time histogram. ``date`` is ignored.
+
+    Both scopes are the BASELINE (single-shot) layer — augmented (persona/PAIR)
+    drill-down is not yet exposed here.
     """
     from rogue.diff.bootstrap import bootstrap_ci
+
+    all_time = scope == "all-time"
 
     if date_str and date_str != "today":
         target = _parse_date(date_str)
     else:
         target = _default_report_date(db) or _parse_date(date_str)
 
-    rows = db.execute(
-        text(
-            """
-            SELECT bm.primitive_id, bm.n_trials, bm.any_breach_rate,
-                   bm.full_breach_rate, bm.avg_confidence,
-                   COALESCE(jr.refused, false) AS refused
-            FROM breach_matrix bm
-            JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
-            LEFT JOIN (
-                SELECT primitive_id, deployment_config_id, ran_at::date AS rd,
-                       bool_or(judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
-                FROM breach_results GROUP BY 1, 2, 3
-            ) jr
-              ON jr.primitive_id = bm.primitive_id
-             AND jr.deployment_config_id = bm.deployment_config_id
-             AND jr.rd = bm.run_date
-            WHERE bm.run_date = :d
-              AND ap.family = :fam
-              AND bm.deployment_config_id = :cfg
-              AND bm.any_breach_rate > 0
-            ORDER BY bm.any_breach_rate DESC, bm.full_breach_rate DESC
-            """
-        ),
-        {"d": target, "fam": family, "cfg": config_id},
-    ).all()
+    if all_time:
+        # Merge every run day's baseline trials, worst kept per primitive. One
+        # query carries both the rate columns (read as ``r``) and the verdict
+        # histogram (read as ``h``) — the same row object serves both below.
+        rows = db.execute(
+            text(
+                """
+                WITH agg AS (
+                    SELECT
+                        br.primitive_id,
+                        COUNT(*) FILTER (WHERE br.verdict != 'error') AS n_trials,
+                        COUNT(*) FILTER (WHERE br.verdict IN ('partial_breach','full_breach')) AS n_breach,
+                        COUNT(*) FILTER (WHERE br.verdict = 'full_breach')    AS n_full,
+                        COUNT(*) FILTER (WHERE br.verdict = 'partial_breach') AS n_partial,
+                        COUNT(*) FILTER (WHERE br.verdict = 'evaded')         AS n_evaded,
+                        COUNT(*) FILTER (WHERE br.verdict = 'refused')        AS n_refused,
+                        COUNT(*) FILTER (WHERE br.verdict = 'error')          AS n_error,
+                        AVG(br.judge_confidence) FILTER (WHERE br.verdict != 'error') AS avg_confidence,
+                        MAX(br.ran_at) AS last_ran_at,
+                        bool_or(br.judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
+                    FROM breach_results br
+                    JOIN attack_primitives ap ON ap.primitive_id = br.primitive_id
+                    WHERE ap.family = :fam
+                      AND br.deployment_config_id = :cfg
+                      AND br.persona_used IS NULL
+                      AND br.pair_attacker_total_cost_usd IS NULL
+                    GROUP BY br.primitive_id
+                )
+                SELECT
+                    primitive_id, n_trials,
+                    n_breach::float / NULLIF(n_trials, 0) AS any_breach_rate,
+                    n_full::float   / NULLIF(n_trials, 0) AS full_breach_rate,
+                    avg_confidence, refused,
+                    n_full, n_partial, n_evaded, n_refused, n_error, last_ran_at
+                FROM agg
+                WHERE n_breach > 0
+                ORDER BY any_breach_rate DESC, full_breach_rate DESC
+                """
+            ),
+            {"fam": family, "cfg": config_id},
+        ).all()
+        hist = {r.primitive_id: r for r in rows}
+    else:
+        rows = db.execute(
+            text(
+                """
+                SELECT bm.primitive_id, bm.n_trials, bm.any_breach_rate,
+                       bm.full_breach_rate, bm.avg_confidence,
+                       COALESCE(jr.refused, false) AS refused
+                FROM breach_matrix bm
+                JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
+                LEFT JOIN (
+                    SELECT primitive_id, deployment_config_id, ran_at::date AS rd,
+                           bool_or(judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
+                    FROM breach_results GROUP BY 1, 2, 3
+                ) jr
+                  ON jr.primitive_id = bm.primitive_id
+                 AND jr.deployment_config_id = bm.deployment_config_id
+                 AND jr.rd = bm.run_date
+                WHERE bm.run_date = :d
+                  AND ap.family = :fam
+                  AND bm.deployment_config_id = :cfg
+                  AND bm.any_breach_rate > 0
+                ORDER BY bm.any_breach_rate DESC, bm.full_breach_rate DESC
+                """
+            ),
+            {"d": target, "fam": family, "cfg": config_id},
+        ).all()
 
-    # Per-primitive verdict histogram for this config on this day (one query).
-    hist_rows = db.execute(
-        text(
-            """
-            SELECT primitive_id,
-                   COUNT(*) FILTER (WHERE verdict = 'full_breach')    AS n_full,
-                   COUNT(*) FILTER (WHERE verdict = 'partial_breach') AS n_partial,
-                   COUNT(*) FILTER (WHERE verdict = 'evaded')         AS n_evaded,
-                   COUNT(*) FILTER (WHERE verdict = 'refused')        AS n_refused,
-                   COUNT(*) FILTER (WHERE verdict = 'error')          AS n_error,
-                   MAX(ran_at) AS last_ran_at
-            FROM breach_results
-            WHERE deployment_config_id = :cfg AND ran_at::date = :d
-            GROUP BY primitive_id
-            """
-        ),
-        {"d": target, "cfg": config_id},
-    ).all()
-    hist = {r.primitive_id: r for r in hist_rows}
+        # Per-primitive verdict histogram for this config on this day (one query).
+        hist_rows = db.execute(
+            text(
+                """
+                SELECT primitive_id,
+                       COUNT(*) FILTER (WHERE verdict = 'full_breach')    AS n_full,
+                       COUNT(*) FILTER (WHERE verdict = 'partial_breach') AS n_partial,
+                       COUNT(*) FILTER (WHERE verdict = 'evaded')         AS n_evaded,
+                       COUNT(*) FILTER (WHERE verdict = 'refused')        AS n_refused,
+                       COUNT(*) FILTER (WHERE verdict = 'error')          AS n_error,
+                       MAX(ran_at) AS last_ran_at
+                FROM breach_results
+                WHERE deployment_config_id = :cfg AND ran_at::date = :d
+                GROUP BY primitive_id
+                """
+            ),
+            {"d": target, "cfg": config_id},
+        ).all()
+        hist = {r.primitive_id: r for r in hist_rows}
 
     config = db.get(DeploymentConfigORM, config_id)
 
@@ -802,6 +860,7 @@ def breach_cell(
 
     return {
         "target_date": target.isoformat(),
+        "scope": scope,
         "family": family,
         "config_id": config_id,
         "config_name": config.name if config else config_id,

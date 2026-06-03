@@ -19,9 +19,15 @@ import { CellView } from "@/components/cell-view";
 export default async function CellPage({
   searchParams,
 }: {
-  searchParams: Promise<{ family?: string; config?: string; date?: string }>;
+  searchParams: Promise<{
+    family?: string;
+    config?: string;
+    date?: string;
+    scope?: string;
+  }>;
 }) {
-  const { family, config, date } = await searchParams;
+  const { family, config, date, scope } = await searchParams;
+  const initialScope = scope === "all-time" ? "all-time" : "this-run";
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
@@ -31,7 +37,12 @@ export default async function CellPage({
             {"// missing ?family= and ?config= query params"}
           </div>
         ) : (
-          <CellView family={family} config={config} date={date} />
+          <CellView
+            family={family}
+            config={config}
+            date={date}
+            initialScope={initialScope}
+          />
         )}
       </div>
     </main>

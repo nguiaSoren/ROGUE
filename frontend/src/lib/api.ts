@@ -119,6 +119,8 @@ export type CellPrimitive = AttackPrimitive & {
 
 export type BreachCellResponse = {
   target_date: string;
+  /** Which SCOPE the cell was resolved at — "this-run" (one day) or "all-time". */
+  scope?: "this-run" | "all-time";
   family: string;
   config_id: string;
   config_name: string;
