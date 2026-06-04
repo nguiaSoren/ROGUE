@@ -77,6 +77,19 @@ def _database_url() -> str:
 _engine = None
 _SessionLocal = None
 
+# Platform service graph (store/queue/engine), populated by `_wire_platform()` at import and consumed
+# by the optional in-process scan worker started in `_lifespan`.
+_PLATFORM: dict = {}
+
+
+def _inprocess_worker_enabled() -> bool:
+    """Whether to run the scan worker inside this web process (the $0 single-service deploy).
+
+    Off by default — set ``ROGUE_INPROCESS_WORKER=1`` on a service that ALSO has the provider keys
+    + ``JUDGE_MODEL`` in its env. For real volume, run a separate ``python -m rogue.platform.worker``.
+    """
+    return os.environ.get("ROGUE_INPROCESS_WORKER", "").strip().lower() in {"1", "true", "yes", "on"}
+
 
 def _session_factory() -> "sessionmaker":
     """Lazy-init the engine + session-maker, returning the session factory.
@@ -142,10 +155,37 @@ _mcp_app = rogue_mcp.streamable_http_app()
 
 @asynccontextmanager
 async def _lifespan(_app: "FastAPI"):
+    # Optional in-process scan worker: a $0 single-service deploy runs the worker loop here as a
+    # background asyncio task (off the request thread — scans are awaited I/O, the API stays
+    # responsive). Off by default; enabled by ROGUE_INPROCESS_WORKER=1 once the platform is wired.
+    import asyncio
+
+    worker_task = None
+    stop_event = None
+    if _inprocess_worker_enabled() and _PLATFORM.get("store") is not None:
+        from rogue.platform.worker import ScanWorker
+
+        stop_event = asyncio.Event()
+        _worker = ScanWorker(
+            _PLATFORM["store"], _PLATFORM["queue"], _PLATFORM["engine"], worker_id="inprocess-1"
+        )
+        worker_task = asyncio.create_task(_worker.run_forever(poll_interval=2.0, stop_event=stop_event))
+        logger.info("in-process scan worker started")
+
     # FastMCP's streamable-http transport needs its session-manager lifespan
     # running for the duration of the server; nest it under the API's lifespan.
-    async with _mcp_app.router.lifespan_context(_app):
-        yield
+    try:
+        async with _mcp_app.router.lifespan_context(_app):
+            yield
+    finally:
+        if stop_event is not None:
+            stop_event.set()
+        if worker_task is not None:
+            worker_task.cancel()
+            try:
+                await worker_task
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 app = FastAPI(
@@ -176,8 +216,9 @@ app.mount("/mcp", _mcp_app)
 # liveness. The routers are pure thin shells over ScanService/ReportService; the
 # production service graph (Postgres store/queue + the engine) is installed via
 # `deps.wire(...)` and only connects to the DB on the first `/v1` request. The
-# `/v1` scan endpoints require migration 0022 (scan_runs/scan_jobs) + a running
-# `python -m rogue.platform.worker` to fully execute scans.
+# `/v1` scan endpoints require migration 0022 (scan_runs/scan_jobs) + a worker to execute scans —
+# either a separate `python -m rogue.platform.worker` process, or the in-process worker started in
+# `_lifespan` when ROGUE_INPROCESS_WORKER=1 (the $0 single-service path).
 try:  # pragma: no cover - exercised at process start
     from rogue.api.v1 import deps as _v1_deps
     from rogue.api.v1 import scans as _v1_scans
@@ -197,6 +238,9 @@ try:  # pragma: no cover - exercised at process start
         store = build_postgres_scan_store()  # lazy engine — no connection until used
         queue = build_postgres_job_queue()
         engine = DefaultScanEngine()
+        _PLATFORM["store"] = store
+        _PLATFORM["queue"] = queue
+        _PLATFORM["engine"] = engine
         _v1_deps.wire(
             scan_service=DefaultScanService(store, queue),
             report_service=DefaultReportService(store),

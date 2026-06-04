@@ -78,6 +78,10 @@ The **WEB service** must carry the **same `DATABASE_URL`** (it writes the `scan_
 
 **Verify** — after the worker boots, its logs should show the migration line (non-fatal) and then the lease loop running. With no queued jobs the worker idles (it sleeps `poll_interval` between empty leases, per `run_forever`).
 
+### Option B — in-process worker ($0, recommended to start)
+
+Render background workers are a **paid** service (no free tier). For a $0 launch, run the worker loop **inside the web service** instead of deploying the separate worker above. Set `ROGUE_INPROCESS_WORKER=1` on the WEB service, plus the same execution credentials the worker needs — `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY` and `JUDGE_MODEL` (the web service otherwise only needs `DATABASE_URL` to enqueue). On startup, `rogue.api.main`'s lifespan starts a `ScanWorker.run_forever` background task in the same process — off the request thread (scans are awaited I/O, so the API stays responsive) — and cancels it cleanly on shutdown. One free Docker web service then both serves `/v1` and executes scans; **skip Step 2 entirely.** Trade-offs: the dyno's CPU is shared between request handling and scan execution, and a free dyno that sleeps won't run scans while asleep (keep it warm — UptimeRobot already pings `/api/health`). The two paths are interchangeable — same `ScanWorker`, same DB — so flip `ROGUE_INPROCESS_WORKER` off and deploy the separate worker service (Step 2) when scan volume warrants it.
+
 ## Step 3 — seed a tenant
 
 Mint an organization and its first API key with the seeding tool. The raw `rk_live_…` key is printed **exactly once** and is never stored (only its sha256 hash + a display prefix land in `api_keys` — see `generate_api_key` in `src/rogue/platform/tenancy.py`):
