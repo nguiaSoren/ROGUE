@@ -88,6 +88,11 @@ async def test_build_json_has_score_risk_level_and_findings():
     assert out["risk_level"] == "critical"
     assert out["target"] == TARGET
     assert len(out["findings"]) == 2
+    # Score methodology caption travels alongside the headline score/risk_level.
+    assert "score_methodology" in out
+    assert "weighted by severity" in out["score_methodology"]
+    # Every finding carries a render-time remediation.
+    assert all(f.get("remediation", "").strip() for f in out["findings"])
 
 
 @pytest.mark.asyncio

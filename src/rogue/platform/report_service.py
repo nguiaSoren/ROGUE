@@ -12,7 +12,13 @@ from __future__ import annotations
 import html as _html
 import re
 
-from rogue.report import Finding, ScanReport, technique_label
+from rogue.report import (
+    SCORE_METHODOLOGY,
+    Finding,
+    ScanReport,
+    remediation_for,
+    technique_label,
+)
 
 from . import scoring
 from .interfaces import ReportService, ScanStore
@@ -93,6 +99,7 @@ class DefaultReportService(ReportService):
         out = report.to_dict()
         out["score"] = score
         out["risk_level"] = scoring.risk_level(score)
+        out["score_methodology"] = SCORE_METHODOLOGY
         return out
 
     async def build_html(self, scan_id: str) -> str:
@@ -141,6 +148,7 @@ class DefaultReportService(ReportService):
         story = [
             Paragraph("ROGUE Threat Scan", styles["Title"]),
             Paragraph(f"Risk score {score:g}/100 ({level.upper()})", styles["Heading2"]),
+            Paragraph(_html.escape(SCORE_METHODOLOGY), styles["BodyText"]),
             Paragraph(_html.escape(report.target), styles["BodyText"]),
             Paragraph(
                 f"Tests {report.n_tests} &middot; Breaches {report.n_breaches} "
@@ -150,19 +158,23 @@ class DefaultReportService(ReportService):
             Spacer(1, 12),
         ]
 
-        # Findings table: header + the ranked findings (severity, success, technique, finding). All cells
-        # escaped; the rebuilt Findings are already redacted by `_load_report`.
-        data = [["Severity", "Success", "Technique", "Finding"]]
+        # Findings table: header + the ranked findings (severity, success, technique, finding,
+        # remediation). Free-text cells wrapped in Paragraphs so long finding/remediation text reflows
+        # instead of overflowing. All cells escaped; the rebuilt Findings are already redacted by
+        # `_load_report`. Remediation is render-time per-family (not stored on the Finding).
+        cell = styles["BodyText"]
+        data = [["Severity", "Success", "Technique", "Finding", "Remediation"]]
         for f in report.top_findings(50):
             data.append(
                 [
                     _html.escape(f.severity),
                     f.success_pct,
-                    _html.escape(technique_label(f.family)),
-                    _html.escape(f.title),
+                    Paragraph(_html.escape(technique_label(f.family)), cell),
+                    Paragraph(_html.escape(f.title), cell),
+                    Paragraph(_html.escape(remediation_for(f.family)), cell),
                 ]
             )
-        table = Table(data, repeatRows=1)
+        table = Table(data, repeatRows=1, colWidths=[55, 50, 90, 130, 195])
         table.setStyle(
             TableStyle(
                 [
