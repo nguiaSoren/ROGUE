@@ -152,21 +152,15 @@ def _winner_rank(res) -> int | None:
 
 
 async def _run_one_cell(
-    *, session, config, goals, n_trials, temperature, max_spend, dry_run
+    *, ctx, config, goals, n_trials, temperature, max_spend
 ) -> dict:
-    """Repertoire-replay one (dataset-goals × target) cell → an aggregate dict."""
-    primitives = [_goal_primitive(g.goal, i) for i, g in enumerate(goals)]
-    ctx = build_escalation_context(
-        session,
-        configs=[config],
-        n_parents_est=len(goals),
-        n_trials=n_trials,
-    )
-    est = len(goals) * len(ctx.rotation) * n_trials * _EST_PER_ATTEMPT_USD
-    if dry_run:
-        return {"dry_run": True, "n_goals": len(goals), "rotation_len": len(ctx.rotation),
-                "estimate_usd": est}
+    """Repertoire-replay one (dataset-goals × target) cell → an aggregate dict.
 
+    Takes a PRE-BUILT escalation context (no DB session) — the ladder's slow LLM
+    calls must NOT run inside an open transaction, or Neon kills it with
+    IdleInTransactionSessionTimeout (see reference_neon_serverless_resilience).
+    """
+    primitives = [_goal_primitive(g.goal, i) for i, g in enumerate(goals)]
     panel = TargetPanel()
     judge = JudgeAgent()
     per_goal: list[dict] = []
@@ -283,11 +277,15 @@ async def _main(args) -> int:
 
     total_est = 0.0
     written = 0
-    with SessionLocal() as session:
-        repertoire_size = _active_repertoire_size(session)
+
+    # Startup reads in a SHORT session, closed before any slow LLM work. Holding a
+    # session open across the ladder's minutes-long LLM calls trips Neon's
+    # IdleInTransactionSessionTimeout (reference_neon_serverless_resilience).
+    with SessionLocal() as s:
+        repertoire_size = _active_repertoire_size(s)
         config_orms = {
             o.config_id: o
-            for o in session.execute(
+            for o in s.execute(
                 select(DeploymentConfigORM).where(
                     DeploymentConfigORM.config_id.in_(list(targets))
                 )
@@ -297,27 +295,36 @@ async def _main(args) -> int:
         if missing:
             logger.error("target config(s) not found in DB: %s", missing)
             return 1
+        configs = {tid: _orm_to_pydantic_config(config_orms[tid]) for tid in targets}
 
-        for tid in targets:
-            config = _orm_to_pydantic_config(config_orms[tid])
-            for ds in datasets:
-                goals = load_canonical(ds)
-                if args.limit:
-                    goals = goals[: args.limit]
-                t0 = time.time()
-                agg = await _run_one_cell(
-                    session=session, config=config, goals=goals,
-                    n_trials=args.n_trials, temperature=args.temperature,
-                    max_spend=args.max_spend, dry_run=args.dry_run,
+    for tid in targets:
+        config = configs[tid]
+        for ds in datasets:
+            goals = load_canonical(ds)
+            if args.limit:
+                goals = goals[: args.limit]
+            # Build the escalation context in a SHORT session, then CLOSE it before
+            # the ladder runs (no transaction held across the slow LLM calls).
+            with SessionLocal() as s:
+                ctx = build_escalation_context(
+                    s, configs=[config], n_parents_est=len(goals), n_trials=args.n_trials,
                 )
-                if args.dry_run:
-                    total_est += agg["estimate_usd"]
-                    print(f"  {ds:13} × {config.target_model:34} "
-                          f"{agg['n_goals']} goals, rotation={agg['rotation_len']} "
-                          f"→ ≤ ${agg['estimate_usd']:.2f}")
-                    continue
-                if not args.no_persist:
-                    session.add(BenchmarkRun(
+            if args.dry_run:
+                est = len(goals) * len(ctx.rotation) * args.n_trials * _EST_PER_ATTEMPT_USD
+                total_est += est
+                print(f"  {ds:13} × {config.target_model:34} "
+                      f"{len(goals)} goals, rotation={len(ctx.rotation)} → ≤ ${est:.2f}")
+                await ctx.planner.aclose()
+                continue
+            t0 = time.time()
+            agg = await _run_one_cell(
+                ctx=ctx, config=config, goals=goals,
+                n_trials=args.n_trials, temperature=args.temperature,
+                max_spend=args.max_spend,
+            )
+            if not args.no_persist:
+                with SessionLocal() as s:  # short session, just the write
+                    s.add(BenchmarkRun(
                         run_label=label,
                         run_at=datetime.now(timezone.utc),
                         dataset=ds,
@@ -332,15 +339,15 @@ async def _main(args) -> int:
                         git_sha=git_sha,
                         detail=agg["detail"],
                     ))
-                    session.commit()
-                    written += 1
-                d = agg["detail"]
-                print(f"  {ds:13} × {config.target_model:34} "
-                      f"ASR={agg['asr']:.1%} ({agg['n_breached']}/{agg['n_goals']}) "
-                      f"med-rank={d['median_winner_rank']} depth(best/mean)="
-                      f"{d['best_ladder_depth']}/{d['mean_ladder_depth']} "
-                      f"$/{agg['n_breached'] or '∅'}={d['cost_per_successful_goal']} "
-                      f"${agg['cost_usd']:.2f}")
+                    s.commit()
+                written += 1
+            d = agg["detail"]
+            print(f"  {ds:13} × {config.target_model:34} "
+                  f"ASR={agg['asr']:.1%} ({agg['n_breached']}/{agg['n_goals']}) "
+                  f"med-rank={d['median_winner_rank']} depth(best/mean)="
+                  f"{d['best_ladder_depth']}/{d['mean_ladder_depth']} "
+                  f"$/{agg['n_breached'] or '∅'}={d['cost_per_successful_goal']} "
+                  f"${agg['cost_usd']:.2f}")
 
     if args.dry_run:
         print(f"\ndry-run: built context for every cell (no paid calls). "
