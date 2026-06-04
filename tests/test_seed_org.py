@@ -16,7 +16,23 @@ from sqlalchemy.orm import sessionmaker
 
 from rogue.db.models import Base
 from rogue.platform import tenancy
-from rogue.platform.models import ApiKey, Organization, User
+from rogue.platform.models import (
+    ApiKey,
+    Membership,
+    Organization,
+    Project,
+    Report,
+    ScanJob,
+    ScanRun,
+    User,
+)
+
+# All platform tables — create the full set so FK targets (e.g. api_keys -> projects) exist when
+# foreign-key enforcement is on.
+_PLATFORM_TABLES = [
+    Organization.__table__, User.__table__, Membership.__table__, Project.__table__,
+    ApiKey.__table__, ScanRun.__table__, ScanJob.__table__, Report.__table__,
+]
 
 # Load the script by path (scripts/ is not an importable package).
 _SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "seed_org.py"
@@ -29,9 +45,15 @@ seed_org = seed_org_mod.seed_org
 @pytest.fixture()
 def session():
     engine = create_engine("sqlite://")
-    Base.metadata.create_all(
-        engine, tables=[Organization.__table__, User.__table__, ApiKey.__table__]
-    )
+    # Enforce foreign keys on SQLite (off by default) so this suite catches FK-ordering bugs the way
+    # Postgres/Neon does — e.g. inserting an api_keys row before its organizations row.
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _fk_on(dbapi_conn, _rec):  # pragma: no cover - trivial pragma
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+    Base.metadata.create_all(engine, tables=_PLATFORM_TABLES)
     Session = sessionmaker(bind=engine)
     sess = Session()
     try:

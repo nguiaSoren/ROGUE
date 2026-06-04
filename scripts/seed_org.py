@@ -94,6 +94,11 @@ def seed_org(
                 )
             )
 
+    # Flush so the org (and user) rows physically exist before the api_keys FK insert. Without an
+    # ORM relationship() linking them, SQLAlchemy's unit-of-work can otherwise order the api_keys
+    # INSERT first → ForeignKeyViolation on Postgres (SQLite doesn't enforce FKs, which hid this).
+    session.flush()
+
     raw_key, key_hash, prefix = tenancy.generate_api_key("live")
     session.add(
         ApiKey(
