@@ -92,6 +92,14 @@ These take a customer `TargetSpec`, cost real money, and write durable per-tenan
 - **`run_benchmark(endpoint?/provider?, dataset, ...)`** — run the target against a standard benchmark dataset (e.g. AdvBench / JailbreakBench). Start+poll like `start_scan` — returns a `scan_id`-shaped handle whose terminal record carries the benchmark `score`/trend; read it back with `get_benchmark` (or `get_scan_status`).
 - **`get_benchmark(scan_id)`** — read a benchmark run's status and, when terminal, its score against the dataset.
 
+### Workflow
+
+These are the **Level-3** tools — they turn a finished scan into the artifacts and notifications a security team actually acts on, so the agent doesn't just report a result, it delivers the consult. Each takes a terminal `scan_id` and reads that scan's stored findings; the summary tool is a pure read, while the alert/ticket tools fan the result out to an external destination whose credentials the calling user supplies as arguments (see Versioning for why those are arguments today, not stored config).
+
+- **`create_executive_summary(scan_id)`** — render a CISO-ready markdown executive summary for a completed scan: the headline score and risk band, the critical and high findings with concrete remediation, and business framing a non-engineer can act on. Returns `{summary}` (the markdown string). A pure read; errors if the scan is not terminal.
+- **`send_slack_alert(scan_id, webhook_url)`** — post the scan result — score, breach count, and the top attack — to a Slack incoming webhook. `webhook_url` is the destination the calling user authorizes the agent with (an `https://hooks.slack.com/services/…` URL); it is used for the post and not persisted. Returns `{ok, status}` — `ok` is true when Slack accepts the post, `status` is the HTTP status from the webhook.
+- **`create_jira_ticket(scan_id, base_url, project_key, email, api_token)`** — file a Jira issue per breached critical/high finding, deduped so re-running the tool against the same scan won't refile a finding already ticketed. `base_url` (your Jira site, e.g. `https://acme.atlassian.net`), `project_key` (e.g. `SEC`), `email`, and `api_token` are the Jira credentials the calling user authorizes the agent with; they are used for the API calls and not persisted. Returns `{created, skipped}` — the lists of finding keys ticketed this call and those skipped as already-filed.
+
 ## Agentic workflows (the real value)
 
 The point of the action tools is that a coding agent can run a complete security task on its own — the model drives the loop, ROGUE does the work server-side. Two worked sequences.
@@ -127,40 +135,63 @@ Agent → user:  "Your staging API failed 7 of 50 red-team attacks (risk 62/100)
 
 The agent validates first (cheap, catches a bad endpoint before spending), starts the scan, paces its polling until the status is terminal, then reads the summary and narrates it. No dashboard involved.
 
-### (b) Agent as security consultant
+### (b) Agent as security consultant — the full Level-3 flow
+
+This is the whole point: the user asks one question and the agent runs the entire consult — validate, scan, read, summarize, and *deliver* — without the user touching a dashboard or a ticket queue. The Workflow tools are what close that loop.
 
 ```
-User:  "Is the model behind our support bot safe to ship? It's an OpenAI deployment,
-        gpt-4o-mini, here's the key."
+User:  "Test our staging endpoint and tell the team. It's at
+        https://staging-api.company.com/v1, here's the key. Slack #security
+        webhook is <hook>, file Jira against the SEC project."
 
-  → validate_target(provider="openai", model="gpt-4o-mini", api_key="sk-…")
-        ← { ok: true, model_responds: true }
+  → validate_target(endpoint="https://staging-api.company.com/v1", api_key="sk-…")
+        ← { ok: true, model_responds: true, supports_image: false }
 
-  → start_scan(provider="openai", model="gpt-4o-mini", api_key="sk-…",
-               pack="compliance", mode="ladder", max_tests=40, budget=20.0)
-        ← { scan_id: "scan_02K…", status: "queued" }
+  → start_scan(endpoint="https://staging-api.company.com/v1", api_key="sk-…",
+               pack="default", mode="ladder", max_tests=50)
+        ← { scan_id: "scan_03L…", status: "queued" }
 
-  → get_scan_status("scan_02K…")  (poll to terminal)
-        ← { status: "completed", n_breaches: 2, top_attack: "Persona override", score: 28 }
+  → get_scan_status("scan_03L…")   ← { status: "running",   progress: 55, … }
+  → get_scan_status("scan_03L…")   ← { status: "completed", n_breaches: 7,
+                                       top_attack: "Crescendo", score: 62,
+                                       summary: "7 vulnerabilities found, top: Crescendo" }
 
-  → get_report("scan_02K…", format="summary")
-        ← { content: "2 of 40 attacks broke through, both persona-override jailbreaks.
-            Risk 28/100 — low. No data-exfiltration or tool-abuse breaches." }
+  → get_report("scan_03L…", format="summary")
+        ← { content: "7 of 50 attacks broke through. Most exposed to multi-turn
+            escalation (Crescendo) and RAG-document injection. Risk 62/100." }
 
-Agent → user:  "Low risk (28/100). 2 of 40 attacks landed, both persona-override
-                jailbreaks — the model can be talked into a different persona, but
-                nothing leaked data or abused tools. Safe to ship with a persona-lock
-                guard; I'd re-scan after that change."
+  → create_executive_summary("scan_03L…")
+        ← { summary: "## Staging API — red-team summary\n**Risk: 62/100 (elevated).**
+            7 of 50 attacks succeeded. **Critical:** RAG-document injection — an
+            attacker-controlled document can override instructions… **Remediation:**
+            …\n**Business impact:** a support-bot deployment could be steered to
+            leak internal docs; recommend gating before GA." }
+
+  → send_slack_alert("scan_03L…", webhook_url="https://hooks.slack.com/services/…")
+        ← { ok: true, status: 200 }
+
+  → create_jira_ticket("scan_03L…", base_url="https://company.atlassian.net",
+                       project_key="SEC", email="sec@company.com", api_token="…")
+        ← { created: ["SEC-412", "SEC-413", "SEC-414"], skipped: [] }
+
+Agent → user:  "Scanned staging: risk 62/100, 7 of 50 attacks landed (worst is
+                multi-turn Crescendo escalation, plus a critical RAG-injection).
+                I filed 3 Jira tickets in SEC for the critical/high findings and
+                posted the summary to #security. I'd gate this before GA — the
+                RAG-injection is the one to fix first."
 ```
 
-The agent runs the consultant loop — validate, scan under the right pack and budget, read the report, give a ship/no-ship recommendation with a concrete next step. Pushing those findings onward — opening a Slack alert or a Jira ticket on HIGH/CRITICAL breaches — is a **roadmap integration**, not part of the v1 tool set; today the agent relays the result in-conversation.
+The agent ran the consultant loop end to end: validate the target, scan it under a ladder, pace its polling to terminal, read the report, turn it into a CISO-ready summary, and then *deliver* — push to Slack and open the right tickets — finally narrating what it did. The user gave one instruction; ROGUE did the work and the agent closed every loop. **This is what makes MCP more than an API: it turns ROGUE into a distribution channel — the agent the customer already lives in runs the whole security consult, from "test this" to "tickets filed."**
 
 ## Versioning
 
-The tools above are **v1**. The v1 contract is **stable**: tool names, their inputs, and their output shapes will not change underneath an integration. The `org` binding (server-side, never a tool argument) and the start+poll async shape for scans are load-bearing invariants of v1 and will hold.
+The tools above are **v1** — including the Slack and Jira Workflow tools, which graduate the "push findings onward" capability out of the roadmap and into the shipped surface. The v1 contract is **stable**: tool names, their inputs, and their output shapes will not change underneath an integration. The `org` binding (server-side, never a tool argument) and the start+poll async shape for scans are load-bearing invariants of v1 and will hold.
+
+**A note on how credentials flow today.** The Workflow tools take their destination and credentials as **tool arguments** — `send_slack_alert` takes the `webhook_url`, `create_jira_ticket` takes the `base_url` / `project_key` / `email` / `api_token`. The calling user authorizes the agent with those each time; ROGUE uses them for the one call and does not persist them. That keeps the integration zero-setup (no onboarding step before the first ticket fires) at the cost of the agent handling raw creds in-conversation. **Per-tenant *stored* integration config — where an org registers its Slack workspace and Jira site once, server-side, and the Workflow tools take only a `scan_id` — is the v2 hardening** (so the agent never touches raw credentials). It rides on the same per-tenant MCP auth work below.
 
 **v2 roadmap** (not yet shipped):
 
+- **Stored integration config** — per-tenant Slack/Jira (and other destination) credentials registered once and resolved server-side, so the Workflow tools drop their credential arguments and the agent stops handling raw secrets. Depends on per-tenant MCP auth (below) to bind the integration to an org.
 - **`list_projects` / `create_project`** — project-scoped organization of scans, blocked on a project service existing in the platform layer.
-- **`download_report`** — binary PDF/HTML report artifacts over MCP. v1 deliberately surfaces only text renderings (`get_report` summary/json) because MCP is a text protocol; binary delivery needs a separate mechanism (e.g. a signed URL the user opens in the dashboard).
+- **`download_report`** — binary PDF/HTML report artifacts over MCP. v1 deliberately surfaces only text renderings (`get_report` summary/json, `create_executive_summary` markdown) because MCP is a text protocol; binary delivery needs a separate mechanism (e.g. a signed URL the user opens in the dashboard).
 - **Per-tenant MCP auth** — `rk_live_…` / `rk_test_…` bearer keys on the `/mcp` mount, resolved through the same authentication and tenancy chain as the `/v1` API, with the read tools gated by `read` scope and the action tools by `scan`. This is what turns the currently-open public endpoint into a multi-tenant one where each client runs and reads only its own org's scans with its own key.

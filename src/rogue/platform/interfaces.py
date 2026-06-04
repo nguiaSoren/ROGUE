@@ -118,6 +118,9 @@ class ReportService(abc.ABC):
     @abc.abstractmethod
     async def build_pdf(self, scan_id: str) -> bytes: ...
 
+    @abc.abstractmethod
+    async def build_executive_summary(self, scan_id: str) -> str: ...
+
 
 __all__ = [
     "ProgressCallback", "LeasedJob",

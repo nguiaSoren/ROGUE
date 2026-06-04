@@ -147,8 +147,103 @@ class JiraDestination:
             logger.warning("jira: auto-close pass failed (%s)", exc)
 
 
+class JiraCloudClient:
+    """Concrete :class:`JiraClient` against the Jira Cloud REST v3 API.
+
+    Authenticates with HTTP Basic ``email:api_token`` (Jira Cloud's API-token scheme). ``create``
+    POSTs an issue into ``project_key`` carrying the ``rogue-<fid>`` label that is the dedup pivot;
+    ``find_open`` runs a best-effort JQL search for that label and returns the first matching issue
+    key (or ``None`` on no match / any error — the destination treats "couldn't find" as "not yet
+    tracked", which at worst risks a duplicate, never a swallowed finding). ``httpx`` is lazy-imported
+    so merely importing this module (e.g. for tests with a fake client) doesn't require the dependency.
+
+    ``close`` / ``list_open`` are NOT implemented here — the v1 ``create_jira_ticket`` tool only
+    creates + dedups; auto-close is a v2 concern driven by the platform, not the MCP action surface.
+    """
+
+    name = "jira-cloud"
+
+    def __init__(self, base_url: str, email: str, api_token: str, project_key: str) -> None:
+        # Trailing slash is stripped so the joined REST paths are well-formed regardless of input.
+        self.base_url = base_url.rstrip("/")
+        self.email = email
+        self.api_token = api_token
+        self.project_key = project_key
+
+    def _label(self, fid: str) -> str:
+        """The Jira label that stamps a finding's identity onto its ticket — the dedup pivot."""
+        return f"rogue-{fid}"
+
+    async def find_open(self, fid: str) -> str | None:
+        """Best-effort JQL lookup for an existing ticket carrying this finding's label.
+
+        Returns the first matching issue key, or ``None`` when nothing matches OR any error occurs
+        (network, auth, malformed response). Swallowing errors here is deliberate: a failed lookup
+        must not abort ticket creation — the worst case is a duplicate, never a dropped finding.
+        """
+        try:
+            import httpx  # noqa: PLC0415 - lazy so importing this module needs no httpx
+
+            jql = f'labels="{self._label(fid)}"'
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/rest/api/3/search",
+                    params={"jql": jql, "fields": "key", "maxResults": 1},
+                    auth=(self.email, self.api_token),
+                )
+                response.raise_for_status()
+                issues = (response.json() or {}).get("issues") or []
+                if issues:
+                    return issues[0].get("key")
+                return None
+        except Exception as exc:  # noqa: BLE001 - a failed lookup must never abort create
+            logger.warning("jira: find_open(%s) failed (%s) — treating as not-yet-tracked", fid, exc)
+            return None
+
+    async def create(self, ticket: JiraTicket) -> str:
+        """POST a new issue into ``project_key`` and return its issue key.
+
+        The description is built as an Atlassian Document Format (ADF) doc — Jira Cloud v3 requires
+        a structured body, not a raw string. The ``rogue-<finding_id>`` label is what a later
+        ``find_open`` matches on to dedup re-scans.
+        """
+        import httpx  # noqa: PLC0415 - lazy so importing this module needs no httpx
+
+        description = (
+            f"{ticket.remediation}\n\nFiled by ROGUE (finding {ticket.finding_id})."
+        )
+        body = {
+            "fields": {
+                "project": {"key": self.project_key},
+                "summary": ticket.title,
+                "issuetype": {"name": "Bug"},
+                "labels": [self._label(ticket.finding_id), "rogue", ticket.severity],
+                # Atlassian Document Format — Jira Cloud v3 rejects a plain-string description.
+                "description": {
+                    "type": "doc",
+                    "version": 1,
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": description}],
+                        }
+                    ],
+                },
+            }
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{self.base_url}/rest/api/3/issue",
+                json=body,
+                auth=(self.email, self.api_token),
+            )
+            response.raise_for_status()
+            return (response.json() or {}).get("key", "")
+
+
 __all__ = [
     "JiraDestination",
+    "JiraCloudClient",
     "JiraTicket",
     "JiraClient",
     "FindingInput",

@@ -204,11 +204,15 @@ def _cmd_benchmark(args: argparse.Namespace, out: Any) -> int:
 
 def _cmd_report(args: argparse.Namespace, out: Any) -> int:
     import json
+    from dataclasses import fields as _dc_fields
 
     from rogue.report import Finding, ScanReport
 
     data = json.loads(Path(args.path).read_text(encoding="utf-8"))
-    findings = [Finding(**f) for f in data.get("findings", [])]
+    # `to_dict()` emits render-time extras (e.g. `remediation`) beyond the Finding dataclass fields;
+    # keep only the real fields so reconstruction tolerates a richer serialized report.
+    _fkeys = {f.name for f in _dc_fields(Finding)}
+    findings = [Finding(**{k: v for k, v in f.items() if k in _fkeys}) for f in data.get("findings", [])]
     report = ScanReport(
         target=data["target"],
         n_tests=data["n_tests"],

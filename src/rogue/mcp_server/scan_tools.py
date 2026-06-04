@@ -35,11 +35,34 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
+from rogue.platform.integrations.dispatcher import ScanCompletedEvent
+from rogue.platform.integrations.jira import (
+    FindingInput,
+    JiraCloudClient,
+)
+from rogue.platform.integrations.slack import SlackDestination
 from rogue.platform.schemas import ScanRecord, ScanSpec, ScanStatus, TargetSpec
 
 if TYPE_CHECKING:
     from rogue.platform.benchmark_service import DefaultBenchmarkService
+    from rogue.platform.integrations.jira import JiraClient
+    from rogue.platform.integrations.slack import Sender
     from rogue.platform.interfaces import ScanEngine, ReportService, ScanService
+
+
+# Module-level test seam for the Slack sender. Production leaves it ``None`` so ``SlackDestination``
+# falls back to its real lazy-``httpx`` transport; an offline test sets it to a fake recorder so
+# ``send_slack_alert`` exercises the full build-payload + notify path with NO network. This lives at
+# module scope (rather than as a tool argument) so an LLM can never inject a transport.
+_SLACK_SENDER: Sender | None = None
+
+# Severities that warrant a tracked Jira ticket — the breached findings a security team must action.
+_TICKETABLE_SEVERITIES = ("critical", "high")
+
+# Module-level test seam for the Jira client. A factory ``(base_url, email, api_token, project_key)
+# -> JiraClient`` so an offline test injects an in-memory fake while production builds a real
+# ``JiraCloudClient``. At module scope (not a tool argument) so an LLM can't inject a client.
+_JIRA_CLIENT_FACTORY: Callable[[str, str, str, str], JiraClient] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -450,6 +473,149 @@ def register_scan_tools(
         out["status"] = _status_str(record.status)
         return out
 
+    # --- create_executive_summary (Level-3: summarize for execs) --------------------------------
+
+    async def create_executive_summary(scan_id: str) -> dict[str, Any]:
+        """Generate a CISO-ready executive summary of a completed scan, as markdown.
+
+        The artifact you paste to a security exec: headline risk score + level, the breach ratio, a
+        "Critical & high findings" list (each with its remediation), and a one-line business-impact
+        framing. Run ``get_scan_status`` first to confirm the scan is completed.
+
+        Args:
+            scan_id: the id of a COMPLETED scan.
+
+        Returns:
+            ``{"summary": <markdown>}`` — or ``{error: ...}`` if the scan is unknown / not completed.
+        """
+        # build_executive_summary raises ValueError when the scan is unknown / not completed —
+        # surface it as a clean error rather than an exception across the MCP boundary.
+        try:
+            summary = await report_service.build_executive_summary(scan_id)
+        except ValueError as exc:
+            return {"error": str(exc)}
+        return {"summary": summary}
+
+    # --- send_slack_alert (Level-3: alert the team) ---------------------------------------------
+
+    async def send_slack_alert(scan_id: str, webhook_url: str) -> dict[str, Any]:
+        """Post a completed scan's result to a Slack channel via an incoming webhook.
+
+        Builds a Block Kit summary (score / breach ratio / top attack) and POSTs it to the supplied
+        webhook. The destination logs+swallows transport errors, so a Slack outage never raises — a
+        ``False`` ``ok`` with an ``error`` status signals it didn't land.
+
+        ``webhook_url`` is a tool argument in v1 (you pass the channel's incoming-webhook URL);
+        per-tenant stored Slack config is a v2 concern resolved server-side, not from the model.
+
+        Args:
+            scan_id: the id of a scan to alert on (any status; aggregates come from the record).
+            webhook_url: the Slack incoming-webhook URL to post to.
+
+        Returns:
+            ``{ok: bool, status: str}`` — or ``{error: ...}`` if the scan is unknown to this org.
+        """
+        # org is the server-bound tenant — NOT a model-supplied argument.
+        record = await scan_service.get_scan(scan_id, org_id=org_id)
+        if record is None:
+            return {"error": f"scan not found: {scan_id}"}
+        event = ScanCompletedEvent.from_record(record)
+        # `_SLACK_SENDER` is the module-level test seam: None in production → real httpx transport.
+        destination = SlackDestination(webhook_url, sender=_SLACK_SENDER)
+        try:
+            await destination.notify(event)
+        except Exception as exc:  # noqa: BLE001 - notify swallows its own, but never raise to MCP
+            return {"ok": False, "status": f"send failed: {exc}"}
+        return {"ok": True, "status": "sent"}
+
+    # --- create_jira_ticket (Level-3: file tickets) ---------------------------------------------
+
+    async def create_jira_ticket(
+        scan_id: str,
+        base_url: str,
+        project_key: str,
+        email: str,
+        api_token: str,
+    ) -> dict[str, Any]:
+        """File a Jira ticket for each critical/high breached finding of a scan (idempotent).
+
+        Each ticketable finding gets a stable ``finding_id``; if an open ticket already carries it
+        (matched via a ``rogue-<fid>`` label) the finding is SKIPPED so re-scans converge rather than
+        spam the board. New findings become a ticket with the technique, severity, and remediation.
+
+        The Jira creds (``base_url`` / ``project_key`` / ``email`` / ``api_token``) are tool
+        arguments in v1; per-tenant stored Jira config is a v2 concern resolved server-side.
+
+        Args:
+            scan_id: the id of a COMPLETED scan.
+            base_url: the Jira Cloud base URL (e.g. "https://acme.atlassian.net").
+            project_key: the Jira project key to file into (e.g. "SEC").
+            email: the Jira account email (HTTP Basic auth user).
+            api_token: the Jira API token (HTTP Basic auth secret).
+
+        Returns:
+            ``{created: [issue_key, ...], skipped: [finding_id, ...]}`` — or ``{error: ...}`` if the
+            scan is unknown / not completed.
+        """
+        try:
+            report = await report_service.build_json(scan_id)
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        # Project the breached critical/high findings onto FindingInputs (family/vector drive the
+        # finding_id; severity gates which ones are ticketable).
+        findings: list[FindingInput] = [
+            FindingInput(
+                family=f.get("family") or "",
+                vector=f.get("vector") or "",
+                severity=f.get("severity") or "",
+                title=f.get("technique") or f.get("title") or "Reproduced vulnerability",
+                remediation=f.get("remediation") or "",
+            )
+            for f in (report.get("findings") or [])
+            if f.get("breached") and (f.get("severity") or "").lower() in _TICKETABLE_SEVERITIES
+        ]
+
+        record = await scan_service.get_scan(scan_id, org_id=org_id)
+        if record is None:
+            return {"error": f"scan not found: {scan_id}"}
+        event = ScanCompletedEvent.from_record(record)
+        # `_JIRA_CLIENT_FACTORY` is the module-level test seam: None in production → a real
+        # JiraCloudClient; a fake in tests so the whole create/dedup path runs with no HTTP.
+        client = (
+            _JIRA_CLIENT_FACTORY(base_url, email, api_token, project_key)
+            if _JIRA_CLIENT_FACTORY is not None
+            else JiraCloudClient(base_url, email, api_token, project_key)
+        )
+
+        # We reuse the dispatcher's JiraDestination contract (stable finding_id → find_open dedup →
+        # create) but drive the loop here so it spans CRITICAL *and* HIGH: JiraDestination.notify
+        # deliberately tickets critical-only (its dispatcher fan-out posture), whereas this on-demand
+        # MCP action covers both ticketable severities. The id + ticket shape match JiraDestination
+        # exactly so a re-scan through either path converges on the same ticket. Never raises to MCP.
+        from rogue.platform.integrations.jira import JiraTicket, finding_id  # noqa: PLC0415
+
+        created: list[str] = []
+        skipped: list[str] = []
+        try:
+            for f in findings:
+                fid = finding_id(event.org_id, event.target, f.family, f.vector)
+                existing = await client.find_open(fid)
+                if existing:
+                    skipped.append(fid)
+                    continue
+                ticket = JiraTicket(
+                    finding_id=fid,
+                    title=f"[ROGUE][{f.severity.upper()}] {f.title} ({f.family}/{f.vector})",
+                    severity=f.severity,
+                    remediation=f.remediation
+                    or "See the ROGUE scan report for reproduction and remediation.",
+                )
+                created.append(await client.create(ticket))
+        except Exception as exc:  # noqa: BLE001 - never raise across the MCP boundary
+            return {"error": f"jira: {exc}", "created": created, "skipped": skipped}
+        return {"created": created, "skipped": skipped}
+
     # Back-compat alias: the original tool name before the catalog grew. Same callable as
     # `get_scan_status`, registered under both names so existing clients keep working.
     get_scan = get_scan_status
@@ -467,6 +633,10 @@ def register_scan_tools(
         "list_findings": list_findings,
         "run_benchmark": run_benchmark,
         "get_benchmark": get_benchmark,
+        # Level-3 workflow tools — turn the agent into a security consultant post-scan.
+        "create_executive_summary": create_executive_summary,
+        "send_slack_alert": send_slack_alert,
+        "create_jira_ticket": create_jira_ticket,
     }
     for fn in tools.values():
         mcp.tool()(fn)

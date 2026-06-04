@@ -16,6 +16,7 @@ from rogue.report import (
     SCORE_METHODOLOGY,
     Finding,
     ScanReport,
+    humanize_technique,
     remediation_for,
     technique_label,
 )
@@ -101,6 +102,66 @@ class DefaultReportService(ReportService):
         out["risk_level"] = scoring.risk_level(score)
         out["score_methodology"] = SCORE_METHODOLOGY
         return out
+
+    async def build_executive_summary(self, scan_id: str) -> str:
+        """A CISO-ready MARKDOWN exec summary — the artifact an agent hands a security exec verbatim.
+
+        Headline risk score + level, the breach ratio, a "Critical & high findings" list (each with humanized technique, severity, and the per-family remediation), and a one-line business framing. Reuses the same `_load_report` + `scoring` spine as the JSON/HTML/PDF renderers, so the headline number matches every other surface. Defensive about an empty report (no breached criticals → a clean all-clear), and the per-finding technique is run through `humanize_technique` so a raw ladder code / internal ULID never leaks into an exec-facing doc.
+        """
+        report = await self._load_report(scan_id)
+        score = scoring.score_for(report)
+        level = scoring.risk_level(score)
+
+        # The findings that warrant exec attention: breached AND critical/high, severity-ranked as `top_findings` already orders them. A breached-but-medium/low finding is a detail for the full report, not the exec summary.
+        notable = [
+            f
+            for f in report.top_findings(50)
+            if f.breached and f.severity in ("critical", "high")
+        ]
+
+        lines = [
+            "# ROGUE security scan — executive summary",
+            "",
+            f"**Risk {score:g}/100 ({level})** — {report.n_breaches}/{report.n_tests} attacks breached the target.",
+            "",
+        ]
+
+        if notable:
+            lines.append("## Critical & high findings")
+            lines.append("")
+            for f in notable:
+                # Humanize the technique defensively — a graduated candidate persists a raw ULID, which must never reach an exec.
+                technique = humanize_technique(f.technique)
+                lines.append(
+                    f"- **{technique}** ({f.severity}, {f.success_pct} success) — {remediation_for(f.family)}"
+                )
+            lines.append("")
+
+        # One-line business framing — the "so what" a CISO acts on. Phrased by risk band so the
+        # summary reads as a recommendation, not just a number.
+        if level == "critical":
+            framing = (
+                "Exploitable critical weaknesses are present today; treat as an active risk to "
+                "brand, compliance, and customer trust and remediate before further exposure."
+            )
+        elif level == "high":
+            framing = (
+                "Material weaknesses were reproduced; prioritize the findings above this sprint to "
+                "reduce the likelihood of a public incident."
+            )
+        elif level == "medium":
+            framing = (
+                "Moderate weaknesses were found; schedule remediation and re-scan to confirm the "
+                "risk has been driven down."
+            )
+        else:
+            framing = (
+                "No material weaknesses were reproduced in this run; maintain the current controls "
+                "and continue periodic scanning."
+            )
+        lines.append(f"**Business impact:** {framing}")
+
+        return "\n".join(lines)
 
     async def build_html(self, scan_id: str) -> str:
         """Reuse `ScanReport.to_html()`, injecting the platform score/risk_level into the header KPIs."""

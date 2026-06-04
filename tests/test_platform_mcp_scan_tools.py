@@ -117,6 +117,22 @@ class FakeReportService:
         }
 
 
+    async def build_executive_summary(self, scan_id):
+        # Mirror DefaultReportService.build_executive_summary's shape from the same canned findings,
+        # so the offline test exercises the tool's plumbing without the real report-store load.
+        self.build_calls.append(scan_id)
+        if scan_id != "scan_done":
+            raise ValueError(f"scan {scan_id!r} not found")
+        return (
+            "# ROGUE security scan — executive summary\n\n"
+            "**Risk 81/100 (critical)** — 7/20 attacks breached the target.\n\n"
+            "## Critical & high findings\n\n"
+            "- **Crescendo** (critical, 80% success) — "
+            "Evaluate the cumulative trajectory of a conversation.\n\n"
+            "**Business impact:** Exploitable critical weaknesses are present today."
+        )
+
+
 class FakeBenchmarkService:
     """Stand-in BenchmarkService: create → {benchmark_id, status}; get → a BenchmarkRecord."""
 
@@ -501,6 +517,166 @@ async def test_summary_singular_and_none():
 
 
 # --------------------------------------------------------------------------- #
+# Level-3 workflow tools — executive summary / Slack alert / Jira ticket
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_create_executive_summary_returns_markdown(ctx):
+    tools, _svc, rpt, *_ = ctx
+    out = await tools["create_executive_summary"]("scan_done")
+    summary = out["summary"]
+    assert isinstance(summary, str)
+    # Headline score + level, the breach ratio, a technique, and its remediation all surface.
+    assert "81/100" in summary
+    assert "critical" in summary
+    assert "7/20" in summary
+    assert "Crescendo" in summary
+    assert "Evaluate the cumulative trajectory" in summary
+    assert rpt.build_calls[-1] == "scan_done"
+
+
+@pytest.mark.asyncio
+async def test_create_executive_summary_unknown_id_returns_error(ctx):
+    tools, *_ = ctx
+    out = await tools["create_executive_summary"]("nope")
+    assert "error" in out
+
+
+@pytest.mark.asyncio
+async def test_send_slack_alert_records_payload_with_injected_sender(ctx, monkeypatch):
+    tools, _svc, *_ = ctx
+
+    # Inject a fake sender via the module-level seam — no HTTP, just record (url, payload).
+    sent: list[tuple[str, dict]] = []
+
+    async def fake_sender(url, payload):
+        sent.append((url, payload))
+
+    import rogue.mcp_server.scan_tools as st
+
+    monkeypatch.setattr(st, "_SLACK_SENDER", fake_sender)
+
+    out = await tools["send_slack_alert"]("scan_done", "https://hooks.slack.test/abc")
+    assert out == {"ok": True, "status": "sent"}
+
+    assert len(sent) == 1
+    url, payload = sent[0]
+    assert url == "https://hooks.slack.test/abc"
+    # The fallback text carries the score + breach ratio + top attack (no HTTP performed).
+    text = payload["text"]
+    assert "81/100" in text
+    assert "7/20" in text
+    assert "Crescendo" in text
+
+
+@pytest.mark.asyncio
+async def test_send_slack_alert_unknown_id_returns_error(ctx):
+    tools, *_ = ctx
+    out = await tools["send_slack_alert"]("nope", "https://hooks.slack.test/abc")
+    assert "error" in out
+
+
+@pytest.mark.asyncio
+async def test_create_jira_ticket_creates_one_per_critical_high_breached(ctx, monkeypatch):
+    tools, _svc, *_ = ctx
+
+    class FakeJiraClient:
+        """In-memory Jira: records created tickets; `find_open` checks the recorded fids."""
+
+        def __init__(self, base_url, email, api_token, project_key):
+            self.init_args = (base_url, email, api_token, project_key)
+            self.created: list[object] = []
+            self._open: dict[str, str] = {}
+
+        async def find_open(self, fid):
+            return self._open.get(fid)
+
+        async def create(self, ticket):
+            key = f"SEC-{len(self.created) + 1}"
+            self.created.append(ticket)
+            self._open[ticket.finding_id] = key
+            return key
+
+    instances: list[FakeJiraClient] = []
+
+    def factory(base_url, email, api_token, project_key):
+        client = FakeJiraClient(base_url, email, api_token, project_key)
+        instances.append(client)
+        return client
+
+    import rogue.mcp_server.scan_tools as st
+
+    monkeypatch.setattr(st, "_JIRA_CLIENT_FACTORY", factory)
+
+    out = await tools["create_jira_ticket"](
+        "scan_done",
+        base_url="https://acme.atlassian.net",
+        project_key="SEC",
+        email="sec@acme.test",
+        api_token="tok",
+    )
+    # The fake report has one breached critical (Crescendo); the high finding is NOT breached, and a
+    # medium/low would be excluded too — so exactly one ticket is created, none skipped.
+    assert out["created"] == ["SEC-1"]
+    assert out["skipped"] == []
+    client = instances[0]
+    assert client.init_args == ("https://acme.atlassian.net", "sec@acme.test", "tok", "SEC")
+    assert len(client.created) == 1
+    ticket = client.created[0]
+    assert "Crescendo" in ticket.title
+    assert ticket.severity == "critical"
+
+
+@pytest.mark.asyncio
+async def test_create_jira_ticket_dedups_via_find_open(ctx, monkeypatch):
+    tools, *_ = ctx
+
+    class PrePopulatedJiraClient:
+        """`find_open` always returns an existing key → every finding dedups to a skip."""
+
+        def __init__(self, *a):
+            self.created: list[object] = []
+
+        async def find_open(self, fid):
+            return "SEC-99"
+
+        async def create(self, ticket):  # pragma: no cover - must not be reached on full dedup
+            self.created.append(ticket)
+            return "SEC-NEW"
+
+    seen: list[PrePopulatedJiraClient] = []
+
+    def factory(*a):
+        c = PrePopulatedJiraClient(*a)
+        seen.append(c)
+        return c
+
+    import rogue.mcp_server.scan_tools as st
+
+    monkeypatch.setattr(st, "_JIRA_CLIENT_FACTORY", factory)
+
+    out = await tools["create_jira_ticket"](
+        "scan_done", base_url="https://acme.atlassian.net", project_key="SEC",
+        email="sec@acme.test", api_token="tok",
+    )
+    # Already-open → nothing created, the finding is skipped (re-scans converge, no dupes).
+    assert out["created"] == []
+    assert len(out["skipped"]) == 1
+    assert seen[0].created == []
+
+
+@pytest.mark.asyncio
+async def test_create_jira_ticket_unknown_id_returns_error(ctx):
+    tools, *_ = ctx
+    out = await tools["create_jira_ticket"](
+        "nope", base_url="https://acme.atlassian.net", project_key="SEC",
+        email="sec@acme.test", api_token="tok",
+    )
+    assert "error" in out
+
+
+# --------------------------------------------------------------------------- #
 # registration against a real FastMCP (skipped if `mcp` isn't installed)
 # --------------------------------------------------------------------------- #
 
@@ -534,4 +710,7 @@ async def test_registers_on_real_fastmcp():
         "list_findings",
         "run_benchmark",
         "get_benchmark",
+        "create_executive_summary",
+        "send_slack_alert",
+        "create_jira_ticket",
     } <= names
