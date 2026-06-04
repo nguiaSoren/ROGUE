@@ -203,8 +203,11 @@ def test_default_bandit_arms_returns_expected_pool() -> None:
     assert "arxiv_prompt_injection" in arm_ids
     assert "github_pliny_umbrella" in arm_ids
     assert "blog_etr_after" in arm_ids
-    # Approximate §5.2 pool size — should be in the ~30-40 range.
-    assert 28 <= len(arms) <= 50, f"unexpected pool size {len(arms)}"
+    # Approximate pool size: 39 original §5.2 arms + 6 multimodal (§1b, 2026-06-03)
+    # + 7 source-expansion (2026-06-04, OpenReview/ACL/garak/HF/advisory/huntr) = 52.
+    # Bound stays loose so a future arm or two doesn't trip it; a halving or a
+    # runaway doubling still does.
+    assert 28 <= len(arms) <= 60, f"unexpected pool size {len(arms)}"
 
 
 def test_discovery_agent_with_bandit_calls_select(small_arm_pool, monkeypatch) -> None:
