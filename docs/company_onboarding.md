@@ -162,7 +162,7 @@ curl "https://api.rogue.ai/v1/scans/scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X/report?forma
   -H "Authorization: Bearer rk_live_…"
 ```
 
-The request body is a `ScanSpec`: `target` is a `TargetSpec` (`endpoint` **or** `provider`+`model`, plus `api_key_ref` and an optional `system_prompt`), then `pack` (`default | aggressive | compliance`, default `default`), optional `attacks`, `max_tests` (default 50), `n_trials` (default 1), and an optional `budget`. The report route takes `?format=json|html|pdf` (default `json`) and returns `404 report_not_ready` while the scan is still running, so keep polling step 2 until `status: "completed"` before fetching it.
+The request body is a `ScanSpec`: `target` is a `TargetSpec` (`endpoint` **or** `provider`+`model`, plus `api_key_ref` and an optional `system_prompt`), then `mode` (`pack | repertoire`, default `pack` — see "Scan modes" above), `pack` (`default | aggressive | compliance`, default `default`; used only in `pack` mode), optional `attacks`, `max_tests` (default 50, the cap on a repertoire run), `n_trials` (default 1), and an optional `budget`. The report route takes `?format=json|html|pdf` (default `json`) and returns `404 report_not_ready` while the scan is still running, so keep polling step 2 until `status: "completed"` before fetching it.
 
 One detail worth flagging: in the hosted body, the target credential is `api_key_ref` — a Vault/KMS handle, **never the raw secret**. The API never sees the raw key; the worker resolves the handle at run time. That is the structural reason hosted mode can promise the platform never persists your target key.
 
@@ -170,9 +170,29 @@ One detail worth flagging: in the hosted body, the target credential is `api_key
 
 ---
 
+## Scan modes — a curated sample vs. the full arsenal
+
+A hosted scan runs in one of two **modes**, set by the `mode` field in the request body (`"pack" | "repertoire"`, default `"pack"`). The mode decides *which* corpus of attacks ROGUE fires; everything downstream — the target calls, the judge, the report — is identical.
+
+- **`pack`** (default) — a small curated JSON pack of 8–17 attacks (the `default` / `aggressive` / `compliance` packs described below). Fast, cheap, deterministic. It is a representative *sample* of ROGUE's threat library, not the whole thing — the right mode for a quick smoke test, a CI gate on every prompt or model change, or your very first run.
+- **`repertoire`** — ROGUE's live harvested corpus: the hundreds of real attack primitives ROGUE continuously grows from the open web, ordered most-reproducible-first and capped at `max_tests`. This throws ROGUE's full continuously-harvested arsenal at your model, not a fixed sample — the mode for a real security assessment, an audit, or a pre-release sign-off where you want breadth and want to know what *actually* breaks through today.
+
+The trade-off is cost. Repertoire is judge-dominated at roughly **$0.02 per test**, so `max_tests=50` lands around **$1**, and running the full (~459-primitive) corpus lands around **$9** — versus cents for a pack. Start with a pack to shake out wiring and target reachability, then run repertoire when you want the thorough sweep. Use `max_tests` to dial the depth (and ceiling) of a repertoire run, and pair it with `budget` for a hard dollar stop.
+
+**How to set it.** Mode is available on the **hosted API** and the **dashboard** today. In the hosted request body, set `mode` alongside `max_tests`:
+
+```bash
+curl -X POST https://api.rogue.ai/v1/scans \
+  -H "Authorization: Bearer rk_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{"target":{"endpoint":"https://gateway.company.ai/v1","api_key_ref":"…"},"mode":"repertoire","max_tests":50,"n_trials":1,"budget":2.0}'
+```
+
+In the dashboard, the **New scan** form has a mode toggle — "Curated pack" (default) vs "Full repertoire" — next to the pack/`max_tests` controls. (The self-serve SDK `Client.scan()` does not take a `mode=` argument yet; it always runs a bundled pack. Repertoire is a hosted/dashboard capability for now — the live corpus lives server-side in the platform DB, which the local SDK does not carry.)
+
 ## The three attack packs
 
-ROGUE ships three curated packs inside the package — no database needed at scan time. Each is a list of real harvested `AttackPrimitive`s (top reproducibility-score per family), replayed at your target. Pick one with `pack=` (SDK) / `--pack` (CLI) / `"pack"` (hosted body).
+In `pack` mode, ROGUE ships three curated packs inside the package — no database needed at scan time. Each is a list of real harvested `AttackPrimitive`s (top reproducibility-score per family), replayed at your target — a fast, fixed *sample* of the threat library; for the full live corpus use `mode: "repertoire"` (above). Pick a pack with `pack=` (SDK) / `--pack` (CLI) / `"pack"` (hosted body).
 
 - **`default`** (8 primitives, 8 families) — a balanced starter battery, one attack per common family (DAN persona, Crescendo multi-turn gradient, role hijack, indirect prompt injection, refusal suppression, obfuscation/encoding, direct instruction override, system-prompt leak). This is what `scan()` runs when you don't ask for anything else. Small, fast, cheap — the right pack for CI and for your first run.
 - **`aggressive`** (17 primitives, all 15 families) — the hardest and broadest set, biased toward high/critical severity (12 critical / 3 high / 2 medium), including three multimodal-image injections that probe vision-capable targets. Text-only targets honestly skip the image attacks.

@@ -17,6 +17,7 @@ export default function NewScanPage() {
   const [endpoint, setEndpoint] = useState("");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [scanMode, setScanMode] = useState<"pack" | "repertoire">("pack");
   const [pack, setPack] = useState("default");
   const [maxTests, setMaxTests] = useState(10);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export default function NewScanPage() {
         model: model.trim() || null,
         api_key: apiKey.trim() || null,
       },
+      mode: scanMode,
       pack,
       max_tests: maxTests,
     };
@@ -106,10 +108,39 @@ export default function NewScanPage() {
           <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" className={`${field} mt-1 font-mono`} />
         </label>
 
+        <div>
+          <span className="text-sm text-muted-foreground">Attack corpus</span>
+          <div className="mt-1 flex gap-2 text-sm">
+            {(
+              [
+                ["pack", "Curated pack"],
+                ["repertoire", "Full repertoire"],
+              ] as const
+            ).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setScanMode(m)}
+                className={`rounded border px-3 py-1 ${scanMode === m ? "border-foreground bg-muted" : "border-border text-muted-foreground"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Full repertoire runs ROGUE&apos;s entire harvested corpus — more thorough, costs more.
+          </p>
+        </div>
+
         <div className="flex gap-4">
           <label className="block flex-1 text-sm">
             <span className="text-muted-foreground">Pack</span>
-            <select value={pack} onChange={(e) => setPack(e.target.value)} className={`${field} mt-1`}>
+            <select
+              value={pack}
+              onChange={(e) => setPack(e.target.value)}
+              disabled={scanMode === "repertoire"}
+              className={`${field} mt-1 disabled:opacity-50`}
+            >
               {["default", "aggressive", "compliance"].map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}

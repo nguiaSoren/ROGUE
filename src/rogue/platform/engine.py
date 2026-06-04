@@ -32,12 +32,29 @@ if TYPE_CHECKING:
 class DefaultScanEngine(ScanEngine):
     """The one execution path for every platform surface (worker, SDK-in-process, API)."""
 
-    def __init__(self, *, panel: Any = None, judge: Any = None, judge_model: str | None = None) -> None:
-        # All three are injectable so tests can run fully offline. When left None, the real panel /
-        # judge are constructed lazily inside ``run`` (so importing this module never needs API keys).
+    def __init__(
+        self,
+        *,
+        panel: Any = None,
+        judge: Any = None,
+        judge_model: str | None = None,
+        repertoire_loader: Any = None,
+    ) -> None:
+        # All injectable so tests run fully offline. When left None, the real panel / judge are built
+        # lazily inside ``run`` (so importing this module never needs API keys), and the repertoire is
+        # loaded from the live corpus via ``DATABASE_URL``.
         self._panel = panel
         self._judge = judge
         self._judge_model = judge_model
+        self._repertoire_loader = repertoire_loader
+
+    def _load_repertoire(self, spec: ScanSpec) -> list:
+        """Source primitives for a ``mode="repertoire"`` scan from the live harvested corpus."""
+        if self._repertoire_loader is not None:
+            return self._repertoire_loader(spec)
+        from .repertoire import default_repertoire_loader
+
+        return default_repertoire_loader(spec)
 
     # --- config construction (shared by run / validate / benchmark) ---------------------------
 
@@ -91,7 +108,12 @@ class DefaultScanEngine(ScanEngine):
         from rogue.schemas.breach_result import BREACH_VERDICTS
 
         config = self._build_config(spec)
-        primitives = filter_attacks(load_pack(spec.pack), spec.attacks)[: spec.max_tests]
+        if spec.mode == "repertoire":
+            # The full harvested arsenal (corpus, most-reproducible first), capped at max_tests —
+            # not a frozen JSON pack. Same single-turn execution loop below.
+            primitives = self._load_repertoire(spec)
+        else:
+            primitives = filter_attacks(load_pack(spec.pack), spec.attacks)[: spec.max_tests]
 
         owns_panel = self._panel is None
         if self._panel is not None:

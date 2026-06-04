@@ -178,6 +178,9 @@ export type TargetSpec = {
 /** Mirrors `ScanSpec` (src/rogue/platform/schemas.py:58) — the POST /v1/scans body. */
 export type ScanSpec = {
   target: TargetSpec;
+  /** "pack" = a small curated JSON pack; "repertoire" = the live harvested corpus (ROGUE's full
+   *  arsenal, capped at max_tests). Default "pack". Mirrors `ScanSpec.mode`. */
+  mode?: "pack" | "repertoire";
   pack?: string;
   attacks?: string[] | null;
   max_tests?: number;

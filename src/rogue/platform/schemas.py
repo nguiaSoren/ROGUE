@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -59,6 +60,9 @@ class ScanSpec(BaseModel):
     """A scan request — the body of POST /v1/scans (minus tenant fields, which come from auth)."""
 
     target: TargetSpec
+    # "pack" = a small curated JSON pack (default/aggressive/compliance). "repertoire" = the live
+    # harvested corpus (ROGUE's full arsenal, capped at max_tests, most-reproducible first).
+    mode: Literal["pack", "repertoire"] = "pack"
     pack: str = "default"
     attacks: list[str] | None = None
     max_tests: int = Field(default=50, ge=1, le=1000)
