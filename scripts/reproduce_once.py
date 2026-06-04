@@ -87,7 +87,6 @@ from rogue.db.models import (  # noqa: E402
     DeploymentConfig as DeploymentConfigORM,
     PairRefinementStep as PairRefinementStepORM,
 )
-from rogue.reproduce.coj import COJ_OPERATIONS  # noqa: E402
 from rogue.reproduce.escalation_planner import EscalationPlanner  # noqa: E402
 from rogue.reproduce.instantiator import RenderedAttack, render  # noqa: E402
 from rogue.reproduce.iterative_attacker import (  # noqa: E402
@@ -895,144 +894,41 @@ async def run_reproduction(
             escalation_now = datetime.now(timezone.utc)
             if escalate:
                 from scripts.synthesize_escalations import (  # noqa: PLC0415
-                    DEFAULT_AUDIO_STYLES,
-                    DEFAULT_IMAGE_RENDERERS,
-                    DEFAULT_STRUCTURED_FORMATS,
-                    ESCALATION_LADDER,
+                    build_escalation_context,
                     run_escalation_ladder_one,
-                )
-                from rogue.reproduce.strategy_library import (  # noqa: PLC0415
-                    load_strategy_library,
-                )
-                from rogue.reproduce.strategy_lifecycle import (  # noqa: PLC0415
-                    build_rotation_plan,
-                    format_rotation_plan,
-                    ladder_config_from_env,
-                )
-                from rogue.reproduce.renderer_registry import (  # noqa: PLC0415
-                    active_dynamic_strategies,
                 )
                 from rogue.reproduce.strategy_lifecycle import (  # noqa: PLC0415
                     log_ladder_attempts,
                 )
 
-                # §10.9 Phase 3b-v1 — merge any ACTIVE harvested renderers into the
-                # ladder's renderer tiers. Empty until a harvested renderer is
-                # activated, so this is a zero-change default for today's runs.
-                image_renderers_tier = DEFAULT_IMAGE_RENDERERS + active_dynamic_strategies(
-                    session, "image"
-                )
-                audio_styles_tier = DEFAULT_AUDIO_STYLES + active_dynamic_strategies(
-                    session, "audio"
-                )
-                if len(image_renderers_tier) > len(DEFAULT_IMAGE_RENDERERS) or len(
-                    audio_styles_tier
-                ) > len(DEFAULT_AUDIO_STYLES):
-                    logger.info(
-                        "escalation renderer tiers incl. harvested: image=%s audio=%s",
-                        image_renderers_tier,
-                        audio_styles_tier,
-                    )
-
-                # §10.10 Step 1 — greedy ladder reorder. Sort each deterministic
-                # transform tier by its Laplace-smoothed historical breach rate so the
-                # likely winner is tried EARLY (breach on attempt 2, not 15), cutting
-                # wasted ladder work. Changes evaluation PRIORITY only — the ladder
-                # execution loop is untouched. Mode via ROGUE_LADDER_ORDER (canonical
-                # exploit-argmax default / discovery UCB-explore / fixed=legacy order).
-                # Computed once per sweep (deterministic within a telemetry snapshot).
-                from rogue.reproduce.ladder_priors import (  # noqa: PLC0415
-                    ladder_order_mode,
-                    order_by_prior,
-                    order_by_starvation,
-                    order_by_value,
-                    strategy_breach_rates,
-                    strategy_reachability,
-                    strategy_values,
-                )
-
-                _ladder_mode = ladder_order_mode()
-                # canonical/discovery/fixed → breach-rate score; viability (Phase 2) →
-                # EV (effectiveness × validity × freshness × exploration); starvation
-                # (Phase 2.2) → EV × (1 + W·starvation), surfacing starved high-value
-                # strategies without penalising strong reachable ones. One stats read
-                # per sweep, then a per-tier reorder.
-                if _ladder_mode == "viability":
-                    _vals = strategy_values(session)
-
-                    def _reorder(els, prefix):
-                        return order_by_value(
-                            els, _vals, now=escalation_now, label_prefix=prefix,
-                        )
-                elif _ladder_mode == "starvation":
-                    _vals = strategy_values(session)
-                    _reach = strategy_reachability(session)
-
-                    def _reorder(els, prefix):
-                        return order_by_starvation(
-                            els, _vals, _reach,
-                            now=escalation_now, label_prefix=prefix,
-                        )
-                else:
-                    _rates = strategy_breach_rates(session)
-
-                    def _reorder(els, prefix):
-                        return order_by_prior(
-                            els, _rates, mode=_ladder_mode, label_prefix=prefix,
-                        )
-
-                image_renderers_tier = _reorder(image_renderers_tier, "image:")
-                coj_tier = _reorder(COJ_OPERATIONS, "coj:")
-                structured_tier = _reorder(DEFAULT_STRUCTURED_FORMATS, "structured:")
-                audio_styles_tier = _reorder(audio_styles_tier, "audio:")
-                logger.info(
-                    "§10.10 ladder reorder [mode=%s]: image=%s coj=%s "
-                    "structured=%s audio=%s",
-                    _ladder_mode, image_renderers_tier, coj_tier,
-                    structured_tier, audio_styles_tier,
-                )
-
-                # §10.9 Phase 4 — seed the planner with the harvested strategy
-                # library (active + candidate, text/multi_turn) so it can drive
-                # harvested techniques, then assemble the rotation + cost plan.
-                _scope, _cap = ladder_config_from_env()
-                if planner is None:
-                    planner = EscalationPlanner.from_env(
-                        extra_strategies=load_strategy_library(session),
-                        use_templates=not escalate_no_templates,
-                        slot_fill=escalate_slot_fill,
-                        **(
-                            {"model": escalate_planner_model}
-                            if escalate_planner_model
-                            else {}
-                        ),
-                    )
-                escalation_plan = build_rotation_plan(
+                # Per-sweep escalation context (renderer/CoJ/structured/audio tiers +
+                # prior-reorder + planner-with-strategy-library + rotation/cost plan).
+                # Extracted to scripts.synthesize_escalations.build_escalation_context so
+                # the benchmark runner drives the IDENTICAL ladder (single source of
+                # truth — §10.9/§10.10). Unpacked into the existing locals so the
+                # downstream ladder call + bookkeeping are unchanged.
+                _ctx = build_escalation_context(
                     session,
-                    base_ladder=ESCALATION_LADDER,
-                    cap=_cap,
-                    # Upper bound: any loaded primitive could refuse the whole
-                    # panel and become an EVADE parent.
+                    configs=configs,
                     n_parents_est=len(primitives),
-                    n_configs=len(configs),
                     n_trials=escalate_n_trials,
+                    planner=planner,
+                    planner_model=escalate_planner_model,
+                    use_templates=not escalate_no_templates,
+                    slot_fill=escalate_slot_fill,
+                    candidate_probe=escalate_candidate_probe,
+                    candidate_quota=escalate_candidate_quota,
                     target_cost_usd=_TARGET_COST_ESTIMATE_PER_CALL_USD,
                     judge_cost_usd=_JUDGE_COST_ESTIMATE_PER_CALL_USD,
                 )
-                # §10.9 effective candidate-attempt quota (scheduler policy) — reused
-                # for the ladder call AND the ladder_attempts telemetry tag.
-                # --candidate-probe is sugar for "all rotation candidates".
-                _effective_quota = (
-                    len(escalation_plan.candidate_ids)
-                    if escalate_candidate_probe
-                    else escalate_candidate_quota
-                )
-                logger.info(
-                    "escalation rotation plan (scope=%s cap=%d):\n%s",
-                    _scope,
-                    _cap,
-                    format_rotation_plan(escalation_plan),
-                )
+                planner = _ctx.planner
+                image_renderers_tier = _ctx.image_renderers
+                coj_tier = _ctx.coj_operations
+                structured_tier = _ctx.structured_formats
+                audio_styles_tier = _ctx.audio_styles
+                escalation_plan = _ctx.plan
+                _effective_quota = _ctx.effective_quota
+                _ladder_mode = _ctx.ladder_mode
                 if escalate_dry_run:
                     logger.info(
                         "escalation --dry-run: plan above; NO paid calls made, "

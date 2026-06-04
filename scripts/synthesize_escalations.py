@@ -497,6 +497,156 @@ async def _strategy_breaches(
     return None, spend
 
 
+@dataclass
+class EscalationContext:
+    """The per-sweep escalation setup shared by ``run_reproduction`` and the
+    benchmark runner, so both drive the *identical* ladder (no drift): the
+    reordered renderer/CoJ/structured/audio tiers, the planner seeded with the
+    harvested strategy library, and the rotation/cost plan + candidate quota.
+
+    Built once per sweep; passed (its fields) into ``run_escalation_ladder_one``
+    per parent. Extracting it is the single-source-of-truth seam — the benchmark
+    measures the real production ladder, not a copy that could diverge.
+    """
+
+    planner: EscalationPlanner
+    image_renderers: tuple[str, ...]
+    coj_operations: tuple[str, ...]
+    structured_formats: tuple[str, ...]
+    audio_styles: tuple[str, ...]
+    rotation: tuple[str, ...]
+    candidate_ids: frozenset[str]
+    effective_quota: int
+    ladder_mode: str
+    plan: object  # RotationPlan (strategy_lifecycle) — kept for logging/format
+
+
+def build_escalation_context(
+    session,
+    *,
+    configs: list,
+    n_parents_est: int,
+    n_trials: int,
+    planner: EscalationPlanner | None = None,
+    planner_model: str | None = None,
+    use_templates: bool = True,
+    slot_fill: bool = True,
+    candidate_probe: bool = False,
+    candidate_quota: int = 0,
+    target_cost_usd: float = 0.01,
+    judge_cost_usd: float = 0.0225,
+) -> EscalationContext:
+    """Assemble the per-sweep escalation context (§10.9/§10.10), unchanged from the
+    logic that previously lived inline in ``reproduce_once.run_reproduction``.
+
+    Merges ACTIVE harvested renderers into the image/audio tiers, reorders every
+    tier by the configured prior (canonical/discovery/fixed → breach-rate;
+    viability → EV; starvation → starvation-adjusted EV), seeds the planner with
+    the harvested strategy library, and builds the rotation + cost plan. Pure
+    setup — no paid target/judge calls happen here.
+    """
+    from datetime import datetime, timezone
+
+    from rogue.reproduce.ladder_priors import (
+        ladder_order_mode,
+        order_by_prior,
+        order_by_starvation,
+        order_by_value,
+        strategy_breach_rates,
+        strategy_reachability,
+        strategy_values,
+    )
+    from rogue.reproduce.renderer_registry import active_dynamic_strategies
+    from rogue.reproduce.strategy_library import load_strategy_library
+    from rogue.reproduce.strategy_lifecycle import (
+        build_rotation_plan,
+        format_rotation_plan,
+        ladder_config_from_env,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    # §10.9 Phase 3b-v1 — merge ACTIVE harvested renderers into the renderer tiers
+    # (empty until a harvested renderer is activated, so a zero-change default).
+    image_renderers_tier = DEFAULT_IMAGE_RENDERERS + active_dynamic_strategies(session, "image")
+    audio_styles_tier = DEFAULT_AUDIO_STYLES + active_dynamic_strategies(session, "audio")
+    if len(image_renderers_tier) > len(DEFAULT_IMAGE_RENDERERS) or len(
+        audio_styles_tier
+    ) > len(DEFAULT_AUDIO_STYLES):
+        logger.info(
+            "escalation renderer tiers incl. harvested: image=%s audio=%s",
+            image_renderers_tier,
+            audio_styles_tier,
+        )
+
+    # §10.10 Step 1 — greedy ladder reorder (evaluation PRIORITY only; execution
+    # loop untouched). Mode via ROGUE_LADDER_ORDER.
+    mode = ladder_order_mode()
+    if mode == "viability":
+        vals = strategy_values(session)
+
+        def _reorder(els, prefix):
+            return order_by_value(els, vals, now=now, label_prefix=prefix)
+    elif mode == "starvation":
+        vals = strategy_values(session)
+        reach = strategy_reachability(session)
+
+        def _reorder(els, prefix):
+            return order_by_starvation(els, vals, reach, now=now, label_prefix=prefix)
+    else:
+        rates = strategy_breach_rates(session)
+
+        def _reorder(els, prefix):
+            return order_by_prior(els, rates, mode=mode, label_prefix=prefix)
+
+    image_renderers_tier = _reorder(image_renderers_tier, "image:")
+    coj_tier = _reorder(COJ_OPERATIONS, "coj:")
+    structured_tier = _reorder(DEFAULT_STRUCTURED_FORMATS, "structured:")
+    audio_styles_tier = _reorder(audio_styles_tier, "audio:")
+    logger.info(
+        "§10.10 ladder reorder [mode=%s]: image=%s coj=%s structured=%s audio=%s",
+        mode, image_renderers_tier, coj_tier, structured_tier, audio_styles_tier,
+    )
+
+    # §10.9 Phase 4 — seed the planner with the harvested strategy library, then
+    # assemble the rotation + cost plan.
+    scope, cap = ladder_config_from_env()
+    if planner is None:
+        planner = EscalationPlanner.from_env(
+            extra_strategies=load_strategy_library(session),
+            use_templates=use_templates,
+            slot_fill=slot_fill,
+            **({"model": planner_model} if planner_model else {}),
+        )
+    plan = build_rotation_plan(
+        session,
+        base_ladder=ESCALATION_LADDER,
+        cap=cap,
+        n_parents_est=n_parents_est,
+        n_configs=len(configs),
+        n_trials=n_trials,
+        target_cost_usd=target_cost_usd,
+        judge_cost_usd=judge_cost_usd,
+    )
+    effective_quota = len(plan.candidate_ids) if candidate_probe else candidate_quota
+    logger.info(
+        "escalation rotation plan (scope=%s cap=%d):\n%s",
+        scope, cap, format_rotation_plan(plan),
+    )
+    return EscalationContext(
+        planner=planner,
+        image_renderers=tuple(image_renderers_tier),
+        coj_operations=tuple(coj_tier),
+        structured_formats=tuple(structured_tier),
+        audio_styles=tuple(audio_styles_tier),
+        rotation=plan.rotation,
+        candidate_ids=frozenset(plan.candidate_ids),
+        effective_quota=effective_quota,
+        ladder_mode=mode,
+        plan=plan,
+    )
+
+
 async def run_escalation_ladder_one(
     parent: AttackPrimitive,
     *,
