@@ -250,15 +250,34 @@ try:  # pragma: no cover - exercised at process start
                 "SECRET_ENCRYPTION_KEY unset — hosted scans persist the raw target key in scan_jobs; "
                 "set it to encrypt target credentials at rest (see rogue.platform.secrets)."
             )
+        scan_service = DefaultScanService(store, queue, secret_store=secret_store)
+        report_service = DefaultReportService(store)
+        benchmark_service = DefaultBenchmarkService(engine=engine)
         _v1_deps.wire(
-            scan_service=DefaultScanService(store, queue, secret_store=secret_store),
-            report_service=DefaultReportService(store),
+            scan_service=scan_service,
+            report_service=report_service,
             scan_engine=engine,
-            benchmark_service=DefaultBenchmarkService(engine=engine),
+            benchmark_service=benchmark_service,
+        )
+
+        # Register the MCP action tools on the live server so agents can run the full scan lifecycle
+        # (validate/start/status/cancel/list/report/findings/benchmark) over /mcp — same services as
+        # the REST API. Org is bound here (never an LLM tool arg); per-tenant MCP auth is a v2 item.
+        import os as _os
+
+        from rogue.mcp_server.scan_tools import register_scan_tools
+
+        register_scan_tools(
+            rogue_mcp,
+            scan_service=scan_service,
+            report_service=report_service,
+            benchmark_service=benchmark_service,
+            engine=engine,
+            org_id=_os.environ.get("ROGUE_MCP_ORG_ID", "demo"),
         )
 
     _wire_platform()
-    logger.info("platform /v1 API wired")
+    logger.info("platform /v1 API wired (incl. MCP action tools)")
 except Exception:  # noqa: BLE001 — never let platform wiring break the core app
     logger.warning("platform /v1 API not wired", exc_info=True)
 

@@ -8,6 +8,7 @@ import { IntroOverlay } from "@/components/intro-overlay";
 import { LiveAttackTicker } from "@/components/live-attack-ticker";
 import { McpConnect } from "@/components/mcp-connect";
 import { MiniMatrix } from "@/components/mini-matrix";
+import { ProductPitch } from "@/components/product-pitch";
 import { SourcesMarquee } from "@/components/sources-marquee";
 
 /**
@@ -16,13 +17,14 @@ import { SourcesMarquee } from "@/components/sources-marquee";
  *
  * Reading order:
  *   1. CINEMATIC HERO — rotating-word headline, hero stat trio, one CTA.
- *   2. AHA MOMENT — "freshest threats" ticker + mini-matrix side-by-side.
- *   3. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
- *   4. AUGMENTATION SHOWCASE — 5 hero-stat cards (the §10.7 results).
- *   5. AUGMENTATION LAB — interactive: pick a config, toggle augmentations,
+ *   2. PRODUCT PITCH — the offer: point ROGUE at an endpoint → scored report.
+ *   3. SOURCES MARQUEE — 19 sources × 5 BD products.
+ *   4. AHA MOMENT — "freshest threats" ticker + mini-matrix side-by-side.
+ *   5. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
+ *   6. AUGMENTATION SHOWCASE — 5 hero-stat cards (the §10.7 results).
+ *   7. AUGMENTATION LAB — interactive: pick a config, toggle augmentations,
  *      watch the estimated breach rate stack.
- *   6. SOURCES MARQUEE — 19 sources × 5 BD products.
- *   7. DEEP-DIVE LINKS — /feed /matrix /brief.
+ *   8. DEEP-DIVE LINKS — /feed /matrix /brief.
  *
  * Server component. All data fetched in parallel via Promise.allSettled —
  * the page renders even if a backend endpoint is offline.
@@ -76,10 +78,17 @@ export default async function Home() {
           nConfigs={health?.n_configs ?? null}
         />
 
-        {/* 2. BRIGHT DATA SPOTLIGHT — first thing after the hero ------- */}
+        {/* 2. PRODUCT PITCH — what you actually buy (give us an endpoint
+            → get a security report). Placed right after the hero so the
+            offer reads before the supporting threat-intel proof. -------- */}
+        <ProductPitch
+          nAttacks={health?.n_primitives ?? attacks?.count ?? null}
+        />
+
+        {/* 3. BRIGHT DATA SPOTLIGHT ------------------------------------ */}
         <SourcesMarquee bandit={bandit} />
 
-        {/* 3. AHA MOMENT — fresh threats + mini-matrix ----------------- */}
+        {/* 4. AHA MOMENT — fresh threats + mini-matrix ----------------- */}
         <section
           className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 animate-rogue-fade-up"
         >
@@ -108,7 +117,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 4. CONNECT VIA MCP — query it yourself, one click ----------- */}
+        {/* 5. CONNECT VIA MCP — query it yourself, one click ----------- */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
@@ -125,7 +134,7 @@ export default async function Home() {
           <McpConnect />
         </section>
 
-        {/* 5. HOW ROGUE THINKS ------------------------------------------ */}
+        {/* 6. HOW ROGUE THINKS ------------------------------------------ */}
         <HowRogueThinks
           nSources={19}
           nPrimitives={health?.n_primitives ?? null}
@@ -133,7 +142,7 @@ export default async function Home() {
           nBreaches={health?.n_breaches ?? null}
         />
 
-        {/* 6. AUGMENTATION SHOWCASE ------------------------------------ */}
+        {/* 7. AUGMENTATION SHOWCASE ------------------------------------ */}
         <AugmentationShowcase
           bandit={bandit}
           persona={persona}
@@ -142,7 +151,7 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
-        {/* 7. AUGMENTATION LAB — interactive --------------------------- */}
+        {/* 8. AUGMENTATION LAB — interactive --------------------------- */}
         <AugmentationLab
           persona={persona}
           escalation={escalation}
@@ -150,7 +159,7 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
-        {/* 8. DEEP-DIVE LINKS ------------------------------------------ */}
+        {/* 9. DEEP-DIVE LINKS ------------------------------------------ */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">

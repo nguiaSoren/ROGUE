@@ -87,6 +87,19 @@ export function CinematicHero({
           on a budget the bandit auto-tunes for you.
         </p>
 
+        {/* Product value line — the "what you actually buy" one-liner */}
+        <p
+          className="text-base md:text-lg max-w-2xl leading-relaxed animate-rogue-reveal"
+          style={{ animationDelay: "0.3s" }}
+        >
+          <span className="text-foreground font-medium">
+            Point ROGUE at your LLM endpoint.
+          </span>{" "}
+          <span className="text-muted-foreground">
+            Get a report of which jailbreaks break it — and how to fix them.
+          </span>
+        </p>
+
         {/* Hero stat trio — the "this is alive" proof */}
         <div
           className="grid grid-cols-3 gap-3 md:gap-6 max-w-2xl animate-rogue-reveal"
@@ -122,16 +135,24 @@ export function CinematicHero({
           style={{ animationDelay: "0.45s" }}
         >
           <Link
-            href="/matrix"
+            href="/scans/new"
             className="px-6 py-3 rounded-md bg-rogue-green text-black font-mono text-sm font-bold tracking-[0.15em] uppercase hover:bg-rogue-green/90 transition-all shadow-[0_0_32px_var(--rogue-green-dim)] hover:shadow-[0_0_48px_var(--rogue-green-dim)] hover:-translate-y-0.5"
           >
-            See what&apos;s breaching → /matrix
+            Run a scan →
           </Link>
-          <Link
-            href="#stress-tests"
+          <a
+            href="/sample-report.html"
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-6 py-3 rounded-md border border-border font-mono text-sm tracking-[0.15em] uppercase hover:border-rogue-green hover:text-rogue-green transition-colors"
           >
-            How it works
+            See a sample report
+          </a>
+          <Link
+            href="/matrix"
+            className="px-6 py-3 rounded-md border border-border font-mono text-sm tracking-[0.15em] uppercase hover:border-rogue-green hover:text-rogue-green transition-colors"
+          >
+            See what&apos;s breaching → /matrix
           </Link>
         </div>
 
