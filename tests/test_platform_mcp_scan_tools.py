@@ -20,6 +20,7 @@ import pytest
 
 from rogue.mcp_server.scan_tools import register_scan_tools
 from rogue.platform.benchmark_service import BenchmarkRecord
+from rogue.platform.integration_store import InMemoryIntegrationStore
 from rogue.platform.schemas import ScanRecord, ScanStatus
 from rogue.report import ValidationResult
 
@@ -198,6 +199,22 @@ def ctx():
     report_service = FakeReportService()
     benchmark_service = FakeBenchmarkService()
     engine = FakeEngine()
+    # Pre-load an integration store under the SERVER-bound org so the reference-by-name path
+    # resolves the stored secret/config server-side — the tool callables only ever see the NAME.
+    integration_store = InMemoryIntegrationStore()
+    integration_store.put(
+        org_id="org_x", kind="slack", name="slack-sec", config={},
+        secret="https://hooks.slack/x",
+    )
+    integration_store.put(
+        org_id="org_x", kind="jira", name="jira-prod",
+        config={
+            "base_url": "https://acme.atlassian.net",
+            "project_key": "SEC",
+            "email": "sec@acme.test",
+        },
+        secret="stored-tok",
+    )
     tools = register_scan_tools(
         _NullMcp(),
         scan_service=scan_service,
@@ -205,6 +222,7 @@ def ctx():
         benchmark_service=benchmark_service,
         engine=engine,
         org_id="org_x",
+        integration_store=integration_store,
     )
     return tools, scan_service, report_service, benchmark_service, engine
 
@@ -557,7 +575,8 @@ async def test_send_slack_alert_records_payload_with_injected_sender(ctx, monkey
 
     monkeypatch.setattr(st, "_SLACK_SENDER", fake_sender)
 
-    out = await tools["send_slack_alert"]("scan_done", "https://hooks.slack.test/abc")
+    # Back-compat raw-args path: pass the webhook URL directly.
+    out = await tools["send_slack_alert"]("scan_done", webhook_url="https://hooks.slack.test/abc")
     assert out == {"ok": True, "status": "sent"}
 
     assert len(sent) == 1
@@ -573,7 +592,49 @@ async def test_send_slack_alert_records_payload_with_injected_sender(ctx, monkey
 @pytest.mark.asyncio
 async def test_send_slack_alert_unknown_id_returns_error(ctx):
     tools, *_ = ctx
-    out = await tools["send_slack_alert"]("nope", "https://hooks.slack.test/abc")
+    out = await tools["send_slack_alert"]("nope", webhook_url="https://hooks.slack.test/abc")
+    assert "error" in out
+
+
+@pytest.mark.asyncio
+async def test_send_slack_alert_resolves_stored_integration_by_name(ctx, monkeypatch):
+    tools, *_ = ctx
+
+    sent: list[tuple[str, dict]] = []
+
+    async def fake_sender(url, payload):
+        sent.append((url, payload))
+
+    import rogue.mcp_server.scan_tools as st
+
+    monkeypatch.setattr(st, "_SLACK_SENDER", fake_sender)
+
+    # Reference the stored Slack integration by NAME — the agent never handles the webhook URL.
+    out = await tools["send_slack_alert"]("scan_done", integration="slack-sec")
+    assert out == {"ok": True, "status": "sent"}
+
+    assert len(sent) == 1
+    url, payload = sent[0]
+    # The server resolved the stored webhook URL; the payload still carries score / breaches.
+    assert url == "https://hooks.slack/x"
+    text = payload["text"]
+    assert "81/100" in text
+    assert "7/20" in text
+    assert "Crescendo" in text
+
+
+@pytest.mark.asyncio
+async def test_send_slack_alert_unknown_integration_returns_error(ctx):
+    tools, *_ = ctx
+    out = await tools["send_slack_alert"]("scan_done", integration="does-not-exist")
+    assert "error" in out
+    assert "does-not-exist" in out["error"]
+
+
+@pytest.mark.asyncio
+async def test_send_slack_alert_requires_integration_or_webhook(ctx):
+    tools, *_ = ctx
+    out = await tools["send_slack_alert"]("scan_done")
     assert "error" in out
 
 
@@ -676,6 +737,104 @@ async def test_create_jira_ticket_unknown_id_returns_error(ctx):
     assert "error" in out
 
 
+@pytest.mark.asyncio
+async def test_create_jira_ticket_resolves_stored_integration_by_name(ctx, monkeypatch):
+    tools, *_ = ctx
+
+    class FakeJiraClient:
+        def __init__(self, base_url, email, api_token, project_key):
+            self.init_args = (base_url, email, api_token, project_key)
+            self.created: list[object] = []
+            self._open: dict[str, str] = {}
+
+        async def find_open(self, fid):
+            return self._open.get(fid)
+
+        async def create(self, ticket):
+            key = f"SEC-{len(self.created) + 1}"
+            self.created.append(ticket)
+            self._open[ticket.finding_id] = key
+            return key
+
+    instances: list[FakeJiraClient] = []
+
+    def factory(base_url, email, api_token, project_key):
+        client = FakeJiraClient(base_url, email, api_token, project_key)
+        instances.append(client)
+        return client
+
+    import rogue.mcp_server.scan_tools as st
+
+    monkeypatch.setattr(st, "_JIRA_CLIENT_FACTORY", factory)
+
+    # Reference the stored Jira integration by NAME — config + token resolved server-side.
+    out = await tools["create_jira_ticket"]("scan_done", integration="jira-prod")
+    assert out["created"] == ["SEC-1"]
+    assert out["skipped"] == []
+    client = instances[0]
+    # The client was built from the STORED config + the stored secret token, not from tool args.
+    assert client.init_args == (
+        "https://acme.atlassian.net", "sec@acme.test", "stored-tok", "SEC",
+    )
+    assert len(client.created) == 1
+    ticket = client.created[0]
+    assert "Crescendo" in ticket.title
+    assert ticket.severity == "critical"
+
+
+@pytest.mark.asyncio
+async def test_create_jira_ticket_unknown_integration_returns_error(ctx):
+    tools, *_ = ctx
+    out = await tools["create_jira_ticket"]("scan_done", integration="does-not-exist")
+    assert "error" in out
+    assert "does-not-exist" in out["error"]
+
+
+@pytest.mark.asyncio
+async def test_create_jira_ticket_requires_integration_or_raw_creds(ctx):
+    tools, *_ = ctx
+    # Neither an integration name nor the full raw-creds set → a clean error, no raise.
+    out = await tools["create_jira_ticket"]("scan_done", base_url="https://acme.atlassian.net")
+    assert "error" in out
+
+
+# --------------------------------------------------------------------------- #
+# list_integrations — names + kinds, NEVER secrets
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_list_integrations_returns_names_and_kinds_no_secrets(ctx):
+    tools, *_ = ctx
+    out = await tools["list_integrations"]()
+    integrations = out["integrations"]
+    by_name = {i["name"]: i for i in integrations}
+    assert by_name["slack-sec"]["kind"] == "slack"
+    assert by_name["jira-prod"]["kind"] == "jira"
+    # No secret value (webhook URL / api token) leaks anywhere in the payload.
+    flat = repr(out)
+    assert "hooks.slack/x" not in flat
+    assert "stored-tok" not in flat
+    # Each row is exactly {kind, name} — no extra secret-bearing fields.
+    for i in integrations:
+        assert set(i) == {"kind", "name"}
+
+
+@pytest.mark.asyncio
+async def test_list_integrations_no_store_reports_none_configured():
+    tools = register_scan_tools(
+        _NullMcp(),
+        scan_service=FakeScanService(),
+        report_service=FakeReportService(),
+        benchmark_service=FakeBenchmarkService(),
+        engine=FakeEngine(),
+        org_id="org_x",
+    )
+    out = await tools["list_integrations"]()
+    assert out["integrations"] == []
+    assert "note" in out
+
+
 # --------------------------------------------------------------------------- #
 # registration against a real FastMCP (skipped if `mcp` isn't installed)
 # --------------------------------------------------------------------------- #
@@ -713,4 +872,5 @@ async def test_registers_on_real_fastmcp():
         "create_executive_summary",
         "send_slack_alert",
         "create_jira_ticket",
+        "list_integrations",
     } <= names

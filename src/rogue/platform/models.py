@@ -140,7 +140,23 @@ class Secret(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class Integration(Base):
+    """A per-org stored integration (Slack / Jira). Holds non-secret `config` inline + a `secret_ref`
+    handle into the `secrets` table for the credential (webhook URL / API token). MCP tools reference it
+    by `name` so an agent never handles the raw secret."""
+
+    __tablename__ = "integrations"
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_integration_org_name"),)
+    integration_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # slack | jira
+    name: Mapped[str] = mapped_column(String(80))
+    config: Mapped[dict] = mapped_column(JSON, default=dict)  # non-secret (e.g. jira base_url/project/email)
+    secret_ref: Mapped[str | None] = mapped_column(String(48), nullable=True)  # secref_ → secrets table
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 __all__ = [
     "Organization", "User", "Membership", "Project", "ApiKey",
-    "ScanRun", "ScanJob", "Report", "Secret",
+    "ScanRun", "ScanJob", "Report", "Secret", "Integration",
 ]

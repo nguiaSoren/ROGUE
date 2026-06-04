@@ -111,6 +111,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "bright_data_cost_log",
         "deployment_configs",
         "fetch_cache",
+        "integrations",
         "ladder_attempts",
         "ladder_rotation_membership",
         "memberships",

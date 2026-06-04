@@ -68,6 +68,7 @@ These read ROGUE's global, already-computed threat data. They take no customer t
 - **`query_threat_brief(date?, format?)`** — the full daily CISO-readable threat brief for a date, as a string. `format` is `"markdown"` (default) or `"json"`. Falls back to a live DB render if the artifact file isn't on disk yet.
 - **`query_breaches_for_config(deployment_config_id, since_days?, limit?)`** — per-trial breach results for one deployment config, with judge rationale and model-response excerpts. Returns a list of `{breach_id, primitive_id, primitive_title, deployment_config_id, trial_index, verdict, judge_confidence, judge_rationale (truncated), model_response_excerpt (truncated), ran_at}`.
 - **`query_attack_detail(primitive_id)`** — one attack's full record plus its per-config breach aggregates. Returns `{primitive:{…full payload + slots…}, breaches:[{deployment_config_id, config_name, target_model, n_trials, n_full_breach, n_partial_breach, n_refused, n_evaded, n_error, avg_confidence, last_ran_at}]}`.
+- **`list_integrations()`** — discover the org's stored Slack/Jira integrations by name + kind, so an agent knows which `integration=` names it can pass to `send_slack_alert` / `create_jira_ticket`. Returns `{integrations:[{kind, name}]}` — **names and kinds only, never a secret**; webhook URLs and API tokens stay encrypted server-side. Returns an empty list with a note when no integration store is configured. Takes no customer target and spends no money.
 
 ### Validate
 
@@ -94,11 +95,11 @@ These take a customer `TargetSpec`, cost real money, and write durable per-tenan
 
 ### Workflow
 
-These are the **Level-3** tools — they turn a finished scan into the artifacts and notifications a security team actually acts on, so the agent doesn't just report a result, it delivers the consult. Each takes a terminal `scan_id` and reads that scan's stored findings; the summary tool is a pure read, while the alert/ticket tools fan the result out to an external destination whose credentials the calling user supplies as arguments (see Versioning for why those are arguments today, not stored config).
+These are the **Level-3** tools — they turn a finished scan into the artifacts and notifications a security team actually acts on, so the agent doesn't just report a result, it delivers the consult. Each takes a terminal `scan_id` and reads that scan's stored findings; the summary tool is a pure read, while the alert/ticket tools fan the result out to an external destination. The **preferred** way to reach that destination is a *stored integration*: an admin registers the org's Slack workspace or Jira site once with `scripts/add_integration.py`, and the agent then passes only the integration *name* — the secret is decrypted server-side and never reaches the model (see Versioning). Each tool also accepts the raw destination credentials as arguments for a quick/demo run, and `list_integrations` lets an agent discover the names available to it.
 
 - **`create_executive_summary(scan_id)`** — render a CISO-ready markdown executive summary for a completed scan: the headline score and risk band, the critical and high findings with concrete remediation, and business framing a non-engineer can act on. Returns `{summary}` (the markdown string). A pure read; errors if the scan is not terminal.
-- **`send_slack_alert(scan_id, webhook_url)`** — post the scan result — score, breach count, and the top attack — to a Slack incoming webhook. `webhook_url` is the destination the calling user authorizes the agent with (an `https://hooks.slack.com/services/…` URL); it is used for the post and not persisted. Returns `{ok, status}` — `ok` is true when Slack accepts the post, `status` is the HTTP status from the webhook.
-- **`create_jira_ticket(scan_id, base_url, project_key, email, api_token)`** — file a Jira issue per breached critical/high finding, deduped so re-running the tool against the same scan won't refile a finding already ticketed. `base_url` (your Jira site, e.g. `https://acme.atlassian.net`), `project_key` (e.g. `SEC`), `email`, and `api_token` are the Jira credentials the calling user authorizes the agent with; they are used for the API calls and not persisted. Returns `{created, skipped}` — the lists of finding keys ticketed this call and those skipped as already-filed.
+- **`send_slack_alert(scan_id, integration?, webhook_url?)`** — post the scan result — score, breach count, and the top attack — to Slack. **Preferred:** pass `integration` — the *name* of a Slack integration the org registered once (e.g. `"slack-sec"`); ROGUE resolves the stored webhook server-side and the agent never handles the raw URL (discover the available names with `list_integrations`). Back-compat: pass `webhook_url` directly (an `https://hooks.slack.com/services/…` URL the calling user authorizes the agent with) for a quick/demo post; it is used once and not persisted. Returns `{ok, status}` — `ok` is true when Slack accepts the post.
+- **`create_jira_ticket(scan_id, integration?, base_url?, project_key?, email?, api_token?)`** — file a Jira issue per breached critical/high finding, deduped so re-running the tool against the same scan won't refile a finding already ticketed. **Preferred:** pass `integration` — the *name* of a Jira integration the org registered once (e.g. `"jira-prod"`); ROGUE resolves the stored `base_url` / `project_key` / `email` plus the encrypted API token server-side and the agent never handles a credential. Back-compat: pass all four raw args (`base_url`, e.g. `https://acme.atlassian.net`; `project_key`, e.g. `SEC`; `email`; `api_token`) for a quick/demo run; they are used for the API calls and not persisted. Returns `{created, skipped}` — the lists of finding keys ticketed this call and those skipped as already-filed.
 
 ## Agentic workflows (the real value)
 
@@ -141,8 +142,12 @@ This is the whole point: the user asks one question and the agent runs the entir
 
 ```
 User:  "Test our staging endpoint and tell the team. It's at
-        https://staging-api.company.com/v1, here's the key. Slack #security
-        webhook is <hook>, file Jira against the SEC project."
+        https://staging-api.company.com/v1, here's the key. Post to Slack and
+        file Jira for the critical/high findings."
+
+  → list_integrations()
+        ← { integrations: [ { kind: "slack", name: "slack-sec" },
+                            { kind: "jira",  name: "jira-prod" } ] }
 
   → validate_target(endpoint="https://staging-api.company.com/v1", api_key="sk-…")
         ← { ok: true, model_responds: true, supports_image: false }
@@ -167,11 +172,10 @@ User:  "Test our staging endpoint and tell the team. It's at
             …\n**Business impact:** a support-bot deployment could be steered to
             leak internal docs; recommend gating before GA." }
 
-  → send_slack_alert("scan_03L…", webhook_url="https://hooks.slack.com/services/…")
-        ← { ok: true, status: 200 }
+  → send_slack_alert("scan_03L…", integration="slack-sec")
+        ← { ok: true, status: "sent" }
 
-  → create_jira_ticket("scan_03L…", base_url="https://company.atlassian.net",
-                       project_key="SEC", email="sec@company.com", api_token="…")
+  → create_jira_ticket("scan_03L…", integration="jira-prod")
         ← { created: ["SEC-412", "SEC-413", "SEC-414"], skipped: [] }
 
 Agent → user:  "Scanned staging: risk 62/100, 7 of 50 attacks landed (worst is
@@ -181,17 +185,16 @@ Agent → user:  "Scanned staging: risk 62/100, 7 of 50 attacks landed (worst is
                 RAG-injection is the one to fix first."
 ```
 
-The agent ran the consultant loop end to end: validate the target, scan it under a ladder, pace its polling to terminal, read the report, turn it into a CISO-ready summary, and then *deliver* — push to Slack and open the right tickets — finally narrating what it did. The user gave one instruction; ROGUE did the work and the agent closed every loop. **This is what makes MCP more than an API: it turns ROGUE into a distribution channel — the agent the customer already lives in runs the whole security consult, from "test this" to "tickets filed."**
+The agent ran the consultant loop end to end: discover the org's registered destinations with `list_integrations`, validate the target, scan it under a ladder, pace its polling to terminal, read the report, turn it into a CISO-ready summary, and then *deliver* — push to Slack and open the right tickets by integration name, never touching a raw credential — finally narrating what it did. The user gave one instruction; ROGUE did the work and the agent closed every loop. **This is what makes MCP more than an API: it turns ROGUE into a distribution channel — the agent the customer already lives in runs the whole security consult, from "test this" to "tickets filed."**
 
 ## Versioning
 
-The tools above are **v1** — including the Slack and Jira Workflow tools, which graduate the "push findings onward" capability out of the roadmap and into the shipped surface. The v1 contract is **stable**: tool names, their inputs, and their output shapes will not change underneath an integration. The `org` binding (server-side, never a tool argument) and the start+poll async shape for scans are load-bearing invariants of v1 and will hold.
+The tools above are **v1** — including the Slack and Jira Workflow tools, which graduate the "push findings onward" capability out of the roadmap and into the shipped surface, and **per-tenant stored integration config**, which has now shipped (see below). The v1 contract is **stable**: tool names, their inputs, and their output shapes will not change underneath an integration. The `org` binding (server-side, never a tool argument) and the start+poll async shape for scans are load-bearing invariants of v1 and will hold.
 
-**A note on how credentials flow today.** The Workflow tools take their destination and credentials as **tool arguments** — `send_slack_alert` takes the `webhook_url`, `create_jira_ticket` takes the `base_url` / `project_key` / `email` / `api_token`. The calling user authorizes the agent with those each time; ROGUE uses them for the one call and does not persist them. That keeps the integration zero-setup (no onboarding step before the first ticket fires) at the cost of the agent handling raw creds in-conversation. **Per-tenant *stored* integration config — where an org registers its Slack workspace and Jira site once, server-side, and the Workflow tools take only a `scan_id` — is the v2 hardening** (so the agent never touches raw credentials). It rides on the same per-tenant MCP auth work below.
+**A note on how credentials flow.** The **preferred** path is a *stored per-org integration*. An admin registers the org's Slack workspace or Jira site **once**, server-side, with `scripts/add_integration.py` — `--org <id> --kind slack --name slack-sec --webhook <url>` for Slack, or `--kind jira --name jira-prod --base-url … --project … --email … --token …` for Jira. The secret (the webhook URL, the Jira API token) is encrypted into the `secrets` table (Fernet) and referenced by a `secret_ref`; the non-secret config (Jira base_url / project / email) sits in plaintext on the integration row. Thereafter the agent passes only the integration **name** — `send_slack_alert(scan_id, integration="slack-sec")`, `create_jira_ticket(scan_id, integration="jira-prod")` — and ROGUE resolves the config and decrypts the secret server-side, so the raw credential **never reaches the LLM** and never appears in the conversation. `list_integrations()` lets the agent discover the configured names (kind + name only, never a secret). The Workflow tools still accept the raw destination credentials as arguments (`webhook_url`; or `base_url` / `project_key` / `email` / `api_token`) for a zero-setup quick/demo run, but the stored integration is the enterprise default.
 
 **v2 roadmap** (not yet shipped):
 
-- **Stored integration config** — per-tenant Slack/Jira (and other destination) credentials registered once and resolved server-side, so the Workflow tools drop their credential arguments and the agent stops handling raw secrets. Depends on per-tenant MCP auth (below) to bind the integration to an org.
 - **`list_projects` / `create_project`** — project-scoped organization of scans, blocked on a project service existing in the platform layer.
 - **`download_report`** — binary PDF/HTML report artifacts over MCP. v1 deliberately surfaces only text renderings (`get_report` summary/json, `create_executive_summary` markdown) because MCP is a text protocol; binary delivery needs a separate mechanism (e.g. a signed URL the user opens in the dashboard).
 - **Per-tenant MCP auth** — `rk_live_…` / `rk_test_…` bearer keys on the `/mcp` mount, resolved through the same authentication and tenancy chain as the `/v1` API, with the read tools gated by `read` scope and the action tools by `scan`. This is what turns the currently-open public endpoint into a multi-tenant one where each client runs and reads only its own org's scans with its own key.

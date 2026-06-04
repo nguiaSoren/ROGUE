@@ -250,9 +250,14 @@ try:  # pragma: no cover - exercised at process start
                 "SECRET_ENCRYPTION_KEY unset — hosted scans persist the raw target key in scan_jobs; "
                 "set it to encrypt target credentials at rest (see rogue.platform.secrets)."
             )
+        from rogue.platform.integration_store import build_postgres_integration_store
+
         scan_service = DefaultScanService(store, queue, secret_store=secret_store)
         report_service = DefaultReportService(store)
         benchmark_service = DefaultBenchmarkService(engine=engine)
+        # Per-org stored integrations (Slack/Jira) — needs the secret store to encrypt creds; None
+        # without SECRET_ENCRYPTION_KEY, in which case the workflow tools fall back to raw-arg destinations.
+        integration_store = build_postgres_integration_store(secret_store)
         _v1_deps.wire(
             scan_service=scan_service,
             report_service=report_service,
@@ -273,6 +278,7 @@ try:  # pragma: no cover - exercised at process start
             report_service=report_service,
             benchmark_service=benchmark_service,
             engine=engine,
+            integration_store=integration_store,
             org_id=_os.environ.get("ROGUE_MCP_ORG_ID", "demo"),
         )
 

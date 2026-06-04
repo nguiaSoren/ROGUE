@@ -45,6 +45,7 @@ from rogue.platform.schemas import ScanRecord, ScanSpec, ScanStatus, TargetSpec
 
 if TYPE_CHECKING:
     from rogue.platform.benchmark_service import DefaultBenchmarkService
+    from rogue.platform.integration_store import IntegrationStore
     from rogue.platform.integrations.jira import JiraClient
     from rogue.platform.integrations.slack import Sender
     from rogue.platform.interfaces import ScanEngine, ReportService, ScanService
@@ -174,6 +175,7 @@ def register_scan_tools(
     benchmark_service: DefaultBenchmarkService,
     engine: ScanEngine,
     org_id: str = "default",
+    integration_store: IntegrationStore | None = None,
 ) -> ScanToolFns:
     """Attach the full action-tool surface to an already-built FastMCP, all routed through services.
 
@@ -190,6 +192,11 @@ def register_scan_tools(
         org_id: the tenant the connection authenticated as. The SERVER resolves this from the MCP
             connection's auth context and binds it here; it is deliberately NOT a tool argument, so
             an LLM can never supply or spoof the org it scans under.
+        integration_store: optional per-org :class:`IntegrationStore`. When bound, the workflow
+            tools (``send_slack_alert`` / ``create_jira_ticket``) can reference a stored integration
+            by NAME — the secret is resolved server-side and the LLM never sees it. ``None`` (the
+            default) leaves only the raw-args back-compat path, and ``list_integrations`` reports
+            that nothing is configured.
 
     Returns:
         A name → bound-async-callable dict for every action tool, so they can be driven directly in
@@ -498,23 +505,42 @@ def register_scan_tools(
 
     # --- send_slack_alert (Level-3: alert the team) ---------------------------------------------
 
-    async def send_slack_alert(scan_id: str, webhook_url: str) -> dict[str, Any]:
+    async def send_slack_alert(
+        scan_id: str,
+        integration: str | None = None,
+        webhook_url: str | None = None,
+    ) -> dict[str, Any]:
         """Post a completed scan's result to a Slack channel via an incoming webhook.
 
-        Builds a Block Kit summary (score / breach ratio / top attack) and POSTs it to the supplied
-        webhook. The destination logs+swallows transport errors, so a Slack outage never raises — a
-        ``False`` ``ok`` with an ``error`` status signals it didn't land.
+        Builds a Block Kit summary (score / breach ratio / top attack) and POSTs it to the channel's
+        incoming-webhook URL. The destination logs+swallows transport errors, so a Slack outage never
+        raises — a ``False`` ``ok`` with an ``error`` status signals it didn't land.
 
-        ``webhook_url`` is a tool argument in v1 (you pass the channel's incoming-webhook URL);
-        per-tenant stored Slack config is a v2 concern resolved server-side, not from the model.
+        PREFERRED: pass ``integration`` — the NAME of a Slack integration your org stored once (see
+        ``list_integrations``). ROGUE resolves the webhook URL server-side; you never handle the
+        secret. Back-compat: pass ``webhook_url`` directly (the raw incoming-webhook URL).
 
         Args:
             scan_id: the id of a scan to alert on (any status; aggregates come from the record).
-            webhook_url: the Slack incoming-webhook URL to post to.
+            integration: the NAME of a stored Slack integration (preferred; secret resolved
+                server-side).
+            webhook_url: the Slack incoming-webhook URL to post to (back-compat fallback).
 
         Returns:
-            ``{ok: bool, status: str}`` — or ``{error: ...}`` if the scan is unknown to this org.
+            ``{ok: bool, status: str}`` — or ``{error: ...}`` if the scan is unknown to this org, the
+            integration can't be resolved, or neither ``integration`` nor ``webhook_url`` was given.
         """
+        if integration is not None:
+            # Reference-by-name: resolve the stored Slack integration; the secret stays server-side.
+            r = integration_store.get(org_id, integration) if integration_store is not None else None
+            if r is None:
+                return {"error": f"unknown integration: {integration}"}
+            if r.kind != "slack":
+                return {"error": f"integration {integration!r} is {r.kind}, not slack"}
+            webhook_url = r.secret
+        elif webhook_url is None:
+            return {"error": "provide integration= (preferred) or webhook_url="}
+
         # org is the server-bound tenant — NOT a model-supplied argument.
         record = await scan_service.get_scan(scan_id, org_id=org_id)
         if record is None:
@@ -532,10 +558,11 @@ def register_scan_tools(
 
     async def create_jira_ticket(
         scan_id: str,
-        base_url: str,
-        project_key: str,
-        email: str,
-        api_token: str,
+        integration: str | None = None,
+        base_url: str | None = None,
+        project_key: str | None = None,
+        email: str | None = None,
+        api_token: str | None = None,
     ) -> dict[str, Any]:
         """File a Jira ticket for each critical/high breached finding of a scan (idempotent).
 
@@ -543,20 +570,42 @@ def register_scan_tools(
         (matched via a ``rogue-<fid>`` label) the finding is SKIPPED so re-scans converge rather than
         spam the board. New findings become a ticket with the technique, severity, and remediation.
 
-        The Jira creds (``base_url`` / ``project_key`` / ``email`` / ``api_token``) are tool
-        arguments in v1; per-tenant stored Jira config is a v2 concern resolved server-side.
+        PREFERRED: pass ``integration`` — the NAME of a Jira integration your org stored once (see
+        ``list_integrations``). ROGUE resolves the base_url / project_key / email + the API token
+        server-side; you never handle the secret. Back-compat: pass all four raw creds
+        (``base_url`` / ``project_key`` / ``email`` / ``api_token``) directly.
 
         Args:
             scan_id: the id of a COMPLETED scan.
-            base_url: the Jira Cloud base URL (e.g. "https://acme.atlassian.net").
-            project_key: the Jira project key to file into (e.g. "SEC").
-            email: the Jira account email (HTTP Basic auth user).
-            api_token: the Jira API token (HTTP Basic auth secret).
+            integration: the NAME of a stored Jira integration (preferred; creds resolved
+                server-side).
+            base_url: the Jira Cloud base URL (e.g. "https://acme.atlassian.net") — back-compat.
+            project_key: the Jira project key to file into (e.g. "SEC") — back-compat.
+            email: the Jira account email (HTTP Basic auth user) — back-compat.
+            api_token: the Jira API token (HTTP Basic auth secret) — back-compat.
 
         Returns:
             ``{created: [issue_key, ...], skipped: [finding_id, ...]}`` — or ``{error: ...}`` if the
-            scan is unknown / not completed.
+            scan is unknown / not completed, the integration can't be resolved, or the raw creds are
+            incomplete.
         """
+        if integration is not None:
+            # Reference-by-name: resolve the stored Jira config + token; the secret stays server-side.
+            r = integration_store.get(org_id, integration) if integration_store is not None else None
+            if r is None:
+                return {"error": f"unknown integration: {integration}"}
+            if r.kind != "jira":
+                return {"error": f"integration {integration!r} is {r.kind}, not jira"}
+            base_url = r.config["base_url"]
+            project_key = r.config["project_key"]
+            email = r.config["email"]
+            api_token = r.secret
+        elif not (base_url and project_key and email and api_token):
+            return {
+                "error": "provide integration= (preferred) or all of "
+                "base_url=, project_key=, email=, api_token="
+            }
+
         try:
             report = await report_service.build_json(scan_id)
         except ValueError as exc:
@@ -616,6 +665,23 @@ def register_scan_tools(
             return {"error": f"jira: {exc}", "created": created, "skipped": skipped}
         return {"created": created, "skipped": skipped}
 
+    # --- list_integrations (Level-3: discover stored destinations) ------------------------------
+
+    async def list_integrations() -> dict[str, Any]:
+        """List your org's stored Slack/Jira integrations by name + kind (never any secret).
+
+        Use this to discover the integration NAMES you can pass to ``send_slack_alert(integration=)``
+        / ``create_jira_ticket(integration=)``. Only names and kinds are returned — webhook URLs and
+        API tokens are stored encrypted server-side and are never exposed to the model.
+
+        Returns:
+            ``{integrations: [{kind, name}, ...]}`` — or ``{integrations: [], note: ...}`` when no
+            integration store is configured for this server.
+        """
+        if integration_store is None:
+            return {"integrations": [], "note": "no stored integrations configured"}
+        return {"integrations": integration_store.list(org_id)}
+
     # Back-compat alias: the original tool name before the catalog grew. Same callable as
     # `get_scan_status`, registered under both names so existing clients keep working.
     get_scan = get_scan_status
@@ -637,6 +703,7 @@ def register_scan_tools(
         "create_executive_summary": create_executive_summary,
         "send_slack_alert": send_slack_alert,
         "create_jira_ticket": create_jira_ticket,
+        "list_integrations": list_integrations,
     }
     for fn in tools.values():
         mcp.tool()(fn)
