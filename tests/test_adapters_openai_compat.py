@@ -298,14 +298,27 @@ async def test_max_tokens_omitted_when_none():
     adapter = OpenAIAdapter(_cfg(fake=fake))
     await adapter.invoke([CanonicalMessage.user("hi")])
     assert "max_tokens" not in fake.last_create_kwargs
+    assert "max_completion_tokens" not in fake.last_create_kwargs
 
 
 @pytest.mark.asyncio
-async def test_max_tokens_passed_when_set():
+async def test_openai_uses_max_completion_tokens_when_set():
+    # OpenAI gpt-5.x rejects `max_tokens` and requires `max_completion_tokens`.
     fake = FakeClient()
     adapter = OpenAIAdapter(_cfg(fake=fake))
     await adapter.invoke([CanonicalMessage.user("hi")], max_output_tokens=64)
+    assert fake.last_create_kwargs["max_completion_tokens"] == 64
+    assert "max_tokens" not in fake.last_create_kwargs
+
+
+@pytest.mark.asyncio
+async def test_openrouter_uses_max_tokens_when_set():
+    # The compat default (OpenRouter/Groq/custom) still uses `max_tokens`.
+    fake = FakeClient()
+    adapter = OpenRouterAdapter(_cfg(model="mistralai/mistral-small-2603", fake=fake))
+    await adapter.invoke([CanonicalMessage.user("hi")], max_output_tokens=64)
     assert fake.last_create_kwargs["max_tokens"] == 64
+    assert "max_completion_tokens" not in fake.last_create_kwargs
 
 
 # --------------------------------------------------------------------------------------------------

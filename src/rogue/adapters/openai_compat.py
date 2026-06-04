@@ -46,6 +46,11 @@ class OpenAICompatAdapter(TargetAdapter):
     :attr:`TargetAdapter.provider` property unless a subclass overrides it.
     """
 
+    # The chat-completions param for the output-token cap. OpenAI's own gpt-5.x rejects ``max_tokens``
+    # and requires ``max_completion_tokens``; OpenRouter/Groq/most compat endpoints still take
+    # ``max_tokens``. The OpenAI adapter overrides this; everyone else keeps the default.
+    _max_tokens_param: str = "max_tokens"
+
     def __init__(self, config: AdapterConfig):
         super().__init__(config)
         # Sensible defaults; concrete subclasses override these in their own __init__.
@@ -193,9 +198,10 @@ class OpenAICompatAdapter(TargetAdapter):
                 "messages": msgs,
                 "temperature": temperature,
             }
-            # The panel omits max_tokens entirely when None — do NOT pass it.
+            # The panel omits the cap entirely when None — do NOT pass it. The param name is
+            # provider-specific (OpenAI gpt-5.x wants max_completion_tokens; see _max_tokens_param).
             if max_output_tokens:
-                create_kwargs["max_tokens"] = max_output_tokens
+                create_kwargs[self._max_tokens_param] = max_output_tokens
             return await client.chat.completions.create(**create_kwargs)
 
         t0 = time.perf_counter()

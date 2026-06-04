@@ -18,6 +18,9 @@ from .openai_compat import OpenAICompatAdapter
 class OpenAIAdapter(OpenAICompatAdapter):
     """OpenAI proper — ``https://api.openai.com/v1``, model id with the ``openai/`` prefix stripped."""
 
+    # gpt-5.x rejects `max_tokens`; the OpenAI API requires `max_completion_tokens`.
+    _max_tokens_param = "max_completion_tokens"
+
     def __init__(self, config: AdapterConfig):
         super().__init__(config)
         self._base_url = "https://api.openai.com/v1"
