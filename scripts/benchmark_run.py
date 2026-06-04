@@ -266,6 +266,42 @@ def _active_repertoire_size(session) -> int:
     )
 
 
+def _report_if_changed(args) -> bool:
+    """$0 'benchmark due?' check (DECIDE-AND-REPORT, like growth_scheduler): compare the
+    live active-strategy count against the repertoire_size stored on the most recent
+    persisted Run. A benchmark only measures the *graduated repertoire*, so if it hasn't
+    grown there's nothing new to measure. Returns True iff the caller should proceed to a
+    paid run — which requires BOTH --yes AND a material change (Δ ≥ --min-delta). Never
+    runs anything itself; safe to call from the harvest tail.
+    """
+    engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
+    SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+    with SessionLocal() as s:
+        current = _active_repertoire_size(s)
+        last = s.execute(
+            select(
+                BenchmarkRun.repertoire_size, BenchmarkRun.run_label, BenchmarkRun.run_at
+            ).order_by(BenchmarkRun.run_at.desc()).limit(1)
+        ).first()
+
+    if last is None or last[0] is None:
+        print(f"benchmark DUE — no prior persisted Run (live repertoire={current}).")
+        due = True
+    else:
+        delta = current - last[0]
+        due = delta >= args.min_delta
+        print(
+            f"benchmark {'DUE' if due else 'skip'} — repertoire {last[0]}→{current} "
+            f"(Δ{delta:+d} since '{last[1]}' @ {last[2]:%Y-%m-%d}); threshold Δ≥{args.min_delta}."
+        )
+    if not args.yes:
+        return False  # report-only ($0); --yes is what authorizes the paid run
+    if not due:
+        print("  --yes given, but repertoire unchanged → skipping the paid run.")
+        return False
+    return True
+
+
 async def _main(args) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     if args.mode == "attacker":
@@ -395,8 +431,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--run-label", default=None)
     p.add_argument("--dry-run", action="store_true", help="build context + estimate, free")
     p.add_argument("--yes", action="store_true", help="confirm the paid run")
+    p.add_argument("--if-changed", action="store_true",
+                   help="$0: report whether the repertoire grew since the last Run; with "
+                        "--yes, run ONLY if it did (else skip). Safe for the harvest tail.")
+    p.add_argument("--min-delta", type=int, default=1,
+                   help="min repertoire growth since last Run to count as 'due' (--if-changed)")
     args = p.parse_args(argv)
-    if not args.dry_run and not args.yes:
+    if args.if_changed:
+        # DECIDE-AND-REPORT ($0). Proceeds to the paid run only if --yes AND due.
+        if not _report_if_changed(args):
+            return 0
+    elif not args.dry_run and not args.yes:
         logger.error("this runs the paid ladder per goal. Re-run with --yes to confirm, "
                      "or --dry-run for a free estimate.")
         return 2
