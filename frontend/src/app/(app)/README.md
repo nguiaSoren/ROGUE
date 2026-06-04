@@ -1,21 +1,25 @@
-# `(app)` — authenticated product group (SCAFFOLD)
+# `(app)` — authenticated product group
 
-This route group is the customer-facing SaaS product (the org-scoped scan workflow), distinct from the public marketing/threat-intel pages that stay in the app root. It is specced in `docs/platform/dashboard/pages-and-routes.md`, `live-scan-ux.md`, and `report-views.md`. What ships here so far is a **scaffold of the scan workflow** — `/scans` (list), `/scans/{scanId}` (live progress detail), and `/scans/{scanId}/report` (completed report) — built against the typed `/v1` client in `frontend/src/lib/platform-api.ts`. It is syntactically valid, follows the existing server-component + `StatCapsule`/severity-token patterns, and would compile, but several product concerns are deliberately stubbed and called out below.
+The customer-facing SaaS product (the org-scoped scan workflow), distinct from the public marketing/threat-intel pages that stay in the app root. Specced in `docs/platform/dashboard/{pages-and-routes,live-scan-ux,report-views}.md`. **Auth is wired and live (2026-06-05)** against the hosted `/v1` API; `tsc --noEmit` + `eslint` clean.
 
-## What is real
+## Auth model — the API key is the session
 
-- `frontend/src/lib/platform-api.ts` — the typed `/v1` client, mirroring `lib/api.ts`'s cold-start retry/backoff/timeout but injecting an `Authorization: Bearer` header, fetching `no-store` (tenant data is per-request, not ISR), and decoding the `{ error: { code, message } }` envelope into an `ApiV1Error`. Types `ScanRecord`/`ScanStatus`/`ScanSpec`/`ScanReportJson`/`Finding` mirror `src/rogue/platform/schemas.py` and `src/rogue/report.py`.
-- `scans/page.tsx` — server-rendered scan table (scan id, target, status, breaches, score, created), with an empty state and an explicit load-error state.
-- `scans/[scanId]/page.tsx` — server shell that fetches the initial `ScanRecord` and hands live state to `components/scan-progress.tsx`.
-- `components/scan-progress.tsx` — a `"use client"` single-poller: exactly one `getScan` poll loop per page (every ~2s, stops on terminal), with the "one connection, many consumers" discipline from `sse-feed-provider.tsx`. Renders the spec's `█████ 67% — 32/50 tests — Current attack: Crescendo` line plus breach tally, live cost, and a derived ETA.
-- `scans/[scanId]/report/page.tsx` — the completed-report view: headline KPIs, a worst-first findings list with attack/response/remediation disclosures, a recommendations panel, and HTML/PDF/JSON export links.
-- `components/score-badge.tsx` — `ScoreBadge` (0–100 risk score banded ≥70 red / ≥40 orange / <40 green) and `StatusBadge`, both using the existing `--rogue-green/orange/red` tokens from `globals.css` — no new tokens.
+The platform authenticates with API keys (not user logins), so the dashboard "session" is the key itself, held server-side:
 
-## TODOs left (the auth-wiring gap)
+- **`/sign-in`** (`src/app/sign-in/page.tsx`) — paste an `rk_live_…` key → `POST /api/session`, which validates it against the platform and stores it in an **httpOnly, secure cookie** (`src/lib/session.ts`). The browser's JS never holds the raw key.
+- **`(app)/layout.tsx`** — the auth gate: reads the cookie via `getApiKey()` and `redirect("/sign-in")`s when absent. Renders the product sub-nav + sign-out (`components/sign-out-button.tsx`, `DELETE /api/session`).
+- **Server Components** read the key with `getApiKey()` and call `platformApi.*` directly (server-side). **Client components** never see the key — they call same-origin **Route Handlers** that re-read the cookie and forward the bearer:
+  - `GET /api/scans/{id}` (the live poller), `POST /api/scans/{id}/cancel`, `GET /api/scans/{id}/report?format=json|html|pdf` (export proxy — keeps the bearer out of client hrefs), `POST /api/scans` (the launch form), `POST|DELETE /api/session`.
 
-- **Session + auth gate.** There is no `(app)/layout.tsx` AppShell yet. Per `pages-and-routes.md` §3 it must resolve the server-side session, `redirect("/sign-in?next=…")` when absent, and mount the org switcher + product nav. Until it exists these pages are reachable without a session.
-- **The bearer is a placeholder.** `platform-api.ts` reads the key from a `NEXT_PUBLIC_PLATFORM_KEY` env var (or the literal `rk_test_placeholder`) via `resolveKey()`. This is a scaffold convenience only — a real key must **never** be `NEXT_PUBLIC_*`. The production path is: read the bearer from the server session inside each Server Component and pass it as the `key` argument to every `platformApi.*` call; client components that must call `/v1` (the cancel action, the `/scans/new` submit) post to a thin `(app)` Route Handler that re-reads the session server-side and forwards the bearer, so the browser never holds it.
-- **Cancel + create are stubbed.** `scan-progress.tsx`'s cancel currently re-fetches rather than `POST /v1/scans/{id}/cancel`; the `/scans/new` create form (and its `Idempotency-Key`) is not built yet. Both need the Route Handler from the point above.
-- **Export links carry no auth.** The report page's HTML/PDF/JSON links point straight at `GET /v1/scans/{id}/report?format=…`; once auth lands these should route through a Route Handler that attaches the bearer (a secret never belongs in a client `href`).
-- **`/v1` endpoint shapes are assumed.** `listScans` (cursor envelope), `getReport` (the JSON = `ScanReport.to_dict()` + `score` + `recommendations`), and `validateTarget` follow the dashboard specs; confirm against Team A's `docs/platform/api/scans-endpoints.md` when the backend ships, and reconcile any drift there first.
-- **SSE transport (Option B).** The detail page polls (`live-scan-ux.md` Option A). The `GET /v1/scans/{id}/events` stream can slot in behind the same `ScanProgress` seam later without a contract change.
+## Pages
+
+- `scans/` — server-rendered list (id, target, status, breaches, score, created) with empty/error states.
+- `scans/new/` — the launch form (provider or custom endpoint, model, target key, pack, max_tests) → `POST /api/scans` with an `Idempotency-Key` → routes to the detail page.
+- `scans/[scanId]/` — server shell + `components/scan-progress.tsx`, a single-poller client component that polls `/api/scans/{id}` every ~2s until terminal (the `█████ 67% — 32/50 — Current attack: …` line + live cost/ETA), with a working cancel button.
+- `scans/[scanId]/report/` — completed report: KPIs (score/breach-rate/top-attack/cost), worst-first findings with remediation, recommendations, and HTML/PDF/JSON exports via the authed proxy.
+
+## Remaining (nice-to-have, not blocking)
+
+- **SSE transport (Option B).** The detail page polls; a `GET /v1/scans/{id}/events` stream can slot in behind the same `ScanProgress` seam later without a contract change.
+- **Multi-project / org switcher.** One key = one tenant today; a switcher (and project scoping in the list) is future work once a tenant has multiple projects.
+- **`NEXT_PUBLIC_API_BASE`** should point at `https://rogue-private.onrender.com` on Vercel (the platform client also defaults there).
