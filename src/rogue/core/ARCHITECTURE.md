@@ -41,7 +41,8 @@ Concretely, `rogue.core` defines the language ROGUE thinks in — `CanonicalMess
   │  rogue.adapters   (the ONLY place provider SDKs are imported)              │
   │    TargetAdapter (abstract base) · AdapterConfig                           │
   │    MockAdapter (reference / conformance fixture) — registered "mock"       │
-  │    [Week 2+] OpenAIAdapter · AnthropicAdapter · GeminiAdapter · ...        │
+  │    [Week 2 ✓] OpenAIAdapter · AnthropicAdapter · OpenRouterAdapter ·       │
+  │              GeminiAdapter · CustomHTTPAdapter · GroqAdapter · MockAdapter  │
   │    each translates CanonicalMessage <-> provider wire format and maps      │
   │    provider failures -> rogue.core.errors types                            │
   └───────────────────────────────────┬────────────────────────────────────────┘
@@ -92,7 +93,7 @@ This is the question Week 1 exists to answer: *can a message go from ROGUE to Op
                            .raw_response : dict   (provider's untouched output, preserved)
 ```
 
-The business code above is byte-for-byte identical in all three columns. `messages` is built once from canonical types; `result` is read with the same accessors regardless of who answered. **The single provider-dependent step is `registry.create(provider, config)`** — swap the string, get a different adapter, and every other line stays put. That is the whole point of the layer, and it is the Week-1 exit criterion made concrete. (Today only `"mock"` is registered; the OpenAI/Anthropic/Gemini boxes are the Week-2 target, and each is a one-line `registry.register(...)`.)
+The business code above is byte-for-byte identical in all three columns. `messages` is built once from canonical types; `result` is read with the same accessors regardless of who answered. **The single provider-dependent step is `registry.create(provider, config)`** — swap the string, get a different adapter, and every other line stays put. That is the whole point of the layer, and it is the Week-1 exit criterion made concrete. (Week 2 ✓: `mock`, `openai`, `anthropic`, `openrouter`, `gemini`, `custom`, `groq` are all registered — each a one-line `registry.register(...)` in `adapters/__init__.py` — and `reproduce/target_panel.py` now dispatches through them with its public `ModelResponse` / `run_attack` contract unchanged.)
 
 ## 4. The five architecture rules
 
@@ -169,7 +170,7 @@ registry.register("xai", XAIAdapter)      # <-- the entire integration surface, 
 
 ## 7. Internal → canonical mapping (the Week-2 migration target)
 
-The core types are not greenfield abstractions; each one is the consolidation of something ROGUE already does in a scattered, provider-leaky way today. Week 2 migrates the reproduction layer onto them. The mapping is mechanical:
+The core types are not greenfield abstractions; each one is the consolidation of something ROGUE already does in a scattered, provider-leaky way today. **Week 2 (shipped) migrated the reproduction layer onto them:** the provider adapters live in `adapters/{openai_compat,openai,openrouter,custom,anthropic,gemini}.py`, the scattered pricing/capability tables are consolidated in `adapters/model_specs.py`, the retry predicate + provider-exception→`AdapterError` mapping live in `adapters/_provider_errors.py`, and `target_panel.py` is now a thin dispatch layer over the registry. The mapping was mechanical:
 
 | Today (provider-leaky)                                                                                                                                              | Canonical (this layer)                                                                                                                                                                  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

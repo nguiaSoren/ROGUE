@@ -4,10 +4,11 @@ Covers the foundation built per ``papers/MULTIMODAL_CONTEXT.md`` Step 0a:
 
   * ``supports_image`` capability classification of the 5-config panel
     (4 vision-capable, Llama-3.1-8B text-only).
-  * the per-provider content-block translator
-    (``_attach_image_to_last_user``) — OpenAI ``image_url`` data-URI vs
-    Anthropic ``image.source.base64``, on the LAST user turn only, system
-    turns untouched.
+  * the panel's canonical message builder (``TargetPanel._build_messages``) attaching the
+    out-of-band image/audio payload to the LAST user turn as an ``ImageBlock``/``AudioBlock``,
+    system turns untouched. (The provider-specific wire format — OpenAI ``image_url`` data-URI vs
+    Anthropic ``image.source.base64`` — now lives in the adapters and is covered by
+    ``test_adapters_openai_compat.py`` / ``test_adapters_anthropic.py``.)
   * ``RenderedAttack`` carrying an out-of-band image payload.
   * ``TargetPanel.run_attack`` skipping (returning ``[]``) an image attack
     aimed at a text-only model — the "modality-unsupported, not an error" gate.
@@ -53,8 +54,6 @@ from rogue.reproduce.modality_renderers import (
 )
 from rogue.reproduce.target_panel import (
     TargetPanel,
-    _attach_audio_to_last_user,
-    _attach_image_to_last_user,
     supports_audio,
     supports_image,
 )
@@ -121,57 +120,46 @@ def test_supports_image_unknown_model_defaults_false() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_openai_block_shape_on_last_user_turn() -> None:
-    messages = [
-        {"role": "system", "content": "sys"},
-        {"role": "user", "content": "hello"},
-    ]
-    out = _attach_image_to_last_user(
-        messages, _TINY_PNG_B64, "image/png", provider="openai"
-    )
+def test_build_messages_text_only_has_no_media_blocks() -> None:
+    from rogue.core import TextBlock
 
-    # System turn untouched and still a plain string.
-    assert out[0] == {"role": "system", "content": "sys"}
-    # User turn became a two-part block list: text first, then image_url.
-    parts = out[1]["content"]
-    assert parts[0] == {"type": "text", "text": "hello"}
-    assert parts[1]["type"] == "image_url"
-    assert parts[1]["image_url"]["url"] == f"data:image/png;base64,{_TINY_PNG_B64}"
-
-    # Input not mutated in place.
-    assert messages[1]["content"] == "hello"
+    msgs = TargetPanel()._build_messages(_rendered_with_image("dc_x", image=False))
+    assert all(isinstance(b, TextBlock) for m in msgs for b in m.content)
 
 
-def test_anthropic_block_shape_on_last_user_turn() -> None:
-    messages = [{"role": "user", "content": "hello"}]
-    out = _attach_image_to_last_user(
-        messages, _TINY_PNG_B64, "image/jpeg", provider="anthropic"
-    )
+def test_build_messages_attaches_image_to_last_user_turn() -> None:
+    """The panel attaches an out-of-band image to the LAST user turn as an ImageBlock; system clean."""
+    from rogue.core import ImageBlock, MessageRole, TextBlock
 
-    parts = out[0]["content"]
-    assert parts[0] == {"type": "text", "text": "hello"}
-    assert parts[1] == {
-        "type": "image",
-        "source": {
-            "type": "base64",
-            "media_type": "image/jpeg",
-            "data": _TINY_PNG_B64,
-        },
-    }
+    msgs = TargetPanel()._build_messages(_rendered_with_image("dc_x", image=True))
+
+    system = next(m for m in msgs if m.role == MessageRole.SYSTEM)
+    assert all(isinstance(b, TextBlock) for b in system.content)  # system turn untouched
+
+    last_user = [m for m in msgs if m.role == MessageRole.USER][-1]
+    assert any(isinstance(b, TextBlock) for b in last_user.content)
+    img = next(b for b in last_user.content if isinstance(b, ImageBlock))
+    assert img.mime_type == "image/png"
 
 
-def test_image_attaches_to_last_user_turn_in_multi_turn() -> None:
+def test_build_messages_image_rides_last_user_turn_in_multi_turn() -> None:
     """In a multi-turn render the image rides the LAST user turn only."""
-    messages = [
-        {"role": "user", "content": "turn one"},
-        {"role": "user", "content": "turn two"},
-    ]
-    out = _attach_image_to_last_user(
-        messages, _TINY_PNG_B64, "image/png", provider="openai"
+    from rogue.core import ImageBlock, MessageRole
+
+    rendered = RenderedAttack(
+        messages=[
+            {"role": "user", "content": "turn one"},
+            {"role": "user", "content": "turn two"},
+        ],
+        is_multi_turn=True,
+        resolved_slots={},
+        primitive_id="prim_test_mt",
+        deployment_config_id="dc_x",
+        image_b64=_TINY_PNG_B64,
     )
-    assert out[0]["content"] == "turn one"  # earlier turn unchanged
-    assert isinstance(out[1]["content"], list)  # last turn carries the image
-    assert out[1]["content"][1]["type"] == "image_url"
+    users = [m for m in TargetPanel()._build_messages(rendered) if m.role == MessageRole.USER]
+    assert not any(isinstance(b, ImageBlock) for b in users[0].content)  # earlier turn unchanged
+    assert any(isinstance(b, ImageBlock) for b in users[1].content)  # image on the last user turn
 
 
 # --------------------------------------------------------------------------- #
@@ -329,21 +317,30 @@ def test_panel_audio_capability_is_gemini_only() -> None:
     assert sum(capable.values()) == 1
 
 
-def test_audio_block_shape_on_last_user_turn() -> None:
-    messages = [
-        {"role": "system", "content": "sys"},
-        {"role": "user", "content": "hello"},
-    ]
-    out = _attach_audio_to_last_user(messages, "QUJD", "wav")
+def test_build_messages_attaches_audio_to_last_user_turn() -> None:
+    """The panel attaches an out-of-band audio payload to the LAST user turn as an AudioBlock."""
+    from rogue.core import AudioBlock, MessageRole, TextBlock
 
-    assert out[0] == {"role": "system", "content": "sys"}  # system untouched
-    parts = out[1]["content"]
-    assert parts[0] == {"type": "text", "text": "hello"}
-    assert parts[1] == {
-        "type": "input_audio",
-        "input_audio": {"data": "QUJD", "format": "wav"},
-    }
-    assert messages[1]["content"] == "hello"  # no in-place mutation
+    rendered = RenderedAttack(
+        messages=[
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "hello"},
+        ],
+        is_multi_turn=False,
+        resolved_slots={},
+        primitive_id="prim_test_audio",
+        deployment_config_id="dc_x",
+        audio_b64="QUJD",
+        audio_format="wav",
+    )
+    msgs = TargetPanel()._build_messages(rendered)
+
+    system = next(m for m in msgs if m.role == MessageRole.SYSTEM)
+    assert all(isinstance(b, TextBlock) for b in system.content)  # system untouched
+
+    last_user = [m for m in msgs if m.role == MessageRole.USER][-1]
+    audio = next(b for b in last_user.content if isinstance(b, AudioBlock))
+    assert audio.mime_type == "audio/wav"
 
 
 @pytest.mark.asyncio
