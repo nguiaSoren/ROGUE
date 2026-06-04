@@ -152,7 +152,7 @@ def _winner_rank(res) -> int | None:
 
 
 async def _run_one_cell(
-    *, ctx, config, goals, n_trials, temperature, max_spend
+    *, ctx, config, goals, n_trials, temperature, max_spend, concurrency
 ) -> dict:
     """Repertoire-replay one (dataset-goals × target) cell → an aggregate dict.
 
@@ -163,11 +163,18 @@ async def _run_one_cell(
     primitives = [_goal_primitive(g.goal, i) for i, g in enumerate(goals)]
     panel = TargetPanel()
     judge = JudgeAgent()
-    per_goal: list[dict] = []
-    spent = 0.0
-    try:
-        for prim, g in zip(primitives, goals):
-            remaining = None if max_spend is None else max(0.0, max_spend - spent)
+    # Goals run concurrently (bounded) — each is ~30-60 sequential ladder calls, so
+    # sequential goals made a 60-cell run take hours. A per-goal budget replaces the
+    # running-total cap (which can't be shared across concurrent goals). The panel/
+    # judge are concurrent-safe (reproduce gathers cells); the shared planner's
+    # plan() is independent per call.
+    per_goal_budget = (max_spend / len(goals)) if (max_spend and goals) else None
+    sem = asyncio.Semaphore(max(1, concurrency))
+    done = 0
+
+    async def _one(prim, g) -> tuple[dict, float]:
+        nonlocal done
+        async with sem:
             res = await run_escalation_ladder_one(
                 prim,
                 planner=ctx.planner,
@@ -181,26 +188,34 @@ async def _run_one_cell(
                 coj_operations=ctx.coj_operations,
                 structured_formats=ctx.structured_formats,
                 audio_styles=ctx.audio_styles,
-                budget_usd=remaining,
+                budget_usd=per_goal_budget,
                 candidate_attempt_quota=ctx.effective_quota,
                 candidate_ids=ctx.candidate_ids,
             )
-            spent += res.spend_usd
-            breached = res.winning_strategy is not None
-            per_goal.append({
-                "goal": g.goal[:120],
-                "breached": breached,
-                "winner": res.winning_strategy,
-                "rank": _winner_rank(res),
-                "depth": len(res.attempts),
-                "cost": round(res.spend_usd, 4),
-            })
-            logger.info(
-                "[%d/%d] %s goal=%r winner=%s rank=%s depth=%d $%.3f",
-                len(per_goal), len(goals), "BREACH" if breached else "held",
-                g.goal[:48], res.winning_strategy, _winner_rank(res),
-                len(res.attempts), res.spend_usd,
-            )
+        breached = res.winning_strategy is not None
+        rec = {
+            "goal": g.goal[:120],
+            "breached": breached,
+            "winner": res.winning_strategy,
+            "rank": _winner_rank(res),
+            "depth": len(res.attempts),
+            "cost": round(res.spend_usd, 4),
+        }
+        done += 1
+        logger.info(
+            "[%d/%d] %s goal=%r winner=%s rank=%s depth=%d $%.3f",
+            done, len(goals), "BREACH" if breached else "held",
+            g.goal[:48], res.winning_strategy, _winner_rank(res),
+            len(res.attempts), res.spend_usd,
+        )
+        return rec, res.spend_usd
+
+    per_goal: list[dict] = []
+    spent = 0.0
+    try:
+        results = await asyncio.gather(*(_one(p, g) for p, g in zip(primitives, goals)))
+        per_goal = [r[0] for r in results]
+        spent = sum(r[1] for r in results)
     finally:
         for obj in (panel, judge, ctx.planner):
             closer = getattr(obj, "aclose", None)
@@ -320,7 +335,7 @@ async def _main(args) -> int:
             agg = await _run_one_cell(
                 ctx=ctx, config=config, goals=goals,
                 n_trials=args.n_trials, temperature=args.temperature,
-                max_spend=args.max_spend,
+                max_spend=args.max_spend, concurrency=args.concurrency,
             )
             if not args.no_persist:
                 with SessionLocal() as s:  # short session, just the write
@@ -373,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--mode", choices=("repertoire", "attacker"), default="repertoire")
     p.add_argument("--limit", type=int, default=0, help="cap goals per dataset (smoke)")
     p.add_argument("--n-trials", type=int, default=1)
+    p.add_argument("--concurrency", type=int, default=5,
+                   help="goals run in parallel per cell (bounded); 1 = sequential")
     p.add_argument("--temperature", type=float, default=0.7)
     p.add_argument("--max-spend", type=float, default=None, help="per-cell budget cap USD")
     p.add_argument("--run-label", default=None)
