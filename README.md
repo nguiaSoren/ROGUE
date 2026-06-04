@@ -218,6 +218,7 @@ ROGUE harvests **two different things** from the open web, and now automates bot
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
 - **True multimodal red-team** — renders attacks as real images/audio and an autonomous escalation ladder (see above)
 - **Self-growing repertoire** — harvests reusable attack *techniques* (not just payloads), classifies + routes them, and graduates / soft-retires / resurrects them on live breach evidence; governed executable-renderer registry + adaptive-orchestration groundwork (see above)
+- **External benchmark layer** — runs the frozen AdvBench / JailbreakBench goal sets through ROGUE's *own* graduated escalation ladder against a fixed target, recording attack-success-rate + winner-rank + ladder-depth + cost-per-success over time (`benchmark_run.py`) — the first metric that asks *"is this month's ROGUE better than last month's?"* against a stable external reference, not just internal telemetry (see [Benchmark](#benchmark--coverage-over-time))
 
 ## Judge calibration
 
@@ -266,6 +267,19 @@ These external checks point in apparently opposite directions — StrongREJECT (
 All four checks are reproducible — `scripts/run_calibration.py` (in-distribution, against `tests/fixtures/judge_calibration_pairs.json`), `scripts/eval_wildguard.py`, `scripts/second_grader_pass.py`, and `scripts/eval_jbb_judge.py` — and the calibration runner enforces a locked ship/refine gate (`< 0.80` agreement → refine the rubric; `≥ 0.90` → ship).
 
 </details>
+
+## Benchmark — coverage over time
+
+Every other number ROGUE reports measures how the system *behaves* (harvested, graduated, reachability, cost-per-breach). None answer the question that actually matters: **is this month's ROGUE better than last month's?** The benchmark layer is the external yardstick. It takes the frozen, field-standard goal sets — [AdvBench](https://github.com/llm-attacks/llm-attacks) (100) and [JailbreakBench](https://github.com/JailbreakBench/jailbreakbench) (100) — and runs each goal through ROGUE's **own graduated escalation ladder** (the *same* code path production uses, not a copy) against a fixed target, then records the result to a durable table. Because the goals are frozen and the target is fixed, the delta between runs is attributable to **the repertoire** — exactly the `harvest → graduate → benchmark → coverage change` loop that was impossible to measure before.
+
+It deliberately records more than attack-success-rate, because ASR alone can't tell you whether the *orchestration* improved:
+
+| Run #0 (Claude Haiku target) | ASR | median winner-rank | ladder depth (best/mean) | cost / success |
+|---|---|---|---|---|
+| **AdvBench-100** | 93.3% | 18 | 13 / 20.3 | $0.51 |
+| **JBB-100** | 90.0% | 17 | 13 / 20.3 | $0.52 |
+
+The target is chosen by a hardness probe, not a guess — soft models (Mistral, GPT-Nano) saturate at 100% on the first ladder rung and show nothing; Claude Haiku sits in the productive middle, where the repertoire breaks goals *deep* in the ladder (median rank ~17). So even with ASR near its ceiling, **winner-rank and cost have large headroom** — a better-ordered or stronger repertoire pulls winners earlier, which the benchmark sees as rank dropping and cost falling, *even if ASR holds flat*. (Run #0's top AdvBench technique is a harvested strategy — the harvest→graduate pipeline is what's breaking the external set.) Run deliberately after major harvests, never on a timer: `python scripts/benchmark_run.py --tier A --yes`.
 
 ## Roadmap
 
