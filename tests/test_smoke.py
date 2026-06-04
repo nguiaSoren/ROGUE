@@ -104,6 +104,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "attack_primitives",
         "attack_strategies",
         "bandit_state",
+        "benchmark_runs",
         "breach_results",
         "bright_data_cost_log",
         "deployment_configs",
