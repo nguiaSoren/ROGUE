@@ -21,13 +21,13 @@
  * plus the platform `score` the report route adds.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-
-// SCAFFOLD: until session/auth is wired (Team C, see docs/platform/api/auth-and-keys.md),
-// fall back to a build-time placeholder key so the pages compile and render. The real
-// credential is read server-side from the session and passed to each call as `key`.
-const PLACEHOLDER_KEY =
-  process.env.NEXT_PUBLIC_PLATFORM_KEY ?? "rk_test_placeholder";
+// Server-side base for the hosted platform API. Defaults to the live service; override with
+// API_BASE / NEXT_PUBLIC_API_BASE. This client runs server-side only (Server Components + Route
+// Handlers) so it reads the real bearer from the session — the key is never shipped to the browser.
+const API_BASE =
+  process.env.API_BASE ??
+  process.env.NEXT_PUBLIC_API_BASE ??
+  "https://rogue-private.onrender.com";
 
 // Same cold-start posture as lib/api.ts: Render's free tier returns transient
 // 502/503/504 (or drops the socket) for the first request or two while it boots.
@@ -39,9 +39,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Resolve the bearer for a call. SCAFFOLD: returns the explicit key or the placeholder. */
+/** Resolve the bearer for a call — required (the caller reads it from the server session). */
 function resolveKey(key?: string): string {
-  return key ?? PLACEHOLDER_KEY;
+  if (!key) {
+    throw new ApiV1Error(401, "no_session", "no API key in session — sign in first");
+  }
+  return key;
 }
 
 /** The `{ error: { code, message, details? } }` envelope the `/v1` surface returns (ARCHITECTURE §5). */
@@ -262,6 +265,10 @@ export const platformApi = {
   /** GET /v1/scans/{id} — the full `ScanRecord` (the poller's route). */
   getScan: (scanId: string, key?: string) =>
     apiV1<ScanRecord>(`/v1/scans/${encodeURIComponent(scanId)}`, key),
+
+  /** POST /v1/scans/{id}/cancel — request cancellation; returns the updated `ScanRecord`. */
+  cancelScan: (scanId: string, key?: string) =>
+    apiV1<ScanRecord>(`/v1/scans/${encodeURIComponent(scanId)}/cancel`, key, { method: "POST" }),
 
   /** GET /v1/scans — newest-first, cursor-paginated list. */
   listScans: (

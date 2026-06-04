@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { platformApi, type ScanRecord } from "@/lib/platform-api";
+import { getApiKey } from "@/lib/session";
 import { ScanProgress } from "@/components/scan-progress";
 
 /**
@@ -11,10 +13,9 @@ import { ScanProgress } from "@/components/scan-progress";
  * (docs/platform/dashboard/live-scan-ux.md). The server fetch seeds the client so
  * the first paint is real data, not a spinner.
  *
- * SCAFFOLD NOTE: auth/session is a TODO — `getScan` runs without a bearer and uses
- * the placeholder key (lib/platform-api.ts). When auth lands, `(app)/layout.tsx`
- * gates the session and the resolved key threads into both the server fetch here
- * and the client poller.
+ * Auth: `(app)/layout.tsx` gates the session; we re-read the key here (server-only)
+ * and thread the bearer into the seed fetch. The client poller never sees it — it
+ * polls the same-origin `/api/scans/{id}` route, which re-attaches the bearer.
  */
 export const dynamic = "force-dynamic"; // tenant data — never statically cached
 
@@ -26,10 +27,13 @@ export default async function ScanDetailPage({
 }) {
   const { scanId } = await params;
 
+  const key = await getApiKey();
+  if (!key) redirect("/sign-in");
+
   let record: ScanRecord | null = null;
   let loadError: string | null = null;
   try {
-    record = await platformApi.getScan(scanId);
+    record = await platformApi.getScan(scanId, key);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load this scan.";
   }

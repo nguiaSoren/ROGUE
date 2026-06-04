@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { platformApi, isTerminal, type ScanRecord } from "@/lib/platform-api";
+import { isTerminal, type ScanRecord } from "@/lib/platform-api";
 import { StatusBadge, ScoreBadge } from "@/components/score-badge";
 
 /**
@@ -12,17 +12,15 @@ import { StatusBadge, ScoreBadge } from "@/components/score-badge";
  *
  *     ████████ 67%   32/50 tests complete   Current attack: Crescendo
  *
- * Transport is Option A — poll `GET /v1/scans/{id}` every ~2s while non-terminal
- * (live-scan-ux.md §2). The "one connection, many consumers" discipline
- * (frontend/src/components/sse-feed-provider.tsx) is honored: this component owns
- * EXACTLY ONE poll loop for the page; every sub-readout (bar, counter, cost, badge)
- * reads the single `record` state, never its own fetcher. Option B (the SSE
- * `/v1/scans/{id}/events` stream) slots in behind this same seam later.
- *
- * SCAFFOLD NOTE: the bearer is a TODO — `platformApi.getScan` falls back to the
- * placeholder key until session/auth is wired (lib/platform-api.ts). When that
- * lands, the server page should pass the session key down (or proxy via a Route
- * Handler), not the client.
+ * Transport is Option A — poll the same-origin `GET /api/scans/{id}` proxy every
+ * ~2s while non-terminal (live-scan-ux.md §2). This is a client component, so it
+ * MUST NOT read the session or hold the bearer; the proxy route re-reads the
+ * httpOnly cookie server-side and forwards the key. The "one connection, many
+ * consumers" discipline (frontend/src/components/sse-feed-provider.tsx) is honored:
+ * this component owns EXACTLY ONE poll loop for the page; every sub-readout (bar,
+ * counter, cost, badge) reads the single `record` state, never its own fetcher.
+ * Option B (the SSE `/v1/scans/{id}/events` stream) slots in behind this same seam
+ * later.
  */
 
 const POLL_INTERVAL_MS = 2_000;
@@ -47,7 +45,12 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
 
     const tick = async () => {
       try {
-        const next = await platformApi.getScan(scanId);
+        const r = await fetch(`/api/scans/${encodeURIComponent(scanId)}`, {
+          cache: "no-store",
+        });
+        if (cancelled) return;
+        if (!r.ok) throw new Error(`scan poll → ${r.status}`);
+        const next = (await r.json()) as ScanRecord;
         if (cancelled) return;
         setRecord(next);
         setError(null);
@@ -76,9 +79,14 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
       if (!ok) return;
     }
     try {
-      // SCAFFOLD: cancel posts to POST /v1/scans/{id}/cancel via a Route Handler once
-      // auth is wired; for now we optimistically re-fetch so the UI reflects state.
-      const next = await platformApi.getScan(scanId);
+      // POST the same-origin cancel proxy (bearer attached server-side); it returns
+      // the updated ScanRecord. The poll loop reconciles any drift afterward.
+      const r = await fetch(`/api/scans/${encodeURIComponent(scanId)}/cancel`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!r.ok) throw new Error(`cancel → ${r.status}`);
+      const next = (await r.json()) as ScanRecord;
       setRecord(next);
     } catch {
       /* swallow — the poll loop will reconcile */

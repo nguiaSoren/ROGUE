@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { platformApi, type ScanRecord } from "@/lib/platform-api";
+import { getApiKey } from "@/lib/session";
 import { StatusBadge, ScoreBadge } from "@/components/score-badge";
 
 /**
@@ -11,17 +13,20 @@ import { StatusBadge, ScoreBadge } from "@/components/score-badge";
  * corpus uses, and a failed fetch renders an explicit error state rather than
  * silently serving stale cross-tenant HTML.
  *
- * SCAFFOLD NOTE: auth/session is a TODO. The `(app)` group will gate on a session
- * in `(app)/layout.tsx` and pass the resolved bearer down to `listScans(key)`;
- * here we call it without a key, so it uses the placeholder (lib/platform-api.ts).
+ * Auth: the `(app)` group gates on a session in `(app)/layout.tsx`; we re-read the
+ * key here (server-only) and pass the bearer to `listScans(key)`. The redirect is a
+ * defensive belt-and-suspenders so TypeScript sees `key` as non-null below.
  */
 export const dynamic = "force-dynamic"; // tenant data — never statically cached
 
 export default async function ScansPage() {
+  const key = await getApiKey();
+  if (!key) redirect("/sign-in");
+
   let scans: ScanRecord[] = [];
   let loadError: string | null = null;
   try {
-    const res = await platformApi.listScans();
+    const res = await platformApi.listScans(key, { limit: 50 });
     scans = res.scans;
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load scans.";

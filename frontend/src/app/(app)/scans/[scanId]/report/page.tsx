@@ -1,11 +1,18 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   platformApi,
-  reportUrl,
   type ScanReportJson,
   type Finding,
 } from "@/lib/platform-api";
+import { getApiKey } from "@/lib/session";
 import { ScoreBadge } from "@/components/score-badge";
+
+/** Same-origin export proxy — the bearer is attached server-side by the route
+ *  handler, never placed in a client href (see app/api/scans/[scanId]/report). */
+function exportHref(scanId: string, format: "json" | "html" | "pdf"): string {
+  return `/api/scans/${encodeURIComponent(scanId)}/report?format=${format}`;
+}
 
 /**
  * /scans/{scanId}/report — a completed scan's report (server component).
@@ -17,11 +24,11 @@ import { ScoreBadge } from "@/components/score-badge";
  * (src/rogue/report.py:130) PLUS the platform `score` and `recommendations[]`
  * (report-views.md §2). The page never recomputes a rate — they arrive pre-derived.
  *
- * SCAFFOLD NOTE: auth/session is a TODO — `getReport` uses the placeholder key
- * (lib/platform-api.ts), and the html/pdf export links point at the raw report
- * route (the bearer for those is supplied by a Route Handler once auth lands —
- * never put a secret in a client href). A `report_not_ready`/404 means the scan
- * isn't completed yet; we surface that as "not ready" rather than a hard error.
+ * Auth: `(app)/layout.tsx` gates the session; we re-read the key here (server-only)
+ * for the report fetch. The json/html/pdf export links point at the same-origin
+ * `/api/scans/{id}/report` proxy, which attaches the bearer server-side — never a
+ * secret in a client href. A `report_not_ready`/404 means the scan isn't completed
+ * yet; we surface that as "not ready" rather than a hard error.
  */
 export const dynamic = "force-dynamic"; // tenant data — never statically cached
 
@@ -39,11 +46,14 @@ export default async function ReportPage({
 }) {
   const { scanId } = await params;
 
+  const key = await getApiKey();
+  if (!key) redirect("/sign-in");
+
   let report: ScanReportJson | null = null;
   let loadError: string | null = null;
   let notReady = false;
   try {
-    report = await platformApi.getReport(scanId, undefined, "json");
+    report = await platformApi.getReport(scanId, key, "json");
   } catch (e) {
     // The report route 404s with `report_not_ready` while the scan is still
     // queued/running — treat that as "not yet", not a failure (report-views.md §6).
@@ -76,7 +86,7 @@ export default async function ReportPage({
           {report && (
             <div className="flex items-center gap-2 font-mono text-xs">
               <a
-                href={reportUrl(scanId, "html")}
+                href={exportHref(scanId, "html")}
                 target="_blank"
                 rel="noreferrer"
                 className="uppercase tracking-[0.15em] border border-border rounded-md px-3 py-1.5 hover:bg-card/40 transition-colors"
@@ -84,13 +94,13 @@ export default async function ReportPage({
                 HTML
               </a>
               <a
-                href={reportUrl(scanId, "pdf")}
+                href={exportHref(scanId, "pdf")}
                 className="uppercase tracking-[0.15em] border border-border rounded-md px-3 py-1.5 hover:bg-card/40 transition-colors"
               >
                 PDF
               </a>
               <a
-                href={reportUrl(scanId, "json")}
+                href={exportHref(scanId, "json")}
                 className="uppercase tracking-[0.15em] border border-border rounded-md px-3 py-1.5 hover:bg-card/40 transition-colors"
               >
                 JSON
