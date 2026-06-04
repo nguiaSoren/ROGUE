@@ -50,6 +50,15 @@ class DeploymentConfig(BaseModel):
         default_factory=list,
         description="topics the customer wants the deployment to refuse, useful for severity scoring and for slot defaults",
     )
+    base_url: str | None = Field(
+        default=None,
+        description=(
+            "optional OpenAI-compatible endpoint URL. When set, the reproduction panel routes this "
+            "config to the CustomHTTPAdapter against this URL (and `target_model` is the bare model "
+            "name the endpoint serves) instead of a known provider. Used by ad-hoc endpoint scans "
+            "(scripts/scan_endpoint.py); ephemeral — not persisted to the deployment_configs table."
+        ),
+    )
 
     model_config = {"frozen": True}  # configs are append-only; versioned by config_id
 

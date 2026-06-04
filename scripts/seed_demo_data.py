@@ -95,10 +95,10 @@ FIXTURES_DIR = PROJECT_ROOT / "tests" / "fixtures"
 def _to_orm_deployment(cfg: DeploymentConfig) -> DeploymentConfigORM:
     """Project a Pydantic ``DeploymentConfig`` into its ORM mirror.
 
-    The two shapes match 1:1 for this model, so a straight
-    ``**model_dump()`` splat is correct.
+    The shapes match 1:1 except for ``base_url``, which is an ephemeral ad-hoc-scan field with no
+    ORM column (custom-endpoint configs are never persisted) — so it is excluded from the splat.
     """
-    return DeploymentConfigORM(**cfg.model_dump())
+    return DeploymentConfigORM(**cfg.model_dump(exclude={"base_url"}))
 
 
 def _to_orm_source(s: SourceProvenance) -> SourceProvenanceORM:

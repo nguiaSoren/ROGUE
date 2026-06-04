@@ -211,13 +211,19 @@ class TargetPanel:
 
     # ----- Internals -----
 
-    def _adapter_for(self, provider: str, model_id: str):
-        """Lazily create + cache the adapter for one (provider, model)."""
-        key = (provider, model_id)
+    def _adapter_for(self, provider: str, model_id: str, base_url: str | None = None):
+        """Lazily create + cache the adapter for one (provider, model, endpoint)."""
+        key = (provider, model_id, base_url)
         adapter = self._adapters.get(key)
         if adapter is None:
             adapter = registry.create(
-                provider, AdapterConfig(model=model_id, extra=dict(self._adapter_extra))
+                provider,
+                AdapterConfig(
+                    model=model_id,
+                    base_url=base_url,
+                    api_key=self._adapter_extra.get("api_key"),
+                    extra=dict(self._adapter_extra),
+                ),
             )
             self._adapters[key] = adapter
         return adapter
@@ -260,8 +266,10 @@ class TargetPanel:
         temperature: float,
     ) -> ModelResponse:
         """Route a single trial to the right adapter and project the result onto ModelResponse."""
-        provider = _resolve_provider(config.target_model)  # raises for an unrouted prefix
-        adapter = self._adapter_for(provider, config.target_model)
+        # A config carrying a base_url targets a custom OpenAI-compatible endpoint (the
+        # CustomHTTPAdapter); otherwise route by the model-id prefix.
+        provider = "custom" if config.base_url else _resolve_provider(config.target_model)
+        adapter = self._adapter_for(provider, config.target_model, config.base_url)
         messages = self._build_messages(rendered)
 
         t0 = time.perf_counter()

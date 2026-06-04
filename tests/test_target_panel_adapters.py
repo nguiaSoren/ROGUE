@@ -194,7 +194,9 @@ class _RaisingAdapter:
 @pytest.mark.asyncio
 async def test_dispatch_one_projects_adapter_errors_to_legacy_tags(monkeypatch, exc, expected_prefix):
     panel = TargetPanel()
-    monkeypatch.setattr(panel, "_adapter_for", lambda provider, model_id: _RaisingAdapter(exc))
+    monkeypatch.setattr(
+        panel, "_adapter_for", lambda provider, model_id, base_url=None: _RaisingAdapter(exc)
+    )
     result = await panel._dispatch_one(_rendered(), _config(), trial_index=2, temperature=0.9)
     assert isinstance(result, ModelResponse)
     assert result.error is not None
