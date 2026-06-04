@@ -60,6 +60,7 @@ export function Nav() {
         <nav className="flex items-center gap-4 md:gap-6 text-xs uppercase tracking-widest">
           <NavLink href="/feed" active={pathname === "/feed"}>/feed</NavLink>
           <NavLink href="/matrix" active={pathname === "/matrix"}>/matrix</NavLink>
+          <NavLink href="/analytics" active={pathname === "/analytics"}>/analytics</NavLink>
           <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
           <LivePill count={count} dbUp={dbUp} />
         </nav>
