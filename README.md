@@ -279,7 +279,21 @@ It deliberately records more than attack-success-rate, because ASR alone can't t
 | **AdvBench-100** | 93.3% | 18 | 13 / 20.3 | $0.51 |
 | **JBB-100** | 90.0% | 17 | 13 / 20.3 | $0.52 |
 
-The target is chosen by a hardness probe, not a guess — soft models (Mistral, GPT-Nano) saturate at 100% on the first ladder rung and show nothing; Claude Haiku sits in the productive middle, where the repertoire breaks goals *deep* in the ladder (median rank ~17). So even with ASR near its ceiling, **winner-rank and cost have large headroom** — a better-ordered or stronger repertoire pulls winners earlier, which the benchmark sees as rank dropping and cost falling, *even if ASR holds flat*. (Run #0's top AdvBench technique is a harvested strategy — the harvest→graduate pipeline is what's breaking the external set.) Run deliberately after major harvests, never on a timer: `python scripts/benchmark_run.py --tier A --yes`.
+The target is chosen by a hardness probe, not a guess — soft models (Mistral, GPT-Nano) saturate at 100% on the first ladder rung and show nothing; Claude Haiku sits in the productive middle, where the repertoire breaks goals *deep* in the ladder (median rank ~17). So even with ASR near its ceiling, **winner-rank and cost have large headroom** — a better-ordered or stronger repertoire pulls winners earlier, which the benchmark sees as rank dropping and cost falling, *even if ASR holds flat*. (Run #0's top AdvBench technique is a harvested strategy — the harvest→graduate pipeline is what's breaking the external set.) Run deliberately after major harvests, never on a timer: `python scripts/benchmark_run.py --tier A --yes` (and `--if-changed` reports, for free, whether the repertoire has grown enough to be worth a run).
+
+<details><summary><b>Is the benchmark worth putting on the live dashboard? — Yes, but not yet, and not as ASR.</b></summary>
+
+Three reasons to hold:
+
+1. **It's N=1.** "Coverage over time" with one Run is a dot, not a trend. A timeline chart needs ≥3–4 points to mean anything — and the `--if-changed` reporter just confirmed there's nothing new to plot until the repertoire grows. Shipping it now would advertise a line and show a single point.
+2. **The headline ASR is judge-inflated.** The README's calibration section is honest about the judge over-eagerness (70.3% on JBB, recall 98% / precision 55%). Putting "93% AdvBench coverage" on a public dashboard — a number the JBB check shows is inflated by the permissive fallback judge — would quietly undo that honesty. Recalibrate the judge first, or the public number oversells.
+3. **ASR is the wrong metric to feature anyway.** It's near-ceiling (90–93%, little room). The metrics with real headroom — and the ones that prove the orchestration work — are **median winner-rank** and **cost-per-success**. A chart of "winner-rank dropping 17 → 8 → 4 over successive harvests" is both more honest *and* more impressive than a flat ASR line.
+
+When it becomes one of the strongest things on the site: after (a) the judge recalibration lands (credible ASR), and (b) ~3–4 Runs accumulate a real trend. Then the figure to ship is **winner-rank ↓ and cost ↓ over time, annotated with harvest/graduation events** — the visual proof of the `harvest → graduate → benchmark → improvement` loop, which is the entire differentiator. The data's already durable in `benchmark_runs` on Neon, so nothing's lost by waiting; `build_analytics.py` can pull it in when the trend exists.
+
+So: build the website chart after Run #3-ish + the recalibrated judge — and lead with winner-rank, not ASR. Right now it'd be a dot that oversells.
+
+</details>
 
 ## Roadmap
 

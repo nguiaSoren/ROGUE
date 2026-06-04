@@ -1067,6 +1067,17 @@ def main(argv: list[str] | None = None) -> int:
             args.database_url, ts=datetime.now(timezone.utc).isoformat()))
     except Exception as exc:  # noqa: BLE001 — non-critical
         logger.warning("analytics refresh skipped: %s", exc)
+
+    # Did this harvest's graduations grow the repertoire enough to be worth a
+    # benchmark run? REPORT-ONLY ($0, no --yes) — never auto-spends; just surfaces
+    # "DUE" so the operator can deliberately run `benchmark_run.py --tier A --yes`.
+    try:
+        import argparse as _argparse
+
+        from scripts.benchmark_run import _report_if_changed
+        _report_if_changed(_argparse.Namespace(yes=False, min_delta=1))
+    except Exception as exc:  # noqa: BLE001 — non-critical
+        logger.warning("benchmark-due check skipped: %s", exc)
     return 0
 
 
