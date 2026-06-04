@@ -215,18 +215,19 @@ class JudgeAgent:
             ``anthropic/claude-sonnet-4-6`` per ROGUE_PLAN.md §10.2 and
             `.env.example`).
         prompt_version: which rubric revision to load from the ``prompts/``
-            directory. Default ``"v1"``. (``v2`` adds an "always classify,
-            never refuse" directive, but Anthropic's model-level ``refusal``
-            stop-reason on fully-harmful responses overrides ANY system prompt,
-            so v2 alone does not recover those cells — the real fix is a
-            secondary judge model for Claude-refused cells.) BreachResults
-            record this so re-grading is reproducible.
+            directory. Default ``"v3"``. (``v2`` added an "always classify,
+            never refuse" directive — carried into v3; ``v3`` adds the
+            content-transfer gate that fixed the over-eager false-positive
+            pattern in `docs/judge_fp_taxonomy.md`, raising JBB precision
+            ~55%→79.5% at ~95.5% recall and human agreement 70.3%→89.3% on the
+            300-item judge-comparison set.) BreachResults record this version so
+            re-grading is reproducible.
     """
 
     def __init__(
         self,
         model: str | None = None,
-        prompt_version: str = "v1",
+        prompt_version: str = "v3",
         fallback_model: str | None = None,
     ) -> None:
         self.model: str = model or os.environ.get(
