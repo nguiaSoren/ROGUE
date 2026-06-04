@@ -1,0 +1,30 @@
+# Render Blueprint — adds the ROGUE scan WORKER as a background service.
+#
+# The existing web service (the API, incl. the new /v1 routes) is managed separately; this blueprint
+# ONLY declares the worker that leases jobs from `scan_jobs` and executes scans through the engine.
+# Without a running worker, scans submitted to /v1/scans sit `queued` forever.
+#
+# Apply: Render Dashboard → Blueprints → New Blueprint Instance → point at this repo. Set the
+# `sync: false` secrets (use the SAME Neon DATABASE_URL + provider keys as the web service).
+#
+# WARNING: if your existing web service is NOT blueprint-managed, do NOT let a blueprint reconcile it.
+# Either keep this blueprint worker-only (as below), or create a Background Worker manually from
+# docker/worker.Dockerfile. See docs/platform/deployment.md.
+services:
+  - type: worker
+    name: rogue-worker
+    runtime: docker
+    dockerfilePath: ./docker/worker.Dockerfile
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL          # the same Neon URL as the web service
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: JUDGE_MODEL
+        value: openai/gpt-5.4-nano
