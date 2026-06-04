@@ -28,6 +28,11 @@ if TYPE_CHECKING:
 
     from .schemas import ScanSpec
 
+# Ladder mode is the expensive path (attacker + target + judge across tiers); a missing budget falls
+# back to this hard cap so an uncapped ladder scan can't run away to tens of dollars.
+_DEFAULT_LADDER_BUDGET = 5.0
+_DEFAULT_DATABASE_URL = "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue"
+
 
 class DefaultScanEngine(ScanEngine):
     """The one execution path for every platform surface (worker, SDK-in-process, API)."""
@@ -39,14 +44,19 @@ class DefaultScanEngine(ScanEngine):
         judge: Any = None,
         judge_model: str | None = None,
         repertoire_loader: Any = None,
+        escalation_ctx_builder: Any = None,
+        ladder_runner: Any = None,
     ) -> None:
         # All injectable so tests run fully offline. When left None, the real panel / judge are built
-        # lazily inside ``run`` (so importing this module never needs API keys), and the repertoire is
-        # loaded from the live corpus via ``DATABASE_URL``.
+        # lazily inside ``run`` (so importing this module never needs API keys), the repertoire is
+        # loaded from the live corpus via ``DATABASE_URL``, and the ladder uses the real escalation
+        # machinery (``rogue.reproduce.escalation_ladder``).
         self._panel = panel
         self._judge = judge
         self._judge_model = judge_model
         self._repertoire_loader = repertoire_loader
+        self._escalation_ctx_builder = escalation_ctx_builder
+        self._ladder_runner = ladder_runner
 
     def _load_repertoire(self, spec: ScanSpec) -> list:
         """Source primitives for a ``mode="repertoire"`` scan from the live harvested corpus."""
@@ -55,6 +65,31 @@ class DefaultScanEngine(ScanEngine):
         from .repertoire import default_repertoire_loader
 
         return default_repertoire_loader(spec)
+
+    def _build_escalation_ctx(self, config: DeploymentConfig, n_goals: int, n_trials: int):
+        """Build the escalation context (planner + graduated rotation + active renderers) for the ladder.
+
+        Reads the live repertoire in a SHORT session and closes it before the ladder's LLM calls (the
+        Neon idle-in-transaction rule). The planner survives the session close (the strategy library is
+        materialized in-memory)."""
+        if self._escalation_ctx_builder is not None:
+            return self._escalation_ctx_builder(config, n_goals, n_trials)
+        import os
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from rogue.reproduce.escalation_ladder import build_escalation_context
+
+        url = os.environ.get("DATABASE_URL", _DEFAULT_DATABASE_URL)
+        engine = create_engine(url, pool_pre_ping=True, pool_recycle=300, pool_timeout=10)
+        try:
+            with sessionmaker(bind=engine)() as session:
+                return build_escalation_context(
+                    session, configs=[config], n_parents_est=max(1, n_goals), n_trials=n_trials
+                )
+        finally:
+            engine.dispose()
 
     # --- config construction (shared by run / validate / benchmark) ---------------------------
 
@@ -96,6 +131,107 @@ class DefaultScanEngine(ScanEngine):
     def _adapter_extra(self, spec: ScanSpec) -> dict[str, Any]:
         return {"api_key": spec.target.api_key} if spec.target.api_key else {}
 
+    # --- operation #1b: ladder scan -----------------------------------------------------------
+
+    async def _run_ladder(self, spec: ScanSpec, config, progress: ProgressCallback | None):
+        """Escalation-ladder scan: throw the full multi-tier arsenal at each goal (the pack primitives
+        act as the goals). Mirrors ``benchmark_run._run_one_cell`` — one shared panel/judge, a
+        per-goal budget, bounded concurrency, first-breach-wins per goal. Budget is effectively
+        mandatory here (the ladder is the expensive path): an unset budget defaults to a safe cap."""
+        import asyncio
+
+        from rogue.packs import filter_attacks, load_pack
+        from rogue.report import Finding, ScanReport, technique_label
+        from rogue.reproduce.escalation_ladder import run_escalation_ladder_one
+        from rogue.reproduce.judge import JudgeAgent
+        from rogue.reproduce.target_panel import TargetPanel
+
+        goals = filter_attacks(load_pack(spec.pack), spec.attacks)[: spec.max_tests]
+        ctx = self._build_escalation_ctx(config, len(goals), spec.n_trials)
+        runner = self._ladder_runner or run_escalation_ladder_one
+
+        owns_panel = self._panel is None
+        panel = self._panel if self._panel is not None else TargetPanel(adapter_extra=self._adapter_extra(spec))
+        owns_judge = self._judge is None
+        judge = self._judge if self._judge is not None else (
+            JudgeAgent(model=self._judge_model) if self._judge_model else JudgeAgent()
+        )
+
+        budget = spec.budget if spec.budget is not None else _DEFAULT_LADDER_BUDGET
+        per_goal = budget / max(1, len(goals))
+        sem = asyncio.Semaphore(3)
+        n_total = len(goals)
+        progressed = {"n": 0}
+
+        async def _one(goal):
+            async with sem:
+                res = await runner(
+                    goal,
+                    planner=ctx.planner,
+                    panel=panel,
+                    judge=judge,
+                    configs=[config],
+                    n_trials=spec.n_trials,
+                    strategies=ctx.rotation,
+                    image_renderers=ctx.image_renderers,
+                    coj_operations=ctx.coj_operations,
+                    structured_formats=ctx.structured_formats,
+                    audio_styles=ctx.audio_styles,
+                    budget_usd=per_goal,
+                    candidate_attempt_quota=ctx.effective_quota,
+                    candidate_ids=ctx.candidate_ids,
+                )
+            progressed["n"] += 1
+            if progress is not None:
+                await progress(progressed["n"], n_total, res.winning_strategy or "held")
+            return goal, res
+
+        try:
+            results = await asyncio.gather(*[_one(g) for g in goals])
+        finally:
+            if owns_panel:
+                await panel.aclose()
+            if owns_judge and hasattr(judge, "aclose"):
+                await judge.aclose()
+            planner = getattr(ctx, "planner", None)
+            if planner is not None and hasattr(planner, "aclose"):
+                await planner.aclose()
+
+        findings: list[Finding] = []
+        n_breaches = 0
+        total_cost = 0.0
+        for goal, res in results:
+            breached = res.winning_strategy is not None
+            if breached:
+                n_breaches += 1
+            total_cost += getattr(res, "spend_usd", 0.0)
+            findings.append(
+                Finding(
+                    family=goal.family.value,
+                    # The winning transform (e.g. "crescendo", "image:ocr") is richer than the family;
+                    # fall back to the family label when the goal held (no breach).
+                    technique=res.winning_strategy or technique_label(goal.family.value),
+                    vector=goal.vector.value,
+                    severity=goal.base_severity.value,
+                    title=goal.title,
+                    # First-breach-wins per goal → 1.0/0.0, not a trial-rate (documented divergence).
+                    success_rate=1.0 if breached else 0.0,
+                    n_trials=max(1, len(res.attempts)),
+                    n_breach=1 if breached else 0,
+                    example_attack=(goal.payload_template or "")[:400] or None,
+                    example_response=None,
+                )
+            )
+
+        findings.sort(key=lambda f: f.success_rate, reverse=True)
+        return ScanReport(
+            target=config.base_url or config.target_model,
+            n_tests=len(findings),
+            n_breaches=n_breaches,
+            cost_usd=round(total_cost, 6),
+            findings=findings,
+        )
+
     # --- operation #1: scan -------------------------------------------------------------------
 
     async def run(self, spec: ScanSpec, *, progress: ProgressCallback | None = None) -> ScanReport:
@@ -108,6 +244,10 @@ class DefaultScanEngine(ScanEngine):
         from rogue.schemas.breach_result import BREACH_VERDICTS
 
         config = self._build_config(spec)
+        if spec.mode == "ladder":
+            # The deepest path: escalate each goal through the full multi-tier ladder (graduated
+            # techniques + CoJ + structured + image/audio renderers). Separate loop — return early.
+            return await self._run_ladder(spec, config, progress)
         if spec.mode == "repertoire":
             # The full harvested arsenal (corpus, most-reproducible first), capped at max_tests —
             # not a frozen JSON pack. Same single-turn execution loop below.

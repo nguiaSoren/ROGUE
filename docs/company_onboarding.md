@@ -172,10 +172,11 @@ One detail worth flagging: in the hosted body, the target credential is `api_key
 
 ## Scan modes — a curated sample vs. the full arsenal
 
-A hosted scan runs in one of two **modes**, set by the `mode` field in the request body (`"pack" | "repertoire"`, default `"pack"`). The mode decides *which* corpus of attacks ROGUE fires; everything downstream — the target calls, the judge, the report — is identical.
+A hosted scan runs in one of three **modes**, set by the `mode` field in the request body (`"pack" | "repertoire" | "ladder"`, default `"pack"`). The mode decides *which* corpus of attacks ROGUE fires; everything downstream — the target calls, the judge, the report — is identical.
 
 - **`pack`** (default) — a small curated JSON pack of 8–17 attacks (the `default` / `aggressive` / `compliance` packs described below). Fast, cheap, deterministic. It is a representative *sample* of ROGUE's threat library, not the whole thing — the right mode for a quick smoke test, a CI gate on every prompt or model change, or your very first run.
 - **`repertoire`** — ROGUE's live harvested corpus: the hundreds of real attack primitives ROGUE continuously grows from the open web, ordered most-reproducible-first and capped at `max_tests`. This throws ROGUE's full continuously-harvested arsenal at your model, not a fixed sample — the mode for a real security assessment, an audit, or a pre-release sign-off where you want breadth and want to know what *actually* breaks through today.
+- **`ladder`** — the deepest mode. Rather than replaying fixed primitives, `ladder` escalates *each goal* through ROGUE's full multi-tier arsenal — graduated techniques, chain-of-jailbreak, structured-data injections, and image/audio renderers — climbing tier by tier with an attacker LLM until the goal breaches or the ladder is exhausted. It is the mode for the most thorough assessment you can ask for: when you want to know not just which known payloads break through but how far an adaptive attacker can push your model. It is also the **most expensive** mode, since it spends an attacker LLM plus the target plus the judge across every tier; for that reason it is budget-capped — pass a `budget` to set the ceiling, and if you leave it unset ROGUE applies a safe default of about **$5**, split across the goals.
 
 The trade-off is cost. Repertoire is judge-dominated at roughly **$0.02 per test**, so `max_tests=50` lands around **$1**, and running the full (~459-primitive) corpus lands around **$9** — versus cents for a pack. Start with a pack to shake out wiring and target reachability, then run repertoire when you want the thorough sweep. Use `max_tests` to dial the depth (and ceiling) of a repertoire run, and pair it with `budget` for a hard dollar stop.
 
@@ -188,7 +189,7 @@ curl -X POST https://api.rogue.ai/v1/scans \
   -d '{"target":{"endpoint":"https://gateway.company.ai/v1","api_key_ref":"…"},"mode":"repertoire","max_tests":50,"n_trials":1,"budget":2.0}'
 ```
 
-In the dashboard, the **New scan** form has a mode toggle — "Curated pack" (default) vs "Full repertoire" — next to the pack/`max_tests` controls. (The self-serve SDK `Client.scan()` does not take a `mode=` argument yet; it always runs a bundled pack. Repertoire is a hosted/dashboard capability for now — the live corpus lives server-side in the platform DB, which the local SDK does not carry.)
+In the dashboard, the **New scan** form has a mode toggle — "Curated pack" (default), "Full repertoire", and "Full ladder" — next to the pack/`max_tests` controls. (The self-serve SDK `Client.scan()` does not take a `mode=` argument yet; it always runs a bundled pack. Repertoire is a hosted/dashboard capability for now — the live corpus lives server-side in the platform DB, which the local SDK does not carry.)
 
 ## The three attack packs
 

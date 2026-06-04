@@ -179,8 +179,10 @@ export type TargetSpec = {
 export type ScanSpec = {
   target: TargetSpec;
   /** "pack" = a small curated JSON pack; "repertoire" = the live harvested corpus (ROGUE's full
-   *  arsenal, capped at max_tests). Default "pack". Mirrors `ScanSpec.mode`. */
-  mode?: "pack" | "repertoire";
+   *  arsenal, capped at max_tests); "ladder" = escalate each goal through ROGUE's full multi-tier
+   *  arsenal (graduated techniques + chain-of-jailbreak + structured-data + image/audio renderers) —
+   *  the deepest and most expensive mode. Default "pack". Mirrors `ScanSpec.mode`. */
+  mode?: "pack" | "repertoire" | "ladder";
   pack?: string;
   attacks?: string[] | null;
   max_tests?: number;

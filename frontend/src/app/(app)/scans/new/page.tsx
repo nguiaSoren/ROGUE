@@ -17,7 +17,7 @@ export default function NewScanPage() {
   const [endpoint, setEndpoint] = useState("");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [scanMode, setScanMode] = useState<"pack" | "repertoire">("pack");
+  const [scanMode, setScanMode] = useState<"pack" | "repertoire" | "ladder">("pack");
   const [pack, setPack] = useState("default");
   const [maxTests, setMaxTests] = useState(10);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +115,7 @@ export default function NewScanPage() {
               [
                 ["pack", "Curated pack"],
                 ["repertoire", "Full repertoire"],
+                ["ladder", "Full ladder"],
               ] as const
             ).map(([m, label]) => (
               <button
@@ -128,7 +129,7 @@ export default function NewScanPage() {
             ))}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Full repertoire runs ROGUE&apos;s entire harvested corpus — more thorough, costs more.
+            Curated pack fires a quick sample of ROGUE&apos;s threat library; full repertoire runs the entire harvested corpus; full ladder escalates each goal through ROGUE&apos;s full multi-tier arsenal — the deepest and most expensive mode.
           </p>
         </div>
 

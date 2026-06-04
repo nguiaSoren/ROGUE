@@ -34,7 +34,7 @@ class CreateScanRequest(BaseModel):
     provider: str | None = None
     api_key: str | None = Field(default=None, repr=False)
     model: str | None = None
-    mode: Literal["pack", "repertoire"] = "pack"
+    mode: Literal["pack", "repertoire", "ladder"] = "pack"
     pack: str = "default"
     attacks: list[str] | None = None
     max_tests: int = Field(default=50, ge=1, le=1000)

@@ -61,8 +61,10 @@ class ScanSpec(BaseModel):
 
     target: TargetSpec
     # "pack" = a small curated JSON pack (default/aggressive/compliance). "repertoire" = the live
-    # harvested corpus (ROGUE's full arsenal, capped at max_tests, most-reproducible first).
-    mode: Literal["pack", "repertoire"] = "pack"
+    # harvested corpus (most-reproducible first). "ladder" = escalate each goal through the full
+    # multi-tier arsenal (graduated techniques + CoJ + structured + image/audio renderers) — the
+    # deepest + most expensive mode; budget defaults to a safe cap if unset.
+    mode: Literal["pack", "repertoire", "ladder"] = "pack"
     pack: str = "default"
     attacks: list[str] | None = None
     max_tests: int = Field(default=50, ge=1, le=1000)
