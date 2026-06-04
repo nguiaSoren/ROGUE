@@ -38,11 +38,15 @@ class ScanWorker:
         engine: ScanEngine,
         *,
         worker_id: str = "worker-1",
+        secret_store=None,
     ) -> None:
         self.store = store
         self.queue = queue
         self.engine = engine
         self.worker_id = worker_id
+        # Resolves an `api_key_ref` handle back to the raw target key just-in-time (held only in memory
+        # for the scan). When None, a spec's raw `api_key` is used as-is.
+        self.secret_store = secret_store
 
     async def run_once(self) -> bool:
         """Lease and process a single job. Returns False only when the queue was empty (nothing leased);
@@ -65,8 +69,15 @@ class ScanWorker:
                 top_attack=current,
             )
 
+        # Resolve the encrypted target key just-in-time: the persisted/leased spec carries only a
+        # `secref_` handle; turn it back into the raw key in memory for this run only.
+        spec = job.spec
+        if self.secret_store is not None and spec.target.api_key_ref and not spec.target.api_key:
+            raw = self.secret_store.resolve(spec.target.api_key_ref, org_id=job.org_id)
+            spec = spec.model_copy(update={"target": spec.target.model_copy(update={"api_key": raw})})
+
         try:
-            report = await self.engine.run(job.spec, progress=cb)
+            report = await self.engine.run(spec, progress=cb)
         except Exception as e:  # noqa: BLE001 — any engine failure is recorded, never escapes the worker.
             await self.store.update(
                 job.scan_id,

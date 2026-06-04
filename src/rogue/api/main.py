@@ -167,7 +167,8 @@ async def _lifespan(_app: "FastAPI"):
 
         stop_event = asyncio.Event()
         _worker = ScanWorker(
-            _PLATFORM["store"], _PLATFORM["queue"], _PLATFORM["engine"], worker_id="inprocess-1"
+            _PLATFORM["store"], _PLATFORM["queue"], _PLATFORM["engine"], worker_id="inprocess-1",
+            secret_store=_PLATFORM.get("secret_store"),
         )
         worker_task = asyncio.create_task(_worker.run_forever(poll_interval=2.0, stop_event=stop_event))
         logger.info("in-process scan worker started")
@@ -233,16 +234,24 @@ try:  # pragma: no cover - exercised at process start
         from rogue.platform.queue import build_postgres_job_queue
         from rogue.platform.report_service import DefaultReportService
         from rogue.platform.scan_service import DefaultScanService
+        from rogue.platform.secrets import build_postgres_secret_store
         from rogue.platform.store import build_postgres_scan_store
 
         store = build_postgres_scan_store()  # lazy engine — no connection until used
         queue = build_postgres_job_queue()
         engine = DefaultScanEngine()
+        secret_store = build_postgres_secret_store()  # None unless SECRET_ENCRYPTION_KEY is set
         _PLATFORM["store"] = store
         _PLATFORM["queue"] = queue
         _PLATFORM["engine"] = engine
+        _PLATFORM["secret_store"] = secret_store
+        if secret_store is None:
+            logger.warning(
+                "SECRET_ENCRYPTION_KEY unset — hosted scans persist the raw target key in scan_jobs; "
+                "set it to encrypt target credentials at rest (see rogue.platform.secrets)."
+            )
         _v1_deps.wire(
-            scan_service=DefaultScanService(store, queue),
+            scan_service=DefaultScanService(store, queue, secret_store=secret_store),
             report_service=DefaultReportService(store),
             scan_engine=engine,
             benchmark_service=DefaultBenchmarkService(engine=engine),

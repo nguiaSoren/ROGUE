@@ -37,6 +37,9 @@ class TargetSpec(BaseModel):
     provider: str | None = None
     model: str | None = None
     api_key: str | None = Field(default=None, repr=False)
+    # Handle to the encrypted target key in the SecretStore (`secref_…`). On the hosted path the API
+    # swaps the raw `api_key` for this before persist/enqueue; the worker resolves it just-in-time.
+    api_key_ref: str | None = None
     system_prompt: str = ""
 
     @model_validator(mode="after")
@@ -52,7 +55,7 @@ class TargetSpec(BaseModel):
             "provider": self.provider,
             "model": self.model,
             "system_prompt_len": len(self.system_prompt),
-            "has_api_key": self.api_key is not None,
+            "has_api_key": self.api_key is not None or self.api_key_ref is not None,
         }
 
 

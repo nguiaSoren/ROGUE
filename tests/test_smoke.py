@@ -122,6 +122,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "reports",
         "scan_jobs",
         "scan_runs",
+        "secrets",
         "source_provenances",
         "users",
     ]

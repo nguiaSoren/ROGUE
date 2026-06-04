@@ -18,9 +18,14 @@ from .schemas import ScanRecord, ScanSpec, ScanStatus
 class DefaultScanService(ScanService):
     """Queue-backed `ScanService`. Owns no execution — it only writes records and enqueues jobs."""
 
-    def __init__(self, store: ScanStore, queue: JobQueue) -> None:
+    def __init__(self, store: ScanStore, queue: JobQueue, *, secret_store=None) -> None:
         self._store = store
         self._queue = queue
+        # When wired (hosted path), a raw target api_key is encrypted into the secret store and the
+        # enqueued spec carries only an `api_key_ref` handle — the raw key never lands in scan_jobs.
+        # When None (SDK in-process / tests), the raw key passes through unchanged (no persistence
+        # concern there).
+        self._secret_store = secret_store
         # Process-local idempotency map keyed (org_id, idempotency_key) → scan_id. This is a
         # best-effort dedup for the in-memory single-process mode; the Postgres store enforces it
         # durably in prod via the scan_runs.idempotency_key column, so the pinned `ScanRecord`
@@ -42,6 +47,13 @@ class DefaultScanService(ScanService):
         target = spec.target
         if not target.endpoint and not target.provider:
             raise ValueError("ScanSpec.target needs either endpoint=... or provider=...")
+
+        # Encrypt the raw target key into the secret store and swap it for a handle BEFORE anything is
+        # persisted or enqueued, so the raw key never enters scan_runs/scan_jobs.
+        if self._secret_store is not None and target.api_key and not target.api_key_ref:
+            secref = self._secret_store.put(target.api_key, org_id=org_id)
+            target = target.model_copy(update={"api_key": None, "api_key_ref": secref})
+            spec = spec.model_copy(update={"target": target})
 
         # Idempotent replay: same (org, key) returns the original record, no new job enqueued.
         if idempotency_key is not None:

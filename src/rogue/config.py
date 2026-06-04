@@ -52,6 +52,7 @@ _ENV_NAMES: dict[str, str] = {
     "judge_model": "JUDGE_MODEL",
     "judge_fallback_model": "JUDGE_FALLBACK_MODEL",
     "slack_webhook_url": "SLACK_WEBHOOK_URL",
+    "secret_encryption_key": "SECRET_ENCRYPTION_KEY",
     "redis_url": "REDIS_URL",
     "mcp_transport": "ROGUE_MCP_TRANSPORT",
     "mcp_port": "ROGUE_MCP_PORT",
@@ -68,6 +69,7 @@ _SECRET_FIELDS: frozenset[str] = frozenset(
         "groq_api_key",
         "gemini_api_key",
         "slack_webhook_url",
+        "secret_encryption_key",
     }
 )
 
@@ -93,6 +95,9 @@ class Settings(BaseModel):
     # ---------- Model selection ----------
     judge_model: str = _DEFAULT_JUDGE_MODEL
     judge_fallback_model: str = _DEFAULT_JUDGE_FALLBACK_MODEL
+
+    # ---------- Tenant-secret encryption (Fernet key for rogue.platform.secrets) ----------
+    secret_encryption_key: SecretStr | None = None
 
     # ---------- Notifications (credential) ----------
     slack_webhook_url: SecretStr | None = None

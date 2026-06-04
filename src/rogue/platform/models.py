@@ -16,6 +16,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -128,7 +129,18 @@ class Report(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class Secret(Base):
+    """Encrypted tenant secret (a customer's raw target credential). The queue/record reference it by
+    `secret_id` (`secref_…`); only Fernet ciphertext is stored here — never plaintext."""
+
+    __tablename__ = "secrets"
+    secret_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 __all__ = [
     "Organization", "User", "Membership", "Project", "ApiKey",
-    "ScanRun", "ScanJob", "Report",
+    "ScanRun", "ScanJob", "Report", "Secret",
 ]
