@@ -1,14 +1,17 @@
 # Keep the Render free-tier API warm.
 #
-# The API (https://rogue-api-mr5w.onrender.com) runs on Render's free tier,
+# The API (https://rogue-private.onrender.com) runs on Render's free tier,
 # which spins the service down after ~15 min idle; the next request then pays a
-# cold-boot (the source of the occasional 502 / multi-second first load).
+# cold-boot (the source of the occasional 502 / multi-second first load — and an
+# "empty" dashboard/marketing site, since the data pages fail hard when the API
+# is unreachable). Updated 2026-06-05: the canonical API moved to rogue-private
+# (the old rogue-api-mr5w is retired) — repoint UptimeRobot to match.
 #
-# UptimeRobot already pings /api/health every 5 min and is the PRIMARY
+# UptimeRobot should ping /api/livez every 5 min as the PRIMARY
 # warm-keeper. This workflow is a code-side BACKUP so warm-keeping isn't solely
 # dependent on an external dashboard — and it lives in the repo where it's
-# visible. Both pinging is harmless: /api/health is a cheap, read-only DB check
-# (no LLM / Bright Data spend — see CLAUDE.md "Costly scripts").
+# visible. Both pinging is harmless: /api/livez is a DB-free liveness check
+# (no DB load, no LLM / Bright Data spend — see CLAUDE.md "Costly scripts").
 #
 # Caveats (why UptimeRobot stays primary):
 #  - GitHub's scheduled cron is best-effort and can be delayed 10–30 min under
@@ -33,10 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ping /api/health (with one mid-window retry)
+      - name: Ping /api/livez (with one mid-window retry)
         run: |
           set -euo pipefail
-          URL="https://rogue-api-mr5w.onrender.com/api/health"
+          URL="https://rogue-private.onrender.com/api/livez"
           ping() {
             code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 90 "$URL" || echo "000")
             echo "$(date -u +%H:%M:%S)Z → $code"
