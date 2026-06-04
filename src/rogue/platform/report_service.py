@@ -52,7 +52,10 @@ class DefaultReportService(ReportService):
         stored = await self.store.get_report(record.report_id)
         if stored is None:
             raise ValueError(f"report {record.report_id!r} for scan {scan_id!r} is missing")
-        payload = stored.get("payload") or {}
+        # `get_report` returns the report payload dict directly (== ScanReport.to_dict()), per the
+        # ScanStore contract — NOT a {"payload": ...} wrapper. (The wrapper assumption silently emptied
+        # every Postgres-backed report while the in-memory test passed.)
+        payload = stored or {}
 
         # Rebuild Findings from the persisted dicts, redacting example excerpts on the way in. Only the
         # known Finding fields are carried over, so a forward-compatible payload (extra keys) is tolerated.

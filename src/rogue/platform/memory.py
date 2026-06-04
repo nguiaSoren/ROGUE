@@ -55,7 +55,10 @@ class InMemoryScanStore(ScanStore):
         self._reports[report_id] = {"scan_id": scan_id, "payload": payload}
 
     async def get_report(self, report_id: str) -> dict | None:
-        return self._reports.get(report_id)
+        # Contract: return the report payload dict directly (matches PostgresScanStore), NOT the
+        # internal {"scan_id", "payload"} wrapper.
+        rec = self._reports.get(report_id)
+        return rec["payload"] if rec is not None else None
 
 
 class InMemoryJobQueue(JobQueue):
