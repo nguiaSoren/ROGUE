@@ -146,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=0, help="0 = all 300; else stratified subset")
     parser.add_argument("--seed", default="rogue")
+    parser.add_argument("--prompt-version", default="v1", help="judge rubric version to score (e.g. v1, v3)")
     parser.add_argument("--dry-run", action="store_true", help="baselines + estimate, free")
     parser.add_argument("--yes", action="store_true", help="confirm the paid judge run")
     args = parser.parse_args(argv)
@@ -172,12 +173,15 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("this calls the live judge (≈ $%.2f). Re-run with --yes to confirm.", est)
         return 2
 
-    judge = JudgeAgent()
-    logger.info("judge model: %s | scoring %d items (≈ $%.2f)", judge.model, len(subset), est)
+    judge = JudgeAgent(prompt_version=args.prompt_version)
+    logger.info(
+        "judge model: %s | rubric: %s | scoring %d items (≈ $%.2f)",
+        judge.model, args.prompt_version, len(subset), est,
+    )
     report = evaluate(subset, _make_verdict_fn(judge))
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = OUTPUT_DIR / "jbb_judge_report.json"
+    out_path = OUTPUT_DIR / f"jbb_judge_report_{args.prompt_version}.json"
     out_path.write_text(
         json.dumps(_serialize(report, seed=args.seed, limit=args.limit), indent=2),
         encoding="utf-8",
