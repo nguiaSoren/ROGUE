@@ -171,6 +171,46 @@ app.mount("/mcp", _mcp_app)
 
 
 # --------------------------------------------------------------------------- #
+# Platform `/v1` API (auth'd, multi-tenant, write-capable). Wired defensively:
+# a failure here must NEVER take down the legacy read-only `/api/*` routes or
+# liveness. The routers are pure thin shells over ScanService/ReportService; the
+# production service graph (Postgres store/queue + the engine) is installed via
+# `deps.wire(...)` and only connects to the DB on the first `/v1` request. The
+# `/v1` scan endpoints require migration 0022 (scan_runs/scan_jobs) + a running
+# `python -m rogue.platform.worker` to fully execute scans.
+try:  # pragma: no cover - exercised at process start
+    from rogue.api.v1 import deps as _v1_deps
+    from rogue.api.v1 import scans as _v1_scans
+    from rogue.api.v1 import validate_benchmark as _v1_vb
+
+    app.include_router(_v1_scans.router)
+    app.include_router(_v1_vb.router)
+
+    def _wire_platform() -> None:
+        from rogue.platform.benchmark_service import DefaultBenchmarkService
+        from rogue.platform.engine import DefaultScanEngine
+        from rogue.platform.queue import build_postgres_job_queue
+        from rogue.platform.report_service import DefaultReportService
+        from rogue.platform.scan_service import DefaultScanService
+        from rogue.platform.store import build_postgres_scan_store
+
+        store = build_postgres_scan_store()  # lazy engine — no connection until used
+        queue = build_postgres_job_queue()
+        engine = DefaultScanEngine()
+        _v1_deps.wire(
+            scan_service=DefaultScanService(store, queue),
+            report_service=DefaultReportService(store),
+            scan_engine=engine,
+            benchmark_service=DefaultBenchmarkService(engine=engine),
+        )
+
+    _wire_platform()
+    logger.info("platform /v1 API wired")
+except Exception:  # noqa: BLE001 — never let platform wiring break the core app
+    logger.warning("platform /v1 API not wired", exc_info=True)
+
+
+# --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
 

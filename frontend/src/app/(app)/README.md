@@ -1,0 +1,21 @@
+# `(app)` — authenticated product group (SCAFFOLD)
+
+This route group is the customer-facing SaaS product (the org-scoped scan workflow), distinct from the public marketing/threat-intel pages that stay in the app root. It is specced in `docs/platform/dashboard/pages-and-routes.md`, `live-scan-ux.md`, and `report-views.md`. What ships here so far is a **scaffold of the scan workflow** — `/scans` (list), `/scans/{scanId}` (live progress detail), and `/scans/{scanId}/report` (completed report) — built against the typed `/v1` client in `frontend/src/lib/platform-api.ts`. It is syntactically valid, follows the existing server-component + `StatCapsule`/severity-token patterns, and would compile, but several product concerns are deliberately stubbed and called out below.
+
+## What is real
+
+- `frontend/src/lib/platform-api.ts` — the typed `/v1` client, mirroring `lib/api.ts`'s cold-start retry/backoff/timeout but injecting an `Authorization: Bearer` header, fetching `no-store` (tenant data is per-request, not ISR), and decoding the `{ error: { code, message } }` envelope into an `ApiV1Error`. Types `ScanRecord`/`ScanStatus`/`ScanSpec`/`ScanReportJson`/`Finding` mirror `src/rogue/platform/schemas.py` and `src/rogue/report.py`.
+- `scans/page.tsx` — server-rendered scan table (scan id, target, status, breaches, score, created), with an empty state and an explicit load-error state.
+- `scans/[scanId]/page.tsx` — server shell that fetches the initial `ScanRecord` and hands live state to `components/scan-progress.tsx`.
+- `components/scan-progress.tsx` — a `"use client"` single-poller: exactly one `getScan` poll loop per page (every ~2s, stops on terminal), with the "one connection, many consumers" discipline from `sse-feed-provider.tsx`. Renders the spec's `█████ 67% — 32/50 tests — Current attack: Crescendo` line plus breach tally, live cost, and a derived ETA.
+- `scans/[scanId]/report/page.tsx` — the completed-report view: headline KPIs, a worst-first findings list with attack/response/remediation disclosures, a recommendations panel, and HTML/PDF/JSON export links.
+- `components/score-badge.tsx` — `ScoreBadge` (0–100 risk score banded ≥70 red / ≥40 orange / <40 green) and `StatusBadge`, both using the existing `--rogue-green/orange/red` tokens from `globals.css` — no new tokens.
+
+## TODOs left (the auth-wiring gap)
+
+- **Session + auth gate.** There is no `(app)/layout.tsx` AppShell yet. Per `pages-and-routes.md` §3 it must resolve the server-side session, `redirect("/sign-in?next=…")` when absent, and mount the org switcher + product nav. Until it exists these pages are reachable without a session.
+- **The bearer is a placeholder.** `platform-api.ts` reads the key from a `NEXT_PUBLIC_PLATFORM_KEY` env var (or the literal `rk_test_placeholder`) via `resolveKey()`. This is a scaffold convenience only — a real key must **never** be `NEXT_PUBLIC_*`. The production path is: read the bearer from the server session inside each Server Component and pass it as the `key` argument to every `platformApi.*` call; client components that must call `/v1` (the cancel action, the `/scans/new` submit) post to a thin `(app)` Route Handler that re-reads the session server-side and forwards the bearer, so the browser never holds it.
+- **Cancel + create are stubbed.** `scan-progress.tsx`'s cancel currently re-fetches rather than `POST /v1/scans/{id}/cancel`; the `/scans/new` create form (and its `Idempotency-Key`) is not built yet. Both need the Route Handler from the point above.
+- **Export links carry no auth.** The report page's HTML/PDF/JSON links point straight at `GET /v1/scans/{id}/report?format=…`; once auth lands these should route through a Route Handler that attaches the bearer (a secret never belongs in a client `href`).
+- **`/v1` endpoint shapes are assumed.** `listScans` (cursor envelope), `getReport` (the JSON = `ScanReport.to_dict()` + `score` + `recommendations`), and `validateTarget` follow the dashboard specs; confirm against Team A's `docs/platform/api/scans-endpoints.md` when the backend ships, and reconcile any drift there first.
+- **SSE transport (Option B).** The detail page polls (`live-scan-ux.md` Option A). The `GET /v1/scans/{id}/events` stream can slot in behind the same `ScanProgress` seam later without a contract change.

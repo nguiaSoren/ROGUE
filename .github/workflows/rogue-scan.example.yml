@@ -1,0 +1,43 @@
+# Example: gate pull requests on a ROGUE red-team scan (shift-left).
+#
+# Copy this into your own repo as e.g. .github/workflows/rogue-scan.yml. The job fails when the
+# scanned model's breach score or critical-finding count crosses your threshold, blocking the merge.
+# Store the target credential (and, for api mode, the ROGUE org key) as encrypted repo secrets.
+
+name: ROGUE scan (PR gate)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  redteam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Provider mode: installs `rogue` and scans the model directly with a target API key.
+      - name: ROGUE scan
+        uses: ./.github/actions/rogue-scan
+        with:
+          provider: openai
+          model: gpt-4o-mini
+          api-key: ${{ secrets.OPENAI_API_KEY }}
+          pack: default
+          max-tests: "50"
+          fail-on-score: "50"     # fail if breach score >= 50/100
+          fail-on-critical: "1"   # fail on any critical finding
+
+      # --- Alternative: api mode against a hosted ROGUE deployment (no model creds in CI) ----------
+      # - name: ROGUE scan (hosted)
+      #   uses: ./.github/actions/rogue-scan
+      #   with:
+      #     use-api: "true"
+      #     api-url: https://rogue-api-mr5w.onrender.com
+      #     org-key: ${{ secrets.ROGUE_ORG_KEY }}
+      #     provider: anthropic
+      #     model: claude-3-5-sonnet
+      #     fail-on-score: "40"

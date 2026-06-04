@@ -98,9 +98,11 @@ def test_models_metadata_has_expected_tables() -> None:
     telemetry, migration 0019) added 2026-06-03. Add new entries here when migrations
     add tables.
     """
+    import rogue.platform.models  # noqa: F401 — register the platform tables on Base
     from rogue.db.models import Base
 
     assert sorted(Base.metadata.tables.keys()) == [
+        "api_keys",
         "attack_primitives",
         "attack_strategies",
         "bandit_state",
@@ -111,10 +113,17 @@ def test_models_metadata_has_expected_tables() -> None:
         "fetch_cache",
         "ladder_attempts",
         "ladder_rotation_membership",
+        "memberships",
+        "organizations",
         "pair_refinement_steps",
         "primitive_images",
+        "projects",
         "renderer_capabilities",
+        "reports",
+        "scan_jobs",
+        "scan_runs",
         "source_provenances",
+        "users",
     ]
 
 

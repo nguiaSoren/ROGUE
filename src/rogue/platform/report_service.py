@@ -1,0 +1,181 @@
+"""`ReportService` impl — render a persisted scan into customer artifacts (JSON / HTML / PDF).
+
+The worker (`worker.py`) finalizes a scan by saving `ScanReport.to_dict()` under a fresh `report_id`
+and stamping that id + the platform `score` onto the `ScanRecord`. This service is the read side: it
+reconstructs a `rogue.report.ScanReport` from the persisted payload and re-renders it, layering in the
+platform `score`/`risk_level` (which the bare SDK `ScanReport` doesn't carry). It owns no scan logic —
+just persistence read + presentation.
+"""
+
+from __future__ import annotations
+
+import html as _html
+import re
+
+from rogue.report import Finding, ScanReport, technique_label
+
+from . import scoring
+from .interfaces import ReportService, ScanStore
+
+# Credential shapes that must never appear in a rendered artifact. The persisted payload should already
+# be secret-free (`TargetSpec.api_key` is excluded from the record), but example strings are harvested
+# free-text, so we scrub provider key prefixes defensively before they reach a customer-facing page.
+_SECRET_RE = re.compile(r"\b(?:sk|rk)[-_][A-Za-z0-9_-]{6,}\b")
+
+
+def _redact(s: str | None) -> str | None:
+    """Mask any leaked provider-key-shaped token in a free-text excerpt; pass `None` through."""
+    if s is None:
+        return None
+    return _SECRET_RE.sub("[REDACTED]", s)
+
+
+class DefaultReportService(ReportService):
+    """Reconstructs the persisted `ScanReport` and renders JSON / HTML / PDF with the platform score."""
+
+    def __init__(self, store: ScanStore):
+        self.store = store
+
+    # --- internals ------------------------------------------------------------------------------
+
+    async def _load_report(self, scan_id: str) -> ScanReport:
+        """Resolve `scan_id` → its persisted payload → a rebuilt `ScanReport`.
+
+        Raises a clear `ValueError` if the scan is unknown, not completed, or has no stored report.
+        """
+        record = await self.store.get(scan_id)
+        if record is None:
+            raise ValueError(f"scan {scan_id!r} not found")
+        if record.report_id is None:
+            raise ValueError(f"scan {scan_id!r} has no report (status={record.status.value})")
+
+        stored = await self.store.get_report(record.report_id)
+        if stored is None:
+            raise ValueError(f"report {record.report_id!r} for scan {scan_id!r} is missing")
+        payload = stored.get("payload") or {}
+
+        # Rebuild Findings from the persisted dicts, redacting example excerpts on the way in. Only the
+        # known Finding fields are carried over, so a forward-compatible payload (extra keys) is tolerated.
+        findings: list[Finding] = []
+        for raw in payload.get("findings") or []:
+            findings.append(
+                Finding(
+                    family=raw["family"],
+                    technique=raw["technique"],
+                    vector=raw["vector"],
+                    severity=raw["severity"],
+                    title=raw["title"],
+                    success_rate=raw["success_rate"],
+                    n_trials=raw["n_trials"],
+                    n_breach=raw["n_breach"],
+                    example_attack=_redact(raw.get("example_attack")),
+                    example_response=_redact(raw.get("example_response")),
+                )
+            )
+
+        return ScanReport(
+            target=payload.get("target", ""),
+            n_tests=payload.get("n_tests", 0),
+            n_breaches=payload.get("n_breaches", 0),
+            cost_usd=payload.get("cost_usd", 0.0),
+            findings=findings,
+        )
+
+    # --- renderers ------------------------------------------------------------------------------
+
+    async def build_json(self, scan_id: str) -> dict:
+        """The SDK report dict + the platform headline (`score` 0-100 and its `risk_level`)."""
+        report = await self._load_report(scan_id)
+        score = scoring.score_for(report)
+        out = report.to_dict()
+        out["score"] = score
+        out["risk_level"] = scoring.risk_level(score)
+        return out
+
+    async def build_html(self, scan_id: str) -> str:
+        """Reuse `ScanReport.to_html()`, injecting the platform score/risk_level into the header KPIs."""
+        report = await self._load_report(scan_id)
+        score = scoring.score_for(report)
+        level = scoring.risk_level(score)
+        page = report.to_html()
+
+        # Splice a Risk-score KPI in front of the existing KPI row so the headline number a customer
+        # acts on leads the page — without re-templating the whole report.
+        kpi = (
+            f'<div class="kpi">Risk score'
+            f"<b>{score:g}/100 ({_html.escape(level)})</b></div>\n "
+        )
+        marker = '<div class="kpis">\n'
+        if marker in page:
+            page = page.replace(marker, marker + " " + kpi, 1)
+        return page
+
+    async def build_pdf(self, scan_id: str) -> bytes:
+        """Render score + summary + a findings table to PDF bytes (lazy-imports reportlab)."""
+        try:
+            from reportlab.lib import colors  # noqa: PLC0415
+            from reportlab.lib.pagesizes import letter  # noqa: PLC0415
+            from reportlab.lib.styles import getSampleStyleSheet  # noqa: PLC0415
+            from reportlab.platypus import (  # noqa: PLC0415
+                Paragraph,
+                SimpleDocTemplate,
+                Spacer,
+                Table,
+                TableStyle,
+            )
+        except ImportError as e:  # pragma: no cover - exercised only without reportlab installed
+            raise RuntimeError(
+                "PDF export requires reportlab. Install with: pip install reportlab"
+            ) from e
+
+        import io  # noqa: PLC0415
+
+        report = await self._load_report(scan_id)
+        score = scoring.score_for(report)
+        level = scoring.risk_level(score)
+        styles = getSampleStyleSheet()
+
+        story = [
+            Paragraph("ROGUE Threat Scan", styles["Title"]),
+            Paragraph(f"Risk score {score:g}/100 ({level.upper()})", styles["Heading2"]),
+            Paragraph(_html.escape(report.target), styles["BodyText"]),
+            Paragraph(
+                f"Tests {report.n_tests} &middot; Breaches {report.n_breaches} "
+                f"&middot; Rate {report.breach_pct}",
+                styles["BodyText"],
+            ),
+            Spacer(1, 12),
+        ]
+
+        # Findings table: header + the ranked findings (severity, success, technique, finding). All cells
+        # escaped; the rebuilt Findings are already redacted by `_load_report`.
+        data = [["Severity", "Success", "Technique", "Finding"]]
+        for f in report.top_findings(50):
+            data.append(
+                [
+                    _html.escape(f.severity),
+                    f.success_pct,
+                    _html.escape(technique_label(f.family)),
+                    _html.escape(f.title),
+                ]
+            )
+        table = Table(data, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#222222")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dddddd")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]
+            )
+        )
+        story.append(table)
+
+        buf = io.BytesIO()
+        SimpleDocTemplate(buf, pagesize=letter).build(story)
+        return buf.getvalue()
+
+
+__all__ = ["DefaultReportService", "_redact"]
