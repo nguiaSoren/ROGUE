@@ -37,6 +37,8 @@ Every source has at least one targeted query. `{date}` is `today - 14 days` for 
 - `site:github.com/advisories ("prompt injection" OR "LLM" OR "AI agent" OR "model context protocol") after:{date}` *(GitHub Advisory DB — OWASP/MITRE-aligned deployment-config / tool-surface CVEs)*
 - `site:huntr.com ("prompt injection" OR "LLM" OR jailbreak OR "AI agent")` *(Protect AI huntr — disclosed prompt-injection / agent-exfiltration issues against real LLM products)*
 
+**Scoped re-test verdicts (2026-06-04, `--only-arms` / `--source-expansion-only`):** OpenReview + ACL = live, 7 reusable techniques. Advisory + huntr = live but yield *primitives* (tool-surface CVEs, e.g. Copilot Cowork file-exfil), not techniques — KEEP. **garak = 0** (SERP can't reach repo file pages — needs a probes-dir fetcher). **HF datasets = intentionally not harvested as primitives:** `analyze_hf_datasets.py` (in-the-wild / wildjailbreak / JBB / AdvBench) found 0 new families — they're known-technique instances + bare harmful goals. The right integration is a **benchmark layer** (JBB + AdvBench as eval denominators / judge-calibration), not a harvest arm. The HF-datasets SERP arm's 0-yield is therefore the correct outcome, not a bug.
+
 **#1 r/ChatGPTJailbreak**
 - `site:reddit.com/r/ChatGPTJailbreak after:{date}`
 - `site:reddit.com/r/ChatGPTJailbreak "new method" after:{date}`
