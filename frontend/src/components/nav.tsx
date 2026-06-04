@@ -63,6 +63,12 @@ export function Nav() {
           <NavLink href="/analytics" active={pathname === "/analytics"}>/analytics</NavLink>
           <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
           <LivePill count={count} dbUp={dbUp} />
+          <Link
+            href="/scans"
+            className="rounded border border-rogue-green/50 px-3 py-1 text-rogue-green transition-colors hover:bg-rogue-green/10"
+          >
+            dashboard
+          </Link>
         </nav>
       </div>
     </header>
