@@ -725,6 +725,44 @@ class LadderRotationMembership(Base):
     )
 
 
+class BenchmarkRun(Base):
+    """One run of the external benchmark (AdvBench/JBB) against a target, stored
+    durably on Neon so the coverage-over-time series survives any single machine.
+
+    The external yardstick ROGUE otherwise lacks: internal metrics (harvested,
+    graduated, reachability, cost/breach, K) measure how the system *behaves*;
+    this measures whether the *repertoire* improved against a fixed reference.
+    Append-only — each row is one point on the ``date -> ASR/coverage`` timeline.
+
+    ``mode`` is ``'repertoire'`` (the graduated repertoire applied to each goal —
+    the standing regression metric) or ``'attacker'`` (IterativeAttacker peak ASR,
+    a milestone-only number). ``repertoire_size`` snapshots how many graduated
+    techniques were available at run time, so a rising ASR can be tied to a
+    growing repertoire rather than noise. ``detail`` holds the per-family /
+    per-goal breakdown so a figure can be redrawn without a re-run.
+    """
+
+    __tablename__ = "benchmark_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_label: Mapped[str] = mapped_column(String(80), index=True)
+    run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, default=lambda: datetime.now(timezone.utc)
+    )
+    dataset: Mapped[str] = mapped_column(String(40), index=True)  # advbench_100|jbb_100|...
+    mode: Mapped[str] = mapped_column(String(20))  # repertoire|attacker
+    target_model: Mapped[str] = mapped_column(String(80))
+    n_goals: Mapped[int] = mapped_column(Integer)
+    n_breached: Mapped[int] = mapped_column(Integer)
+    asr: Mapped[float] = mapped_column(Float)  # n_breached / n_goals
+    repertoire_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cost_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    duration_s: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    git_sha: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -740,4 +778,5 @@ __all__ = [
     "BanditState",
     "FetchCache",
     "PrimitiveImage",
+    "BenchmarkRun",
 ]

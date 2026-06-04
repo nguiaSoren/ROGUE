@@ -141,6 +141,29 @@ def load_jbb_harmful() -> list[BenchmarkGoal]:
     ]
 
 
+SUBSET_SEED = "rogue-benchmark-v1"
+CANONICAL_DATASETS = ("advbench_100", "jbb_100")
+
+
+def load_canonical(name: str) -> list[BenchmarkGoal]:
+    """Load a fixed regression subset (``advbench_100`` / ``jbb_100``). These are
+    the standing denominators the repertoire-replay benchmark runs against so each
+    run is cheap and comparable over time."""
+    src = {
+        "advbench_100": "walledai/AdvBench",
+        "jbb_100": "JailbreakBench/JBB-Behaviors:harmful",
+    }.get(name, name)
+    return [
+        BenchmarkGoal(
+            goal=r["goal"],
+            target=r.get("target", ""),
+            category=r.get("category", ""),
+            source=src,
+        )
+        for r in _read_frozen(name)
+    ]
+
+
 def load_jbb_judge_comparison() -> list[JudgeComparisonItem]:
     return [
         JudgeComparisonItem(
@@ -215,12 +238,35 @@ def freeze_all() -> list[dict]:
     return metas
 
 
+def freeze_canonical_subsets() -> list[dict]:
+    """Derive the fixed 100-goal regression subsets from the already-frozen full
+    sets (pure-local, no network). ``advbench_100`` = a deterministic 100 of
+    AdvBench's 520 (md5(seed:goal) order — reproducible, no RNG); ``jbb_100`` =
+    all 100 JBB-harmful (already exactly 100), mirrored under the canonical name
+    so both denominators load the same way."""
+    adv = _read_frozen("advbench")
+    adv.sort(key=lambda r: hashlib.md5(f"{SUBSET_SEED}:{r['goal']}".encode()).hexdigest())
+    metas = [
+        _write_frozen(
+            "advbench_100",
+            adv[:100],
+            f"walledai/AdvBench (canonical 100 of 520, seed={SUBSET_SEED})",
+        ),
+        _write_frozen(
+            "jbb_100",
+            _read_frozen("jbb_harmful"),
+            "JailbreakBench/JBB-Behaviors:harmful (canonical 100)",
+        ),
+    ]
+    return metas
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--freeze", action="store_true", help="one-time pull + freeze")
     args = parser.parse_args(argv)
     if not args.freeze:
-        for name in ("advbench", "jbb_harmful", "jbb_judge_comparison"):
+        for name in ("advbench", "jbb_harmful", "jbb_judge_comparison", "advbench_100", "jbb_100"):
             try:
                 meta = json.loads((FROZEN_DIR / f"{name}.meta.json").read_text())
                 print(f"  {name}: {meta['n']} rows  sha={meta['sha256'][:12]}  ({meta['source']})")
@@ -230,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
     from dotenv import load_dotenv
 
     load_dotenv()
-    for meta in freeze_all():
+    for meta in freeze_all() + freeze_canonical_subsets():
         print(f"froze {meta['name']}: {meta['n']} rows  sha={meta['sha256'][:12]}  ({meta['source']})")
     return 0
 
