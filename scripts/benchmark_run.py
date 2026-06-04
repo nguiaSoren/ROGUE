@@ -266,7 +266,10 @@ async def _main(args) -> int:
         )
         return 2
 
-    targets = TIER_A if args.tier == "A" else TIER_B
+    if args.targets:
+        targets = tuple(t.strip() for t in args.targets.split(",") if t.strip())
+    else:
+        targets = TIER_A if args.tier == "A" else TIER_B
     datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
     for d in datasets:
         if d not in CANONICAL_DATASETS:
@@ -313,24 +316,24 @@ async def _main(args) -> int:
                           f"{agg['n_goals']} goals, rotation={agg['rotation_len']} "
                           f"→ ≤ ${agg['estimate_usd']:.2f}")
                     continue
-                row = BenchmarkRun(
-                    run_label=label,
-                    run_at=datetime.now(timezone.utc),
-                    dataset=ds,
-                    mode="repertoire",
-                    target_model=config.target_model,
-                    n_goals=agg["n_goals"],
-                    n_breached=agg["n_breached"],
-                    asr=agg["asr"],
-                    repertoire_size=repertoire_size,
-                    cost_usd=agg["cost_usd"],
-                    duration_s=round(time.time() - t0, 1),
-                    git_sha=git_sha,
-                    detail=agg["detail"],
-                )
-                session.add(row)
-                session.commit()
-                written += 1
+                if not args.no_persist:
+                    session.add(BenchmarkRun(
+                        run_label=label,
+                        run_at=datetime.now(timezone.utc),
+                        dataset=ds,
+                        mode="repertoire",
+                        target_model=config.target_model,
+                        n_goals=agg["n_goals"],
+                        n_breached=agg["n_breached"],
+                        asr=agg["asr"],
+                        repertoire_size=repertoire_size,
+                        cost_usd=agg["cost_usd"],
+                        duration_s=round(time.time() - t0, 1),
+                        git_sha=git_sha,
+                        detail=agg["detail"],
+                    ))
+                    session.commit()
+                    written += 1
                 d = agg["detail"]
                 print(f"  {ds:13} × {config.target_model:34} "
                       f"ASR={agg['asr']:.1%} ({agg['n_breached']}/{agg['n_goals']}) "
@@ -342,6 +345,8 @@ async def _main(args) -> int:
     if args.dry_run:
         print(f"\ndry-run: built context for every cell (no paid calls). "
               f"Estimated upper bound ≤ ${total_est:.2f}. Re-run with --yes.")
+    elif args.no_persist:
+        print(f"\nprobe complete — NOT persisted (--no-persist; repertoire_size={repertoire_size}).")
     else:
         print(f"\nwrote {written} benchmark_runs row(s) to Neon "
               f"(label={label}, repertoire_size={repertoire_size}).")
@@ -352,6 +357,10 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--tier", choices=("A", "B"), default="A",
                    help="A = mistral-small (cheap, every harvest); B = 4 vendors (milestone)")
+    p.add_argument("--targets", default=None,
+                   help="comma-separated config_ids overriding the tier roster (e.g. hardness probe)")
+    p.add_argument("--no-persist", action="store_true",
+                   help="don't write benchmark_runs rows (for hardness probes — keeps the timeline clean)")
     p.add_argument("--datasets", default=",".join(CANONICAL_DATASETS),
                    help=f"comma-separated; default all of {CANONICAL_DATASETS}")
     p.add_argument("--mode", choices=("repertoire", "attacker"), default="repertoire")
