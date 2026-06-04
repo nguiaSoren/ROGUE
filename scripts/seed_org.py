@@ -45,7 +45,7 @@ from rogue.platform.models import ApiKey, Organization, User  # noqa: E402
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue"
 DEFAULT_SCOPES = ["scan:read", "scan:write"]
-API_BASE_URL = "https://rogue-api-mr5w.onrender.com"
+API_BASE_URL = "https://rogue-private.onrender.com"
 
 
 def seed_org(
