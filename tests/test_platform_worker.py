@@ -84,11 +84,10 @@ async def test_run_once_success_finalizes_completed():
     assert rec.completed_at is not None
     assert rec.report_id is not None
 
-    # The report payload is retrievable and carries the engine's findings.
-    stored = await store.get_report(rec.report_id)
-    assert stored is not None
-    assert stored["scan_id"] == scan_id
-    payload = stored["payload"]
+    # The report payload is retrievable and carries the engine's findings. `get_report` returns the
+    # report payload dict DIRECTLY (the unified ScanStore contract — not a {"scan_id","payload"} wrapper).
+    payload = await store.get_report(rec.report_id)
+    assert payload is not None
     assert payload["n_tests"] == 2
     assert payload["n_breaches"] == 1
     assert payload["top_attack"] == "DAN"

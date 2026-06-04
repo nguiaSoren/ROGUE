@@ -63,7 +63,11 @@ export default function SignInPage() {
         </button>
       </form>
       <p className="mt-6 text-xs text-muted-foreground">
-        No key? An operator issues one with <span className="font-mono">scripts/seed_org.py</span>.
+        Don&apos;t have a key yet?{" "}
+        <a href="mailto:nguiasoren@gmail.com?subject=ROGUE%20access%20request" className="underline hover:text-foreground">
+          Request access
+        </a>{" "}
+        and we&apos;ll set up your account.
       </p>
     </div>
   );

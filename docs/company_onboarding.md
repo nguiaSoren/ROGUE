@@ -4,16 +4,31 @@ This is the path from "I have one model endpoint and some credentials" to "I'm h
 
 There are two ways to run it, and they differ in exactly one thing: **who runs the judge.** Read this section before anything else, because it determines how many credentials you need.
 
-- **Mode 1 — self-serve SDK.** You install ROGUE and run it on your own machine. ROGUE calls your target endpoint *and* grades the responses, both from your laptop. Nothing leaves your machine except the calls to your own endpoint and the calls to whichever LLM provider you choose as the judge. This needs **two** credentials — your target key and a judge key — and it **works today**.
-- **Mode 2 — hosted API.** You send ROGUE one `curl` with a single ROGUE-issued key; we run the scan and the judge on our infrastructure and you poll for the report. This needs **one** credential. It is **not live yet** — it requires the hosted platform to be deployed (see the honesty note in that section).
+- **Mode 1 — self-serve SDK.** You install ROGUE and run it on your own machine. ROGUE calls your target endpoint *and* grades the responses, both from your process. Nothing leaves your machine except the calls to your own endpoint and the calls to whichever LLM provider you choose as the judge. This needs **two** credentials — your target key and a judge key. It **works today** and, because your target key never leaves your process, it is the path we recommend for regulated or pilot deployments (see "Security and privacy").
+- **Mode 2 — hosted API.** You send ROGUE one `curl` with a single ROGUE-issued key; we run the scan and the judge on our infrastructure and you poll for the report. The hosted `/v1` API is **live and key-authenticating today** as a private beta (request an `rk_live_` key); the one caveat is that executing a queued scan still needs a deployed background worker, so end-to-end scan completion is not yet generally available. Before using Mode 2 against a sensitive deployment, read the secret-handling disclosure in "Security and privacy" — today the hosted path stores the raw target key, so regulated/pilot customers should stay on Mode 1.
 
-If you want a report in the next ten minutes, use Mode 1. Mode 2 is the near-term hosted convenience layer on top of the same scan engine.
+If you want a graded report in the next ten minutes, use Mode 1. Mode 2 is the hosted convenience layer on top of the same scan engine.
 
-## Prerequisites (both modes)
+## Prerequisites — you need TWO credentials
 
-- **A sanitized OpenAI-compatible endpoint.** A chat-completions URL we can call — a company gateway (`https://gateway.company.ai/v1`), a proxy, a self-hosted vLLM/TGI server, or a hosted provider. "Sanitized" means: point it at a staging/eval deployment, scope the key to that deployment, and assume every prompt ROGUE sends is adversarial (that is the point). ROGUE talks the OpenAI chat-completions wire format; anything that speaks it works.
-- **A key for that endpoint.** Whatever your gateway/provider expects in the `Authorization` header.
-- **(Mode 1 only) a judge provider + its key.** ROGUE grades every response with an LLM judge — that is what turns "the model said some words" into "this attack broke through." The judge defaults to `anthropic/claude-sonnet-4-6`; point it at a provider you actually hold credits for. See "The judge" below.
+The single thing to get right up front: ROGUE grades every response with an LLM judge, so a scan calls **two** services and needs **two** keys.
+
+1. **A target endpoint/model key** — the model you want scanned. A sanitized OpenAI-compatible chat-completions URL we can call (a company gateway `https://gateway.company.ai/v1`, a proxy, a self-hosted vLLM/TGI server, or a hosted provider), plus whatever key its `Authorization` header expects. "Sanitized" means: point it at a staging/eval deployment, scope the key to that deployment, and assume every prompt ROGUE sends is adversarial (that is the point). ROGUE talks the OpenAI chat-completions wire format; anything that speaks it works.
+2. **A judge key** — ROGUE grades every response with an LLM judge; that is what turns "the model said some words" into "this attack broke through," and ROGUE will not produce a graded report without it. The default judge is `anthropic/claude-sonnet-4-6`, which reads **`ANTHROPIC_API_KEY` specifically**. If you don't hold Anthropic credits, repoint it with `JUDGE_MODEL` and set that provider's key instead (see "Step 2 — set the judge credential" below).
+
+```bash
+# (1) target key — the model you want scanned
+export OPENAI_API_KEY="sk-..."            # or match whatever your target endpoint expects
+# (2) judge key — default judge is anthropic/claude-sonnet-4-6, which reads ANTHROPIC_API_KEY
+export ANTHROPIC_API_KEY="sk-ant-..."
+# …or repoint the judge if you lack Anthropic credits:
+# export JUDGE_MODEL="openai/gpt-5.4-nano"
+# export OPENAI_API_KEY="sk-..."
+# (optional) the fallback judge used on refused grades — see "Security and privacy"
+# export JUDGE_FALLBACK_MODEL="deepseek/deepseek-v4-flash"   # OpenRouter; needs OPENROUTER_API_KEY
+```
+
+(In Mode 2 the judge runs on our infrastructure, so a hosted scan needs only the single `rk_live_` key; the target key still has to reach us — see the secret-handling disclosure in "Security and privacy.")
 
 You do not need Postgres, Docker, the dashboard, or any ROGUE backend for Mode 1. The attack packs ship inside the package.
 
@@ -23,7 +38,7 @@ You do not need Postgres, Docker, the dashboard, or any ROGUE backend for Mode 1
 
 ### Step 1 — install (≈2 min)
 
-ROGUE is not on PyPI yet, so install it from the repository as an editable package:
+ROGUE is not published to PyPI, so install it from the repository as an editable package:
 
 ```bash
 git clone https://github.com/nguiaSoren/ROGUE.git
@@ -31,7 +46,7 @@ cd ROGUE
 pip install -e .          # or: uv pip install -e .
 ```
 
-That installs both the Python SDK (`from rogue import Client`) and the `rogue` command-line tool. Once the package is published, this whole step becomes `pip install rogue`.
+That installs both the Python SDK (`from rogue import Client`) and the `rogue` command-line tool. (`pip install rogue` is a future convenience once the package is published — it does not work today.)
 
 ### Step 2 — set the judge credential (≈1 min)
 
@@ -140,33 +155,33 @@ That's it. From a clean machine to `report.html` is well under ten minutes, with
 
 ---
 
-## Mode 2 — hosted API (not live yet)
+## Mode 2 — hosted API (private beta)
 
-In the hosted model, ROGUE runs the judge, so a company needs only **one** credential: a ROGUE-issued `rk_live_…` key. You give us a sanitized endpoint and key in the request body, we enqueue the scan on our infrastructure, you poll for status and pull the report. Three calls:
+In the hosted model, ROGUE runs the judge, so a company needs only **one** credential: a ROGUE-issued `rk_live_…` key (request one — it's a private beta). The live host today is **`https://rogue-private.onrender.com`** (`api.rogue.ai` is a future vanity domain that does not resolve yet — don't use it). You give us a sanitized endpoint and key in the request body, we enqueue the scan, you poll for status and pull the report. Three calls:
 
 ```bash
 # 1. Create — returns immediately with a scan_id
-curl -X POST https://api.rogue.ai/v1/scans \
+curl -X POST https://rogue-private.onrender.com/v1/scans \
   -H "Authorization: Bearer rk_live_…" \
   -H "Content-Type: application/json" \
-  -d '{"target":{"endpoint":"https://gateway.company.ai/v1","api_key_ref":"…","system_prompt":""},"pack":"default","max_tests":50,"n_trials":3,"budget":5.0}'
+  -d '{"target":{"endpoint":"https://gateway.company.ai/v1","api_key":"<your endpoint key>","system_prompt":""},"pack":"default","max_tests":50,"n_trials":3,"budget":5.0}'
 # → {"scan_id":"scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X","status":"queued"}
 
 # 2. Poll — status / progress / running breach count
-curl https://api.rogue.ai/v1/scans/scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X \
+curl https://rogue-private.onrender.com/v1/scans/scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X \
   -H "Authorization: Bearer rk_live_…"
 # → {... "status":"running","progress":62,"n_completed":31,"n_breaches":4 ...}
 
 # 3. Report — once status == "completed"
-curl "https://api.rogue.ai/v1/scans/scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X/report?format=json" \
+curl "https://rogue-private.onrender.com/v1/scans/scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X/report?format=json" \
   -H "Authorization: Bearer rk_live_…"
 ```
 
-The request body is a `ScanSpec`: `target` is a `TargetSpec` (`endpoint` **or** `provider`+`model`, plus `api_key_ref` and an optional `system_prompt`), then `mode` (`pack | repertoire`, default `pack` — see "Scan modes" above), `pack` (`default | aggressive | compliance`, default `default`; used only in `pack` mode), optional `attacks`, `max_tests` (default 50, the cap on a repertoire run), `n_trials` (default 1), and an optional `budget`. The report route takes `?format=json|html|pdf` (default `json`) and returns `404 report_not_ready` while the scan is still running, so keep polling step 2 until `status: "completed"` before fetching it.
+The request body is a `ScanSpec`: `target` is a `TargetSpec` (`endpoint` **or** `provider`+`model`, plus the target `api_key` and an optional `system_prompt`), then `mode` (`pack | repertoire | ladder`, default `pack` — see "Scan modes" above), `pack` (`default | aggressive | compliance`, default `default`; used only in `pack` mode), optional `attacks`, `max_tests` (default 50, the cap on a repertoire run), `n_trials` (default 1), and an optional `budget`. The report route takes `?format=json|html|pdf` (default `json`) and returns `404 report_not_ready` while the scan is still running, so keep polling step 2 until `status: "completed"` before fetching it.
 
-One detail worth flagging: in the hosted body, the target credential is `api_key_ref` — a Vault/KMS handle, **never the raw secret**. The API never sees the raw key; the worker resolves the handle at run time. That is the structural reason hosted mode can promise the platform never persists your target key.
+A request with no key returns `{"error":{"code":"invalid_token","message":"missing bearer api key"}}` and an unrecognized key returns `{"error":{"code":"invalid_api_key",…}}` — i.e. the `/v1` API is live and authenticating today.
 
-**Honesty note — this is not live as of writing.** Mode 2 requires the hosted platform to be deployed: the scan-persistence migration (0022+), a queue and a background worker that runs scans off the request thread, and an issued `rk_live_…` key bound to your org. As of writing, only the scan *engine* (the same one Mode 1 uses, `rogue.scan.run_scan`) and these API/orchestration designs exist; the worker, queue, key-issuance, and `api.rogue.ai` host are design-spec, not running. The design lives under `docs/platform/` — `ARCHITECTURE.md` §7 (the 30-day roadmap: migration 0022, queue, `ScanWorker`, key auth), `docs/platform/api/scans-endpoints.md` (these five routes), and `docs/platform/orchestration/` (the service, queue, and worker). Until that ships, **use Mode 1** — it produces the identical report from the identical engine, today.
+**Status note — what's live and what isn't.** The hosted `/v1` API is deployed and key-authenticating at `https://rogue-private.onrender.com` (private beta). What is *not* yet generally available is end-to-end scan *execution*: a queued scan needs a deployed background worker to pick the job off the queue and run it, and that worker isn't running in production yet, so a `POST /v1/scans` will queue but not complete. The scan *engine* itself is the same one Mode 1 uses (`rogue.scan.run_scan`). The remaining platform design (the secret store, worker, and full orchestration) lives under `docs/platform/` — `ARCHITECTURE.md` §7, `docs/platform/api/scans-endpoints.md`, and `docs/platform/orchestration/`. For a graded report today, and for any regulated/pilot deployment, **use Mode 1** — it produces the identical report from the identical engine, with your target key never leaving your process.
 
 ---
 
@@ -183,10 +198,10 @@ The trade-off is cost. Repertoire is judge-dominated at roughly **$0.02 per test
 **How to set it.** Mode is available on the **hosted API** and the **dashboard** today. In the hosted request body, set `mode` alongside `max_tests`:
 
 ```bash
-curl -X POST https://api.rogue.ai/v1/scans \
+curl -X POST https://rogue-private.onrender.com/v1/scans \
   -H "Authorization: Bearer rk_live_…" \
   -H "Content-Type: application/json" \
-  -d '{"target":{"endpoint":"https://gateway.company.ai/v1","api_key_ref":"…"},"mode":"repertoire","max_tests":50,"n_trials":1,"budget":2.0}'
+  -d '{"target":{"endpoint":"https://gateway.company.ai/v1","api_key":"<your endpoint key>"},"mode":"repertoire","max_tests":50,"n_trials":1,"budget":2.0}'
 ```
 
 In the dashboard, the **New scan** form has a mode toggle — "Curated pack" (default), "Full repertoire", and "Full ladder" — next to the pack/`max_tests` controls. (The self-serve SDK `Client.scan()` does not take a `mode=` argument yet; it always runs a bundled pack. Repertoire is a hosted/dashboard capability for now — the live corpus lives server-side in the platform DB, which the local SDK does not carry.)
@@ -223,10 +238,11 @@ The headline scan cost (the `Cost:` line) is **target-call spend only** — what
 
 ---
 
-## Security and privacy
+Read this before pointing ROGUE at anything sensitive. We'd rather you know the current limits than be surprised by them in a security review.
 
-- **Raw target keys are never persisted by the platform.** In hosted mode the request carries an `api_key_ref` (a Vault/KMS handle), not the secret; the API never sees the raw key, and the stored record keeps only a redacted snapshot of the target config. In SDK mode the question doesn't even arise — your key lives only in your process's memory and goes only to your own endpoint.
-- **SDK mode keeps everything local.** Nothing leaves your machine except (1) the attack calls to your own endpoint and (2) the grading calls to the judge provider you chose. ROGUE has no backend in this mode; the attack packs ship in the package.
+- **Mode 1 (SDK) is the safe path, and the one we recommend for regulated or pilot deployments.** Your target key lives only in your own process's memory and goes only to (1) your own endpoint and (2) the judge provider you chose. ROGUE has no backend in this mode; the attack packs ship in the package; nothing else leaves your machine.
+- **Mode 2 (hosted) currently persists the raw target key in cleartext.** Be clear-eyed about this: today the hosted API carries the raw target `api_key` in the `ScanSpec`, and the queue writes that spec — key included — into the `scan_jobs` table in the platform database in cleartext. The `api_key_ref` / Vault-KMS / `SecretService` indirection that would replace the raw key with a handle and resolve it just-in-time in the worker is **designed but not yet built** (see `docs/platform/tenancy/secrets.md`, which states "design spec, not yet built"). Until that secret store ships, the hosted path does **not** keep your raw key out of the database, so **regulated and pilot customers should use Mode 1.**
+- **The judge sees the target's response text, and the worst breaches may go to a second provider.** ROGUE's verdicts come from an LLM judge, so the target model's *response text* (not just the attack) is sent to the judge provider — `JUDGE_MODEL`, by default Anthropic. When the primary judge refuses to grade a cell (which happens precisely on the most harmful, fully-complied responses), ROGUE re-sends that response to a fallback judge — `JUDGE_FALLBACK_MODEL`, by default an OpenRouter-hosted open model (`deepseek/deepseek-v4-flash`). So a bank should expect those specific responses to transit a *second* provider (OpenRouter) as well. Both are repointable, and the fallback can be disabled, by setting `JUDGE_MODEL` / `JUDGE_FALLBACK_MODEL` to providers you've vetted.
 - **Assume every prompt is adversarial.** That is the product — point ROGUE at a staging/eval deployment with a scoped key, not at anything where a successful jailbreak would have real-world consequences.
 
 ---
@@ -237,10 +253,10 @@ The headline scan cost (the `Cost:` line) is **target-call spend only** — what
 - **Endpoint auth rejected / 404.** Run `validate()` first. If `Authenticated` is ✗, the target key is wrong or scoped to the wrong deployment. If `Reachable` is ✗ or you get a 404, the URL is wrong — for OpenAI-compatible gateways the base URL usually ends in `/v1` (ROGUE appends the chat-completions path), so pass the base, not the full `…/chat/completions`.
 - **Image/audio attacks "skipped" on a text-only target.** Expected and honest. The `aggressive` pack includes multimodal-image injections; a target whose `validate()` shows `Supports image: ✗` simply won't have those probes counted against it. Use `validate()` to see a target's modalities up front, and `default`/`compliance` (text-only) if you don't want any multimodal probes at all.
 - **`ValueError: Client needs either endpoint=... or provider=...`.** You constructed the client with neither a URL nor a known provider (or an unknown provider with no `model=`). Pass an `endpoint=` or one of `openai`/`anthropic`/`openrouter`/`gemini`/`groq`.
-- **Hosted `curl` returns `report_not_ready`.** The scan hasn't finished — keep polling `GET /v1/scans/{id}` until `status: "completed"`, then fetch the report. (And see the Mode 2 honesty note: the hosted host isn't live yet.)
+- **Hosted `curl` returns `report_not_ready`.** The scan hasn't finished — keep polling `GET /v1/scans/{id}` until `status: "completed"`, then fetch the report. (And see the Mode 2 status note: the `/v1` API is live, but scan *execution* needs a deployed worker that isn't running in production yet, so a hosted scan may sit `queued`. The live host is `https://rogue-private.onrender.com`, not `api.rogue.ai`.)
 
 ---
 
 ## The pitch, in one line
 
-Give me a sanitized endpoint — a staging deployment, or any OpenAI-compatible gateway URL — plus the credentials to call it, and you get a threat report: every open-web jailbreak that breaks your model, graded by an independent judge, with the exact attack and response to remediate. Today that's two lines of Python on your own machine (Mode 1); soon it's one `curl` to a hosted endpoint (Mode 2).
+Give me a sanitized endpoint — a staging deployment, or any OpenAI-compatible gateway URL — plus the credentials to call it, and you get a threat report: every open-web jailbreak that breaks your model, graded by an independent judge, with the exact attack and response to remediate. Today that's a few lines of Python on your own machine (Mode 1, the recommended path); the hosted `curl` API (Mode 2) is in private beta, with end-to-end scan execution landing as the background worker and secret store ship.

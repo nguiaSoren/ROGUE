@@ -141,7 +141,7 @@ class DefaultScanEngine(ScanEngine):
         import asyncio
 
         from rogue.packs import filter_attacks, load_pack
-        from rogue.report import Finding, ScanReport, technique_label
+        from rogue.report import Finding, ScanReport, humanize_technique, technique_label
         from rogue.reproduce.escalation_ladder import run_escalation_ladder_one
         from rogue.reproduce.judge import JudgeAgent
         from rogue.reproduce.target_panel import TargetPanel
@@ -209,8 +209,14 @@ class DefaultScanEngine(ScanEngine):
                 Finding(
                     family=goal.family.value,
                     # The winning transform (e.g. "crescendo", "image:ocr") is richer than the family;
-                    # fall back to the family label when the goal held (no breach).
-                    technique=res.winning_strategy or technique_label(goal.family.value),
+                    # humanize it so the PERSISTED technique is already customer-facing (a graduated
+                    # candidate's raw ULID never reaches a report). Fall back to the family label when
+                    # the goal held (no breach).
+                    technique=(
+                        humanize_technique(res.winning_strategy)
+                        if res.winning_strategy
+                        else technique_label(goal.family.value)
+                    ),
                     vector=goal.vector.value,
                     severity=goal.base_severity.value,
                     title=goal.title,

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html as _html
 import json as _json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -31,11 +32,94 @@ _TECHNIQUE_DISPLAY: dict[str, str] = {
     "multi_turn_persona_chain": "Multi-Turn Persona Chain",
 }
 
+# Display label per internal attack *vector* slug (so customers see "User turn", not "user_turn").
+_VECTOR_DISPLAY: dict[str, str] = {
+    "user_turn": "User turn",
+    "user_multi_turn": "User (multi-turn)",
+    "rag_document": "RAG document",
+    "tool_output": "Tool output",
+    "system_prompt": "System prompt",
+    "multimodal_image": "Image",
+    "multimodal_audio": "Audio",
+}
+
+# Display label per *static* escalation-ladder winning-strategy code.
+_STRATEGY_DISPLAY: dict[str, str] = {
+    "crescendo": "Crescendo (gradual escalation)",
+    "actor_attack": "Actor/roleplay attack",
+    "acronym": "Acronym obfuscation",
+}
+
+# Display template per *prefixed* winning-strategy code (`<prefix>:<arg>`).
+_STRATEGY_PREFIX_DISPLAY: dict[str, str] = {
+    "image": "Image-rendered payload ({arg})",
+    "coj": "Chain-of-jailbreak edit ({arg})",
+    "structured": "Structured-format wrapper ({arg})",
+    "audio": "Audio-rendered payload ({arg})",
+}
+
 _SEVERITY_RANK = {"critical": 3, "high": 2, "medium": 1, "low": 0}
+
+
+def _fmt_usd(x: float) -> str:
+    """Format a USD cost: 2 decimals at/above a cent, finer precision below (so small scans
+    don't read as a misleading ``$0.00``)."""
+    if x >= 0.01:
+        return f"${x:.2f}"
+    if x > 0:
+        return f"${x:.4f}"
+    return "$0.00"
+
+
+# A 26-char Crockford base32 ULID (Crockford excludes I, L, O, U).
+_ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
+# A raw/cryptic machine token: no whitespace, only lowercase/digits/_/:/- (the shape ladder
+# codes and ids take). Humane labels carry capitals or spaces, so they fail this and pass through.
+_RAW_CODE_RE = re.compile(r"^[a-z0-9_:-]+$")
+
+
+def _looks_like_id(code: str) -> bool:
+    """True for an internal id / raw machine token that must never reach a customer."""
+    return bool(_ULID_RE.match(code) or _RAW_CODE_RE.match(code))
 
 
 def technique_label(family: str) -> str:
     return _TECHNIQUE_DISPLAY.get(family, family.replace("_", " ").title())
+
+
+def vector_label(vector: str) -> str:
+    """Humanize an internal attack-vector slug (``user_turn`` → "User turn")."""
+    return _VECTOR_DISPLAY.get(vector, vector.replace("_", " ").title())
+
+
+def humanize_technique(code: str) -> str:
+    """Map a raw escalation-ladder ``winning_strategy`` code to a human display label.
+
+    The escalation ladder credits a breach with either a *static* strategy
+    (``crescendo`` / ``actor_attack`` / ``acronym``), a *prefixed* transform
+    (``image:<renderer>`` / ``coj:<op>`` / ``structured:<fmt>`` / ``audio:<style>``),
+    or — when a harvested candidate graduates — the parent primitive's raw ULID.
+    A ULID is an internal id and must NEVER reach a customer; map it (and any
+    other raw/cryptic code) to a generic, honest label.
+
+    This is also applied *defensively* at render time over `Finding.technique`,
+    which in single/repertoire mode already holds a humane family label (e.g.
+    "DAN / Persona Jailbreak"). Such already-humane labels are NOT codes, so they
+    pass through unchanged. Pure + table-driven.
+    """
+    if not code:
+        return "Harvested escalation technique"
+    if code in _STRATEGY_DISPLAY:
+        return _STRATEGY_DISPLAY[code]
+    prefix, sep, arg = code.partition(":")
+    if sep and prefix in _STRATEGY_PREFIX_DISPLAY and arg:
+        return _STRATEGY_PREFIX_DISPLAY[prefix].format(arg=arg)
+    # A graduated candidate persists its parent ULID (26-char Crockford base32, no I/L/O/U).
+    # An internal id must never leak — map any id-shaped token to the generic label.
+    if _looks_like_id(code):
+        return "Harvested escalation technique"
+    # Anything else is an already-humane label (single/repertoire mode) → leave untouched.
+    return code
 
 
 @dataclass
@@ -95,7 +179,8 @@ class ScanReport:
         breached = self.breached_findings()
         if not breached:
             return None
-        return max(breached, key=lambda f: (f.success_rate, _SEVERITY_RANK.get(f.severity, 0))).technique
+        top = max(breached, key=lambda f: (f.success_rate, _SEVERITY_RANK.get(f.severity, 0)))
+        return humanize_technique(top.technique)
 
     # --- renderers ----------------------------------------------------------------------------
 
@@ -113,11 +198,19 @@ class ScanReport:
             "Top Attack:",
             f"  {self.top_attack or '— (none breached)'}",
             "Cost:",
-            f"  ${self.cost_usd:.2f}",
+            f"  {_fmt_usd(self.cost_usd)}",
         ]
         return "\n".join(lines)
 
     def to_dict(self) -> dict:
+        findings = []
+        for f in self.findings:
+            d = asdict(f)
+            # Render-time humanization: a raw ULID/code stored in `technique` (from a
+            # ladder scan) must never surface to a customer. `top_attack` is already humane.
+            d["technique"] = humanize_technique(f.technique)
+            d["vector"] = vector_label(f.vector)
+            findings.append(d)
         return {
             "target": self.target,
             "n_tests": self.n_tests,
@@ -125,7 +218,7 @@ class ScanReport:
             "breach_rate": round(self.breach_rate, 4),
             "top_attack": self.top_attack,
             "cost_usd": round(self.cost_usd, 6),
-            "findings": [asdict(f) for f in self.findings],
+            "findings": findings,
         }
 
     def to_json(self, path: str | Path | None = None, *, indent: int = 2) -> str:
@@ -144,7 +237,7 @@ class ScanReport:
                 f"<td>{mark}</td>"
                 f"<td>{_html.escape(f.severity)}</td>"
                 f"<td>{f.success_pct}</td>"
-                f"<td>{_html.escape(f.technique)}</td>"
+                f"<td>{_html.escape(humanize_technique(f.technique))}</td>"
                 f"<td>{_html.escape(f.title)}</td>"
                 "</tr>"
             )
@@ -166,7 +259,7 @@ class ScanReport:
  <div class="kpi">Breaches<b>{self.n_breaches}</b></div>
  <div class="kpi">Breach rate<b class="rate">{self.breach_pct}</b></div>
  <div class="kpi">Top attack<b>{_html.escape(self.top_attack or '—')}</b></div>
- <div class="kpi">Cost<b>${self.cost_usd:.2f}</b></div>
+ <div class="kpi">Cost<b>{_fmt_usd(self.cost_usd)}</b></div>
 </div>
 <table><thead><tr><th></th><th>Severity</th><th>Success</th><th>Technique</th><th>Finding</th></tr></thead>
 <tbody>{''.join(rows) or '<tr><td colspan=5>No findings.</td></tr>'}</tbody></table>
@@ -248,7 +341,7 @@ class BenchmarkReport:
             f"Target:           {self.target}",
             f"Goals:            {self.n_goals}",
             f"ASR:              {round(self.asr * 100)}%  ({self.n_success}/{self.n_goals})",
-            f"Cost:             ${self.cost_usd:.2f}",
+            f"Cost:             {_fmt_usd(self.cost_usd)}",
             f"Cost / success:   {('$%.4f' % cps) if cps is not None else '—'}",
         ]
         if self.winner_rank is not None:
@@ -273,4 +366,6 @@ __all__ = [
     "ValidationResult",
     "BenchmarkReport",
     "technique_label",
+    "humanize_technique",
+    "vector_label",
 ]
