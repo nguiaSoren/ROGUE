@@ -94,13 +94,22 @@ class DefaultReportService(ReportService):
     # --- renderers ------------------------------------------------------------------------------
 
     async def build_json(self, scan_id: str) -> dict:
-        """The SDK report dict + the platform headline (`score` 0-100 and its `risk_level`)."""
+        """The SDK report dict + the platform headline (`score` 0-100, its `risk_level`) + a coverage block.
+
+        Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation`): we layer the platform `score`/`risk_level`/`score_methodology` headline and a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised) so a programmatic consumer gets the same scan-coverage framing the PDF/HTML surfaces show, without parsing prose. The underlying SDK shape is untouched.
+        """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
         out = report.to_dict()
         out["score"] = score
         out["risk_level"] = scoring.risk_level(score)
         out["score_methodology"] = SCORE_METHODOLOGY
+        out["coverage"] = {
+            "n_tests": report.n_tests,
+            "n_breaches": report.n_breaches,
+            "breach_rate": round(report.breach_rate, 4),
+            "families_tested": report.families_covered(),
+        }
         return out
 
     async def build_executive_summary(self, scan_id: str) -> str:
@@ -164,25 +173,40 @@ class DefaultReportService(ReportService):
         return "\n".join(lines)
 
     async def build_html(self, scan_id: str) -> str:
-        """Reuse `ScanReport.to_html()`, injecting the platform score/risk_level into the header KPIs."""
+        """Reuse `ScanReport.to_html()`, surfacing the platform score/risk_level in the header KPIs.
+
+        Per the R1 contract `ScanReport.to_html()` grows optional `score`/`risk_level` params that render the Risk-score KPI natively; we pass them through. While that change is in flight we fall back to the prior string-splice so the headline number still leads the page either way — the fallback is removed once `to_html` accepts the params everywhere.
+        """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
-        page = report.to_html()
 
-        # Splice a Risk-score KPI in front of the existing KPI row so the headline number a customer
-        # acts on leads the page — without re-templating the whole report.
-        kpi = (
-            f'<div class="kpi">Risk score'
-            f"<b>{score:g}/100 ({_html.escape(level)})</b></div>\n "
-        )
-        marker = '<div class="kpis">\n'
-        if marker in page:
-            page = page.replace(marker, marker + " " + kpi, 1)
-        return page
+        try:
+            return report.to_html(score=score, risk_level=level)
+        except TypeError:
+            # `to_html` doesn't accept the params yet (R1 contract in flight). Splice a Risk-score KPI
+            # in front of the existing KPI row so the headline number a customer acts on still leads
+            # the page — without re-templating the whole report.
+            page = report.to_html()
+            kpi = (
+                f'<div class="kpi">Risk score'
+                f"<b>{score:g}/100 ({_html.escape(level)})</b></div>\n "
+            )
+            marker = '<div class="kpis">\n'
+            if marker in page:
+                page = page.replace(marker, marker + " " + kpi, 1)
+            return page
 
     async def build_pdf(self, scan_id: str) -> bytes:
-        """Render score + summary + a findings table to PDF bytes (lazy-imports reportlab)."""
+        """Render a CISO-ready PDF document (lazy-imports reportlab; raises if it's absent).
+
+        Structure, top to bottom: a cover title, the headline Risk score + risk_level with the
+        `SCORE_METHODOLOGY` caption, a one-paragraph executive summary (reusing `build_executive_summary`
+        so the prose matches every other surface), a scan-coverage / methodology section (how many tests
+        across which families, and one honest sentence on what "breach" means — ROGUE grades
+        goal-achievement via an independent LLM judge), then the findings table, severity-grouped
+        (critical → high → medium → low) with the wrapped Remediation column.
+        """
         try:
             from reportlab.lib import colors  # noqa: PLC0415
             from reportlab.lib.pagesizes import letter  # noqa: PLC0415
@@ -205,36 +229,73 @@ class DefaultReportService(ReportService):
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
         styles = getSampleStyleSheet()
+        body = styles["BodyText"]
 
+        # The exec summary is markdown (one short paragraph + a findings list); for the PDF we want a
+        # single prose paragraph as the lead-in, so take the markdown's headline/business-framing prose
+        # rather than re-rendering its bullet list (the table below already enumerates the findings).
+        summary_md = await self.build_executive_summary(scan_id)
+        summary_prose = self._summary_prose(summary_md)
+
+        # --- Cover + headline -------------------------------------------------------------------
         story = [
-            Paragraph("ROGUE Threat Scan", styles["Title"]),
+            Paragraph("ROGUE Threat Scan — Security Assessment", styles["Title"]),
+            Paragraph(f"Target: {_html.escape(report.target)}", styles["Heading3"]),
+            Spacer(1, 10),
             Paragraph(f"Risk score {score:g}/100 ({level.upper()})", styles["Heading2"]),
             Paragraph(_html.escape(SCORE_METHODOLOGY), styles["BodyText"]),
-            Paragraph(_html.escape(report.target), styles["BodyText"]),
-            Paragraph(
-                f"Tests {report.n_tests} &middot; Breaches {report.n_breaches} "
-                f"&middot; Rate {report.breach_pct}",
-                styles["BodyText"],
-            ),
             Spacer(1, 12),
         ]
 
-        # Findings table: header + the ranked findings (severity, success, technique, finding,
-        # remediation). Free-text cells wrapped in Paragraphs so long finding/remediation text reflows
+        # --- Executive summary ------------------------------------------------------------------
+        story.append(Paragraph("Executive summary", styles["Heading2"]))
+        story.append(Paragraph(_html.escape(summary_prose), body))
+        story.append(Spacer(1, 12))
+
+        # --- Scan coverage / methodology --------------------------------------------------------
+        families = report.families_covered()
+        families_str = ", ".join(_html.escape(fam) for fam in families) or "none"
+        story.append(Paragraph("Scan coverage &amp; methodology", styles["Heading2"]))
+        story.append(
+            Paragraph(
+                f"This scan ran {report.n_tests} attack tests against the target across "
+                f"{len(families)} attack famil{'y' if len(families) == 1 else 'ies'} "
+                f"({families_str}); {report.n_breaches} breached "
+                f"({_html.escape(report.breach_pct)} breach rate).",
+                body,
+            )
+        )
+        story.append(
+            Paragraph(
+                "A test counts as a breach when ROGUE judges the target to have achieved the attack's "
+                "harmful goal — graded by an independent LLM judge on the model's actual response, not "
+                "by keyword matching — with the rate taken as the worst (any-breach) result over the "
+                "repeated trials per attack.",
+                body,
+            )
+        )
+        story.append(Spacer(1, 14))
+
+        # --- Findings table (severity-grouped) --------------------------------------------------
+        story.append(Paragraph("Findings", styles["Heading2"]))
+        # Header + findings grouped by severity (critical → high → medium → low), breached-first within
+        # each group. Free-text cells wrapped in Paragraphs so long finding/remediation text reflows
         # instead of overflowing. All cells escaped; the rebuilt Findings are already redacted by
         # `_load_report`. Remediation is render-time per-family (not stored on the Finding).
-        cell = styles["BodyText"]
         data = [["Severity", "Success", "Technique", "Finding", "Remediation"]]
-        for f in report.top_findings(50):
-            data.append(
-                [
-                    _html.escape(f.severity),
-                    f.success_pct,
-                    Paragraph(_html.escape(technique_label(f.family)), cell),
-                    Paragraph(_html.escape(f.title), cell),
-                    Paragraph(_html.escape(remediation_for(f.family)), cell),
-                ]
-            )
+        for _sev, members in report.findings_by_severity():
+            for f in members:
+                data.append(
+                    [
+                        _html.escape(f.severity),
+                        f.success_pct,
+                        Paragraph(_html.escape(technique_label(f.family)), body),
+                        Paragraph(_html.escape(f.title), body),
+                        Paragraph(_html.escape(remediation_for(f.family)), body),
+                    ]
+                )
+        if len(data) == 1:
+            data.append([Paragraph("No findings.", body), "", "", "", ""])
         table = Table(data, repeatRows=1, colWidths=[55, 50, 90, 130, 195])
         table.setStyle(
             TableStyle(
@@ -252,6 +313,27 @@ class DefaultReportService(ReportService):
         buf = io.BytesIO()
         SimpleDocTemplate(buf, pagesize=letter).build(story)
         return buf.getvalue()
+
+    @staticmethod
+    def _summary_prose(summary_md: str) -> str:
+        """Distill the markdown exec summary into one prose paragraph for the PDF lead-in.
+
+        `build_executive_summary` emits a headline line, an optional bullet list of critical/high
+        findings (enumerated again by the PDF's findings table, so dropped here), and a bold
+        "Business impact:" framing line. We keep the headline + the business framing, stripped of
+        markdown emphasis, joined into a single sentence-flowing paragraph.
+        """
+        keep: list[str] = []
+        for line in summary_md.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or stripped.startswith("- "):
+                continue
+            # Drop markdown bold/emphasis markers and the "Business impact:" label so the prose reads
+            # as plain narrative.
+            text = stripped.replace("**", "").replace("Business impact:", "").strip()
+            if text:
+                keep.append(text)
+        return " ".join(keep)
 
 
 __all__ = ["DefaultReportService", "_redact"]

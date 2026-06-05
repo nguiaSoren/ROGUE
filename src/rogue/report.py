@@ -155,6 +155,20 @@ def _fmt_usd(x: float) -> str:
     return "$0.00"
 
 
+# Cap on a rendered evidence excerpt — long enough to read the gist of an attack/response, short
+# enough that the HTML report stays scannable. Excerpts are already redacted upstream.
+_EVIDENCE_MAX_CHARS = 600
+
+
+def _truncate(text: str, limit: int = _EVIDENCE_MAX_CHARS) -> str:
+    """Trim an evidence excerpt to ``limit`` chars on a word boundary, appending an ellipsis."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip()
+    return f"{cut or text[:limit]} …"
+
+
 # A 26-char Crockford base32 ULID (Crockford excludes I, L, O, U).
 _ULID_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 # A raw/cryptic machine token: no whitespace, only lowercase/digits/_/:/- (the shape ladder
@@ -226,6 +240,12 @@ class Finding:
         return f"{round(self.success_rate * 100)}%"
 
     @property
+    def breach_label(self) -> str:
+        """Human-readable hit rate: "breached N/M trials (XX%)" — a bare `success_rate` float reads
+        ambiguously to a customer ("success" of *what*?), so present the trial count alongside it."""
+        return f"breached {self.n_breach}/{self.n_trials} trials ({self.success_pct})"
+
+    @property
     def breached(self) -> bool:
         return self.n_breach > 0
 
@@ -250,6 +270,27 @@ class ScanReport:
 
     def breached_findings(self) -> list[Finding]:
         return [f for f in self.findings if f.breached]
+
+    def families_covered(self) -> list[str]:
+        """Distinct human attack-family labels exercised in this scan, in stable first-seen order."""
+        seen: list[str] = []
+        for f in self.findings:
+            label = technique_label(f.family)
+            if label not in seen:
+                seen.append(label)
+        return seen
+
+    def findings_by_severity(self) -> list[tuple[str, list[Finding]]]:
+        """Findings grouped by severity (critical→high→medium→low), breached-first within each
+        group, then by success rate. Only non-empty groups are returned, in descending rank."""
+        groups: list[tuple[str, list[Finding]]] = []
+        for sev in ("critical", "high", "medium", "low"):
+            members = [f for f in self.findings if f.severity == sev]
+            if not members:
+                continue
+            members.sort(key=lambda f: (f.breached, f.success_rate), reverse=True)
+            groups.append((sev, members))
+        return groups
 
     def top_findings(self, n: int = 5) -> list[Finding]:
         return sorted(
@@ -281,6 +322,14 @@ class ScanReport:
             f"  {self.breach_pct}",
             "Top Attack:",
             f"  {self.top_attack or '— (none breached)'}",
+        ]
+        # Spell out the top breaching finding's hit rate in human terms ("breached N/M trials")
+        # rather than leaving a bare float for the reader to interpret.
+        breached = self.breached_findings()
+        if breached:
+            top = max(breached, key=lambda f: (f.success_rate, _SEVERITY_RANK.get(f.severity, 0)))
+            lines += ["  " + top.breach_label]
+        lines += [
             "Cost:",
             f"  {_fmt_usd(self.cost_usd)}",
         ]
@@ -296,6 +345,9 @@ class ScanReport:
             d["vector"] = vector_label(f.vector)
             # Render-time only: remediation lives on the family slug, not the shared `Finding` dataclass.
             d["remediation"] = remediation_for(f.family)
+            # Keep the raw `success_rate` float (above, via asdict) for back-compat, but ADD a clear
+            # human label so a JSON consumer doesn't have to guess what "success" means.
+            d["breach_label"] = f.breach_label
             findings.append(d)
         return {
             "target": self.target,
@@ -313,40 +365,103 @@ class ScanReport:
             Path(path).write_text(text, encoding="utf-8")
         return text
 
-    def to_html(self, path: str | Path | None = None) -> str:
-        """A standalone HTML report — the artifact for a sales demo / email attachment."""
-        rows = []
-        for f in self.top_findings(50):
-            mark = "🔴" if f.breached else "🟢"
+    def to_html(
+        self,
+        path: str | Path | None = None,
+        *,
+        score: float | None = None,
+        risk_level: str | None = None,
+    ) -> str:
+        """A standalone HTML report — the artifact for a sales demo / email attachment.
+
+        ``score`` / ``risk_level`` are the platform's 0–100 risk number and its band ("HIGH"),
+        passed in by the platform report layer (this module never imports `rogue.platform.scoring`).
+        The SDK path has no platform score and omits both, so the headline score KPI is suppressed
+        gracefully. Self-contained: inline CSS, no external assets, valid standalone HTML.
+        """
+        # Severity-grouped finding rows: critical→high→medium→low, breached-first within each group,
+        # each group introduced by a labelled header row carrying its count.
+        rows: list[str] = []
+        for sev, members in self.findings_by_severity():
+            n_breached = sum(1 for f in members if f.breached)
             rows.append(
-                "<tr>"
-                f"<td>{mark}</td>"
-                f"<td>{_html.escape(f.severity)}</td>"
-                f"<td>{f.success_pct}</td>"
-                f"<td>{_html.escape(humanize_technique(f.technique))}</td>"
-                f"<td>{_html.escape(f.title)}</td>"
-                "</tr>"
-                '<tr class="remediation"><td></td>'
-                f'<td colspan="4"><b>Remediation:</b> {_html.escape(remediation_for(f.family))}</td>'
-                "</tr>"
+                f'<tr class="sevhead sev-{sev}"><td colspan="5">'
+                f"{_html.escape(sev.upper())} severity — {len(members)} finding"
+                f"{'s' if len(members) != 1 else ''}"
+                f"{f' ({n_breached} breached)' if n_breached else ''}"
+                "</td></tr>"
             )
+            for f in members:
+                mark = "🔴" if f.breached else "🟢"
+                rows.append(
+                    "<tr>"
+                    f"<td>{mark}</td>"
+                    f"<td>{_html.escape(sev)}</td>"
+                    f"<td>{_html.escape(f.breach_label)}</td>"
+                    f"<td>{_html.escape(humanize_technique(f.technique))}</td>"
+                    f"<td>{_html.escape(f.title)}</td>"
+                    "</tr>"
+                )
+                # Evidence excerpts, clearly labelled and visually distinct (already redacted
+                # upstream — we only truncate long excerpts so the page stays readable).
+                evidence = self._evidence_html(f)
+                if evidence:
+                    rows.append(
+                        '<tr class="evidence"><td></td>'
+                        f'<td colspan="4">{evidence}</td></tr>'
+                    )
+                rows.append(
+                    '<tr class="remediation"><td></td>'
+                    f'<td colspan="4"><b>Remediation:</b> '
+                    f"{_html.escape(remediation_for(f.family))}</td></tr>"
+                )
         rate_color = "#d33" if self.breach_rate > 0 else "#2a2"
+
+        # Headline score KPI — only when the platform supplied a number.
+        score_kpi = ""
+        if score is not None:
+            level = f" — {_html.escape(risk_level)}" if risk_level else ""
+            score_kpi = (
+                '<div class="kpi score">Risk score<b>'
+                f"{round(score)}/100{level}</b></div>"
+            )
+
+        families = self.families_covered()
+        intro = (
+            f"ROGUE ran {self.n_tests} attack{'s' if self.n_tests != 1 else ''} across "
+            f"{len(families)} famil{'ies' if len(families) != 1 else 'y'}; "
+            f"{self.n_breaches} breached."
+        )
         body = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>ROGUE Scan Report</title>
 <style>
  body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:860px;margin:2rem auto;color:#1a1a1a}}
- h1{{font-size:1.4rem}} .kpis{{display:flex;gap:2rem;margin:1.5rem 0}}
+ h1{{font-size:1.4rem;margin-bottom:.2rem}} .intro{{color:#555;margin:.2rem 0 .6rem}}
+ .meta{{font-size:.85rem;color:#666;margin:.2rem 0 1rem}} .meta code{{color:#111}}
+ .kpis{{display:flex;gap:2rem;margin:1.5rem 0;flex-wrap:wrap}}
  .kpi{{font-size:.85rem;color:#666}} .kpi b{{display:block;font-size:1.6rem;color:#111}}
+ .kpi.score b{{font-size:2rem;color:#d33}}
  table{{border-collapse:collapse;width:100%;font-size:.9rem}}
  th,td{{text-align:left;padding:.5rem .6rem;border-bottom:1px solid #eee}} th{{color:#888;font-weight:600}}
  .rate{{color:{rate_color}}}
  .methodology{{font-size:.8rem;color:#888;margin:.3rem 0 1.5rem}}
+ tr.sevhead td{{background:#f6f6f6;font-weight:600;color:#333;border-bottom:2px solid #ddd}}
+ tr.sev-critical td{{color:#a01818}} tr.sev-high td{{color:#b85c00}}
  tr.remediation td{{border-bottom:1px solid #eee;color:#555;font-size:.84rem;padding-top:0}}
  tr.remediation b{{color:#333}}
+ tr.evidence td{{border-bottom:0;padding-bottom:.2rem}}
+ .ev{{margin:.2rem 0;font-size:.82rem}} .ev .lbl{{color:#888;font-weight:600}}
+ .ev pre{{margin:.15rem 0;padding:.4rem .6rem;background:#f7f7f9;border-left:3px solid #ccc;
+  white-space:pre-wrap;word-break:break-word;font-size:.8rem;color:#333}}
+ .ev.attack pre{{border-left-color:#d33}} .ev.response pre{{border-left-color:#888}}
 </style></head><body>
 <h1>ROGUE Threat Scan</h1>
-<p>Target: <code>{_html.escape(self.target)}</code></p>
+<p class="intro">{_html.escape(intro)}</p>
+<p class="meta">Target: <code>{_html.escape(self.target)}</code> &nbsp;·&nbsp;
+ {self.n_tests} tests &nbsp;·&nbsp; {len(families)} families &nbsp;·&nbsp;
+ {_fmt_usd(self.cost_usd)}</p>
 <div class="kpis">
+ {score_kpi}
  <div class="kpi">Tests<b>{self.n_tests}</b></div>
  <div class="kpi">Breaches<b>{self.n_breaches}</b></div>
  <div class="kpi">Breach rate<b class="rate">{self.breach_pct}</b></div>
@@ -354,12 +469,29 @@ class ScanReport:
  <div class="kpi">Cost<b>{_fmt_usd(self.cost_usd)}</b></div>
 </div>
 <p class="methodology">{_html.escape(SCORE_METHODOLOGY)}</p>
-<table><thead><tr><th></th><th>Severity</th><th>Success</th><th>Technique</th><th>Finding</th></tr></thead>
+<table><thead><tr><th></th><th>Severity</th><th>Hit rate</th><th>Technique</th><th>Finding</th></tr></thead>
 <tbody>{''.join(rows) or '<tr><td colspan=5>No findings.</td></tr>'}</tbody></table>
 </body></html>"""
         if path is not None:
             Path(path).write_text(body, encoding="utf-8")
         return body
+
+    @staticmethod
+    def _evidence_html(f: Finding) -> str:
+        """Render a finding's attack/response excerpts as clearly-labelled, truncated HTML blocks
+        (empty string when neither is present). Excerpts are already redacted upstream."""
+
+        def block(cls: str, label: str, text: str | None) -> str:
+            if not text:
+                return ""
+            return (
+                f'<div class="ev {cls}"><span class="lbl">{label}</span>'
+                f"<pre>{_html.escape(_truncate(text))}</pre></div>"
+            )
+
+        return block("attack", "Attack sent:", f.example_attack) + block(
+            "response", "Model response:", f.example_response
+        )
 
     def __str__(self) -> str:  # pragma: no cover
         return self.summary()

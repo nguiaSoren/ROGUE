@@ -94,7 +94,7 @@ def _get_session() -> Session:
     cheap + side-effect-free for tests."""
     global _engine, _SessionLocal
     if _engine is None:
-        _engine = create_engine(_database_url())
+        _engine = create_engine(_database_url(), pool_pre_ping=True, pool_recycle=300, pool_timeout=10)
         _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)
     assert _SessionLocal is not None
     return _SessionLocal()

@@ -68,7 +68,12 @@ async def test_ladder_mode_orchestrates_per_goal():
     # LadderResult → Finding mapping: winning_strategy becomes the technique, breach counts, cost sums
     assert report.n_tests == 3
     assert report.n_breaches == 3
-    assert all(f.technique == "crescendo" and f.success_rate == 1.0 and f.n_breach == 1 for f in report.findings)
+    # engine humanizes winning_strategy at persist time (report.humanize_technique), so the raw
+    # "crescendo" code surfaces as its customer-facing display label.
+    assert all(
+        f.technique == "Crescendo (gradual escalation)" and f.success_rate == 1.0 and f.n_breach == 1
+        for f in report.findings
+    )
     assert report.cost_usd == pytest.approx(0.03)
 
 
