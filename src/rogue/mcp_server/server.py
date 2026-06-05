@@ -647,14 +647,18 @@ def main() -> None:
         )
 
     if transport == "stdio":
-        logger.info("ROGUE MCP server starting — 5 tools — transport=stdio")
+        logger.info(
+            "ROGUE MCP server starting — 6 read-only tools (scan/workflow action tools register "
+            "when mounted in the /v1 API) — transport=stdio"
+        )
     else:
         # HTTP transports bind a real port; default 8001 so we never collide
         # with the FastAPI dashboard backend on 8000.
         mcp.settings.host = os.getenv("ROGUE_MCP_HOST", "127.0.0.1")
         mcp.settings.port = int(os.getenv("ROGUE_MCP_PORT", "8001"))
         logger.info(
-            "ROGUE MCP server starting — 5 tools — transport=%s on http://%s:%d",
+            "ROGUE MCP server starting — 6 read-only tools (scan/workflow action tools register "
+            "when mounted in the /v1 API) — transport=%s on http://%s:%d",
             transport,
             mcp.settings.host,
             mcp.settings.port,
