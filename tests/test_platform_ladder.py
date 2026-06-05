@@ -39,6 +39,24 @@ def _ladder_result(winning):
     )
 
 
+def test_ladder_telemetry_skipped_on_injected_path():
+    # When a ladder runner / ctx builder is injected (the offline test path), the §10.10 telemetry
+    # write is skipped entirely — it must never touch a DB. Junk args prove it returns before use.
+    engine = DefaultScanEngine(ladder_runner=lambda *a, **k: None)
+    assert engine._log_ladder_telemetry([("goal", object())], None, None) is None
+
+
+def test_ladder_telemetry_is_best_effort(monkeypatch):
+    # On the real path, a telemetry-write failure (here: an unreachable DB) is swallowed — a logging
+    # error must never fail a customer's scan.
+    monkeypatch.setenv("DATABASE_URL", "bogus://unreachable")
+    engine = DefaultScanEngine()  # real path (no injected ctx / runner)
+    goal = SimpleNamespace(primitive_id="prim_1")
+    config = SimpleNamespace(target_model="anthropic/claude-haiku-4-5")
+    ctx = SimpleNamespace(candidate_ids=frozenset(), effective_quota=0)
+    assert engine._log_ladder_telemetry([(goal, _ladder_result("crescendo"))], config, ctx) is None
+
+
 @pytest.mark.asyncio
 async def test_ladder_mode_orchestrates_per_goal():
     ctx_calls: list = []

@@ -133,6 +133,61 @@ class DefaultScanEngine(ScanEngine):
     def _adapter_extra(self, spec: ScanSpec) -> dict[str, Any]:
         return {"api_key": spec.target.api_key} if spec.target.api_key else {}
 
+    def _log_ladder_telemetry(self, results, config, ctx) -> None:
+        """Best-effort: append each goal's ladder trace (incl. §10.10 vendor/family tags) to
+        ``ladder_attempts`` so HOSTED customer scans feed the contextual priors — the same write the
+        reproduce sweep does. Telemetry only: any failure is swallowed (a logging error must never
+        fail a customer's scan), and it is skipped on the injected/offline test path (a fake ctx
+        builder or ladder runner means there is no real DB to write to)."""
+        if self._escalation_ctx_builder is not None or self._ladder_runner is not None:
+            return
+        try:
+            import os
+            from datetime import datetime, timezone
+
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
+
+            from rogue.reproduce.strategy_lifecycle import log_ladder_attempts
+
+            from .memory import _new_id
+
+            run_id = _new_id("platladder")
+            now = datetime.now(timezone.utc)
+            candidate_ids = frozenset(getattr(ctx, "candidate_ids", ()) or ())
+            quota = getattr(ctx, "effective_quota", 0)
+            url = os.environ.get("DATABASE_URL", _DEFAULT_DATABASE_URL)
+            engine = create_engine(url, pool_pre_ping=True, pool_recycle=300, pool_timeout=10)
+            try:
+                with sessionmaker(bind=engine)() as session:
+                    for goal, res in results:
+                        parent_id = getattr(res, "parent_id", None) or getattr(
+                            goal, "primitive_id", None
+                        )
+                        if parent_id is None:
+                            continue
+                        log_ladder_attempts(
+                            session,
+                            run_id=run_id,
+                            parent_id=parent_id,
+                            attempts=res.attempts,
+                            winning_strategy=res.winning_strategy,
+                            breached_on=res.breached_on,
+                            candidate_ids=candidate_ids,
+                            quota=quota,
+                            now=now,
+                            configs=[config],  # single-config scan ⇒ vendor/family tagged
+                        )
+                    session.commit()
+            finally:
+                engine.dispose()
+        except Exception as exc:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "ladder telemetry logging failed (non-fatal): %s", exc
+            )
+
     # --- operation #1b: ladder scan -----------------------------------------------------------
 
     async def _run_ladder(self, spec: ScanSpec, config, progress: ProgressCallback | None):
@@ -201,6 +256,9 @@ class DefaultScanEngine(ScanEngine):
             planner = getattr(ctx, "planner", None)
             if planner is not None and hasattr(planner, "aclose"):
                 await planner.aclose()
+
+        # §10.10 — feed the contextual priors from hosted scans too (best-effort; never fatal).
+        self._log_ladder_telemetry(results, config, ctx)
 
         findings: list[Finding] = []
         n_breaches = 0
