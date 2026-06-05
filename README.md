@@ -44,6 +44,12 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
 5. **Diff.** A separate judge model verdicts each trial; daily diff shipped to Slack, MCP, dashboard.
 
+## Hosted platform — submit an endpoint, get a report
+
+Beyond the daily threat brief, ROGUE runs as a **hosted platform**: a company points it at their own LLM endpoint and gets back a scored security report — no install, no infrastructure. `POST /v1/scans` with a target → ROGUE queues it, runs the scan on the same engine behind the SDK, the dashboard, and MCP, and returns a report you can pull as **JSON, HTML, or a CISO-ready PDF** (or read in the dashboard, or drive end-to-end from an IDE over MCP).
+
+**The full loop is closed and proven on the live host.** A real scan submitted to the deployed API runs end to end — `POST /v1/scans` → completion → `GET …/report?format=json` (scored findings + an executive summary) → `GET …/report?format=pdf` (a valid, downloadable PDF). The thing that makes the platform sellable — *submit an endpoint → receive a report* — works today: a company can hand ROGUE an endpoint and get back a JSON report and a downloadable PDF.
+
 ## Bright Data integration
 
 ROGUE uses 5 Bright Data products end-to-end:
