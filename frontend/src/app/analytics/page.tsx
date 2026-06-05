@@ -33,11 +33,24 @@ type Analytics = {
     early_stop_bias?: number; exploration_efficiency?: number; scheduler_allocation_quality?: number;
   };
   cost: { total_breach_spend_usd: number; cost_per_breach_usd: number | null; cost_per_graduation_usd: number | null };
+  atp?: {
+    default_mode: string;
+    by_order_mode: Record<string, { goals: number; asr: number | null; median_winner_rank: number | null; cost_per_success_usd: number | null }>;
+    canonical_to_contextual: {
+      median_winner_rank: [number | null, number | null]; asr: [number | null, number | null]; cost_per_success_usd: [number | null, number | null];
+    } | null;
+    prior_warming: {
+      ladder_attempts_total: number; vendor_tagged: number; vendor_tagged_pct: number | null; winners: number;
+      by_vendor: Record<string, { attempts: number; breaches: number }>; by_family: Record<string, { attempts: number; breaches: number }>;
+    };
+  };
 };
 
 const GREEN = "#00ff88", ORANGE = "#ff6b00", RED = "#ff003c";
 const pct = (x: number | null | undefined) => (x == null ? "—" : `${Math.round(x * 100)}%`);
 const num = (x: number | null | undefined, d = 2) => (x == null ? "—" : x.toFixed(d));
+const usd = (x: number | null | undefined) => (x == null ? "—" : `$${num(x)}`);
+const arrow = (p: [number | null, number | null] | undefined, f: (x: number | null | undefined) => string) => (p ? `${f(p[0])} → ${f(p[1])}` : "—");
 const short = (m: string) => (m.split("/").pop() ?? m).replace(/-?\d[\d.-]*$/, "").replace(/-instruct$/, "").slice(0, 12);
 const hex = (r: number) => (r >= 0.5 ? RED : r >= 0.25 ? ORANGE : r > 0 ? GREEN : "#3a3a44");
 const gradHex = (r: number) => (r >= 0.25 ? GREEN : r >= 0.12 ? ORANGE : "rgba(0,255,136,0.4)");
@@ -182,6 +195,8 @@ export default function AnalyticsPage() {
           <Stat label="Avg ladder depth" value={num(a.allocation.avg_ladder_depth, 1)} tone="blue" />
         </div>
       </Section>
+
+      {a.atp && <AtpSection atp={a.atp} />}
     </Shell>
   );
 }
@@ -199,6 +214,59 @@ function FamilyRow({ f, m, models, thresh, focused, dim, onClick }: { f: string;
         );
       })}
     </>
+  );
+}
+
+function AtpSection({ atp }: { atp: NonNullable<Analytics["atp"]> }) {
+  const d = atp.canonical_to_contextual;
+  const pw = atp.prior_warming;
+  const modes = ["fixed", "canonical", "contextual"].filter((m) => atp.by_order_mode[m]);
+  return (
+    <Section title="Adaptive scheduler (ATP)" tag="contextual vs canonical · same ladder, same attacks, better order · aggregated across ATP benchmark runs">
+      {d && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Stat label="Winner-rank" value={arrow(d.median_winner_rank, (x) => num(x, 1))} sub="canonical → contextual" tone="green" />
+          <Stat label="ASR" value={arrow(d.asr, pct)} sub="more breaches before depth cap" tone="green" />
+          <Stat label="Cost / success" value={arrow(d.cost_per_success_usd, usd)} sub="cheaper per breach" tone="green" />
+          <Stat label="Default mode" value={atp.default_mode} sub="rollback: ROGUE_LADDER_ORDER=canonical" tone="blue" />
+        </div>
+      )}
+      {modes.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-xs font-mono border-collapse">
+            <thead>
+              <tr className="text-muted-foreground uppercase tracking-wider text-[10px]">
+                <th className="text-left py-1 pr-4">order mode</th>
+                <th className="text-right px-3">goals</th>
+                <th className="text-right px-3">winner-rank</th>
+                <th className="text-right px-3">ASR</th>
+                <th className="text-right px-3">$/success</th>
+              </tr>
+            </thead>
+            <tbody>
+              {modes.map((m) => {
+                const v = atp.by_order_mode[m];
+                const isCtx = m === "contextual";
+                return (
+                  <tr key={m} className={`border-t border-border/40 ${isCtx ? "text-rogue-green" : "text-foreground"}`}>
+                    <td className="py-1.5 pr-4">{m}{isCtx ? " · default" : ""}</td>
+                    <td className="text-right px-3 tabular-nums">{v.goals}</td>
+                    <td className="text-right px-3 tabular-nums">{num(v.median_winner_rank, 1)}</td>
+                    <td className="text-right px-3 tabular-nums">{pct(v.asr)}</td>
+                    <td className="text-right px-3 tabular-nums">{usd(v.cost_per_success_usd)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground mt-3">
+        Vendor/family prior warming:{" "}
+        <span className="tabular-nums text-foreground">{pw.vendor_tagged}/{pw.ladder_attempts_total}</span> attempts tagged ({pct(pw.vendor_tagged_pct)}) · winners <span className="tabular-nums">{pw.winners}</span>.
+        {pw.vendor_tagged === 0 && " Cold — fills as scans run on the new scheduler."}
+      </p>
+    </Section>
   );
 }
 
