@@ -12,6 +12,7 @@ from __future__ import annotations
 import html as _html
 import re
 
+import rogue.report as _report
 from rogue.report import (
     SCORE_METHODOLOGY,
     Finding,
@@ -35,6 +36,35 @@ def _redact(s: str | None) -> str | None:
     if s is None:
         return None
     return _SECRET_RE.sub("[REDACTED]", s)
+
+
+def _explanation_for(finding: Finding, finding_dict: dict | None = None) -> str:
+    """Plain-language "what this attack class means for you" for an exec/PDF audience.
+
+    Sourced, in priority order: (1) the `explanation` key the SDK's `to_dict()` now emits per finding
+    (Engineer A's `explain_family` landing in `rogue.report`); (2) `rogue.report.explain_family(family)`
+    called directly when we hold a `Finding` but not its dict; (3) a built-in family-agnostic fallback
+    so an exec-facing surface is never blank if neither upstream source is present yet. Defensive by
+    design — this module must render a complete summary whether or not `explain_family` has shipped.
+    """
+    if finding_dict is not None:
+        explanation = finding_dict.get("explanation")
+        if isinstance(explanation, str) and explanation.strip():
+            return explanation.strip()
+
+    explain_family = getattr(_report, "explain_family", None)
+    if callable(explain_family):
+        try:
+            explanation = explain_family(finding.family)
+        except Exception:  # pragma: no cover - upstream helper must never break the report
+            explanation = None
+        if isinstance(explanation, str) and explanation.strip():
+            return explanation.strip()
+
+    return (
+        f"An attacker can use {technique_label(finding.family).lower()} techniques to push the "
+        "assistant past its safety policy, making it produce output it is meant to refuse."
+    )
 
 
 class DefaultReportService(ReportService):
@@ -96,7 +126,7 @@ class DefaultReportService(ReportService):
     async def build_json(self, scan_id: str) -> dict:
         """The SDK report dict + the platform headline (`score` 0-100, its `risk_level`) + a coverage block.
 
-        Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation`): we layer the platform `score`/`risk_level`/`score_methodology` headline and a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised) so a programmatic consumer gets the same scan-coverage framing the PDF/HTML surfaces show, without parsing prose. The underlying SDK shape is untouched.
+        Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation` and, once Engineer A's change lands, `explanation`): we layer the platform `score`/`risk_level`/`score_methodology` headline, a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised), and a top-level `executive_summary` (the markdown narrative from `build_executive_summary`) so the dashboard renders the CISO summary without a second call. Each finding is also guaranteed a non-empty `explanation` — backfilled defensively here if `to_dict()` didn't already emit one — so a programmatic consumer never sees a finding without a plain-language meaning. The underlying SDK shape is untouched (additive only).
         """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
@@ -110,65 +140,111 @@ class DefaultReportService(ReportService):
             "breach_rate": round(report.breach_rate, 4),
             "families_tested": report.families_covered(),
         }
+        # Guarantee every finding carries a plain-language `explanation`. `to_dict()` may already emit
+        # one (Engineer A's `explain_family`); where it doesn't, backfill so the dashboard's per-finding
+        # "what this means" never renders blank. `findings` and `report.findings` are positionally aligned.
+        for f_dict, f in zip(out.get("findings", []), report.findings, strict=False):
+            if not (isinstance(f_dict.get("explanation"), str) and f_dict["explanation"].strip()):
+                f_dict["explanation"] = _explanation_for(f, f_dict)
+        # Top-level exec summary so the dashboard renders the CISO narrative without a second round-trip.
+        out["executive_summary"] = await self.build_executive_summary(scan_id)
         return out
 
     async def build_executive_summary(self, scan_id: str) -> str:
-        """A CISO-ready MARKDOWN exec summary — the artifact an agent hands a security exec verbatim.
+        """A CISO-ready MARKDOWN exec summary — the artifact a security buyer forwards to their boss.
 
-        Headline risk score + level, the breach ratio, a "Critical & high findings" list (each with humanized technique, severity, and the per-family remediation), and a one-line business framing. Reuses the same `_load_report` + `scoring` spine as the JSON/HTML/PDF renderers, so the headline number matches every other surface. Defensive about an empty report (no breached criticals → a clean all-clear), and the per-finding technique is run through `humanize_technique` so a raw ladder code / internal ULID never leaks into an exec-facing doc.
+        Narrative, not a stat dump. Four moves: (1) a one-line **risk-posture verdict** tying the
+        0–100 score and its band to a plain recommendation; (2) **Top risks in business terms** — the
+        breached critical/high findings, each rendered as "what this means for you" via the family
+        explanation (`explain_family`, consumed defensively); (3) a prioritized **"What to do first"**
+        list — the remediation for the worst findings, severity-ranked, deduped per family so the same
+        fix isn't repeated; (4) a closing **posture** sentence. Reuses the same `_load_report` +
+        `scoring` spine as the JSON/HTML/PDF renderers so the headline number matches every other
+        surface; humanizes each technique so a raw ladder code / internal ULID never reaches an exec;
+        and degrades gracefully to a clean all-clear when nothing material breached.
         """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
 
-        # The findings that warrant exec attention: breached AND critical/high, severity-ranked as `top_findings` already orders them. A breached-but-medium/low finding is a detail for the full report, not the exec summary.
+        # The findings that warrant exec attention: breached AND critical/high, already severity- then
+        # success-ranked by `top_findings`. A breached-but-medium/low finding is full-report detail.
         notable = [
             f
             for f in report.top_findings(50)
             if f.breached and f.severity in ("critical", "high")
         ]
 
+        # (1) Risk-posture verdict — one line, recommendation-shaped, banded off the score.
+        verdict = {
+            "critical": "the deployment is exposed to exploitable critical weaknesses and should be treated as an active risk.",
+            "high": "the deployment carries material, reproducible weaknesses that warrant remediation this sprint.",
+            "medium": "the deployment shows moderate weaknesses worth scheduling and re-testing.",
+            "low": "the deployment held up well against this run, with no material weaknesses reproduced.",
+        }[level]
+
         lines = [
             "# ROGUE security scan — executive summary",
             "",
-            f"**Risk {score:g}/100 ({level})** — {report.n_breaches}/{report.n_tests} attacks breached the target.",
+            f"**Risk {score:g}/100 ({level.upper()}).** Across {report.n_tests} adversarial tests, "
+            f"{report.n_breaches} breached the target ({report.breach_pct}) — {verdict}",
             "",
         ]
 
+        # (2) Top risks in business terms — what each worst finding *means*, not just its name.
         if notable:
-            lines.append("## Critical & high findings")
+            lines.append("## Top risks, in business terms")
             lines.append("")
             for f in notable:
-                # Humanize the technique defensively — a graduated candidate persists a raw ULID, which must never reach an exec.
                 technique = humanize_technique(f.technique)
+                explanation = _explanation_for(f)
                 lines.append(
-                    f"- **{technique}** ({f.severity}, {f.success_pct} success) — {remediation_for(f.family)}"
+                    f"- **{technique}** ({f.severity}, breached {f.n_breach}/{f.n_trials} trials, "
+                    f"{f.success_pct} of attempts succeeded). {explanation}"
                 )
             lines.append("")
 
-        # One-line business framing — the "so what" a CISO acts on. Phrased by risk band so the
-        # summary reads as a recommendation, not just a number.
+            # (3) What to do first — remediation for the worst findings, severity-ranked, deduped per
+            # family so a buyer sees a clean ordered action list, not the same fix four times.
+            lines.append("## What to do first")
+            lines.append("")
+            seen_families: set[str] = set()
+            rank = 1
+            for f in notable:
+                if f.family in seen_families:
+                    continue
+                seen_families.add(f.family)
+                lines.append(f"{rank}. {remediation_for(f.family)}")
+                rank += 1
+            lines.append("")
+        else:
+            lines.append(
+                "No critical or high-severity attack reproduced against this target in this run."
+            )
+            lines.append("")
+
+        # (4) Closing posture — the "so what" a CISO acts on, banded so it reads as a recommendation.
         if level == "critical":
-            framing = (
-                "Exploitable critical weaknesses are present today; treat as an active risk to "
-                "brand, compliance, and customer trust and remediate before further exposure."
+            posture = (
+                "Bottom line: remediate the items above before further exposure, then re-scan to "
+                "confirm the critical paths are closed — this is a brand, compliance, and customer-trust risk today."
             )
         elif level == "high":
-            framing = (
-                "Material weaknesses were reproduced; prioritize the findings above this sprint to "
-                "reduce the likelihood of a public incident."
+            posture = (
+                "Bottom line: work the prioritized list above this sprint and re-scan to verify the "
+                "fixes hold under adversarial framing before the next release."
             )
         elif level == "medium":
-            framing = (
-                "Moderate weaknesses were found; schedule remediation and re-scan to confirm the "
-                "risk has been driven down."
+            posture = (
+                "Bottom line: schedule the remediation above into the next cycle and re-scan to confirm "
+                "the residual risk has been driven down."
             )
         else:
-            framing = (
-                "No material weaknesses were reproduced in this run; maintain the current controls "
-                "and continue periodic scanning."
+            posture = (
+                "Bottom line: maintain the current controls and keep scanning on a regular cadence — "
+                "today's posture is sound but the open-web threat surface keeps moving."
             )
-        lines.append(f"**Business impact:** {framing}")
+        lines.append(f"**Posture:** {posture}")
 
         return "\n".join(lines)
 
@@ -279,24 +355,30 @@ class DefaultReportService(ReportService):
         # --- Findings table (severity-grouped) --------------------------------------------------
         story.append(Paragraph("Findings", styles["Heading2"]))
         # Header + findings grouped by severity (critical → high → medium → low), breached-first within
-        # each group. Free-text cells wrapped in Paragraphs so long finding/remediation text reflows
-        # instead of overflowing. All cells escaped; the rebuilt Findings are already redacted by
-        # `_load_report`. Remediation is render-time per-family (not stored on the Finding).
-        data = [["Severity", "Success", "Technique", "Finding", "Remediation"]]
+        # each group. Free-text cells wrapped in Paragraphs so long text reflows instead of overflowing.
+        # The Finding cell carries the title PLUS the plain-language `explanation` ("what this means for
+        # you"); the Remediation cell carries the per-family fix — so each row is self-explanatory to a
+        # non-specialist reader. All cells escaped; the rebuilt Findings are already redacted by
+        # `_load_report`. Explanation + remediation are render-time per-family (not stored on the Finding).
+        data = [["Severity", "Success", "Technique", "Finding & what it means", "Remediation"]]
         for _sev, members in report.findings_by_severity():
             for f in members:
+                finding_cell = (
+                    f"<b>{_html.escape(f.title)}</b><br/>"
+                    f"{_html.escape(_explanation_for(f))}"
+                )
                 data.append(
                     [
                         _html.escape(f.severity),
                         f.success_pct,
                         Paragraph(_html.escape(technique_label(f.family)), body),
-                        Paragraph(_html.escape(f.title), body),
+                        Paragraph(finding_cell, body),
                         Paragraph(_html.escape(remediation_for(f.family)), body),
                     ]
                 )
         if len(data) == 1:
             data.append([Paragraph("No findings.", body), "", "", "", ""])
-        table = Table(data, repeatRows=1, colWidths=[55, 50, 90, 130, 195])
+        table = Table(data, repeatRows=1, colWidths=[50, 45, 80, 150, 195])
         table.setStyle(
             TableStyle(
                 [
@@ -314,23 +396,37 @@ class DefaultReportService(ReportService):
         SimpleDocTemplate(buf, pagesize=letter).build(story)
         return buf.getvalue()
 
-    @staticmethod
-    def _summary_prose(summary_md: str) -> str:
+    # Leading "1. " / "12. " style ordered-list marker — the "What to do first" items, which the PDF's
+    # findings table already enumerates per row, so they're dropped from the prose lead-in.
+    _ORDERED_LI_RE = re.compile(r"^\d+\.\s")
+
+    @classmethod
+    def _summary_prose(cls, summary_md: str) -> str:
         """Distill the markdown exec summary into one prose paragraph for the PDF lead-in.
 
-        `build_executive_summary` emits a headline line, an optional bullet list of critical/high
-        findings (enumerated again by the PDF's findings table, so dropped here), and a bold
-        "Business impact:" framing line. We keep the headline + the business framing, stripped of
-        markdown emphasis, joined into a single sentence-flowing paragraph.
+        `build_executive_summary` emits a headline verdict line, section headings, a bullet list of
+        top risks and a numbered "what to do first" list (both enumerated again by the PDF's findings
+        table, so dropped here), and a bold "Posture:" closing line. We keep the headline verdict + the
+        posture sentence, stripped of markdown emphasis and section labels, joined into one flowing
+        paragraph.
         """
         keep: list[str] = []
         for line in summary_md.splitlines():
             stripped = line.strip()
-            if not stripped or stripped.startswith("#") or stripped.startswith("- "):
+            if (
+                not stripped
+                or stripped.startswith("#")
+                or stripped.startswith("- ")
+                or cls._ORDERED_LI_RE.match(stripped)
+            ):
                 continue
-            # Drop markdown bold/emphasis markers and the "Business impact:" label so the prose reads
-            # as plain narrative.
-            text = stripped.replace("**", "").replace("Business impact:", "").strip()
+            # Drop markdown emphasis and the section labels so the prose reads as plain narrative.
+            text = (
+                stripped.replace("**", "")
+                .replace("Posture:", "")
+                .replace("Business impact:", "")
+                .strip()
+            )
             if text:
                 keep.append(text)
         return " ".join(keep)

@@ -6,6 +6,8 @@ score-methodology caption next to the headline number.
 
 from __future__ import annotations
 
+import html as _html
+
 import pytest
 
 from rogue.report import (
@@ -78,7 +80,8 @@ def test_to_dict_findings_carry_remediation() -> None:
 def test_to_html_has_remediation_line_and_methodology_caption() -> None:
     page = _report().to_html()
     assert "Remediation:" in page
-    assert remediation_for("dan_persona") in page
+    # Remediation text is HTML-escaped in the page (it contains apostrophes), so compare escaped.
+    assert _html.escape(remediation_for("dan_persona")) in page
     # Score-methodology caption present (use a stable fragment, robust to HTML-escaping the en dash).
     assert "weighted by severity" in page
     assert "≥75 critical" in page

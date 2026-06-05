@@ -101,6 +101,34 @@ async def test_build_json_has_score_risk_level_and_findings():
     # Two findings from distinct families → two human family labels exercised.
     assert len(cov["families_tested"]) == 2
     assert all(isinstance(fam, str) and fam.strip() for fam in cov["families_tested"])
+    # Top-level executive_summary (CONTRACT for Engineer C) — a non-empty markdown narrative the
+    # dashboard renders without a second call. It must lead with the risk posture and name a top finding.
+    summary = out["executive_summary"]
+    assert isinstance(summary, str) and summary.strip()
+    assert "100/100" in summary and "CRITICAL" in summary  # score + risk posture
+    assert "DAN / Persona Jailbreak" in summary  # references the worst (critical) finding
+    assert "What to do first" in summary  # prioritized remediation list
+    # Every finding carries a non-empty plain-language explanation (backfilled defensively if
+    # `to_dict()` didn't already emit one).
+    assert all(f.get("explanation", "").strip() for f in out["findings"])
+
+
+@pytest.mark.asyncio
+async def test_executive_summary_is_ciso_narrative():
+    store = InMemoryScanStore()
+    scan_id = await _seed_completed(store)
+    svc = DefaultReportService(store)
+
+    summary = await svc.build_executive_summary(scan_id)
+    # Risk-posture verdict ties the score + band to a recommendation.
+    assert "Risk 100/100 (CRITICAL)" in summary
+    # Business-terms framing of the worst finding, plus a prioritized action list and a closing posture.
+    assert "Top risks, in business terms" in summary
+    assert "DAN / Persona Jailbreak" in summary
+    assert "What to do first" in summary
+    assert "Posture:" in summary
+    # The low-severity finding is full-report detail, not exec-summary material.
+    assert "Refusal Suppression" not in summary
 
 
 @pytest.mark.asyncio

@@ -231,6 +231,9 @@ export type Finding = {
   n_breach: number;
   example_attack?: string | null;
   example_response?: string | null;
+  /** Plain-language "what this attack is + why it matters" (non-expert framing);
+   *  surfaced by the report route, absent on older runs. */
+  explanation?: string | null;
   /** Render-time concern surfaced by the report route; absent on older runs. */
   remediation?: string | null;
 };
@@ -245,6 +248,9 @@ export type ScanReportJson = {
   top_attack?: string | null;
   cost_usd: number;
   findings: Finding[];
+  /** Markdown "forward-to-your-boss" overview rendered prominently below the
+   *  headline; absent on older runs (the exec-summary block degrades out). */
+  executive_summary?: string | null;
   /** 0–100 headline added by the report route on top of the SDK dataclass. */
   score?: number | null;
   /** Banded headline level for `score` (critical/high/medium/low); from the report

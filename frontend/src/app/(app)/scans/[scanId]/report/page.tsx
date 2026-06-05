@@ -6,6 +6,7 @@ import {
   type Finding,
 } from "@/lib/platform-api";
 import { getApiKey } from "@/lib/session";
+import { ReportSummaryMarkdown } from "@/components/report-summary-markdown";
 
 /** Same-origin export proxy — the bearer is attached server-side by the route
  *  handler, never placed in a client href (see app/api/scans/[scanId]/report). */
@@ -145,6 +146,10 @@ function ReportBody({ report }: { report: ScanReportJson }) {
       {/* Headline — the risk score leads the report (report-views.md §1). */}
       <RiskHeadline report={report} />
 
+      {/* Executive summary — the "forward-to-your-boss" overview, right under the
+          headline so it's the first thing read after the score. */}
+      <ExecutiveSummary report={report} />
+
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Kpi label="Tests">
@@ -246,6 +251,22 @@ function RiskHeadline({ report }: { report: ScanReportJson }) {
   );
 }
 
+/** Executive summary — the markdown overview a customer forwards to leadership.
+ *  Rendered prominently below the headline; degrades to nothing on older runs
+ *  (or when the report route didn't supply one). */
+function ExecutiveSummary({ report }: { report: ScanReportJson }) {
+  const summary = report.executive_summary?.trim();
+  if (!summary) return null;
+  return (
+    <section className="rogue-card p-6 sm:p-7 space-y-3 animate-rogue-fade-up">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+        Executive summary
+      </h2>
+      <ReportSummaryMarkdown source={summary} />
+    </section>
+  );
+}
+
 /** Severity pill — reuses the page's `SEVERITY_CLASS` color vocabulary. */
 function SeverityBadge({
   severity,
@@ -307,37 +328,91 @@ function FindingCard({ f, rank }: { f: Finding; rank: number }) {
         {f.family} · {f.technique}
       </p>
 
-      {f.example_attack && (
-        <details className="group">
-          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
-            Example attack
-          </summary>
-          <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-card/60 p-3 text-xs text-foreground whitespace-pre-wrap break-words">
-            {f.example_attack}
-          </pre>
-        </details>
-      )}
-
-      {f.example_response && (
-        <details>
-          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
-            Model response
-          </summary>
-          <div className="mt-2 border-l-2 border-border pl-3 text-xs text-muted-foreground whitespace-pre-wrap break-words">
-            {f.example_response}
-          </div>
-        </details>
-      )}
-
-      {f.remediation && (
-        <div className="rounded-md border border-border bg-card/30 p-3 text-xs text-foreground whitespace-pre-wrap">
+      {/* What this is — plain-language framing so a non-expert grasps the risk,
+          shown above the fix and the evidence. */}
+      {f.explanation && (
+        <div className="rounded-md border border-border/60 bg-card/20 p-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1">
-            Remediation
+            What this is
           </p>
-          {f.remediation}
+          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+            {f.explanation}
+          </p>
         </div>
       )}
+
+      {/* How to fix — actionable remediation, visually distinct from the
+          explanation (green accent = the "do this" block). */}
+      {f.remediation && (
+        <div className="rounded-md border border-rogue-green/40 bg-rogue-green/5 p-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-rogue-green mb-1">
+            How to fix
+          </p>
+          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+            {f.remediation}
+          </p>
+        </div>
+      )}
+
+      {/* Evidence — proof of the breach: the attack sent and the model's
+          response, framed as a transcript with the breach state flagged. */}
+      <FindingEvidence f={f} />
     </article>
+  );
+}
+
+/** Evidence block — "Attack sent → Model response" as proof. Collapsible; the
+ *  summary flags that this finding was breached so the evidence reads as a
+ *  confirmed compromise, not a benign sample. */
+function FindingEvidence({ f }: { f: Finding }) {
+  if (!f.example_attack && !f.example_response) return null;
+  const breached = f.n_breach > 0;
+  return (
+    <details className="group rounded-md border border-border/60 bg-card/20">
+      <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
+        <span className="flex items-center gap-2">
+          <span className="transition-transform group-open:rotate-90">›</span>
+          Evidence — attack &amp; model response
+        </span>
+        {breached && (
+          <span className="inline-flex items-center rounded-sm border border-rogue-red/40 bg-rogue-red/10 px-1.5 py-0.5 font-bold text-rogue-red">
+            breached
+          </span>
+        )}
+      </summary>
+      <div className="space-y-3 border-t border-border/60 p-3">
+        {f.example_attack && (
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-orange-300">
+              Attack sent →
+            </p>
+            <pre className="overflow-x-auto rounded-md border border-border bg-card/60 p-3 text-xs text-foreground whitespace-pre-wrap break-words">
+              {f.example_attack}
+            </pre>
+          </div>
+        )}
+        {f.example_response && (
+          <div className="space-y-1">
+            <p
+              className={`font-mono text-[10px] uppercase tracking-[0.15em] ${
+                breached ? "text-rogue-red" : "text-muted-foreground"
+              }`}
+            >
+              Model response
+            </p>
+            <div
+              className={`rounded-md border-l-2 pl-3 py-2 text-xs whitespace-pre-wrap break-words ${
+                breached
+                  ? "border-rogue-red/60 bg-rogue-red/5 text-foreground/90"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {f.example_response}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
