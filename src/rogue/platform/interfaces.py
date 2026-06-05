@@ -80,6 +80,12 @@ class JobQueue(abc.ABC):
     @abc.abstractmethod
     async def extend_lease(self, job_id: str, *, lease_seconds: float = 300) -> None: ...
 
+    def reap_expired(self) -> int:
+        """Crash recovery: requeue every job whose lease has expired (its worker died / was redeployed
+        mid-scan), so the scan resumes instead of hanging forever. Returns the count reclaimed. Default
+        no-op for single-process queues (`InMemoryJobQueue`); `PostgresJobQueue` overrides it."""
+        return 0
+
 
 class ScanEngine(abc.ABC):
     """The ONE execution path — a thin wrapper over the existing `rogue.scan.run_scan`."""

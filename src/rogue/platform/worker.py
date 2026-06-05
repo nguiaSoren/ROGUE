@@ -13,11 +13,19 @@ fail the job. A worker never lets an engine exception escape ``run_once`` — th
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from . import memory, scoring
 from .schemas import ScanStatus
+
+_log = logging.getLogger("rogue.platform.worker")
+
+# How many idle poll-cycles between expired-lease recovery sweeps. At the default poll_interval the
+# lease TTL (≈300s) is what gates how soon an orphan is reclaimable, so sweeping ~every 60s recovers a
+# crashed/redeployed worker's scan promptly without hammering the DB.
+_REAP_EVERY_IDLE_CYCLES = 30
 
 if TYPE_CHECKING:
     from .interfaces import JobQueue, ScanEngine, ScanStore
@@ -137,11 +145,33 @@ class ScanWorker:
         stop_event: asyncio.Event | None = None,
     ) -> None:
         """Loop ``run_once`` forever (or until ``stop_event`` is set), sleeping ``poll_interval`` seconds
-        whenever the queue is empty so an idle worker doesn't spin."""
+        whenever the queue is empty so an idle worker doesn't spin.
+
+        On startup and then periodically while idle, sweep for expired leases (`reap_expired`) so a scan
+        orphaned by a previous worker's death — e.g. a redeploy that restarted this process mid-scan —
+        is requeued and resumed instead of hanging in RUNNING forever."""
+        self._reap()  # recover anything orphaned before this worker started (e.g. the last redeploy)
+        idle = 0
         while stop_event is None or not stop_event.is_set():
             did_work = await self.run_once()
-            if not did_work:
-                await asyncio.sleep(poll_interval)
+            if did_work:
+                idle = 0
+                continue
+            idle += 1
+            if idle % _REAP_EVERY_IDLE_CYCLES == 0:
+                self._reap()
+            await asyncio.sleep(poll_interval)
+
+    def _reap(self) -> None:
+        """Requeue jobs whose lease expired (crashed/redeployed worker). Never lets a sweep failure
+        crash the worker loop."""
+        try:
+            n = self.queue.reap_expired()
+        except Exception as e:  # noqa: BLE001 — recovery sweep is best-effort; a failure must not kill the loop.
+            _log.warning("reap_expired sweep failed: %s", e)
+            return
+        if n:
+            _log.info("recovered %d orphaned scan job(s) via expired-lease reap", n)
 
 
 def main() -> None:
