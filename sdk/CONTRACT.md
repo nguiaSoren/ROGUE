@@ -4,7 +4,7 @@ This is the **single source of truth** for the wire protocol between the `rogue`
 (this package) and the ROGUE Hosted API. The SDK client codes to it; `MockTransport` serves it
 faithfully in-memory; the (future) Hosted API team **builds the server to match this exact shape**.
 
-Status of each endpoint against the *currently deployed* API (`https://rogue-api-mr5w.onrender.com`):
+Status of each endpoint against the *currently deployed* API (`https://rogue-private.onrender.com`):
 
 | Area | Endpoint | Server today |
 |---|---|---|

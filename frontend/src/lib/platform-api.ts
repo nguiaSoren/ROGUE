@@ -8,9 +8,12 @@
  * three differences driven by tenancy (see docs/platform/dashboard/pages-and-routes.md §3-4):
  *
  *  1. It injects an `Authorization: Bearer <key>` header. The bearer is passed in as
- *     an argument (read from the server session) — it is NEVER `NEXT_PUBLIC_*`, so the
- *     secret never ships to the browser. SCAFFOLD NOTE: session wiring is a TODO; for
- *     now `resolveKey()` falls back to a `NEXT_PUBLIC_*` placeholder so the pages render.
+ *     an argument and is NEVER `NEXT_PUBLIC_*`, so the secret never ships to the browser.
+ *     The key comes from the httpOnly session cookie (`lib/session.ts:getApiKey()`), read
+ *     server-side by the `/api/*` proxy route handlers that wrap these calls; client
+ *     components hit those same-origin proxies and never see the bearer. There is no
+ *     placeholder fallback — `resolveKey()` throws `ApiV1Error(401, "no_session", …)`
+ *     when no key is supplied.
  *  2. Tenant data is per-request, not ISR — every call is `cache: "no-store"`.
  *  3. On a non-OK response it reads the error envelope `{ error: { code, message } }`
  *     (ARCHITECTURE §5) and throws an `ApiV1Error` carrying it, so product pages can
@@ -308,10 +311,19 @@ export const platformApi = {
       key,
     ),
 
-  /** POST /v1/scans/validate — dry-run a target (reachability/credentials) before a paid scan. */
+  /** POST /v1/validate — dry-run a target (reachability/credentials) before a paid scan. */
   validateTarget: (body: TargetSpec, key?: string) =>
-    apiV1<{ ok: boolean; message?: string; details?: unknown }>(
-      "/v1/scans/validate",
+    apiV1<{
+      target: string;
+      reachable: boolean;
+      authenticated: boolean;
+      model_responds: boolean;
+      supports_image: boolean;
+      supports_audio: boolean;
+      error: string | null;
+      ok: boolean;
+    }>(
+      "/v1/validate",
       key,
       { method: "POST", body },
     ),

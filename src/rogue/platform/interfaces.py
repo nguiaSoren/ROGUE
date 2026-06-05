@@ -43,7 +43,13 @@ class ScanStore(abc.ABC):
     async def get(self, scan_id: str, *, org_id: str | None = None) -> ScanRecord | None: ...
 
     @abc.abstractmethod
-    async def update(self, scan_id: str, **fields: Any) -> ScanRecord: ...
+    async def update(
+        self, scan_id: str, *, expected_status: ScanStatus | None = None, **fields: Any
+    ) -> ScanRecord: ...
+    # Compare-and-set: when `expected_status` is given the update applies ONLY if the record's CURRENT
+    # status equals it; otherwise the call is a no-op and returns the record UNCHANGED. This is the guard
+    # the worker uses so a CANCELED scan (set mid-run by `cancel_scan`) is never clobbered back to
+    # COMPLETED, and a redelivered job's terminal write can't overwrite an already-finalized record.
 
     @abc.abstractmethod
     async def list(self, *, org_id: str, project_id: str | None = None, status: ScanStatus | None = None,

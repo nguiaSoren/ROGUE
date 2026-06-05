@@ -48,6 +48,31 @@ class BoomEngine:
         raise RuntimeError("engine exploded")
 
 
+class SpyEngine:
+    """Records whether `run` was invoked — used to prove the worker skips a redelivered terminal job."""
+
+    def __init__(self) -> None:
+        self.ran = False
+
+    async def run(self, spec, *, progress=None):
+        self.ran = True
+        return ScanReport(target="t", n_tests=1, n_breaches=0, cost_usd=0.0, findings=[])
+
+
+class CancelMidRunEngine:
+    """An engine that cancels its own scan (via the store) before returning — simulates a cancel_scan
+    landing while the engine is in-flight. Proves the worker's terminal write is guarded."""
+
+    def __init__(self, store: InMemoryScanStore, scan_id: str) -> None:
+        self._store = store
+        self._scan_id = scan_id
+
+    async def run(self, spec, *, progress=None):
+        # Mirror what ScanService.cancel_scan does to the record while a scan is RUNNING.
+        await self._store.update(self._scan_id, status=ScanStatus.CANCELED)
+        return ScanReport(target="t", n_tests=1, n_breaches=0, cost_usd=0.0, findings=[])
+
+
 def _spec() -> ScanSpec:
     return ScanSpec(target=TargetSpec(provider="openai", model="gpt-4o"))
 
@@ -129,3 +154,64 @@ async def test_run_once_marks_running_before_completion_state():
     await worker.run_once()
     rec = await store.get(scan_id, org_id="org-1")
     assert rec.started_at <= rec.completed_at
+
+
+@pytest.mark.asyncio
+async def test_cancel_during_run_stays_canceled():
+    # A cancel that lands while the engine is running must win: the worker's terminal COMPLETED write is
+    # guarded on expected_status=RUNNING, so once the record is CANCELED the write is a no-op.
+    store, queue = InMemoryScanStore(), InMemoryJobQueue()
+    spec = _spec()
+    scan_id = await _seed(store, queue, spec)
+
+    worker = ScanWorker(store, queue, CancelMidRunEngine(store, scan_id))
+    handled = await worker.run_once()
+
+    assert handled is True
+    rec = await store.get(scan_id, org_id="org-1")
+    assert rec is not None
+    # Cancellation survives — it is NOT clobbered back to COMPLETED.
+    assert rec.status == ScanStatus.CANCELED
+    # And the (now-finished) job is acked, not left for redelivery.
+    assert queue._jobs == {}
+
+
+@pytest.mark.asyncio
+async def test_redelivered_terminal_job_acks_without_running_engine():
+    # At-least-once redelivery: the leased job's scan is already terminal. run_once must ack the job and
+    # NOT invoke the engine (no re-run of finished work, no reviving a canceled scan).
+    store, queue = InMemoryScanStore(), InMemoryJobQueue()
+    spec = _spec()
+    scan_id = await _seed(store, queue, spec)
+    # Drive the record to a terminal state before the worker leases the (redelivered) job.
+    await store.update(scan_id, status=ScanStatus.COMPLETED)
+
+    engine = SpyEngine()
+    worker = ScanWorker(store, queue, engine)
+    handled = await worker.run_once()
+
+    assert handled is True
+    assert engine.ran is False  # engine never invoked
+    assert queue._jobs == {}  # job acked, won't be redelivered again
+    rec = await store.get(scan_id, org_id="org-1")
+    assert rec.status == ScanStatus.COMPLETED  # unchanged
+
+
+@pytest.mark.asyncio
+async def test_update_compare_and_set_noop_on_status_mismatch():
+    # Direct unit check of the guard: an expected_status that doesn't match is a no-op returning the
+    # unchanged record; a matching one applies.
+    store = InMemoryScanStore()
+    scan_id = _new_id("scan")
+    await store.create(
+        ScanRecord(scan_id=scan_id, org_id="org-1", status=ScanStatus.CANCELED, target=_spec().target.redacted())
+    )
+
+    # Mismatch (record is CANCELED, expected RUNNING) → no-op.
+    out = await store.update(scan_id, expected_status=ScanStatus.RUNNING, status=ScanStatus.COMPLETED, progress=100)
+    assert out.status == ScanStatus.CANCELED
+    assert out.progress == 0
+
+    # Match → applies.
+    out = await store.update(scan_id, expected_status=ScanStatus.CANCELED, progress=42)
+    assert out.progress == 42

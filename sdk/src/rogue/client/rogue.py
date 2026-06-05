@@ -30,7 +30,7 @@ from .deployments import DeploymentsClient
 from .reports import ReportsClient
 from .scans import ScansClient
 
-DEFAULT_BASE_URL = "https://rogue-api-mr5w.onrender.com"
+DEFAULT_BASE_URL = "https://rogue-private.onrender.com"
 
 
 class Rogue:

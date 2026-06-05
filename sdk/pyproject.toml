@@ -24,7 +24,7 @@ rogue = "rogue.cli.main:main"
 
 [project.urls]
 Homepage = "https://rogue-eosin.vercel.app"
-API = "https://rogue-api-mr5w.onrender.com"
+API = "https://rogue-private.onrender.com"
 
 [build-system]
 requires = ["hatchling"]

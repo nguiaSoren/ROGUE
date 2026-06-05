@@ -130,11 +130,19 @@ class PostgresScanStore(ScanStore):
                 return None
             return _orm_to_record(row)
 
-    async def update(self, scan_id: str, **fields: Any) -> ScanRecord:
+    async def update(
+        self, scan_id: str, *, expected_status: ScanStatus | None = None, **fields: Any
+    ) -> ScanRecord:
         with self._session_factory() as s:
             row = s.get(ScanRun, scan_id)
             if row is None:
                 raise KeyError(scan_id)
+            # Compare-and-set guard. The session is already a transaction, so reading the current status
+            # and (conditionally) writing within it is atomic for the single in-process worker. If the
+            # caller pinned an `expected_status` and the row has since moved off it (e.g. CANCELED mid-run),
+            # skip every setattr and return the unchanged record — the stale terminal write is dropped.
+            if expected_status is not None and row.status != expected_status.value:
+                return _orm_to_record(row)
             for key, value in fields.items():
                 if key == "status" and isinstance(value, ScanStatus):
                     value = value.value

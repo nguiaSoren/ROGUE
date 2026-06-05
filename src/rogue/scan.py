@@ -8,11 +8,17 @@ platform's real ``TargetPanel`` + ``JudgeAgent``; nothing here is provider-speci
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .report import ScanReport
     from .schemas import AttackPrimitive, DeploymentConfig
+
+# (n_completed, n_total, current_label) — fired after each primitive completes. Optional; default
+# None means no behaviour change for existing callers. The platform worker wires this through to
+# stream completion percentage into a ScanRecord.
+ProgressHook = Callable[[int, int, str | None], Awaitable[None]]
 
 
 def _attack_text(rendered: Any) -> str:
@@ -32,11 +38,14 @@ async def run_scan(
     panel: Any = None,
     judge: Any = None,
     judge_model: str | None = None,
+    progress: ProgressHook | None = None,
 ) -> ScanReport:
     """Run ``primitives`` against the target described by ``config`` and grade the responses.
 
     ``budget`` (USD) stops the sweep early once accumulated target-call cost reaches it. ``panel`` /
     ``judge`` are injectable for testing. Cost reported is target-call cost (judge cost is separate).
+    ``progress`` is an optional per-primitive hook (awaited with ``(n_completed, n_total, label)``
+    after each primitive); default ``None`` is a no-op, so existing callers are unaffected.
     """
     from .report import Finding, ScanReport, technique_label
     from .reproduce.instantiator import render
@@ -53,6 +62,8 @@ async def run_scan(
     findings: list[Finding] = []
     total_cost = 0.0
     n_breaches = 0
+    n_completed = 0
+    n_total = len(primitives)
     try:
         for prim in primitives:
             if budget is not None and total_cost >= budget:
@@ -95,6 +106,9 @@ async def run_scan(
                     example_response=example_response,
                 )
             )
+            n_completed += 1
+            if progress is not None:
+                await progress(n_completed, n_total, technique_label(prim.family.value))
     finally:
         if owns_panel:
             await panel.aclose()
@@ -110,4 +124,4 @@ async def run_scan(
     )
 
 
-__all__ = ["run_scan"]
+__all__ = ["ProgressHook", "run_scan"]
