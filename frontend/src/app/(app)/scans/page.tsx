@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LocalTime } from "@/components/local-time";
 import { platformApi, type ScanRecord } from "@/lib/platform-api";
 import { getApiKey } from "@/lib/session";
 import { StatusBadge, ScoreBadge } from "@/components/score-badge";
@@ -103,7 +104,7 @@ export default async function ScansPage() {
                       <ScoreBadge score={s.score} />
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground tabular-nums">
-                      {formatCreated(s.created_at)}
+                      <LocalTime iso={s.created_at} />
                     </td>
                   </tr>
                 ))}
@@ -138,16 +139,4 @@ function EmptyState() {
 function targetLabel(s: ScanRecord): string {
   const t = s.target ?? {};
   return t.model || t.provider || t.endpoint || "—";
-}
-
-function formatCreated(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return "—";
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
