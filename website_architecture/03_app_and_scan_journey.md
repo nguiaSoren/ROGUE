@@ -115,14 +115,17 @@ The deliverable, top to bottom:
 
 **The RiskHeadline.** The score leads. A big `score/100` numeral, color-tinted to the banded risk level (critical red / high orange / medium yellow / low green), with a risk-level pill beside it and, pulled to the right, the **Top attack** name. Below it, set off by a top border, the **methodology caption** — one plain-English line (`score_methodology`) explaining how the score is computed, so the headline number is never a black box. (`risk_level` comes from the report route; on older runs the page derives the band from `score` with the same cut-points the platform uses: ≥75 critical, ≥50 high, ≥25 medium, else low.)
 
+**The executive summary.** Directly under the headline — before the KPI row — a branded "Executive summary" card renders the report's top-level `executive_summary` markdown (via `ReportSummaryMarkdown`): the forward-to-your-boss overview a customer reads first after the score. It's the same exec narrative the platform's `ReportService.build_json` emits and the MCP `create_executive_summary` tool returns. It degrades to nothing on older runs that didn't carry one.
+
 **The KPI row.** Four cards: **Tests** (`n_tests`), **Breaches** (red if any, green at zero), **Breach rate** (`Math.round(breach_rate × 100)%`, same coloring), and **Cost** (formatted USD — two decimals at/above a cent, four below). The whole risk picture in one glance.
 
 **The findings.** Each breached finding (filtered to `n_breach > 0`, sorted worst-first by severity then success rate) becomes a color-banded card carrying:
 - a rank, a severity pill, and the attack **vector**;
 - the breach math, e.g. `breached 4/5 trials · 80%`, colored by how bad the rate is;
 - the finding **title**, and a monospace `family · technique` line;
-- **collapsible evidence** — an "Example attack" `<details>` revealing the actual jailbreak payload in a monospace block, and a "Model response" `<details>` revealing the target's actual (breaching) reply. These are folded by default so the report reads clean, and expand for the customer who wants proof;
-- a **Remediation** block — the concrete "what to do about this finding," surfaced per-card.
+- a **"What this is"** block — the per-finding `explanation`, plain-language framing so a non-expert grasps the risk, shown above the fix and the evidence (degrades gracefully when absent);
+- a distinct **"How to fix"** block — the finding's `remediation`, given a green accent so it reads as the "do this" instruction, visually separated from the explanation;
+- a single **collapsible evidence** `<details>` — "Evidence — attack & model response" — holding both the **Attack sent →** (the literal jailbreak payload, in a monospace block) and the **Model response** (the target's actual reply). It's folded by default so the report reads clean; because the finding breached, the summary line carries a red **"breached"** flag and the response is tinted red, so the evidence reads as confirmed proof of a compromise, not a benign sample.
 
 If nothing reproduced, the findings section is a green all-clear: "No vulnerabilities reproduced across N tests." And a closing **Recommendations** panel lists the report-level "what to do next" (`recommendations[]`), degrading gracefully to a sensible one-liner when the platform didn't supply any.
 

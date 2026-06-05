@@ -2,7 +2,12 @@
 
 > Distribution into where teams already work. A scan completing is an *event*; this doc specifies the single event that fires when it does, the per-org fan-out that delivers it to whichever destinations a tenant has configured, and the three first-party destinations — Slack notifications + slash command, a GitHub Action that gates CI, and Jira tickets per critical finding. It builds on what already ships: the `_maybe_post_to_slack` webhook in [`src/rogue/diff/threat_brief.py:470`](../../../src/rogue/diff/threat_brief.py) is the *precedent* this generalizes from a single env-var webhook into a per-tenant, multi-destination event bus. Like the MCP doc ([`./mcp.md`](./mcp.md)), every surface here is a thin client of `ScanService` (inbound) or a reader of the persisted `ScanRecord` / report (outbound). Nothing redefines a contract — `ScanRecord`, `score`, `ScanStatus`, `Finding`, `ScanService`, `ReportService` come verbatim from [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) §4–§5.
 
-Status: design spec, not yet built (ARCHITECTURE §7 Week-4 "distribution"). The threat-brief Slack hook exists today; the platform integration layer below is the generalization.
+Status: **PARTIALLY BUILT (local).** What shipped: a per-org **`integrations` store** (`src/rogue/platform/integration_store.py` + the `integrations` table, migration 0024) holding `{kind, name, config, secret_ref}` with the credential Fernet-encrypted via the `SecretStore`; **Slack** and **Jira** destinations (`src/rogue/platform/integrations/{slack,jira}.py`) plus a `dispatcher.py` with a `ScanCompletedEvent` (`from_record`) fan-out core; and the **MCP action tools** `send_slack_alert` / `create_jira_ticket` / `list_integrations` (in `mcp_server/scan_tools.py`) that resolve a stored integration by name and deliver. **Key deviations from this doc:**
+- **There is no `GitHub` *destination* in code** — GitHub integration is only a packaged **GitHub Action** shell under `.github/actions/rogue-scan/` that calls the public API (the "shift-left" §4 story is real but is a client of `/v1/scans`, not a server-side `GitHubReporter`). No Check-Run/PR-comment writer ships.
+- **Delivery is MCP-tool-driven, not an automatic worker event bus.** The `ScanWorker` does **not** emit `scan.completed` and the dispatcher is **not** subscribed to it; instead an MCP client (or caller) invokes `send_slack_alert(scan_id, integration=…)` / `create_jira_ticket(...)`. The `scan.completed`/`finding.critical` event taxonomy and auto-fan-out below are the intended design.
+- The shipped `Integration` row is `{integration_id, org_id, kind ('slack'|'jira'), name, config, secret_ref, created_at}` with `UNIQUE(org_id, name)` — **no `project_id`, `enabled`, or `events` columns**, and `secret_ref` is a Fernet `secref_` handle (not `vault://`).
+
+The threat-brief single-tenant Slack hook still exists alongside this. Sections below are the original generalized design; reconcile against the shipped facts above.
 
 ## Where this sits
 
@@ -93,25 +98,25 @@ The dispatcher itself is fire-and-forget per destination with the brief writer's
 
 Today the Slack target is a single process-wide env var, `SLACK_WEBHOOK_URL`, read directly inside `_maybe_post_to_slack` ([`src/rogue/diff/threat_brief.py:479`](../../../src/rogue/diff/threat_brief.py)). That is correct for the single-tenant `acme` world (ARCHITECTURE §3) and exactly what we generalize: in the platform, each **org** configures its own destinations, and the credential for each is a Vault/KMS handle — never a raw secret in a row — resolved through Team C's secrets layer ([`../tenancy/secrets.md`](../tenancy/secrets.md)), the same `api_key_ref` discipline `TargetSpec` already uses (ARCHITECTURE §5).
 
-An `integrations` table (Team C-owned migration, alongside the orgs/projects tables in ARCHITECTURE §7 Week-2) holds one row per configured destination:
+**Shipped `integrations` table** (migration 0024, `src/rogue/platform/models.py`):
 
 ```
 integrations(
-  integration_id   text pk,            -- intg_<ulid>
-  org_id           text fk,            -- tenant scope (ARCHITECTURE §5)
-  project_id       text fk null,       -- optional: scope a destination to one project
-  kind             text,               -- 'slack' | 'github' | 'jira'
-  enabled          boolean,
-  events           text[],             -- subscribed events: scan.completed, finding.critical, …
-  secret_ref       text,               -- vault://… handle (Team C); never the raw token
-  config           jsonb,              -- kind-specific, non-secret (channel id, repo, jira project key, thresholds)
+  integration_id   String(48) pk,      -- secref-family ulid
+  org_id           String(40) idx,     -- tenant scope
+  kind             String(20),         -- 'slack' | 'jira'   (no 'github')
+  name             String(80),         -- the handle MCP tools reference; UNIQUE(org_id, name)
+  config           JSON,               -- kind-specific, non-secret (slack: nothing; jira: base_url/email/project_key)
+  secret_ref       String(48) null,    -- secref_ handle into the Fernet `secrets` table; never the raw token
   created_at       timestamptz
 )
 ```
 
-`config` holds the non-secret knobs: Slack channel id + default notify level; GitHub installation id + the CI threshold (`fail_on: { score: 70, severity: "critical" }`); Jira base URL + project key + the issue type. `secret_ref` resolves at delivery time to the Slack bot token / GitHub app private key / Jira API token. The dispatcher loads `enabled` rows for the event's `org_id` (and matching `project_id` when set), so fan-out is tenant-isolated by construction — the same scoping the API enforces on `get_scan`/`list_scans` ([`../api/scans-endpoints.md`](../api/scans-endpoints.md)).
+There is **no `project_id`, `enabled`, or `events` column** — selection is by `(org_id, name)`, and "which events" / per-project scoping from the design below did not ship. `config` holds the non-secret knobs (Jira `base_url`/`email`/`project_key`; Slack stores its webhook URL as the *secret*). `secret_ref` resolves at delivery time through the `SecretStore` to the Slack webhook URL / Jira API token. `IntegrationStore.list(org_id)` returns `[{kind, name}]` only — never secrets.
 
 ## 3. Slack
+
+> **Shipped:** `SlackDestination` (`integrations/slack.py`) posts a Block-Kit payload to a **stored incoming-webhook URL** (the org's `secret_ref`), via `build_payload(event)` → an httpx POST — not `chat.postMessage` with a bot token, and there is **no `/rogue scan` slash-command handler** (`POST /v1/integrations/slack/commands` does not exist). Delivery is triggered by the `send_slack_alert` MCP tool, not an automatic `scan.completed` subscription. The bot-token + slash-command design below is unrealized.
 
 Two outbound notifications + one inbound slash command. All three reuse the message body builder so the bot post, the alert, and the slash-command reply are formatted identically.
 
@@ -146,6 +151,8 @@ Block Kit, built from the `ScanRecord` (`score` 73, `n_breaches` 6, `top_attack`
 ```
 
 ## 4. GitHub — CI gating ("shift-left")
+
+> **Shipped:** only the **GitHub Action** half exists — a packaged Action under `.github/actions/rogue-scan/` that calls the public `/v1` API with a `ROGUE_API_KEY` and fails the job on threshold. There is **no GitHub App, no `GitHubReporter`, no Check-Run/PR-comment writer, and no `kind='github'` integration row** in the shipped code. The outbound Check-Run/comment design below is unrealized; treat GitHub as a pure API client, not a server-side destination.
 
 A GitHub App (installed per org; its installation id + private-key `secret_ref` live in the `integrations` row) plus a thin **GitHub Action** customers drop into a workflow. The story: a scan runs on a pull request — or on a push that touches a model/prompt file — and the build **fails** when the result crosses the org's threshold, so a regression in safety posture blocks merge the same way a failing unit test does.
 

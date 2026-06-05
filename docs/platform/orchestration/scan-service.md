@@ -2,7 +2,7 @@
 
 > Team B, Scan Orchestration. This doc specs `ScanService`, the one façade the SDK, the public API ([../api/scans-endpoints.md](../api/scans-endpoints.md)), MCP ([../integrations/mcp.md](../integrations/mcp.md)), and the dashboard all call to start, read, cancel, and list scans. It is the box labelled *Scan Orchestrator* in [../ARCHITECTURE.md](../ARCHITECTURE.md) §2, sitting above `ScanEngine` and in front of the queue. It owns the `scan_runs` lifecycle and nothing below it. The contract here is the one frozen in [../ARCHITECTURE.md](../ARCHITECTURE.md) §4 — this doc elaborates it, it does not redefine it.
 
-Status: design spec, not yet built. The engine it wraps (`rogue.scan.run_scan`, `src/rogue/scan.py:24`) ships today; `ScanService`, the queue ([./job-queue.md](./job-queue.md)), the worker ([./worker.md](./worker.md)), and the engine adapter ([./scan-engine-adapter.md](./scan-engine-adapter.md)) are the layers being added in Week 1 of the [../ARCHITECTURE.md](../ARCHITECTURE.md) §7 roadmap.
+Status: **BUILT (local).** Shipped as `DefaultScanService` in `src/rogue/platform/scan_service.py`, against the `ScanService` ABC in `src/rogue/platform/interfaces.py`. The queue ([./job-queue.md](./job-queue.md)), the worker ([./worker.md](./worker.md)), and the engine adapter ([./scan-engine-adapter.md](./scan-engine-adapter.md)) all shipped too. **One major deviation from this doc: there is no Redis.** Progress, cancellation, and idempotency are all carried by Postgres (the `ScanStore` rows + the queue's status column); the in-memory single-process mode uses a process-local dict. References to a "Redis overlay" / live-progress heartbeat below describe the *original design*, not the shipped system — the shipped worker writes progress straight into the `scan_runs` row on every callback (see [./worker.md](./worker.md)). Likewise the rich synchronous-validation table in §4 is aspirational: `DefaultScanService.create_scan` re-asserts only the endpoint-or-provider invariant and the idempotency check; pack/provider/budget validation happens upstream (Pydantic on `ScanSpec`/`TargetSpec`) or at engine run-time, not as a pre-enqueue gate in the service.
 
 ## 1. Responsibility — and the one rule
 
@@ -14,10 +14,12 @@ The load-bearing rule, stated once in [../ARCHITECTURE.md](../ARCHITECTURE.md) �
 
 ```
 src/rogue/platform/
-  scan_service.py      ← ScanService (this doc)
-  scan_engine.py       ← ScanEngine wrapper            (./scan-engine-adapter.md)
-  queue.py             ← JobQueue protocol + Redis impl (./job-queue.md)
-  worker.py            ← ScanWorker drain loop          (./worker.md)
+  interfaces.py        ← ScanStore / JobQueue / ScanEngine / ScanService / ReportService ABCs
+  scan_service.py      ← DefaultScanService (this doc)
+  engine.py            ← DefaultScanEngine wrapper            (./scan-engine-adapter.md)
+  queue.py             ← JobQueue ABC + PostgresJobQueue impl  (./job-queue.md)
+  worker.py            ← ScanWorker drain loop                 (./worker.md)
+  store.py             ← ScanStore (in-memory + Postgres) — scan_runs/reports persistence
 ```
 
 `src/rogue/platform/` is a new package — the platform layer above the existing engine. It depends *downward* on `rogue.scan`, `rogue.packs`, `rogue.schemas`, and `rogue.db.models`, and is depended on *upward* by `src/rogue/api/main.py` (Team A) and the SDK. Nothing in `src/rogue/scan.py` or `src/rogue/reproduce/` imports back up into `platform/`; the dependency arrow points one way, matching the §2 diagram.
@@ -25,14 +27,15 @@ src/rogue/platform/
 ## 3. The contract (verbatim from [../ARCHITECTURE.md](../ARCHITECTURE.md) §4)
 
 ```python
-class ScanService:
-    async def create_scan(self, spec: ScanSpec, *, org_id: str, project_id: str, actor: str) -> ScanRecord: ...
-    async def get_scan(self, scan_id: str, *, org_id: str) -> ScanRecord: ...
+class ScanService(abc.ABC):
+    async def create_scan(self, spec: ScanSpec, *, org_id: str, project_id: str | None = None,
+                          actor: str | None = None, idempotency_key: str | None = None) -> ScanRecord: ...
+    async def get_scan(self, scan_id: str, *, org_id: str) -> ScanRecord | None: ...
     async def cancel_scan(self, scan_id: str, *, org_id: str) -> ScanRecord: ...
     async def list_scans(self, *, org_id: str, project_id: str | None = None, limit: int = 50) -> list[ScanRecord]: ...
 ```
 
-Every method takes `org_id` and enforces it (§6). All four are `async` — they touch Postgres (`scan_runs`), Redis (queue + live progress), and the secrets layer, never CPU-bound work. `ScanSpec`, `TargetSpec`, `ScanRecord`, and the `ScanStatus` enum are the canonical types from [../ARCHITECTURE.md](../ARCHITECTURE.md) §5; this service constructs `ScanRecord`s and consumes `ScanSpec`s but defines none of them. `actor` (the API key id or user id that initiated the scan) is recorded for audit and is not part of the read shape.
+Every method takes `org_id` and enforces it (§6). All four are `async` — they touch Postgres (`scan_runs` via the `ScanStore`, plus the `scan_jobs` queue) and the secrets layer, never CPU-bound work. `ScanSpec`, `TargetSpec`, `ScanRecord`, and the `ScanStatus` enum are the canonical types from [../ARCHITECTURE.md](../ARCHITECTURE.md) §5; this service constructs `ScanRecord`s and consumes `ScanSpec`s but defines none of them. `actor` (the API key id or user id that initiated the scan) is recorded for audit and is not part of the read shape.
 
 ## 4. `create_scan` — validate → persist → enqueue → return
 
@@ -40,7 +43,7 @@ The whole method is four steps, in order, and returns in milliseconds.
 
 **Step 1 — validate the `ScanSpec` *before* anything is persisted or enqueued.** A bad `TargetSpec` must be rejected synchronously so the caller gets a `400`-class error, not a scan that fails in a worker minutes later. Reject before enqueue when: neither `target.endpoint` nor `target.provider` is set (the SDK's own constructor enforces exactly this at `src/rogue/client.py:79–80` — `"Client needs either endpoint=... or provider=..."` — and the service mirrors it); `provider` is set but unknown to `rogue.adapters.registry`; `pack` is not a known pack name (`load_pack` would `KeyError`); `attacks` names that filter to zero primitives; `max_tests`, `n_trials`, or `budget` out of range. `api_key_ref` is validated as a *handle* — that it resolves in the secrets layer (Team C, [../tenancy/secrets.md](../tenancy/secrets.md)) — never as a raw secret; per [../ARCHITECTURE.md](../ARCHITECTURE.md) §5 the raw key never reaches this service. Validation failures raise a typed error that Team A maps to the §5 error envelope (`{"error": {"code", "message", "details"}}`); they leave no `scan_runs` row behind.
 
-**Step 2 — persist a `scan_runs` row in `status=queued`.** Mint `scan_id = "scan_" + ulid()` ([../ARCHITECTURE.md](../ARCHITECTURE.md) §5 ID grammar), insert one row scoped to `org_id`/`project_id` with `actor`, `created_at`, the resolved spec, and `status=queued`, `progress=0`, all counters null. This row is the durable record of intent and the thing `get_scan`/`list_scans` read. Schema, columns, indexes, and the `0022+` migration are owned by [../tenancy/data-model.md](../tenancy/data-model.md) (the latest shipped migration is `0021_add_benchmark_runs.py`; `scan_runs` lands next). `ScanService` is the *only* writer that creates these rows and the *only* writer that sets `queued`.
+**Step 2 — persist a `scan_runs` row in `status=queued`.** Mint `scan_id = "scan_" + ulid()` ([../ARCHITECTURE.md](../ARCHITECTURE.md) §5 ID grammar), insert one row scoped to `org_id`/`project_id` with `actor`, `created_at`, the resolved spec, and `status=queued`, `progress=0`, all counters null. This row is the durable record of intent and the thing `get_scan`/`list_scans` read. Schema, columns, indexes, and the migration are owned by [../tenancy/data-model.md](../tenancy/data-model.md) (the `scan_runs`/`scan_jobs` tables shipped in migration `0022_platform_tables.py`). `ScanService` is the *only* writer that creates these rows and the *only* writer that sets `queued`.
 
 **Step 3 — enqueue a job.** Push a job (`scan_id`, `org_id`, the resolved spec, `idempotency_key` if any) onto the queue via the `JobQueue` interface from [./job-queue.md](./job-queue.md). The insert (step 2) and the enqueue (step 3) must not drift: if the enqueue fails, the row is left `queued` and a reconciler/visibility-timeout re-enqueues it — the queue is the at-least-once delivery layer, so the worker tolerates a redelivered job (idempotent transition `queued→running`, §7). We never enqueue *before* the row exists, so a worker can never dequeue a `scan_id` it can't find.
 
@@ -69,7 +72,7 @@ Validation is pure and side-effect-free: no DB row, no queue push, no secret der
 
 ## 5. `get_scan` — row + live progress
 
-`get_scan` answers `GET /v1/scans/{id}` ([../api/scans-endpoints.md](../api/scans-endpoints.md)). It reads the `scan_runs` row scoped to `org_id`, then **merges live progress from Redis**. The durable row is authoritative for `status` and the final counters; while a scan is `running`, the worker writes a fast-moving heartbeat to a Redis key (`scan:progress:{scan_id}` → `progress`, `n_completed`, running `n_breaches`, `top_attack` so far) on every trial, far more often than it would touch Postgres. `get_scan` overlays that heartbeat onto the row so a polling dashboard sees a smoothly climbing `progress: 0–100` instead of stepping only at terminal write. The Redis overlay is *advisory*: if the key is absent (worker hasn't started, or scan already terminal) the row's persisted values stand. On a terminal `status` (`completed`/`failed`/`canceled`) the row alone is returned and the Redis key is irrelevant (and TTL'd away by the worker). The `ScanRecord` shape returned is exactly [../ARCHITECTURE.md](../ARCHITECTURE.md) §5: `score` and `report_id` are populated only once terminal (`report_id = "rep_" + ulid()`, set by the worker after [../reports/report-service.md](../reports/report-service.md) persists the report).
+`get_scan` answers `GET /v1/scans/{id}` ([../api/scans-endpoints.md](../api/scans-endpoints.md)). It reads the `scan_runs` row scoped to `org_id` and returns it directly — there is no Redis overlay in the shipped system. Live progress is real because the **worker writes progress straight into the row** on every engine callback (`progress` 0–100, `n_completed`, `n_tests`, `top_attack`; see [./worker.md](./worker.md)), so a polling dashboard sees `progress` climb from successive `scan_runs` reads. (The original design below proposed a fast Redis heartbeat to avoid frequent Postgres writes; the shipped worker just writes the row per callback. If write volume ever matters, the heartbeat is the intended optimization — but it is not built.) The `ScanRecord` shape returned is exactly [../ARCHITECTURE.md](../ARCHITECTURE.md) §5: `score` and `report_id` are populated only once terminal (`report_id = "rep_" + ulid()`, set by the worker after [../reports/report-service.md](../reports/report-service.md) persists the report).
 
 ## 6. Tenant scoping — every method, no exceptions
 
@@ -122,7 +125,7 @@ The `running`-column "advisory" values come from the Redis overlay (§5) and are
 
 ## 8. `cancel_scan` and `list_scans`
 
-**`cancel_scan(scan_id, *, org_id)`** — org-scoped lookup, then: if `queued`, mark `canceled` and tombstone the queued job so the worker skips it on pickup (cheap, no engine ever ran). If `running`, set a cancel flag (a Redis key `scan:cancel:{scan_id}` the worker checks between trials) and mark the row `canceling`/`canceled` cooperatively — the in-flight trial finishes, the worker sees the flag at the top of the next `for prim in primitives` iteration (`src/rogue/scan.py:57`) and stops, writing `canceled` with partial counters. If already terminal, `cancel_scan` is a no-op returning the existing `ScanRecord` (idempotent). Cancellation is cooperative because `run_scan` is a long loop, not a killable subprocess; we never hard-kill mid customer-model call.
+**`cancel_scan(scan_id, *, org_id)`** — org-scoped lookup (a missing/cross-tenant id raises `KeyError`, which the API maps to `404`), then: if already terminal, it is a no-op returning the existing `ScanRecord` (idempotent). Otherwise it sets the row to `CANCELED` with `completed_at` and best-effort drops the queued job (`PostgresJobQueue` cancels via the job's status column; the in-memory queue exposes a synchronous `.cancel`). **Shipped caveat:** there is no mid-run cancel flag — the worker does *not* poll for cancellation between trials, and `ScanStore.update` is an unconditional `setattr` (no `WHERE status='running'` guard). So cancelling a job that has already been leased and is `running` marks the row `CANCELED`, but when the in-flight `engine.run` returns the worker's terminal write overwrites it back to `COMPLETED`. True cooperative mid-run cancellation (the conditional-write + cancel-flag design described below) is not built; effective cancellation is for still-`queued` jobs.
 
 **`list_scans(*, org_id, project_id=None, limit=50)`** — the dashboard's and `GET /v1/scans`' backing query: org-scoped, optional project filter, newest first, capped at `limit`. Returns lightweight `ScanRecord`s straight from `scan_runs` (no Redis overlay — list views show last-persisted state, not live heartbeats; live progress is a per-scan concern handled by `get_scan`).
 

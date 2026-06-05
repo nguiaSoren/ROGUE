@@ -2,6 +2,8 @@
 
 Extracted from ROGUE_PLAN.md §3. Do not redesign during the build.
 
+> This doc is the **research pipeline** architecture (harvest → extract → reproduce → diff). For the **product/platform** architecture — turning ROGUE into a SaaS platform (SDK + REST API + dashboard + MCP over one scan engine) — see `docs/platform/ARCHITECTURE.md` and its per-team docs (a design spec, not yet built).
+
 ## The five-layer pipeline
 
 ```
@@ -105,7 +107,7 @@ The harvest layer is built around a `DiscoveryAgent` that:
 4. For each result, decides whether to deep-fetch: pre-built Web Scraper for social sources, Web Unlocker for static blogs, Scraping Browser as fallback.
 5. Updates discovery memory: which queries surfaced novel primitives, which sources are most prolific.
 
-This is a real agentic loop, not "for query in queries: requests.get(query)". The DiscoveryAgent runs an epsilon-greedy bandit over a 39-query pool, learning per-query yield-per-dollar across daily runs (per ROGUE_PLAN.md §11.6, locked-as-committed 2026-05-24 PM — replaces the earlier "LLM-planning evolves Day 2" framing). Same agentic principle in extraction: `ExtractionAgent` chooses which schema fields to populate confidently and which to defer, with rationale stored.
+This is a real agentic loop, not "for query in queries: requests.get(query)". The DiscoveryAgent runs an epsilon-greedy bandit over a 52-query pool (39 original + 6 multimodal arms 2026-06-03 + 7 source-expansion arms 2026-06-04), learning per-query yield-per-dollar across daily runs (per ROGUE_PLAN.md §11.6, locked-as-committed 2026-05-24 PM — replaces the earlier "LLM-planning evolves Day 2" framing). Same agentic principle in extraction: `ExtractionAgent` chooses which schema fields to populate confidently and which to defer, with rationale stored.
 
 **Persistent skip-cache (§11.7).** Where the bandit decides *which queries* to spend on, the cross-run `fetch_cache` table decides *which individual URLs not to re-pay for* — so re-running the harvest over many days stops re-spending on content it already took. Two tiers, keyed by URL:
 

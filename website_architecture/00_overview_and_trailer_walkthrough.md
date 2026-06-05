@@ -111,7 +111,7 @@ Below it: "Built on **all 5 Bright Data products**. Harvests every new jailbreak
 
 ### Scene 9 — The threat brief (`/brief`)
 **Route:** `/brief` (page + `brief-exec-snapshot.tsx` + `brief-markdown.tsx`)
-**On screen:** `/brief · {date}`, title **Threat Brief**, "Daily snapshot · regenerable from the breach matrix on demand," with **Markdown / JSON download** buttons. An executive snapshot (net Δ vs yesterday, top-3 worst new attackers, a recommended-action line), four tier chips (**CRITICAL** / HIGH / MEDIUM / LOW, the red one pulsing), then the full CISO-readable markdown report.
+**On screen:** A branded **masthead** — a pulsing-green "daily threat brief" eyebrow, the title **Threat Brief**, a long human date ("Friday, June 5, 2026"), a dynamically-built one-line CISO headline ("N new CRITICAL attacks bypassed guardrails since yesterday…" / "Steady state…"), "Daily snapshot · regenerable from the breach matrix on demand," and **Markdown / JSON download** buttons. Then an **at-a-glance KPI snapshot strip** (Newly breaching / New CRITICAL / Newly defended / signed Net Δ), four tier chips (**CRITICAL** / HIGH / MEDIUM / LOW, the red one pulsing), the executive snapshot (net Δ vs yesterday, top-3 worst new attackers, a recommended-action line), then the full CISO-readable markdown report in a branded reading container.
 **Money shot:** the CRITICAL chip with a non-zero count, then the download buttons — "the artifact you'd actually send."
 **VO/caption:** "And every day, the one-page brief that ends the argument — the diff vs yesterday, ready to send."
 
@@ -142,8 +142,8 @@ A determinate green bar, a running readout — **"N breaches so far"** (turns re
 
 ### Scene 14 — The report lands (`/scans/{scanId}/report`)
 **Route:** `/scans/[scanId]/report`
-**On screen:** **The RiskHeadline is the hero of this screen** — a giant `NN /100` risk score, color-banded, with a severity pill (critical/high/medium/low) and a `Top attack` callout; a methodology caption underneath. Then a KPI row (Tests / Breaches / Breach rate / Cost), a **worst-first findings table** — each card shows severity + vector, "breached 4/5 trials · 80%," the attack title, family·technique, and expandable **Example attack** / **Model response** / **Remediation** (the actual system-prompt patch). Top-right: **HTML / PDF / JSON export** buttons. A recommendations panel closes it.
-**Money shot:** the big `NN/100` landing with its color band, then the worst finding expanding to reveal the real prompt → the real model response → the fix. Then the **PDF export** click.
+**On screen:** **The RiskHeadline is the hero of this screen** — a giant `NN /100` risk score, color-banded, with a severity pill (critical/high/medium/low) and a `Top attack` callout; a methodology caption underneath. Beneath the headline, a branded **Executive summary** card (markdown — the forward-to-your-boss verdict). Then a KPI row (Tests / Breaches / Breach rate / Cost) and a **worst-first findings list** — each card shows severity + vector, "breached 4/5 trials · 80%," the attack title, family·technique, a plain-language **"What this is"** block, a green **"How to fix"** remediation block, and a single expandable **Evidence — attack & model response** section flagged red as **breached** (the actual payload + the model's own incriminating reply). Top-right: **HTML / PDF / JSON export** buttons. A recommendations panel closes it.
+**Money shot:** the big `NN/100` landing with its color band, the exec-summary verdict resolving beneath it, then the worst finding's evidence expanding to reveal the real prompt → the real model response → with the green "How to fix" block right there. Then the **PDF export** click.
 **VO/caption:** "And here's your report. One score. Every breach, with the exact prompt, the model's own words, and how to close it. Export the PDF, send it up the chain."
 
 ### Scene 15 — The scans dashboard (`/scans`) [bookend / B-roll]

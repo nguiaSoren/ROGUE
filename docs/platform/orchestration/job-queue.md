@@ -1,138 +1,108 @@
 # Job Queue & the `ScanJob` Model — Team B
 
-> Where a scan *waits*. [`ScanService`](./scan-service.md) accepts a `ScanSpec` in the request thread, persists a `ScanRecord`, and hands the work off here; the [`ScanWorker`](./worker.md) pulls from here and runs it through the engine. This doc owns the seam between those two: the Redis dispatch queue and the durable `scan_jobs` table. It does **not** redefine the [`ScanStatus`](../ARCHITECTURE.md) enum (`queued | running | completed | failed | canceled`) or the `scan_<ulid>` / `org_<ulid>` / `proj_<ulid>` IDs — those are canonical in [`ARCHITECTURE.md §5`](../ARCHITECTURE.md) and are imported, never restated.
+> Where a scan *waits*. [`ScanService`](./scan-service.md) accepts a `ScanSpec` in the request thread, persists a `ScanRecord`, and hands the work off here; the [`ScanWorker`](./worker.md) pulls from here and runs it through the engine. This doc owns the seam between those two: the durable `scan_jobs` dispatch table. It does **not** redefine the [`ScanStatus`](../ARCHITECTURE.md) enum (`queued | running | completed | failed | canceled`) or the `scan_<ulid>` / `org_<ulid>` / `proj_<ulid>` IDs — those are canonical in [`ARCHITECTURE.md §5`](../ARCHITECTURE.md) and are imported, never restated.
 
-Status: **design spec, not yet built.** Targets migration `0022` (see below); the engine it ultimately feeds (`rogue.scan.run_scan`, `src/rogue/scan.py:24`) already exists.
+Status: **BUILT (local).** Shipped as `PostgresJobQueue` (`src/rogue/platform/queue.py`) against the `JobQueue` ABC (`src/rogue/platform/interfaces.py`), with an `InMemoryJobQueue` twin in `memory.py` for tests / single-process mode. The `scan_jobs` table shipped in migration `0022_platform_tables.py`.
+
+**Major deviation from the original design below: there is NO Redis.** The shipped queue is **Postgres-only** — a `SELECT … FOR UPDATE SKIP LOCKED` lease on the `scan_jobs` table, exactly the "fallback / rebuild path" §7 once described as a degraded mode. Postgres is both the durable record *and* the dispatch layer; the single-box deployment (one Neon Postgres, no service mesh, no Redis) is the whole reason. Everything below that talks about `LPUSH`/`BRPOP`/`ZADD`/`rogue:q:*` lists, priority bands drained by `BRPOP`, per-tenant fairness lists, or a Redis delayed-set reaper is **the original aspirational design and is not built** — `SKIP LOCKED` is the concurrency guard, `available_at` (a timestamp column) schedules retry backoff, and a `reap_expired()` sweep reclaims dead-worker leases. The `priority` column exists but is only an `ORDER BY` key; there is no cross-tenant fairness layer.
 
 ---
 
-## 1. Two stores, two jobs
+## 1. One store, two roles
 
-A scan has two distinct persistence needs and we split them deliberately:
+- **Durability — Postgres (Neon).** A `ScanRecord` (the customer-facing status row, returned by `GET /v1/scans/{id}`) lives in `scan_runs`. Its execution backing — the unit of work a worker leases — lives in the `scan_jobs` table. Both are the source of truth, and because dispatch is *also* Postgres, there is no second store to keep in sync.
+- **Dispatch — Postgres `SKIP LOCKED`.** `lease()` claims the oldest available `queued` job with `SELECT … ORDER BY priority DESC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`, so N concurrent workers never get the same row. (SQLite ignores `with_for_update`, which is why offline tests are single-threaded and exercise the state machine, not the locking.)
 
-- **Durability — Postgres (Neon).** A `ScanRecord` (the customer-facing status row, returned by `GET /v1/scans/{id}`) lives in `scan_runs`. Its execution backing — the unit of work a worker leases — lives in a new `scan_jobs` table. These are the **source of truth**: if Redis is wiped, no scan is lost; the queue can be rebuilt from `scan_jobs WHERE status IN (queued, leased, running)`.
-- **Dispatch — Redis.** A lightweight list/stream that answers exactly one question fast: *which job should a free worker pick up next, and has anyone else already grabbed it?* The Redis state is **ephemeral and reconstructable** — it is a cache of "what's pending," never the record of "what happened."
-
-`scan_runs` is the [`ScanRecord`](../ARCHITECTURE.md) (status, progress, score, report_id) — owned jointly with [`../tenancy/data-model.md`](../tenancy/data-model.md), which adds the `org_id` / `project_id` FK columns and the tenant-scoping indexes. `scan_jobs` is the queue's own durable mirror, owned entirely by Team B. One scan row → one job row (1:1 today; the column shape leaves room for fan-out later without a schema change).
+`scan_runs` is the [`ScanRecord`](../ARCHITECTURE.md) (status, progress, score, report_id) — owned jointly with [`../tenancy/data-model.md`](../tenancy/data-model.md). `scan_jobs` carries `org_id` as its own indexed column (not read through the FK). One scan row → one job row.
 
 The split is the whole point of [ARCHITECTURE.md §4](../ARCHITECTURE.md)'s "NEVER runs a scan in the request thread": the API call returns the instant the job is durably enqueued, and a long red-team run (multi-minute, multi-dollar, `full reproduce ≈ $35` per CLAUDE.md) happens out-of-band.
 
-## 2. Why Redis-for-dispatch, not Kafka — and why a queue at all
+## 2. Why Postgres-only, not Kafka or Redis — and why a queue at all
 
-The deployment is a **single Neon Postgres** and a **3 GB / 2 CPU Docker box** (per CLAUDE.md's footprint note). That budget rules out Kafka/RabbitMQ/a broker cluster: they want partitions, ZooKeeper/KRaft, multi-GB heaps, and an ops surface a solo dev can't carry. A single small Redis (`redis:7-alpine`, `maxmemory ~128mb`, `--appendonly no` since the durable copy is in Postgres) fits the box and gives us the two primitives we actually need: an atomic blocking pop and a sorted-set for visibility timeouts.
+The deployment is a **single Neon Postgres** and a **3 GB / 2 CPU Docker box** (per CLAUDE.md's footprint note). That budget rules out Kafka/RabbitMQ/a broker cluster. The original design (below) reached for a small Redis as a dispatch cache, keeping `SELECT … FOR UPDATE SKIP LOCKED` only as a fallback. **What actually shipped inverted that: Postgres `SKIP LOCKED` *is* the queue, and there is no Redis at all** — one fewer moving part to run, monitor, and keep durable, consistent with the "one Postgres, no service mesh, no Redis" rule. A worker polls `lease()` on a poll interval (`run_forever(poll_interval=1.0)`); `SKIP LOCKED` keeps concurrent workers from colliding without any external broker.
 
-We could have used **Postgres alone** as the queue (`SELECT … FOR UPDATE SKIP LOCKED`). That works and we keep it as the **fallback / rebuild path** (§7). But a hot `SKIP LOCKED` poll against the *one* Neon instance competes with every read the dashboard and API issue, and Neon's serverless connection ceiling is already a known constraint (`reference_neon_serverless_resilience.md`). Redis absorbs the high-frequency "anything for me?" polling so Postgres only sees a write when a job's **state actually changes**. Redis dispatches; Postgres remembers.
+## 3. The leased-job shape
 
-## 3. The `ScanJob` shape
-
-The in-memory/wire object the worker dequeues. It is the `payload` JSON of a `scan_jobs` row plus its envelope columns:
+The object a worker dequeues is `LeasedJob` (`src/rogue/platform/interfaces.py`), built from a `scan_jobs` row:
 
 ```python
-@dataclass(frozen=True)
-class ScanJob:
+class LeasedJob:
     job_id: str          # job_<ulid>
     scan_id: str         # scan_<ulid>  → scan_runs.scan_id
-    org_id: str          # org_<ulid>   (tenant; drives fairness, §8)
-    project_id: str      # proj_<ulid>
-    payload: dict        # the frozen ScanSpec: {target, pack, attacks, max_tests, n_trials, budget}
-    priority: int        # 0 = normal; higher = sooner (§8)
-    attempts: int        # delivery count so far (idempotency / retry, §6)
-    max_attempts: int    # default 3, then → dead-letter
+    spec: ScanSpec       # the frozen ScanSpec (rehydrated from the row's `payload` JSON)
+    org_id: str          # org_<ulid>
+    attempts: int        # delivery count so far (retry / backoff, §6)
 ```
 
-`payload` is the [`ScanSpec`](../ARCHITECTURE.md) captured at create time, frozen into the row so a replay runs the *exact* spec the customer submitted even if defaults later change. The worker reconstructs a `TargetSpec` from it and calls `ScanEngine.run` (the [worker doc](./worker.md) owns that hand-off; the [scan-engine adapter](./scan-engine-adapter.md) owns the engine wrapper).
+The `payload` column is the [`ScanSpec`](../ARCHITECTURE.md) captured at create time (`spec.model_dump(mode="json")`), frozen into the row so a replay runs the *exact* spec the customer submitted even if defaults later change. The worker rehydrates it with `ScanSpec.model_validate(...)` and calls `ScanEngine.run(spec, ...)` (the [worker doc](./worker.md) owns that hand-off; the [scan-engine adapter](./scan-engine-adapter.md) owns the engine wrapper).
 
-## 4. The `scan_jobs` table (migration `0022`)
+## 4. The `scan_jobs` table (migration `0022_platform_tables.py`)
 
-Modeled on the existing run-record precedent `BenchmarkRun` (`src/rogue/db/models.py:728`) — an append-style durable row with `BigInteger` surrogate PK, indexed string business keys, a `JSON` detail blob, and `DateTime(timezone=True)` timestamps. New ORM class in `src/rogue/db/models.py` (added to `__all__` alongside `BenchmarkRun`), enums imported from `rogue.schemas` per the no-duplication rule (`models.py:38`):
+The shipped ORM (`src/rogue/platform/models.py`, in the new `platform` model module — *not* the legacy `src/rogue/db/models.py`):
 
 ```python
 class ScanJob(Base):
-    """Durable queue record — the unit of work a ScanWorker leases. Redis holds
-    the *dispatch* copy (ephemeral); this row is the source of truth. status uses
-    the canonical ScanStatus vocabulary plus the queue-internal 'leased' phase.
-    """
+    """Durable dispatch record (the queue's source of truth). Postgres SKIP-LOCKED lease."""
+
     __tablename__ = "scan_jobs"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    job_id: Mapped[str] = mapped_column(String(40), unique=True, index=True)      # job_<ulid>
+    job_id: Mapped[str] = mapped_column(String(48), primary_key=True)              # job_<ulid>
     scan_id: Mapped[str] = mapped_column(ForeignKey("scan_runs.scan_id"), index=True)
-    status: Mapped[str] = mapped_column(String(20), index=True, server_default="queued")
-    payload: Mapped[dict] = mapped_column(JSON, default=dict)                     # frozen ScanSpec
-    priority: Mapped[int] = mapped_column(Integer, server_default="0", index=True)
-    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
-    max_attempts: Mapped[int] = mapped_column(Integer, server_default="3")
-    locked_by: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)   # worker id holding lease
-    locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    lease_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), index=True, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc))
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(20), index=True)  # queued|leased|running|done|failed|canceled
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)                       # frozen ScanSpec
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    locked_by: Mapped[str | None] = mapped_column(String(80), nullable=True)        # worker id holding lease
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)  # retry-backoff gate
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 ```
 
-Notes on the columns. `status` reuses the canonical `ScanStatus` *values* plus the one queue-internal phase `leased` (§5) — stored as a CHECK-constrained `String(20)` rather than a native PG enum, because `leased` is a queue concept that does not belong in the customer-facing `ScanStatus` enum (the same `String` + values-from-`Literal` discipline `SourceType`/`BrightDataProduct` use at `models.py:62`). The `scan_id` FK points at `scan_runs.scan_id` (the [`ScanRecord`](../ARCHITECTURE.md) table that [`../tenancy/data-model.md`](../tenancy/data-model.md) defines); `org_id`/`project_id` are read through that FK for fairness rather than duplicated here. The `locked_by` / `locked_at` / `lease_expires_at` triple is the visibility-timeout lease (§5). `error` mirrors the `ScanRecord.error` field for the terminal-failure case.
+Notes on the columns. The PK is the `job_id` string itself (no surrogate `BigInteger`). `status` carries `queued|leased|running|done|failed|canceled` as a plain `String(20)` (`done` is the queue's ack state; the canonical customer-facing `ScanStatus` lives on `scan_runs`). The `scan_id` FK points at `scan_runs.scan_id`; **`org_id` is a direct indexed column on this table**, not read through the FK (no fairness layer needs it routed). The `locked_by` / `locked_at` / `lease_expires_at` triple is the visibility-timeout lease (§5). **`available_at`** is the shipped retry mechanism: a failed job is re-queued with `available_at = now + backoff`, and `lease()` only considers rows with `available_at <= now` — this replaces the design's Redis delayed-set. There is no `updated_at` and no `project_id` column on `scan_jobs`.
 
-### The migration file — `0022_add_scan_jobs.py`
+### The migration file — `0022_platform_tables.py`
 
-A new revision under `src/rogue/db/migrations/versions/`, continuing the linear chain. The latest is `0021_add_benchmark_runs.py` (`revision = "0021"`, `down_revision = "0020"`), so:
+`scan_jobs` did **not** ship as a standalone `0022_add_scan_jobs.py`. It landed in `0022_platform_tables.py`, the single migration that creates the whole multi-tenant platform schema at once (`organizations`, `users`, `memberships`, `projects`, `api_keys`, `scan_runs`, `scan_jobs`, `reports`). The `secrets` table came later in `0023_secrets.py` and `integrations` in `0024_integrations.py`. Applied the standard way (per CLAUDE.md's Database section): `uv run alembic upgrade head`.
 
-```python
-# 0022_add_scan_jobs.py
-revision: str = "0022"
-down_revision: Union[str, Sequence[str], None] = "0021"   # chains onto benchmark_runs
+## 5. Enqueue / lease with a visibility-timeout lease (shipped)
+
+The shipped `PostgresJobQueue` methods (`src/rogue/platform/queue.py`), all Postgres, no Redis:
+
+**`enqueue(scan_id, spec, *, org_id) -> job_id`** — a single `INSERT scan_jobs (status='queued', payload=spec.model_dump(mode="json"), available_at=now, …)`. The Postgres commit is the durable enqueue. `ScanService` calls this right after persisting the `scan_runs` row (row-then-enqueue ordering, [scan-service §11](./scan-service.md)).
+
+**`lease(*, worker_id, lease_seconds=300) -> LeasedJob | None`** — one statement claims the oldest ready job:
+
+```sql
+SELECT * FROM scan_jobs
+ WHERE status='queued' AND available_at <= now()
+ ORDER BY priority DESC, created_at ASC
+ LIMIT 1 FOR UPDATE SKIP LOCKED;
 ```
 
-It is `op.create_table("scan_jobs", …)` with the columns above, the `ForeignKey("scan_runs.scan_id")` constraint (so `scan_runs` from the tenancy migration must land first — coordinate the chain so the `scan_runs` revision is an ancestor), plus the dispatch indexes: a composite `(status, priority, created_at)` for the rebuild scan (§7) and `ix_scan_jobs_lease_expires_at` on `lease_expires_at` for the reaper sweep (§5). `downgrade()` drops the indexes then the table. No data migration — `scan_jobs` is born empty.
+then sets `status='leased'`, `locked_by=worker_id`, `locked_at=now()`, `lease_expires_at=now()+lease_seconds` and commits. `SKIP LOCKED` is the whole concurrency story: two workers leasing at once skip each other's locked row, so no job is double-leased. Returns `None` when nothing is ready (the worker then sleeps `poll_interval`).
 
-Applied the standard way (per CLAUDE.md's Database section): `uv run alembic upgrade head`. The alembic `env.py` overrides `sqlalchemy.url` from `DATABASE_URL` via `dotenv.load_dotenv()` at runtime (`src/rogue/db/migrations/env.py:8-21`) — so `0022` runs against whatever DB `DATABASE_URL` points at (local Docker Postgres or Neon), with no hard-coded connection string in the migration.
+**`ack(job_id)`** — `status='done'`. **`extend_lease(job_id, *, lease_seconds=300)`** — pushes `lease_expires_at` out so a legitimately long scan isn't reclaimed (the worker's lease heartbeat).
 
-## 5. Enqueue / dequeue with a visibility-timeout lease
+**`fail(job_id, *, error, retry)`** — records `error`; if `retry` and `attempts + 1 < max_attempts`, bumps `attempts`, sets `status='queued'` and `available_at = now + backoff(attempts)` (clearing the lease columns) so the row becomes leasable again only after the delay; otherwise `status='failed'` (dead-letter). Backoff is `min(5 · 5^(attempts-1), 600)` seconds — i.e. 5s → 25s → 125s, capped at 600s.
 
-**Enqueue** (in the API request thread, transactionally with the `scan_runs` insert):
-
-1. `INSERT scan_jobs (status='queued', priority, payload, …)`.
-2. `LPUSH rogue:q:{priority} <job_id>` — push the job id onto the Redis list for its priority band.
-
-The Postgres write is the commit point. If step 2 fails (Redis down), the row still exists as `queued`; the reaper/rebuild (§7) re-pushes it. This ordering is what makes the queue **rebuildable** — Redis never holds a job Postgres doesn't.
-
-**Dequeue** (in the worker loop — detail in [`worker.md`](./worker.md)):
-
-1. `BRPOP rogue:q:{high} rogue:q:{normal} … <timeout>` — atomic blocking pop across priority bands (highest first). Blocking means no busy-poll against Redis or Neon.
-2. **Lease, don't delete.** In one Redis transaction add the job to a `ZADD rogue:leased <now+visibility_timeout> <job_id>` sorted set keyed by lease expiry. The job is now invisible to other workers but *not gone*.
-3. `UPDATE scan_jobs SET status='leased', locked_by=:worker_id, locked_at=now(), lease_expires_at=now()+:vt, attempts=attempts+1 WHERE job_id=:id AND status='queued'`. The `AND status='queued'` guard makes the claim atomic at the DB level too — a double-delivered id can't be claimed twice.
-4. Worker transitions the row to `running` and starts the engine; it `ZADD`s a fresh expiry periodically (a **lease heartbeat**) so a legitimately long scan isn't reclaimed mid-flight.
-
-**The crashed-worker reclaim.** A reaper (a periodic sweep, can be a `0` background coroutine in the worker or a tiny cron) does `ZRANGEBYSCORE rogue:leased -inf <now>` to find leases whose `lease_expires_at` has passed with no heartbeat — i.e. the worker holding them died. For each: `UPDATE scan_jobs SET status='queued', locked_by=NULL WHERE job_id=:id AND status IN ('leased','running')`, remove from `rogue:leased`, and `LPUSH` it back onto its priority list. The job is redelivered. The visibility timeout (start at ~5 min, longer than a normal scan's slow step, refreshed by heartbeat) is the single knob governing how fast a dead worker's work is rescued.
+**The crashed-worker reclaim.** `reap_expired()` is a periodic sweep (run by a supervisor): `UPDATE scan_jobs SET status='queued', available_at=now(), locked_by=NULL … WHERE status='leased' AND lease_expires_at < now()`. A worker that died mid-lease never acked, so its job sits in `leased` until its `lease_expires_at` passes and this hands it back to the pool. The visibility timeout (`lease_seconds`, default 300s) is the single knob governing how fast a dead worker's work is rescued.
 
 ## 6. At-least-once delivery + idempotency
 
-The lease model gives **at-least-once** delivery: a worker that crashes after starting a scan but before recording the result will have its job reclaimed and re-run. That is the correct trade — we never want a paid scan to silently vanish — but it means a job can execute more than once, so every consumer must be **idempotent**.
+The lease model gives **at-least-once** delivery: a worker that crashes after leasing but before acking has its job reclaimed by `reap_expired()` and re-run. That is the correct trade — we never want a paid scan to silently vanish — but it means a job can execute more than once.
 
-The idempotency key is `(scan_id, attempt)` is *not* used; instead the worker is idempotent on `scan_id`: before running, it checks `scan_runs.status` — if the scan already reached a terminal `ScanStatus` (`completed`/`failed`/`canceled`), the redelivered job is a **no-op ack** (pop the lease, mark the job `completed`, write no second report). The result-write itself is an `UPDATE scan_runs … WHERE scan_id=:id AND status='running'` so two racing executions can't both commit a result. `attempts`/`max_attempts` bound how many times we'll redeliver before giving up (§ dead-letter).
+**Shipped caveat:** the worker does *not* check `scan_runs.status` before running, and the result-write (`ScanStore.update`) is **not** a conditional `WHERE status='running'`. So a redelivered job re-runs the scan and overwrites the record. Re-execution is bounded by `attempts`/`max_attempts` (default 3) but not deduplicated against an already-terminal scan. (The conditional-write / terminal-state guard the original design describes is not built — flag if exactly-once result semantics become a requirement.)
 
-## 7. Postgres as the rebuild / fallback path
+## 7. Postgres is the only store
 
-Redis is allowed to disappear. On worker startup, or on a Redis flush, the queue is reconstructed from the durable table:
+There is no Redis to rebuild from — the durable `scan_jobs` table *is* the queue. On worker startup nothing needs reconstructing: `lease()` simply queries `scan_jobs` for the next ready `queued` row. Stuck `leased` rows from a dead worker are recovered by `reap_expired()` (§5).
 
-```sql
-SELECT job_id, priority FROM scan_jobs
- WHERE status IN ('queued','leased','running')
- ORDER BY priority DESC, created_at ASC;        -- uses ix (status,priority,created_at)
-```
+## 8. Priority & fairness
 
-Every `queued`/`leased`/`running` job is re-`LPUSH`ed (leased/running ones are treated as expired-lease reclaims). This is also the **degraded mode**: if Redis is unreachable, the worker falls back to polling this exact query with `FOR UPDATE SKIP LOCKED` — slower and heavier on Neon, but correct, and acceptable for a single-box deployment that rarely loses Redis. The durable table is what makes "lightweight ephemeral Redis" a safe choice rather than a single point of data loss.
-
-## 8. Priority & cross-tenant fairness
-
-Two levers, both cheap on a single small Redis:
-
-- **Priority bands.** A fixed set of Redis lists — `rogue:q:high`, `rogue:q:normal`, `rogue:q:low` — drained in order by the `BRPOP` key list. `priority` on the row maps to a band; an interactive dashboard scan can outrank a bulk benchmark sweep without a real priority-queue data structure.
-- **Per-tenant fairness within a band.** A single noisy `org_id` must not starve others sharing its band. The dequeue applies **round-robin over `org_id`**: rather than one list per band, key the lists per tenant (`rogue:q:{band}:{org_id}`) and keep a Redis list of *active tenant queues* per band; the worker pops one job, then rotates that tenant to the back. This is weighted-fair-queuing-lite — O(1) per dequeue, no global scan — and bounds any one tenant's share of worker time. The `org_id` for routing is read off the job's `scan_runs` row at enqueue (see [`../tenancy/data-model.md`](../tenancy/data-model.md) for the tenant model). A per-tenant in-flight cap (e.g. ≤ N `running` jobs per `org_id`) is the natural extension when concurrency grows.
-
-For the Week-1 single-worker deployment ([ARCHITECTURE.md §7](../ARCHITECTURE.md)) fairness is mostly latent, but the band + per-tenant-list shape is in from the start so turning on a second worker needs no schema or protocol change.
+The `scan_jobs.priority` column exists and `lease()` orders by `priority DESC, created_at ASC`, so a higher-priority job is leased first. **Cross-tenant fairness (per-`org_id` round-robin / weighted-fair-queuing) is NOT built** — the design below was Redis-list-based and did not ship. For the current single-worker deployment this is latent; a fairness layer would be a future addition over the same `org_id` column.
 
 ## 9. The job state machine
 
@@ -170,11 +140,11 @@ For the Week-1 single-worker deployment ([ARCHITECTURE.md §7](../ARCHITECTURE.m
                                                                     └──────────────────┘
 ```
 
-**Retry & backoff.** A `failed` execution (engine exception, adapter timeout) is retried iff `attempts < max_attempts`: the row goes back to `queued` and is re-`LPUSH`ed after an **exponential backoff** delay (`base · 2^attempts`, e.g. 5s → 10s → 20s, jittered). The delay is implemented with a Redis **delayed set** — `ZADD rogue:q:delayed <ready_at> <job_id>` — that the reaper promotes to the live list once `ready_at` passes (same sweep that reclaims expired leases). Provider rate-limit errors (HTTP 429 from the customer's model) use a longer floor.
+**Retry & backoff.** When the worker calls `fail(job_id, retry=…)`, a retry happens iff `attempts + 1 < max_attempts`: the row goes back to `queued` with `available_at = now + backoff`, where `backoff = min(5 · 5^(attempts-1), 600)` seconds (5s → 25s → 125s, capped at 600s). There is no Redis delayed-set — the `available_at` timestamp column gates re-leasing (a row is only leasable once `available_at <= now()`). (Note: the *shipped* worker calls `fail(retry=False)`, so engine exceptions currently dead-letter immediately; the retry path exists in the queue but the worker does not yet opt into it — flag if automatic retry of transient adapter/429 failures is wanted.)
 
-**Dead-letter.** When `attempts ≥ max_attempts` (default 3), the job stops retrying: `status='failed'`, `error` set to the last exception, pushed to `rogue:q:dlq`, and the `ScanRecord` goes `failed` with the same `error` (the [`ScanRecord.error`](../ARCHITECTURE.md) field surfaces it to the customer via the [error envelope](../ARCHITECTURE.md)). The DLQ is inspected manually — a poisoned job (bad target, malformed spec) should never silently loop and burn budget. Re-driving a DLQ job is a deliberate `status='queued', attempts=0` reset + re-push.
+**Dead-letter.** When retries are exhausted (or `retry=False`), the job goes `status='failed'` with `error` set to the last exception, and the worker also marks the `ScanRecord` `failed` with the same `error` (surfaced to the customer via the [error envelope](../ARCHITECTURE.md)). There is no separate DLQ list — a `failed` `scan_jobs` row *is* the dead letter. Re-driving is a deliberate `status='queued', attempts=0, available_at=now()` reset.
 
-**Cancel.** [`ScanService.cancel_scan`](./scan-service.md) sets `scan_runs.status='canceled'`; the worker checks the scan's status at each safe checkpoint (between attacks) and, seeing `canceled`, stops the engine cleanly and marks the job `canceled`. A still-`queued` job is canceled by removing it from its Redis list and setting both rows terminal — no worker ever picks it up.
+**Cancel.** [`ScanService.cancel_scan`](./scan-service.md) sets `scan_runs.status='canceled'` and best-effort cancels the queued job (`PostgresJobQueue` has no `.cancel`; the in-memory queue does — so on Postgres a still-`queued` job's record is marked canceled but the job row may still be leasable; see the scan-service §8 caveat). **There is no mid-run cancel checkpoint** — the worker does not poll `scan_runs.status` between attacks. The DLQ / cooperative-cancel boxes in the diagram below are original-design, not shipped.
 
 ---
 

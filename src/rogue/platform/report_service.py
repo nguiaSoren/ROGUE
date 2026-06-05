@@ -41,11 +41,11 @@ def _redact(s: str | None) -> str | None:
 def _explanation_for(finding: Finding, finding_dict: dict | None = None) -> str:
     """Plain-language "what this attack class means for you" for an exec/PDF audience.
 
-    Sourced, in priority order: (1) the `explanation` key the SDK's `to_dict()` now emits per finding
-    (Engineer A's `explain_family` landing in `rogue.report`); (2) `rogue.report.explain_family(family)`
-    called directly when we hold a `Finding` but not its dict; (3) a built-in family-agnostic fallback
-    so an exec-facing surface is never blank if neither upstream source is present yet. Defensive by
-    design — this module must render a complete summary whether or not `explain_family` has shipped.
+    Sourced, in priority order: (1) the `explanation` key the SDK's `to_dict()` emits per finding
+    (`rogue.report.explain_family`); (2) `rogue.report.explain_family(family)` called directly when we
+    hold a `Finding` but not its dict; (3) a built-in family-agnostic fallback so an exec-facing surface
+    is never blank if neither upstream source is present. Defensive by design — this module must render a
+    complete summary even against an older `rogue.report` that lacks `explain_family`.
     """
     if finding_dict is not None:
         explanation = finding_dict.get("explanation")
@@ -126,7 +126,7 @@ class DefaultReportService(ReportService):
     async def build_json(self, scan_id: str) -> dict:
         """The SDK report dict + the platform headline (`score` 0-100, its `risk_level`) + a coverage block.
 
-        Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation` and, once Engineer A's change lands, `explanation`): we layer the platform `score`/`risk_level`/`score_methodology` headline, a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised), and a top-level `executive_summary` (the markdown narrative from `build_executive_summary`) so the dashboard renders the CISO summary without a second call. Each finding is also guaranteed a non-empty `explanation` — backfilled defensively here if `to_dict()` didn't already emit one — so a programmatic consumer never sees a finding without a plain-language meaning. The underlying SDK shape is untouched (additive only).
+        Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation` and `explanation`): we layer the platform `score`/`risk_level`/`score_methodology` headline, a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised), and a top-level `executive_summary` (the markdown narrative from `build_executive_summary`) so the dashboard renders the CISO summary without a second call. Each finding is also guaranteed a non-empty `explanation` — backfilled defensively here if `to_dict()` didn't already emit one — so a programmatic consumer never sees a finding without a plain-language meaning. The underlying SDK shape is untouched (additive only).
         """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
@@ -140,9 +140,9 @@ class DefaultReportService(ReportService):
             "breach_rate": round(report.breach_rate, 4),
             "families_tested": report.families_covered(),
         }
-        # Guarantee every finding carries a plain-language `explanation`. `to_dict()` may already emit
-        # one (Engineer A's `explain_family`); where it doesn't, backfill so the dashboard's per-finding
-        # "what this means" never renders blank. `findings` and `report.findings` are positionally aligned.
+        # Guarantee every finding carries a plain-language `explanation`. `to_dict()` emits one
+        # (`explain_family`); where it doesn't (an older `rogue.report`), backfill so the dashboard's
+        # per-finding "what this means" never renders blank. `findings`/`report.findings` are positionally aligned.
         for f_dict, f in zip(out.get("findings", []), report.findings, strict=False):
             if not (isinstance(f_dict.get("explanation"), str) and f_dict["explanation"].strip()):
                 f_dict["explanation"] = _explanation_for(f, f_dict)
@@ -251,7 +251,7 @@ class DefaultReportService(ReportService):
     async def build_html(self, scan_id: str) -> str:
         """Reuse `ScanReport.to_html()`, surfacing the platform score/risk_level in the header KPIs.
 
-        Per the R1 contract `ScanReport.to_html()` grows optional `score`/`risk_level` params that render the Risk-score KPI natively; we pass them through. While that change is in flight we fall back to the prior string-splice so the headline number still leads the page either way — the fallback is removed once `to_html` accepts the params everywhere.
+        `ScanReport.to_html()` accepts optional `score`/`risk_level` params and renders the Risk-score KPI natively; we pass them through. The `TypeError` fallback below is a defensive vestige for an older `rogue.report` that predates those params — it string-splices a Risk-score KPI in front of the KPI row so the headline number still leads the page even against that build.
         """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
@@ -260,9 +260,9 @@ class DefaultReportService(ReportService):
         try:
             return report.to_html(score=score, risk_level=level)
         except TypeError:
-            # `to_html` doesn't accept the params yet (R1 contract in flight). Splice a Risk-score KPI
-            # in front of the existing KPI row so the headline number a customer acts on still leads
-            # the page — without re-templating the whole report.
+            # Defensive: only reached against an older `to_html` that predates the score/risk_level
+            # params. Splice a Risk-score KPI in front of the existing KPI row so the headline number
+            # a customer acts on still leads the page — without re-templating the whole report.
             page = report.to_html()
             kpi = (
                 f'<div class="kpi">Risk score'

@@ -72,7 +72,7 @@ The fast "am I exposed?" answer — the hardest-breaching attacks, optionally sc
 
 Fourteen tools from `register_scan_tools(...)` (one is a back-compat alias of another). All are `async`. All are org-scoped to the server-bound org. None raises across the MCP boundary — a recoverable failure returns `{"error": "<message>"}`.
 
-The four target tools (`validate_target`, `start_scan`, `run_benchmark`) share the same target inputs: provide **either** `endpoint` (a custom OpenAI-compatible URL) **or** `provider` (a hosted provider name); `model` and `api_key` are optional. `api_key` is the *target's* credential — it is redacted before any record is persisted and never logged or stored raw. Supplying neither `endpoint` nor `provider` raises a validation error from `TargetSpec` that surfaces as the tool's error.
+The three target tools (`validate_target`, `start_scan`, `run_benchmark`) share the same target inputs: provide **either** `endpoint` (a custom OpenAI-compatible URL) **or** `provider` (a hosted provider name); `model` and `api_key` are optional. `api_key` is the *target's* credential — it is redacted before any record is persisted and never logged or stored raw. Supplying neither `endpoint` nor `provider` raises a validation error from `TargetSpec` that surfaces as the tool's error.
 
 ### Validate
 

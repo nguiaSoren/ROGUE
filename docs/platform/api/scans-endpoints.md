@@ -1,6 +1,8 @@
 # Scan Endpoints (Team A)
 
-> The five HTTP routes that turn a scan into a hosted product: create one, poll it, cancel it, list them, and fetch the rendered report. These are the **first write endpoints** on ROGUE's public API — every other route on the existing FastAPI app (`src/rogue/api/main.py:1`) is read-only (`GET /api/attacks`, `GET /api/breaches/matrix`, …). This doc specifies request/response shapes and the exact `ScanService` call each route makes; it does **not** redefine any contract. The vocabulary — `ScanSpec`, `TargetSpec`, `ScanRecord`, `ScanStatus`, the ID grammar, the error envelope — is owned by [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) §4–§5 and used here verbatim. See also [`./overview.md`](./overview.md) for the versioning/base-URL/auth conventions these routes inherit, [`./auth-and-keys.md`](./auth-and-keys.md) for how `org_id`/`project_id`/`actor` are derived from the API key, [`../orchestration/scan-service.md`](../orchestration/scan-service.md) for the service these routes are thin clients of, and [`../reports/report-service.md`](../reports/report-service.md) for the report renderer the report route delegates to.
+> The five HTTP routes that turn a scan into a hosted product: create one, poll it, cancel it, list them, and fetch the rendered report. These are the public API's write surface; the legacy `/api/*` routes stay read-only. This doc specifies request/response shapes and the exact `ScanService` call each route makes. The vocabulary — `ScanSpec`, `TargetSpec`, `ScanRecord`, `ScanStatus`, the ID grammar, the error envelope — is owned by [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) §4–§5. See also [`./overview.md`](./overview.md), [`./auth-and-keys.md`](./auth-and-keys.md), [`../orchestration/scan-service.md`](../orchestration/scan-service.md), [`../reports/report-service.md`](../reports/report-service.md).
+
+Status: **BUILT (local)** — shipped in `src/rogue/api/v1/scans.py`. A few shapes differ from this spec and are corrected inline: (a) **list returns `{scans, count}`, not `{items, next_cursor}` — there is no cursor pagination** (just `limit` + optional `status`/`project_id`); (b) **cancel on an already-terminal scan returns `200` with the unchanged record (idempotent no-op), not `409`** — `cancel_scan` never raises a conflict; (c) the target carries `api_key` (raw, swapped to a `secref_` handle by the service) or `api_key_ref`, **not** a `vault://` handle; (d) an unknown `format` is rejected by FastAPI's `Literal["json","html","pdf"]` as a `422`, not a hand-rolled `400`; (e) `create_scan` is called with `idempotency_key` (from the `Idempotency-Key` header) but **no `actor`**; (f) the `402 payment_required` / `403 forbidden` cross-tenant-write cases are not implemented.
 
 ## Where these routes live
 
@@ -53,15 +55,16 @@ Enqueue a scan and return immediately. The body **is** a `ScanSpec` (ARCHITECTUR
 
 **Request body (`ScanSpec`):**
 
+The shipped request body is **flat** (`CreateScanRequest` in `scans.py`) — the target fields sit at the top level, not nested under a `target` object; the handler folds them into a `ScanSpec.target`. It also carries a `mode` field (`pack | repertoire | ladder`, default `pack`):
+
 ```json
 {
-  "target": {
-    "endpoint": "https://api.acme.ai/v1/chat",
-    "provider": "openai",
-    "model": "acme-support-bot",
-    "api_key_ref": "vault://acme/openai/support-bot",
-    "system_prompt": "You are Acme's customer-support assistant. Never reveal internal policies."
-  },
+  "endpoint": "https://api.acme.ai/v1/chat",
+  "provider": "openai",
+  "model": "acme-support-bot",
+  "api_key": "sk-…",
+  "system_prompt": "You are Acme's customer-support assistant. Never reveal internal policies.",
+  "mode": "pack",
   "pack": "default",
   "attacks": null,
   "max_tests": 50,
@@ -70,7 +73,7 @@ Enqueue a scan and return immediately. The body **is** a `ScanSpec` (ARCHITECTUR
 }
 ```
 
-Field rules: `target.api_key_ref` is a Vault/KMS handle (ARCHITECTURE §5 — **never** the raw secret; Team C resolves it inside the worker, the API never sees the key). Exactly one routing mode is required on `target`: either `endpoint` (a self-hosted/custom URL → `base_url` on the engine's `DeploymentConfig`) **or** `provider` + `model` (→ provider-prefixed model, e.g. `openai/acme-support-bot`); supplying neither is `invalid_request`. `pack` defaults to `"default"` and must be one of the loadable packs (`default | aggressive | compliance`, `src/rogue/api/main.py` engine wraps `rogue.packs`); an unknown pack is `invalid_request`. `attacks` (optional `list[str]`) pins specific attack-primitive IDs/families and, when set, overrides pack selection for those entries. `max_tests` (default `50`) caps planned tests; `n_trials` (default `1`) is repetitions per test (the N in "MAX any-breach over N trials"); `budget` (optional USD ceiling) aborts the run cleanly when projected spend would exceed it.
+Field rules: pass the raw provider credential as `api_key` — `DefaultScanService` (when wired with a secret store) encrypts it into the Fernet `secrets` table and swaps it for a `secref_` handle before persist/enqueue, so the raw key never lands in `scan_runs`/`scan_jobs` and the worker resolves it just-in-time (it never appears in any `ScanRecord`). Exactly one routing mode is required: either `endpoint` (custom URL → `base_url`) **or** `provider` (+ optional `model` → provider-prefixed model, e.g. `openai/acme-support-bot`); supplying neither fails `TargetSpec`'s validator → **`422 invalid_request`**. `mode` selects the attack source: `pack` (curated JSON pack), `repertoire` (live harvested corpus), or `ladder` (full escalation arsenal). `pack` defaults to `"default"`. `max_tests` (default `50`, 1–1000), `n_trials` (default `1`, 1–10), `budget` (optional USD ceiling) are validated by Pydantic field bounds. **Note:** unknown-pack and quota validation are *not* done synchronously in the create handler — an unknown pack surfaces later as a failed scan, not a `422`.
 
 **Responses:**
 
@@ -90,7 +93,7 @@ Field rules: `target.api_key_ref` is a Vault/KMS handle (ARCHITECTURE §5 — **
 
 `401 unauthorized` — missing/invalid API key (auth dep, before the handler runs). `402 payment_required` — org over plan quota (overview). `403 forbidden` — the key's org may not write to the requested `project_id`.
 
-**`ScanService` call:** `await scan_service.create_scan(spec, org_id=org_id, project_id=project_id, actor=actor)`. The service mints the `scan_<ulid>`, persists a `ScanRecord` in `queued`, enqueues the job, and returns the record; the handler emits the `{scan_id, status}` subset as `202`. The handler never touches the queue or the engine directly.
+**`ScanService` call:** `await scan_service.create_scan(spec, org_id=principal.org_id, project_id=principal.project_id, idempotency_key=…)` (the `Idempotency-Key` header is threaded in; **no `actor`** arg is passed). The service mints the `scan_<ulid>`, persists a `ScanRecord` in `queued`, enqueues the job, and returns the record; the handler emits the `{scan_id, status}` subset as `202`.
 
 **Status transition:** creates the record in `queued`. The worker (Team B) moves it `queued → running` on pickup and `running → completed | failed` at the end; this route owns only the `→ queued` creation edge.
 
@@ -150,35 +153,29 @@ Request cancellation. Idempotent and best-effort: a `queued` job is dequeued, a 
 
 **Responses:**
 
-`200 OK` — the updated `ScanRecord`, now `status == "canceled"` (for a `queued` scan, canceled immediately) or still `"running"` with a cancellation flag the worker will honor — the service decides; the handler returns whatever record the service hands back. Calling cancel on an already-`canceled` scan returns `200` with the same record (idempotent), not an error.
+`200 OK` — the updated `ScanRecord`. For a non-terminal scan the service sets `status == "canceled"` and best-effort drops the queued job. **For an already-terminal scan (`completed`/`failed`/`canceled`) the shipped service returns `200` with the record untouched — it is a no-op, NOT a `409`.** (The original design raised a conflict on terminal cancel; `DefaultScanService.cancel_scan` does not.)
 
-`409 conflict` — the scan is already in a terminal state that cannot be canceled (`completed` or `failed`):
+`404 not_found` — no such scan for this org (the service raises `KeyError`, mapped to `404`). `401 unauthorized` (auth dep).
 
-```json
-{ "error": { "code": "conflict", "message": "cannot cancel a completed scan", "details": { "status": "completed" } } }
-```
+**`ScanService` call:** `await scan_service.cancel_scan(scan_id, org_id=principal.org_id)`. A missing/cross-tenant scan raises `KeyError` → `404`; a terminal scan returns unchanged; otherwise it transitions to `canceled`. See the [scan-service §8 cancellation caveat](../orchestration/scan-service.md) — there is no mid-run cancellation of a `running` scan.
 
-`404 not_found` — no such scan for this org. `401 unauthorized`.
-
-**`ScanService` call:** `await scan_service.cancel_scan(scan_id, org_id=org_id)`. The service enforces the legal transition (`queued | running → canceled`) and raises the conflict for terminal states; the handler maps that to `409`. The handler does not reach into the queue.
-
-**Status transition:** owns the `→ canceled` edge from `queued`/`running`. `completed`/`failed`/`canceled` are terminal and reject the transition.
+**Status transition:** sets `→ canceled` for a non-terminal scan; terminal scans are returned as-is.
 
 ---
 
-## 5. `GET /v1/scans?project_id=&status=&limit=&cursor=` — list scans
+## 5. `GET /v1/scans?project_id=&status=&limit=` — list scans
 
-List the org's scans, newest-first, with cursor pagination. Backs the dashboard's Scans index page ([`../dashboard/pages-and-routes.md`]).
+List the org's scans, newest-first. Backs the dashboard's Scans index page ([`../dashboard/pages-and-routes.md`]). **No cursor pagination shipped** — `limit` only.
 
-**Request (query params):** `project_id` (optional, `proj_<ulid>` — restrict to one project), `status` (optional `ScanStatus` — filter to one state), `limit` (optional, default `50`, `1–200`, matching the dashboard list cap at `src/rogue/api/main.py:350`), `cursor` (optional opaque pagination token from a prior page's `next_cursor`).
+**Request (query params):** `project_id` (optional, restrict to one project), `status` (optional `ScanStatus` — filter to one state, applied in-handler), `limit` (optional, default `50`, `1–200`).
 
 **Responses:**
 
-`200 OK` — a page of records plus the next cursor. `items` are full `ScanRecord`s (same shape as route 2); `next_cursor` is `null` on the last page:
+`200 OK` — a count-wrapped list of full `ScanRecord`s (same shape as route 2). The wrapper is `{scans, count}` (no `next_cursor`):
 
 ```json
 {
-  "items": [
+  "scans": [
     {
       "scan_id": "scan_01J9ZC4M0K8Q2R3S4T5U6V7W8X",
       "org_id": "org_01J9Z0000000000000000ACME",
@@ -198,13 +195,13 @@ List the org's scans, newest-first, with cursor pagination. Backs the dashboard'
       "completed_at": "2026-06-04T12:07:41Z"
     }
   ],
-  "next_cursor": "eyJjcmVhdGVkX2F0IjoiMjAyNi0wNi0wNFQxMjowMDowMFoifQ"
+  "count": 1
 }
 ```
 
-`422 invalid_request` — `limit` out of range, malformed `cursor`, or unknown `status` value. `401 unauthorized`.
+`422 invalid_request` — `limit` out of range or unknown `status` value (FastAPI param validation). `401 unauthorized`.
 
-**`ScanService` call:** `await scan_service.list_scans(org_id=org_id, project_id=project_id, limit=limit)`. The `org_id` is always the caller's resolved tenant, so the list is tenant-scoped by construction. The contract method (ARCHITECTURE §4) takes `org_id`, optional `project_id`, and `limit`; `status` filtering and `cursor` pagination are applied by the service per [`../orchestration/scan-service.md`](../orchestration/scan-service.md) (the API surfaces them as query params and forwards them).
+**`ScanService` call:** `await scan_service.list_scans(org_id=principal.org_id, project_id=project_id, limit=limit)`. The `org_id` is always the caller's resolved tenant, so the list is tenant-scoped by construction. The `status` filter is applied in the handler (the service's `list_scans` takes no status arg).
 
 ---
 

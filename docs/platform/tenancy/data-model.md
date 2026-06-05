@@ -2,7 +2,21 @@
 
 > The persistence layer that turns ROGUE from a single-tenant tool into a SaaS platform. This doc owns the **new tables** — `organizations`, `users`, `memberships`, `projects`, `api_keys`, `scan_runs`, `reports` — and the alembic plan that lands them on the single Neon Postgres database alongside the engine's existing schema. It is written to the IDs, enums, and contracts frozen in [../ARCHITECTURE.md](../ARCHITECTURE.md): we **use** `org_<ulid>`/`proj_<ulid>`/`scan_<ulid>`/`rep_<ulid>`/`rk_live_*`, `ScanStatus`, `ScanRecord`, and `TargetSpec` — we never redefine them. Authentication, key verification, and row-scoping policy live in [./isolation-and-rbac.md](./isolation-and-rbac.md); secret storage and the `api_key_ref` handle live in [./secrets.md](./secrets.md); the `scan_jobs` work-queue table is owned by [../orchestration/job-queue.md](../orchestration/job-queue.md) and is referenced here, never duplicated.
 
-Status: **design spec, not yet built.** The engine schema (`src/rogue/db/models.py`, latest migration `0021`) ships today; this is the SaaS layer above it, landing as migrations `0022+` per ARCHITECTURE.md §7 Week-2.
+Status: **BUILT (local), simpler than this spec.** The tables shipped — but in a **new module, `src/rogue/platform/models.py`** (its own `Base`), not `src/rogue/db/models.py`, and all in a **single migration `0022_platform_tables.py`** (not the `0022/0023/0024` tenancy chain this doc plans; those numbers were instead used for `secrets` (0023) and `integrations` (0024)). The shipped schema is leaner than the column tables below. Read this doc as the intended design; the actual shipped shape is summarized here:
+
+**Shipped tables (`src/rogue/platform/models.py`, migration 0022):**
+
+- `organizations` — `org_id` (PK), `name`, `created_at`. *No `slug`/`plan`/`deleted_at`.*
+- `users` — `user_id` (PK), `email` (unique), `name`, `created_at`.
+- `memberships` — **integer autoincrement `id`** (PK), `org_id` FK, `user_id` FK, `role` (`String(20)`); `UNIQUE(org_id, user_id)`. *No `mem_<ulid>`, no `created_at`.*
+- `projects` — `project_id` (PK), `org_id` FK, `name`, `slug`, `created_at`; `UNIQUE(org_id, slug)`.
+- `api_keys` — `key_id` (PK), `org_id` FK, `project_id` FK (nullable), `key_hash` (unique), `prefix` (`String(24)`), `name`, `scopes` (JSON), `created_at`, `last_used_at`, `revoked_at`. *No `expires_at`, `created_by`.*
+- `scan_runs` — `scan_id` (`String(48)` PK), `org_id` FK, `project_id` FK (**nullable**), `status` (**`String(20)`, not a native `scan_status` enum**), `progress`, `n_tests`, `n_completed`, `n_breaches`, `top_attack`, `score`, `cost_usd`, `report_id` (**plain `String(48)`, no FK**), `error`, **`target` (JSON, redacted snapshot)**, `pack`, **`spec` (JSON)**, `idempotency_key`, `created_at`, `started_at`, `completed_at`. *The `TargetSpec` is a JSON snapshot, not `target_provider`/`target_model`/`target_endpoint`/`target_api_key_ref` columns.*
+- `scan_jobs` — the queue table, **also in 0022** (see [../orchestration/job-queue.md](../orchestration/job-queue.md)).
+- `reports` — `report_id` (PK), `scan_id` FK, `format` (`String(16)`, default `json`), **`payload` (JSON — the whole `ScanReport.to_dict()`)**, `created_at`. *No `formats`/`json_blob`/`html_ref`/`pdf_ref`/`exec_summary_ref`/`org_id`/score columns; PDF/HTML are rendered on demand by `ReportService`, not stored.*
+- `secrets` (migration 0023) and `integrations` (migration 0024) — see [./secrets.md](./secrets.md) and [../integrations/slack-github-jira.md](../integrations/slack-github-jira.md).
+
+Notably **not done:** soft-delete (`deleted_at`), the native `scan_status` Postgres enum, and the `deployment_configs.customer_id → org_id` expand/backfill migration (§4) — the legacy single-tenant `acme` engine tables are untouched. The detailed design below is retained for intent; defer to the shipped summary above for facts.
 
 ---
 
@@ -188,13 +202,13 @@ No existing FK, index, or enum is altered. The 0022 wave is purely "new tables +
 
 Migrations are hand-written in `src/rogue/db/migrations/versions/`, following the established style (revision = zero-padded string, `down_revision` chains linearly, `op.create_table` + explicit `op.create_index`, matching `0021_add_benchmark_runs.py`). `env.py` (`src/rogue/db/migrations/env.py:9`) calls `load_dotenv()` **before** importing `Base`, then overrides `sqlalchemy.url` from `DATABASE_URL` — so every migration in this chain runs against the same Neon DB the engine uses; there is no separate tenancy database.
 
-Chain (each `down_revision` is the prior id):
+**As shipped, the chain collapsed into one platform migration plus two follow-ons** (not the 3-part tenancy plan originally written):
 
-- **`0022_add_tenancy_core`** (`down_revision = "0021"`): create `organizations`, `users`, `memberships`, `projects`, `api_keys`. Order matters for FKs — `organizations` and `users` first, then `memberships`/`projects`/`api_keys` which reference them. Declare the `scan_status` enum is **not** needed here.
-- **`0023_link_configs_to_orgs`** (`down_revision = "0022"`): the §4 expand+backfill — add nullable `org_id`/`project_id` to `deployment_configs` with FKs, run the bootstrap-org data migration, leave `customer_id` intact.
-- **`0024_add_scan_runs_and_reports`** (`down_revision = "0023"`): create the `scan_status` Postgres enum (`sa.Enum(..., name="scan_status")` — note the engine's `_enum_values` convention so values are the lowercase Pydantic values, per `src/rogue/db/models.py:70`), then create `scan_runs` (without the `report_id` FK), create `reports` (with its `scan_id` FK), then `op.create_foreign_key` to add `scan_runs.report_id → reports.report_id` last. This two-phase create resolves the §3.7 mutual reference; `downgrade()` drops the FK, then `reports`, then `scan_runs`, then the enum (`sa.Enum(name="scan_status").drop(op.get_bind())`).
+- **`0022_platform_tables`** (`down_revision = "0021"`): creates **all** the platform tables at once — `organizations`, `users`, `memberships`, `projects`, `api_keys`, `scan_runs`, **`scan_jobs`** (the queue table is in here, not a separate Team-B migration), and `reports`. `status` is a plain `String(20)` column (no native `scan_status` enum), and `scan_runs.report_id` is a plain string (no mutual-reference FK), so the two-phase create-FK dance below was unnecessary.
+- **`0023_secrets`**: the Fernet `secrets` table ([./secrets.md](./secrets.md)).
+- **`0024_integrations`**: the per-org `integrations` table ([../integrations/slack-github-jira.md](../integrations/slack-github-jira.md)).
 
-`scan_jobs` — the worker queue/lease table — is **not** in this chain. It is owned by [../orchestration/job-queue.md](../orchestration/job-queue.md) and lands in its own migration in Team B's stream; the two streams share the linear `down_revision` chain, so whichever merges first takes `0022` and the other rebases its `down_revision`. Coordinate the integer at merge time; do not branch the alembic tree.
+The `deployment_configs.customer_id → org_id` expand/backfill migration (§4) was **not** written — the legacy engine tables are untouched, so the original design below is unrealized.
 
 Verification per migration: `uv run alembic upgrade head` then `uv run alembic downgrade -1` round-trips cleanly (the project's migration-smoke bar), and `uv run pytest tests/test_smoke.py` still passes the metadata/alembic checks.
 

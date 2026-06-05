@@ -48,13 +48,16 @@ class Severity(str, Enum):
 
 
 class SourceProvenance(BaseModel):
+    # source_type / bright_data_product are `Literal` types in the real schema
+    # (src/rogue/schemas/source_provenance.py); the ORM derives its CHECK
+    # constraint vocabulary from those via typing.get_args — no duplication.
     url: HttpUrl
-    source_type: str = Field(..., description="reddit | x | arxiv | github | huggingface | blog | mitre | owasp | other")
+    source_type: str = Field(..., description="reddit | x | arxiv | github | huggingface | blog | mitre | owasp | vendor_safety_blog | discord_archive | community_archive | other")
     author: Optional[str] = None
     published_at: Optional[datetime] = None
     fetched_at: datetime
     archive_hash: str = Field(..., description="SHA-256 of raw fetched content")
-    bright_data_product: str = Field(..., description="web_scraper_api | serp | unlocker | scraping_browser")
+    bright_data_product: str = Field(..., description="web_scraper_api | serp | web_unlocker | scraping_browser | mcp_server | fixture")
 
 
 class DeploymentConfig(BaseModel):

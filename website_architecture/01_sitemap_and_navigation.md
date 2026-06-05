@@ -15,7 +15,7 @@ Every user-facing route, its source file, whether it is public or gated, and wha
 | `/matrix` | `matrix/page.tsx` | Public | Breach Matrix heatmap — attack families × deployment configs, with SCOPE × ATTACKER quadrant toggles and a "worst attacker today" callout. Click a cell to open its drawer. Statically prerendered + ISR (300s). |
 | `/matrix/cell` | `matrix/cell/page.tsx` | Public | Single-cell expansion. Reads `?family=&config=&date=&scope=&attacker=` query params and lists every breaching primitive in that (family × config) cell, worst-first. Reached from the matrix cell drawer and the "worst attacker today" callout. Client-fetched (dynamic route, no server fetch). |
 | `/analytics` | `analytics/page.tsx` | Public | Telemetry report layer. Reads the bundled static `/analytics.json` (no API call) and renders capability / discovery / contextual / allocation / research / cost charts (Recharts + a custom family × model heatmap). |
-| `/brief` | `brief/page.tsx` | Public | Threat Brief. Executive-snapshot panel (net Δ vs yesterday, top-3 new attackers, recommended action), tier chips, then the full CISO-readable markdown brief with Markdown / JSON / PDF downloads. Statically prerendered + ISR. |
+| `/brief` | `brief/page.tsx` | Public | Threat Brief. Branded masthead (one-line headline + Markdown / JSON downloads), at-a-glance KPI snapshot strip, executive-snapshot panel (net Δ vs yesterday, top-3 new attackers, recommended action), tier chips, then the full CISO-readable markdown brief. Statically prerendered + ISR. |
 | `/sign-in` | `sign-in/page.tsx` | Public (auth entry) | Paste an `rk_live_…` API key → `POST /api/session`, which validates it and stores it in an httpOnly cookie. On success routes to `/scans`. This is the gateway into the authenticated product. |
 | `/scans` | `(app)/scans/page.tsx` | Authenticated | Scan list. Server-rendered table of the tenant's scans (id, target, status, breaches, score, created) with empty/error states. `force-dynamic`, per-request, never cached. |
 | `/scans/new` | `(app)/scans/new/page.tsx` | Authenticated | Launch form. Choose provider or custom endpoint, model, target key, scan mode (pack / repertoire / ladder), pack, and max_tests → `POST /api/scans` with an `Idempotency-Key`, then routes to the detail page. |
@@ -53,7 +53,7 @@ Not user pages: the route handlers under `frontend/src/app/api/` (`/api/session`
  ├─ /matrix            top nav "/matrix" OR landing card → breach heatmap
  │   └─ /matrix/cell?family=…&config=…   click a heatmap cell drawer → "see all breaching primitives"
  ├─ /analytics         top nav "/analytics" → telemetry charts
- ├─ /brief             top nav "/brief" OR landing card → daily threat brief (+ MD/JSON/PDF download)
+ ├─ /brief             top nav "/brief" OR landing card → daily threat brief (+ MD/JSON download)
  └─ /sample-report.html   landing hero CTA / product-pitch link → static example report
 ```
 
@@ -87,7 +87,7 @@ ROGUE website
 │   ├── /matrix                   breach matrix heatmap
 │   │   └── /matrix/cell          single (family × config) cell expansion  [?family=&config=&…]
 │   ├── /analytics                telemetry report charts (static analytics.json)
-│   ├── /brief                    daily CISO threat brief (+ MD/JSON/PDF)
+│   ├── /brief                    daily CISO threat brief (+ MD/JSON)
 │   ├── /sign-in                  paste rk_live_… key → session cookie  ──► gateway into (app)
 │   └── /sample-report.html       static example report (public/ asset)
 │

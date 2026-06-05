@@ -1,9 +1,10 @@
-"""Shared customer-facing vocabulary: enums, display labels, and remediation templates.
+"""Shared customer-facing vocabulary: enums, display labels, explanation + remediation templates.
 
 This is the *customer* taxonomy. It deliberately mirrors ROGUE's internal `AttackFamily` /
-`AttackVector` / `Severity` slugs (so the server can pass them straight through) but adds the two
+`AttackVector` / `Severity` slugs (so the server can pass them straight through) but adds the three
 things customers actually need and the internal system does not provide: a human **display label**
-per technique and a **remediation** template per family.
+per technique, a plain-language **explanation** ("what this is + why it matters") per family, and a
+**remediation** template per family.
 """
 
 from __future__ import annotations

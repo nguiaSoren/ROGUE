@@ -62,12 +62,12 @@ The public page list, in nav order, is: **`/` (landing)**, **`/feed`**, **`/matr
 
 ## `/brief` — The Daily Threat Brief
 
-> Note: `/brief` is getting a visual refresh in parallel — this section describes its **purpose and content**, not its exact current pixels.
-
 **Purpose.** The deliverable distilled to its most shippable form: a daily, CISO-readable diff of what changed since yesterday in the threat landscape. It's "the artifact you'd actually send" — the one-page answer to "is anything new breaking us today, and should I care?"
 
 **What's on it (content).** The brief is a **diff digest**, not a full dump. Its content centers on the day-over-day delta:
 
+- A branded **masthead** — a pulsing green "daily threat brief" eyebrow, the "Threat Brief" title, a long human date ("Friday, June 5, 2026"), a dynamically-built one-line CISO headline ("N new CRITICAL attacks bypassed guardrails since yesterday…" / "Steady state — no critical movers"), the snapshot-vs-live provenance note, and the export buttons.
+- An **at-a-glance KPI snapshot strip** — four "vs yesterday" cards (Newly breaching, New CRITICAL, Newly defended, signed Net Δ; the red ones pulse when nonzero).
 - An **executive snapshot** — the net change vs yesterday (total breaching today vs yesterday and the net delta), the top-3 worst *new* attackers, and a recommended-action line.
 - **Tier chips** counting the *newly-breaching* attacks by severity: CRITICAL, HIGH, MEDIUM, LOW. The CRITICAL chip pulses when nonzero.
 - The full **long-form markdown brief** — the human-readable report, broken out by severity tier, listing each newly-breaching primitive (title, family, vector, severity score/tier, max breach rate, and which configs it breached) and a "newly defended" section for cells that *stopped* breaching since yesterday.

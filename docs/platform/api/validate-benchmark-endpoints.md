@@ -2,7 +2,9 @@
 
 > Team A. Two endpoints on the public REST API that bracket a scan: `validate` is the cheap **pre-flight** ("can ROGUE even reach this target, and what can it do?"), and `benchmark` is the standardized **yardstick** ("how does this target score against a known dataset?"). Both are thin clients of the one engine — they call `ScanEngine.validate` and `ScanEngine.benchmark` (see [../orchestration/scan-engine-adapter.md](../orchestration/scan-engine-adapter.md)), never a scanning path of their own. This doc specifies the HTTP contract; it does not redefine `TargetSpec`, `ValidationResult`, `BenchmarkReport`, the ID scheme, or the error envelope — those are frozen in [../ARCHITECTURE.md](../ARCHITECTURE.md) §4–§5, and this doc cites the engine code that produces each shape.
 
-Read first: [./overview.md](./overview.md) for the API surface, versioning, and error envelope; [./scans-endpoints.md](./scans-endpoints.md) for the async-job pattern `benchmark` reuses; [./auth-and-keys.md](./auth-and-keys.md) for the key auth and tenant scoping both endpoints inherit; [../benchmark/api-and-datasets.md](../benchmark/api-and-datasets.md) for dataset definitions and scoring, which this doc defers to.
+Read first: [./overview.md](./overview.md) for the API surface, versioning, and error envelope; [./scans-endpoints.md](./scans-endpoints.md); [./auth-and-keys.md](./auth-and-keys.md); [../benchmark/api-and-datasets.md](../benchmark/api-and-datasets.md).
+
+Status: **BUILT (local)** — shipped in `src/rogue/api/v1/validate_benchmark.py` + `src/rogue/platform/benchmark_service.py`. Corrections to this spec, inline below: (a) both request bodies are **flat** (target fields at top level), and they carry a raw `api_key`, not a `vault://` `api_key_ref`; (b) `validate` goes straight to `ScanEngine.validate(spec)` — there is no `model`-required rule (model is optional); (c) `benchmark` rides a **dedicated `DefaultBenchmarkService`** (not `ScanService`), and in the shipped MVP it **runs inline inside `create` then returns** — the record lives in an **in-memory map**, it is *not* enqueued on the scan `JobQueue` and no `ScanWorker` runs it (so the `202` body's `status` is already `completed`/`failed`, and benchmark state does not survive a process restart); (d) the polling route is `GET /v1/benchmark/{benchmark_id}`.
 
 ---
 
@@ -10,9 +12,9 @@ Read first: [./overview.md](./overview.md) for the API surface, versioning, and 
 
 Both endpoints sit behind the same gate as `/v1/scans`. Every request carries an API key (`rk_live_<rand>` / `rk_test_<rand>`, of which only a SHA-256 is stored — [../ARCHITECTURE.md](../ARCHITECTURE.md) §5), resolves to an `org_<ulid>` + `proj_<ulid>`, and is rejected with the standard envelope on failure. The mechanics — header name, key lookup, the `401 unauthenticated` / `403 forbidden` / `429 rate_limited` envelopes — live in [./auth-and-keys.md](./auth-and-keys.md) and are not repeated here.
 
-Both bodies embed a `TargetSpec` (`{ endpoint, provider, model, api_key_ref, system_prompt }`, [../ARCHITECTURE.md](../ARCHITECTURE.md) §5). The `api_key_ref` is a Vault/KMS handle resolved by Team C at execution time, **never** a raw provider secret on the wire — the same rule scans follow. A request that inlines a raw key instead of a ref is a `400 invalid_request`.
+Both bodies carry the target fields **flat** (not nested under a `target` object): `{ endpoint, provider, model, api_key, system_prompt, … }`. The shipped contract takes the **raw** `api_key` on the wire (the platform encrypts it into the Fernet secret store on the scan path; the validate path uses it transiently and closes the adapter) — there is no `api_key_ref`/`vault://` form here. A target missing both `endpoint` and `provider` is a `400 invalid_request` (the `TargetSpec` validator rejects it before the engine runs).
 
-Both route through `ScanEngine` (the `validate` / `benchmark` methods declared in [../ARCHITECTURE.md](../ARCHITECTURE.md) §4), so a target that validates here is the same target a scan will exercise — the "one engine" invariant holds across all three operations.
+Both bottom out at the one `ScanEngine` (`validate` directly; `benchmark` via `DefaultBenchmarkService` → `ScanEngine.benchmark`), so a target that validates here is the same target a scan exercises — the "one engine" invariant holds.
 
 ---
 
@@ -32,12 +34,12 @@ Content-Type: application/json
   "endpoint": "https://api.openai.com/v1",
   "provider": "openai",
   "model": "gpt-4o-mini",
-  "api_key_ref": "vault://org_01.../openai-prod",
+  "api_key": "sk-…",
   "system_prompt": "You are Acme's support assistant."
 }
 ```
 
-The body **is** a `TargetSpec` (no envelope around it — unlike `ScanSpec`, validate takes the target directly). `endpoint` or `provider` must pin a reachable base URL; `model` is required so the engine knows what to invoke.
+The body is the flat `ValidateRequest` (`endpoint`/`provider`/`model`/`api_key`/`system_prompt`), folded into a `ScanSpec` server-side. `endpoint` or `provider` is required; `model` is optional (the engine falls back to a per-provider default).
 
 ### Response — `200 OK`, a `ValidationResult`
 
@@ -83,7 +85,7 @@ Cost: one provider completion of a few tokens, billed to the tenant as a negligi
 
 ## 3. `POST /v1/benchmark` — async job
 
-Benchmarking runs a known dataset against the target and reports attack-success-rate. Because it issues one target call per goal (up to `max_goals`), it spends real money and takes minutes — so it is an **async job modeled exactly like a scan** ([./scans-endpoints.md](./scans-endpoints.md)): submit returns `202` with an ID, the caller polls for completion. The engine entry point is `ScanEngine.benchmark` ([../ARCHITECTURE.md](../ARCHITECTURE.md) §4), a thin wrapper over `run_benchmark` (`src/rogue/benchmark.py:90`), which itself calls the one `run_scan` (`src/rogue/benchmark.py:111`) — no separate execution path.
+Benchmarking runs a known dataset against the target and reports attack-success-rate. It issues one target call per goal (up to `max_goals`), so it spends real money and takes minutes. It is shaped as a submit-then-poll job: `POST /v1/benchmark` returns `202 {benchmark_id, status}`, the caller polls `GET /v1/benchmark/{id}`. **Shipped MVP caveat:** unlike scans, the benchmark is **not** queue-backed — `DefaultBenchmarkService.create` runs `ScanEngine.benchmark` *inline* and only then returns, against an in-memory record map (so the `202` response already carries the terminal `status`, and a process restart loses the record). The code's own comment marks this as MVP; production would enqueue onto the same `JobQueue` scans use. The engine entry point is `ScanEngine.benchmark`, a wrapper over `run_benchmark` (`src/rogue/benchmark.py`), which itself calls the one `run_scan` — no separate execution path.
 
 ### Two benchmark engines — what the API exposes
 
@@ -102,15 +104,18 @@ Authorization: Bearer rk_live_…
 ```
 ```json
 {
-  "target": { "endpoint": "https://api.openai.com/v1", "provider": "openai", "model": "gpt-4o-mini", "api_key_ref": "vault://org_01.../openai-prod" },
+  "endpoint": "https://api.openai.com/v1",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "api_key": "sk-…",
   "dataset": "advbench_100",
   "max_goals": 25
 }
 ```
 
-- **`target`** — a `TargetSpec` (here nested under `target`, mirroring `ScanSpec`, unlike validate's bare body).
-- **`dataset`** — one of `VALID_DATASETS` (`"advbench_100" | "jbb_100"`, `src/rogue/benchmark.py:32`) or a tenant `custom` set defined per [../benchmark/api-and-datasets.md](../benchmark/api-and-datasets.md). An unknown value is rejected: `run_benchmark` raises `ValueError` (`src/rogue/benchmark.py:41`), which the API maps to `400 invalid_request` **at submit time**, before queueing — a bad dataset should never cost a job slot.
-- **`max_goals`** — cap on goals run (engine default `25`, `src/rogue/benchmark.py:93`). The API SHOULD clamp this to a tenant-tier ceiling and reflect the effective value in the report's `n_goals`.
+- **target fields** — flat (`endpoint`/`provider`/`model`/`api_key`/`system_prompt`), like validate; folded into a `ScanSpec` server-side. Not nested under `target`.
+- **`dataset`** — defaults to `"advbench_100"`. An unknown value makes `run_benchmark` raise `ValueError`, which the handler maps to `400 invalid_request` **at submit time** (before the inline run).
+- **`max_goals`** — cap on goals run, default `25` (1–1000).
 
 ### Response — `202 Accepted`
 

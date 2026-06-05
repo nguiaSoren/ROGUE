@@ -2,7 +2,7 @@
 
 > **Team C — Multi-Tenant.** This is the doc that makes ROGUE multi-tenant *safe*: the rules and the one helper that guarantee no request ever reads another org's data, the role/permission model that decides who inside an org may do what, and the migration that kills the single-tenant `acme` hard-codes inherited from the Week-1–3 engine. It elaborates the **Team C** box in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §6 and is bound by the `ScanService` contract in §4. The tenant tables themselves (orgs/users/projects/api_keys, and the org-scoping columns added to existing tables) are specified in [`./data-model.md`](./data-model.md); secret material (the `api_key_ref` Vault handles, key hashing) lives in [`./secrets.md`](./secrets.md); the authentication step that resolves a key into an org lives in [`../api/auth-and-keys.md`](../api/auth-and-keys.md); the methods every rule below applies to are in [`../orchestration/scan-service.md`](../orchestration/scan-service.md).
 
-Status: **design spec, not yet built.** The engine is single-tenant today; this doc is the contract for making it not.
+Status: **PARTIALLY BUILT (local).** The core isolation seam shipped in `src/rogue/platform/tenancy.py`: a `Principal` (org_id / role / key_id / project_id / scopes), `resolve_principal_from_token`, and the **`query_scope(stmt, principal)`** helper that appends `WHERE org_id = :org [AND project_id = :project]` (raising if the entity has no `org_id` column). The 4-role vocabulary (`owner|admin|member|viewer`) and `has_scope`/`role_at_least` exist. **What did NOT ship:** the `scoped()`/`scoped_project()` naming and the `TenantScoped` mixin (the real helper is `query_scope`, and it inspects the statement's FROM entity for an `org_id` column rather than a marker mixin); the **CI lint rule** that turns a missing filter into a build failure; **RLS**; the **`audit_log`** table and audit writes; the **`deployment_configs.customer_id → org_id` migration** (the legacy `acme` hard-codes in `threat_brief.py` / MCP / `api/main.py:1052` are untouched); and per-route RBAC *enforcement* in the `/v1` handlers (they gate on `require_principal` only, not `require(principal, resource, action)`). Sections below describing those are design — each is flagged inline. The tenant tables are in [`./data-model.md`](./data-model.md); key hashing + the Fernet secret store in [`./secrets.md`](./secrets.md); key→org resolution in [`../api/auth-and-keys.md`](../api/auth-and-keys.md).
 
 ---
 
@@ -31,16 +31,19 @@ ROGUE runs on **one Neon Postgres database** (the runtime store from the project
 
 `org_id` is not a parameter a handler chooses to pass; it is established once at the edge and threaded as a non-optional argument through every layer. The chain has four hops.
 
-**(1) Key → principal.** A request arrives with `Authorization: Bearer rk_live_…`. [`../api/auth-and-keys.md`](../api/auth-and-keys.md) hashes the presented key (SHA-256), looks the hash up in `api_keys`, and resolves a **`RequestPrincipal`**:
+**(1) Key → principal.** A request arrives with `Authorization: Bearer rk_…`. `require_principal` ([`../api/auth-and-keys.md`](../api/auth-and-keys.md)) hashes the presented key (SHA-256), looks the hash up in `api_keys`, and resolves a **`Principal`** (the shipped name; the doc's `RequestPrincipal` is the same idea):
 
 ```python
-@dataclass(frozen=True)
-class RequestPrincipal:
-    org_id: str            # org_<ulid> — the tenant boundary
-    actor: str             # "key:rk_live_…last4" or "user:usr_<ulid>"
-    role: Role             # owner | admin | member | viewer  (§5)
-    project_id: str | None # set iff the key/user is project-scoped (§6); None = org-wide
+@dataclass
+class Principal:               # src/rogue/platform/tenancy.py
+    org_id: str                # org_<ulid> — the tenant boundary
+    role: str                  # owner | admin | member | viewer  (§5)
+    key_id: str                # the issuing api_keys row
+    project_id: str | None = None  # set iff the key is project-scoped (§6); None = org-wide
+    scopes: list[str] = …      # the key's explicit scope grant
 ```
+
+(There is no `actor` field on the shipped `Principal`; `key_id` is the audit handle.)
 
 The raw key never travels past this step; from here on the system speaks in `RequestPrincipal`. An unrecognised or revoked key never produces a principal — the request is rejected with `401` and the error envelope from [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §5 before any handler runs.
 
@@ -63,28 +66,30 @@ The raw key never travels past this step; from here on the system speaks in `Req
 
 Row-scoping fails the day someone writes `session.execute(select(ScanRun).where(ScanRun.scan_id == sid))` and forgets `.where(ScanRun.org_id == org)`. The mitigation is to make the *unscoped* call impossible to express against a tenant table. Two layers:
 
-**(a) The `scoped()` helper is the only sanctioned way to query a tenant table.** It takes the org and returns a statement pre-filtered on `org_id`, refusing any model that isn't tenant-owned:
+**(a) The `query_scope()` helper is the sanctioned way to scope a tenant query.** The shipped signature is `query_scope(stmt, principal)` (not `scoped(stmt, org_id)`): it takes the whole `Principal`, applies `WHERE org_id = :org` and — when `principal.project_id` is set and the entity has a `project_id` column — `AND project_id = :project`, and **raises `ValueError` if the statement's FROM entity has no `org_id` column** (the "not tenant-scoped" guard):
 
 ```python
-def scoped(stmt: Select, org_id: str) -> Select:
-    """Apply WHERE org_id = :org to a SELECT over a TenantScoped model.
-    Raises at construction time if the target entity is not tenant-owned."""
-    entity = _sole_entity(stmt)               # the model the SELECT is FROM
-    if not issubclass(entity, TenantScoped):  # mixin marker — see ./data-model.md
-        raise TenantScopingError(f"{entity.__name__} is not tenant-scoped; "
-                                 "do not route it through scoped()")
-    return stmt.where(entity.org_id == org_id)
+def query_scope(stmt, principal: Principal):           # src/rogue/platform/tenancy.py
+    entity = stmt.get_final_froms()[0]
+    org_col = getattr(entity.c, "org_id", None)
+    if org_col is None:
+        raise ValueError("query_scope: target has no org_id column — it is not tenant-scoped")
+    stmt = stmt.where(org_col == principal.org_id)
+    project_col = getattr(entity.c, "project_id", None)
+    if principal.project_id is not None and project_col is not None:
+        stmt = stmt.where(project_col == principal.project_id)
+    return stmt
 ```
 
-Tenant-owned tables (the `org_id`-bearing tables added in [`./data-model.md`](./data-model.md): `scan_jobs`, `scan_runs`, `reports`, `deployment_configs`, `api_keys`, `projects`, plus the harvest/breach tables once org-scoped) inherit a `TenantScoped` mixin that declares the indexed `org_id` column. Genuinely global tables — the shared attack corpus `attack_primitives`, `source_provenances` — are **not** `TenantScoped` and are intentionally readable cross-org; they hold ROGUE's own threat intel, not customer data, and routing them through `scoped()` raises (catching the *opposite* mistake of over-scoping a global table).
+The "is it tenant-owned?" test is **column presence (`entity.c.org_id`)**, not a `TenantScoped` mixin — there is no such mixin in the shipped code. Tenant-owned tables (`scan_runs`, `scan_jobs`, `reports`, `api_keys`, `projects`, …) carry an `org_id` column and pass; genuinely global tables (the shared `attack_primitives` corpus) have none and raise.
 
-**(b) A lint rule makes the bare call a CI failure.** A repo-local AST check (Ruff custom rule / a `flake8`-style plugin in CI) flags any `session.execute`/`session.scalars` whose statement targets a `TenantScoped` model and was not produced by `scoped()`. The check is **blocking** — a missing tenant filter does not merge. This is the load-bearing line of the whole strategy: *the absence of a `WHERE org_id` clause is a red build, surfaced at the PR, not a leak surfaced by a customer.* Writes go through `scoped()` analogously (every `update()`/`delete()` carries the org predicate), and inserts set `org_id = principal.org_id` from a base-repository `add()` that stamps it — a handler cannot choose the `org_id` it writes.
+**(b) The CI lint rule is NOT built.** The blocking AST check that would flag a bare `session.execute` over a tenant model is design only — there is no Ruff/flake8 plugin enforcing `query_scope` usage today. The discipline is by-convention (route every tenant read through `query_scope`), not machine-enforced. Note also: the `DefaultScanService`/`PostgresScanStore` shipped path filters by passing `org_id` to the store methods (`store.get(scan_id, org_id=…)` does the cross-tenant `→ None` check inline) rather than via `query_scope` — `query_scope` is the general helper, used where a raw `select` is built.
 
 ---
 
 ## 5. RBAC roles & the permission matrix
 
-Authentication answers *which org*; authorization answers *what may this principal do inside it*. Four roles, ordered by privilege, stored on the membership row (`org_members`, per [`./data-model.md`](./data-model.md)) and on `RequestPrincipal.role`:
+Authentication answers *which org*; authorization answers *what may this principal do inside it*. Four roles, ordered by privilege, stored on the membership row (the table is **`memberships`**, per [`./data-model.md`](./data-model.md)) and on `Principal.role`. **Shipped caveat:** the building blocks exist (`Principal.role`, `Principal.scopes`, `role_at_least`, `has_scope`), but the `(role, resource, action)` permission **matrix and the `require(principal, …)` enforcement call are NOT wired into the `/v1` handlers** — routes gate on authentication (`require_principal`) only. The matrix below is the intended policy, not an enforced one.
 
 - **owner** — the org's root authority. Billing, deleting the org, transferring ownership. Exactly one (or a small set) per org.
 - **admin** — manages people and configuration: invite/remove members, issue/revoke API keys, manage projects and org settings. No billing-destructive or org-deletion rights.
@@ -120,7 +125,9 @@ Project scope is enforced in the same helper layer as org scope, so the same lin
 
 ## 7. Killing the single-tenant hard-codes
 
-The Week-1–3 engine was built for one customer, `acme`, with a string `customer_id` standing in for a real tenant. Three concrete hard-codes leak that assumption and **must die** in the Week-2 "make it SaaS" milestone ([`../ARCHITECTURE.md`](../ARCHITECTURE.md) §7). Each is a place where the new `org_id` chain (§3) replaces a literal.
+> **Shipped status: NOT done.** The three `acme` hard-codes below were **not** removed — the legacy single-tenant dashboard/threat-brief/MCP path still uses `customer_id="acme"` (`api/main.py:1052`, `threat_brief.py`, `mcp_server/server.py`), and `deployment_configs.customer_id` is unchanged. The new multi-tenant `/v1` + `platform/` stack was added *alongside* the legacy single-tenant engine rather than by migrating it. This section remains the intended cutover plan.
+
+The Week-1–3 engine was built for one customer, `acme`, with a string `customer_id` standing in for a real tenant. Three concrete hard-codes leak that assumption and were slated to die in the "make it SaaS" milestone ([`../ARCHITECTURE.md`](../ARCHITECTURE.md) §7). Each is a place where the new `org_id` chain (§3) would replace a literal.
 
 **(a) `ThreatBriefBuilder.build_diff(customer_id="acme")`** — `src/rogue/diff/threat_brief.py:152` takes `customer_id: str` and is called with the literal `"acme"`; its own docstring (`threat_brief.py:159`) already flags this as "single-customer for now … a WHERE swap." Migration: rename the parameter to `org_id: str`, make it non-default and keyword-only (`build_diff(*, org_id, target_date=None)`), and have `_fetch_breach_matrix` filter the `breach_matrix` view on the org-scoped column instead of `customer_id`. No caller may pass a literal; the org comes from the request principal.
 
@@ -138,7 +145,9 @@ The principle across all three: **`customer_id` was a stringly-typed stand-in fo
 
 ## 8. Audit logging of privileged actions
 
-Every action that mutates tenant state or touches credentials/billing writes an immutable **`audit_log`** row (table in [`./data-model.md`](./data-model.md)). Audit is append-only: no `UPDATE`, no `DELETE`, retained for the org's lifetime.
+> **Shipped status: NOT built.** There is no `audit_log` table and no audit-write path in the shipped platform. `api_keys.last_used_at` is the only usage breadcrumb. This section is the intended design.
+
+Every action that mutates tenant state or touches credentials/billing would write an immutable **`audit_log`** row. Audit is append-only: no `UPDATE`, no `DELETE`, retained for the org's lifetime.
 
 A row records: `org_id`, `actor` (the `RequestPrincipal.actor` — `user:usr_…` or `key:…last4`), `action` (e.g. `scan.create`, `scan.cancel`, `apikey.issue`, `apikey.revoke`, `member.invite`, `member.role_change`, `project.create`, `org.settings_change`, `billing.change`), `resource_id`, `before`/`after` for state changes, request IP/user-agent, and `ts`. Privileged actions that **must** be audited: any API-key lifecycle event, any membership/role change, any project create/delete, any billing or org-settings change, and scan create/cancel (they spend money — see the costly-scripts note in the project `CLAUDE.md`). Reads are **not** audited by default (too noisy; the value is in mutations and credential events).
 
