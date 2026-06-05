@@ -1,5 +1,7 @@
 # ROGUE MCP — the threat DB and the scan lifecycle, as a tool surface
 
+> **This is the usage/integration guide.** For the design/architecture see [`docs/mcp/ARCHITECTURE.md`](mcp/ARCHITECTURE.md); for the frozen per-tool v1 interface see [`docs/mcp/CONTRACT.md`](mcp/CONTRACT.md).
+
 ## What it is
 
 ROGUE exposes its **own** Model Context Protocol server. This is the producer role: ROGUE is the server, and any MCP-speaking client — Claude Desktop, Cursor, ChatGPT, Windsurf, or anything that speaks the protocol — is the client. (ROGUE also uses MCP as a *consumer* inside its harvest pipeline, where the `DiscoveryAgent` calls Bright Data's MCP server to find novel attacks off the open web; that path is internal and is not what this document covers.) The producer server is the `FastMCP("rogue")` instance defined in `src/rogue/mcp_server/server.py`, and it is the piece that lets a coding agent work with ROGUE without ever opening the dashboard.
