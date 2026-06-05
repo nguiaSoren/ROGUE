@@ -215,3 +215,35 @@ async def test_update_compare_and_set_noop_on_status_mismatch():
     # Match → applies.
     out = await store.update(scan_id, expected_status=ScanStatus.CANCELED, progress=42)
     assert out.progress == 42
+
+
+class _ReapSpyQueue(InMemoryJobQueue):
+    """Records reap_expired() calls so we can assert the worker sweeps for orphaned jobs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.reaps = 0
+
+    def reap_expired(self) -> int:
+        self.reaps += 1
+        return 0
+
+
+def test_reap_invokes_queue_reap_expired() -> None:
+    store, queue = InMemoryScanStore(), _ReapSpyQueue()
+    ScanWorker(store, queue, FakeEngine())._reap()
+    assert queue.reaps == 1
+
+
+@pytest.mark.asyncio
+async def test_run_forever_reaps_orphaned_jobs_on_startup() -> None:
+    # A redeploy/crash mid-scan leaves a job leased; the worker must sweep expired leases on startup so
+    # the orphaned scan is requeued and resumes instead of hanging in RUNNING forever.
+    import asyncio
+
+    store, queue = InMemoryScanStore(), _ReapSpyQueue()
+    worker = ScanWorker(store, queue, FakeEngine())
+    stop = asyncio.Event()
+    stop.set()  # stop the loop immediately — we only want to observe the startup reap
+    await worker.run_forever(poll_interval=0.01, stop_event=stop)
+    assert queue.reaps >= 1

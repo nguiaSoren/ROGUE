@@ -207,6 +207,17 @@ class DefaultScanEngine(ScanEngine):
             if breached:
                 n_breaches += 1
             total_cost += getattr(res, "spend_usd", 0.0)
+            # A ladder run is ONE test per goal: the goal was either achieved (the escalation broke
+            # through) or held. success_rate / n_breach / n_trials all reflect that single outcome
+            # (1/1 = achieved, 0/1 = held) so they AGREE with the headline score (severity × success).
+            # Reporting the raw escalation-attempt count as n_trials made a finding read "breached
+            # 1/18 (6%)" next to a critical-100 score — the same number meaning two different things.
+            # The escalation DEPTH (how many techniques it took to break through — a real signal of how
+            # hard the model was to crack) is surfaced in the title instead.
+            depth = len(res.attempts)
+            title = goal.title
+            if breached and depth > 1:
+                title = f"{goal.title} — broke through after escalating through {depth} techniques"
             findings.append(
                 Finding(
                     family=goal.family.value,
@@ -221,10 +232,9 @@ class DefaultScanEngine(ScanEngine):
                     ),
                     vector=goal.vector.value,
                     severity=goal.base_severity.value,
-                    title=goal.title,
-                    # First-breach-wins per goal → 1.0/0.0, not a trial-rate (documented divergence).
+                    title=title,
                     success_rate=1.0 if breached else 0.0,
-                    n_trials=max(1, len(res.attempts)),
+                    n_trials=1,
                     n_breach=1 if breached else 0,
                     example_attack=(goal.payload_template or "")[:400] or None,
                     example_response=None,
