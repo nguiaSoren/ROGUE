@@ -191,6 +191,9 @@ async def _run_one_cell(
                 budget_usd=per_goal_budget,
                 candidate_attempt_quota=ctx.effective_quota,
                 candidate_ids=ctx.candidate_ids,
+                # §10.10 contextual mode — cross-tier blended order (None ⇒ fixed
+                # tier sequence). The benchmark always runs single-config cells.
+                cross_tier_order=getattr(ctx, "cross_tier_order", None),
             )
         breached = res.winning_strategy is not None
         rec = {
@@ -311,6 +314,13 @@ async def _main(args) -> int:
         )
         return 2
 
+    # Pin the ladder-ordering mode for this whole run BEFORE any escalation context
+    # is built (build_escalation_context → order_by_prior → ladder_order_mode() reads
+    # ROGUE_LADDER_ORDER). When --ladder-order is omitted we touch nothing, so the
+    # ambient env / default (canonical) is preserved exactly.
+    if args.ladder_order:
+        os.environ["ROGUE_LADDER_ORDER"] = args.ladder_order
+
     if args.targets:
         targets = tuple(t.strip() for t in args.targets.split(",") if t.strip())
     else:
@@ -325,6 +335,11 @@ async def _main(args) -> int:
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
     git_sha = _git_sha()
     label = args.run_label or f"{args.tier.lower()}-{int(time.time())}"
+    # Resolve the EFFECTIVE order mode (after the --ladder-order pin above), via the
+    # same resolver the ladder uses — so the Run records exactly what it ran under,
+    # whether the mode came from the flag, the ambient env, or the default.
+    from rogue.reproduce.ladder_priors import ladder_order_mode  # noqa: PLC0415
+    ladder_order = ladder_order_mode()
 
     total_est = 0.0
     written = 0
@@ -373,6 +388,9 @@ async def _main(args) -> int:
                 n_trials=args.n_trials, temperature=args.temperature,
                 max_spend=args.max_spend, concurrency=args.concurrency,
             )
+            # Mirror the resolved order mode into detail for redundancy (the column
+            # is canonical; detail survives even if the column is dropped/renamed).
+            agg["detail"]["ladder_order"] = ladder_order
             if not args.no_persist:
                 with SessionLocal() as s:  # short session, just the write
                     s.add(BenchmarkRun(
@@ -380,6 +398,7 @@ async def _main(args) -> int:
                         run_at=datetime.now(timezone.utc),
                         dataset=ds,
                         mode="repertoire",
+                        ladder_order=ladder_order,
                         target_model=config.target_model,
                         n_goals=agg["n_goals"],
                         n_breached=agg["n_breached"],
@@ -393,10 +412,13 @@ async def _main(args) -> int:
                     s.commit()
                 written += 1
             d = agg["detail"]
-            print(f"  {ds:13} × {config.target_model:34} "
-                  f"ASR={agg['asr']:.1%} ({agg['n_breached']}/{agg['n_goals']}) "
-                  f"med-rank={d['median_winner_rank']} depth(best/mean)="
-                  f"{d['best_ladder_depth']}/{d['mean_ladder_depth']} "
+            # Rank is THE metric: rank↓ ⇒ fewer attempts ⇒ cost/latency↓ at constant
+            # ASR. Lead with it; ASR is secondary (it gates whether a rank is even
+            # comparable, but the reorder's payoff is the rank).
+            print(f"  {ds:13} × {config.target_model:34} [{ladder_order}] "
+                  f"KPI: median winner-rank={d['median_winner_rank']} "
+                  f"depth(best/mean)={d['best_ladder_depth']}/{d['mean_ladder_depth']}  "
+                  f"| ASR={agg['asr']:.1%} ({agg['n_breached']}/{agg['n_goals']}) "
                   f"$/{agg['n_breached'] or '∅'}={d['cost_per_successful_goal']} "
                   f"${agg['cost_usd']:.2f}")
 
@@ -422,6 +444,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--datasets", default=",".join(CANONICAL_DATASETS),
                    help=f"comma-separated; default all of {CANONICAL_DATASETS}")
     p.add_argument("--mode", choices=("repertoire", "attacker"), default="repertoire")
+    p.add_argument(
+        "--ladder-order",
+        choices=("fixed", "canonical", "discovery", "viability", "starvation", "contextual"),
+        default=None,
+        help="ladder-ordering mode for this run; sets ROGUE_LADDER_ORDER before the "
+             "escalation context is built. Omit to use the ambient env / default "
+             "(canonical). Recorded on the BenchmarkRun row so each Run knows its order.",
+    )
     p.add_argument("--limit", type=int, default=0, help="cap goals per dataset (smoke)")
     p.add_argument("--n-trials", type=int, default=1)
     p.add_argument("--concurrency", type=int, default=5,

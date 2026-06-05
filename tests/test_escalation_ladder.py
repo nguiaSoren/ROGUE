@@ -403,3 +403,139 @@ async def test_candidate_quota_reserves_exactly_n_attempts() -> None:
     assert ("image:mml:wr", "breach") in res.attempts
     assert len(planner.planned) == 1  # exactly N=1 candidate attempted, not both
     assert res.winning_strategy == "image:mml:wr"
+
+
+# --------------------------------------------------------------------------- #
+# §10.10 Adaptive Technique Prioritization — cross-tier (contextual) ordering
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_default_no_cross_tier_order_preserves_fixed_tier_sequence() -> None:
+    """REPRODUCIBILITY GUARD: with cross_tier_order=None (the default + every non-
+    contextual mode), the ladder visits image → planner in the FIXED tier order, so a
+    Tier-1 image breach short-circuits before the planner tier — byte-for-byte the
+    legacy behavior. This is the safety net for the whole Phase-1 refactor."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.FULL_BREACH])  # image breaches at Tier 1
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, image_renderers=("mml:wr",), strategies=("crescendo",),
+        cross_tier_order=None,
+    )
+    assert res.attempts == [("image:mml:wr", "breach")]  # fixed tier order, image first
+    assert planner.planned == []  # planner tier never reached (image short-circuited)
+    assert res.winning_strategy == "image:mml:wr"
+
+
+@pytest.mark.asyncio
+async def test_cross_tier_order_runs_planner_before_image() -> None:
+    """CROSS-TIER PROMOTION: when cross_tier_order puts a planner strategy ahead of the
+    image renderers, the ladder executes crescendo FIRST (the whole point of contextual
+    mode — a strong planner prior rises above a tier-1 renderer)."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.FULL_BREACH])  # whatever runs first breaches
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, image_renderers=("mml:wr",), strategies=("crescendo",),
+        cross_tier_order=("crescendo", "image:mml:wr"),
+    )
+    # crescendo ran first and breached → image renderer never reached.
+    assert res.winning_strategy == "crescendo"
+    assert planner.planned == ["crescendo"]
+    assert res.attempts == [("crescendo", "breach")]
+    assert not any(lbl.startswith("image:") for lbl, _ in res.attempts)
+
+
+@pytest.mark.asyncio
+async def test_cross_tier_order_advances_through_units_in_blend_order() -> None:
+    """Contextual path advances unit-by-unit in the supplied order, preserving the
+    first-breach-wins semantics across tiers (planner no_breach → image breach)."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.REFUSED, JudgeVerdict.FULL_BREACH])
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, image_renderers=("mml:wr",), strategies=("crescendo",),
+        cross_tier_order=("crescendo", "image:mml:wr"),
+    )
+    assert res.attempts == [("crescendo", "no_breach"), ("image:mml:wr", "breach")]
+    assert res.winning_strategy == "image:mml:wr"
+
+
+@pytest.mark.asyncio
+async def test_cross_tier_order_audio_unit_skipped_without_audio_config() -> None:
+    """An audio unit in the cross-tier order is silently skipped (no attempt) when no
+    config accepts audio — same eligibility gate as the fixed Tier-4 block."""
+    planner = _FakePlanner()
+    judge = _FakeJudge([JudgeVerdict.FULL_BREACH])  # crescendo breaches
+    res = await run_escalation_ladder_one(
+        _parent(), planner=planner, panel=_FakePanel(), judge=judge, configs=_ONE_CONFIG,
+        n_trials=1, strategies=("crescendo",),
+        cross_tier_order=("audio:plain", "crescendo"),
+    )
+    assert not any(lbl.startswith("audio:") for lbl, _ in res.attempts)  # skipped
+    assert res.winning_strategy == "crescendo"
+
+
+def test_build_escalation_context_contextual_promotes_high_prior_planner(monkeypatch) -> None:
+    """build_escalation_context under mode==contextual derives the target vendor/family
+    from the single config and produces a CROSS-TIER blended order in which a planner
+    strategy with a strong global prior outranks weak tier-1 renderers. Mocked at the
+    DB-touching seams (rates + setup helpers) — no DB, no live LLM."""
+    from rogue.reproduce import escalation_ladder as EL
+    from rogue.reproduce import ladder_priors
+    from rogue.reproduce import renderer_registry, strategy_library, strategy_lifecycle
+    from rogue.reproduce.ladder_priors import VendorFamilyStat
+
+    # Force contextual mode.
+    monkeypatch.setenv("ROGUE_LADDER_ORDER", "contextual")
+
+    # Stub the DB-touching setup helpers so no real session/schema is needed.
+    monkeypatch.setattr(renderer_registry, "active_dynamic_strategies", lambda s, m: ())
+    monkeypatch.setattr(strategy_library, "load_strategy_library", lambda *a, **k: {})
+    monkeypatch.setattr(strategy_lifecycle, "ladder_config_from_env", lambda: ("run", 0))
+    # Contextual falls into the breach-rate else-branch for the per-tier pre-sort.
+    monkeypatch.setattr(ladder_priors, "strategy_breach_rates", lambda s, **k: {})
+
+    class _Plan:
+        rotation = ("crescendo", "actor_attack", "acronym")
+        candidate_ids = ()
+        harvested_ids = frozenset()
+
+    monkeypatch.setattr(
+        strategy_lifecycle, "build_rotation_plan", lambda *a, **k: _Plan()
+    )
+    monkeypatch.setattr(strategy_lifecycle, "format_rotation_plan", lambda p: "plan")
+
+    captured = {}
+
+    def _fake_rates(session, *, target_vendor, target_family):
+        captured["vendor"] = target_vendor
+        captured["family"] = target_family
+        # crescendo: strong global prior; image renderers: proven weak (0 of many).
+        return {
+            "crescendo": VendorFamilyStat("crescendo", 20, 20, 0, 0, 0, 0),
+            **{
+                f"image:{r}": VendorFamilyStat(f"image:{r}", 0, 30, 0, 0, 0, 0)
+                for r in EL.DEFAULT_IMAGE_RENDERERS
+            },
+        }
+
+    monkeypatch.setattr(ladder_priors, "vendor_family_strategy_rates", _fake_rates)
+
+    ctx = EL.build_escalation_context(
+        session=object(),  # never used (all DB helpers stubbed)
+        configs=_ONE_CONFIG,  # single claude-haiku config
+        n_parents_est=1,
+        n_trials=1,
+        planner=_FakePlanner(),  # injected ⇒ no EscalationPlanner.from_env / API key
+    )
+
+    assert ctx.ladder_mode == "contextual"
+    # vendor/family derived from the single claude config.
+    assert captured == {"vendor": "anthropic", "family": "claude"}
+    order = ctx.cross_tier_order
+    assert order is not None
+    # The strong-prior planner strategy is promoted ahead of EVERY weak image renderer.
+    first_image = next(i for i, lbl in enumerate(order) if lbl.startswith("image:"))
+    assert order.index("crescendo") < first_image

@@ -679,6 +679,21 @@ class LadderAttempt(Base):
     stopped_run: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
+    # ----- Adaptive Technique Prioritization (vendor/family segmentation) -----
+    # Denormalized vendor/family of the attempt's target model, so ladder telemetry
+    # can be sliced by who-built-the-model without re-parsing config_id. NOTE: vendor
+    # is the model *maker* (anthropic/openai/google/...), distinct from the routing
+    # provider/backend in target_panel._PROVIDER_ROUTES (openrouter/anthropic/groq) —
+    # several vendors (mistralai/google/meta-llama) all route through one backend.
+    # Derived via adapters.model_specs.extract_vendor / extract_model_family.
+    target_vendor: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    target_family: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    # The causal winner of this ladder (the attempt whose strategy actually broke
+    # the target), distinct from ``breached`` which is true on any attempt that
+    # breached — see §10.9 attribution (ranking, NOT graduation). NULL on legacy rows.
+    is_winner: Mapped[Optional[bool]] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         index=True,
@@ -756,6 +771,10 @@ class BenchmarkRun(Base):
     n_breached: Mapped[int] = mapped_column(Integer)
     asr: Mapped[float] = mapped_column(Float)  # n_breached / n_goals
     repertoire_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Which escalation-ladder ordering policy this benchmark run used (e.g. the
+    # static default vs an adaptive-priority reorder), so the ASR timeline can be
+    # segmented by ladder policy. NULL on runs taken before the policy was recorded.
+    ladder_order: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     cost_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     duration_s: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     git_sha: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)

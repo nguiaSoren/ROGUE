@@ -519,6 +519,12 @@ class EscalationContext:
     effective_quota: int
     ladder_mode: str
     plan: object  # RotationPlan (strategy_lifecycle) — kept for logging/format
+    # §10.10 Adaptive Technique Prioritization — the cross-tier execution order for
+    # ``contextual`` mode ONLY (a single descending-by-blend list of FULL labels
+    # spanning every tier, so a planner strategy can rise ahead of a tier-1 renderer).
+    # ``None`` for every other mode ⇒ the ladder runs its fixed tier1→tier5 sequence,
+    # byte-for-byte unchanged (Run #0 reproducibility). See ``run_escalation_ladder_one``.
+    cross_tier_order: tuple[str, ...] | None = None
 
 
 def build_escalation_context(
@@ -633,6 +639,49 @@ def build_escalation_context(
         "escalation rotation plan (scope=%s cap=%d):\n%s",
         scope, cap, format_rotation_plan(plan),
     )
+
+    # §10.10 Adaptive Technique Prioritization — CROSS-TIER ordering (contextual mode
+    # ONLY). Every other mode leaves ``cross_tier_order`` None, so the ladder keeps its
+    # fixed tier1→tier5 sequence with within-tier reorder (unchanged). Here we collapse
+    # all five tiers into one full-label set and sort it by the per-target contextual
+    # blend, so a high-prior planner strategy can execute before a weak tier-1 renderer.
+    cross_tier_order: tuple[str, ...] | None = None
+    if mode == "contextual":
+        from rogue.adapters.model_specs import extract_model_family, extract_vendor
+        from rogue.reproduce.ladder_priors import (
+            order_by_blend,
+            vendor_family_strategy_rates,
+        )
+
+        # Derive the target vendor/family for the blend. A SINGLE config (the per-target
+        # / benchmark case the contextual blend is built for) gives an unambiguous
+        # vendor/family; a mixed multi-config panel is ambiguous → pass "unknown" so the
+        # vendor/family rates Laplace-fall-back to 0.5 and the blend degenerates to
+        # global + exploration (still gives cross-tier promotion via the global rate).
+        if len(configs) == 1:
+            tv = extract_vendor(configs[0].target_model)
+            tf = extract_model_family(configs[0].target_model)
+        else:
+            tv = tf = "unknown"
+        stats = vendor_family_strategy_rates(
+            session, target_vendor=tv, target_family=tf,
+        )
+        # The full cross-tier label set, in the (already prior-reordered) per-tier order
+        # — this seeds the stable tiebreak so a cold all-unseen blend reproduces the
+        # tier sequence. Labels mirror the ladder's execution labels exactly.
+        full_labels = (
+            [f"image:{r}" for r in image_renderers_tier]
+            + [f"coj:{o}" for o in coj_tier]
+            + [f"structured:{f}" for f in structured_tier]
+            + [f"audio:{s}" for s in audio_styles_tier]
+            + list(plan.rotation)
+        )
+        cross_tier_order = order_by_blend(full_labels, stats)
+        logger.info(
+            "§10.10 contextual cross-tier order [vendor=%s family=%s]: %s",
+            tv, tf, cross_tier_order,
+        )
+
     return EscalationContext(
         planner=planner,
         image_renderers=tuple(image_renderers_tier),
@@ -644,6 +693,7 @@ def build_escalation_context(
         effective_quota=effective_quota,
         ladder_mode=mode,
         plan=plan,
+        cross_tier_order=cross_tier_order,
     )
 
 
@@ -666,6 +716,7 @@ async def run_escalation_ladder_one(
     budget_usd: float | None = None,
     candidate_attempt_quota: int = 0,
     candidate_ids: frozenset[str] = frozenset(),
+    cross_tier_order: tuple[str, ...] | None = None,
 ) -> LadderResult:
     """Auto-ladder: try transforms in order until one breaches, then STOP.
 
@@ -716,6 +767,16 @@ async def run_escalation_ladder_one(
     reaches it (records a ``("budget", "stopped")`` attempt) — the per-primitive
     spend cap the inline reproduce escalation reads. ``spend_usd`` on the result
     is the estimated total across every attempt tried.
+
+    **§10.10 ``cross_tier_order`` (contextual mode ONLY).** ``None`` (the default,
+    and what every non-contextual mode / every existing caller passes) runs the
+    FIXED tier1→tier5 sequence below, byte-for-byte unchanged — the Run #0
+    reproducibility guarantee. A non-None tuple is a single CROSS-TIER list of full
+    labels (``"image:mml:wr"`` / ``"coj:reorder"`` / ``"structured:json"`` /
+    ``"audio:fast"`` / a planner strategy id) ordered by the contextual blend, and
+    the ladder executes the SAME per-candidate units in THAT order — so a high-prior
+    planner strategy can run before a weak tier-1 renderer. Early-stop / quota /
+    budget semantics are identical to the tier path; only the visiting order differs.
     """
     attempts: list[tuple[str, str]] = []
     spend = 0.0
@@ -756,6 +817,123 @@ async def run_escalation_ladder_one(
         if probe_first is None:
             probe_first = (label, breached_on, child)
         return None
+
+    # ===================================================================== #
+    # §10.10 Adaptive Technique Prioritization — CONTEXTUAL cross-tier path. #
+    # ===================================================================== #
+    # Guarded: this branch runs ONLY when ``cross_tier_order`` is supplied (contextual
+    # mode). Every other mode / caller passes None and falls through to the FIXED
+    # tier1→tier5 sequence below, untouched. It executes the SAME per-candidate units
+    # (image/coj/structured/audio/planner) but visits them in the blended order, so a
+    # high-prior planner strategy can run before a weak renderer. Early-stop / quota /
+    # budget / render-error semantics mirror the tier path exactly.
+    if cross_tier_order is not None:
+        vision_configs = [c for c in configs if supports_image(c.target_model)]
+        audio_configs = [c for c in configs if supports_audio(c.target_model)]
+
+        async def _run_unit(label: str) -> LadderResult | None:
+            """Execute one full-label unit. Appends its attempt; returns a finalized
+            LadderResult on a quota-met breach, else None. Mirrors the tier blocks."""
+            nonlocal spend
+            # --- planner-driven units (Tier-5 strategies: no tier prefix) ---
+            if not (
+                label.startswith("image:")
+                or label.startswith("coj:")
+                or label.startswith("structured:")
+                or label.startswith("audio:")
+            ):
+                strat = label
+                is_probe_cand = strat in candidate_ids
+                plan = await planner.plan(parent, n_turns=n_turns, arms_strategy=strat)
+                if plan is None:
+                    attempts.append((strat, "refused"))
+                    if is_probe_cand:
+                        probe_attempted.add(strat)
+                    return None
+                child_orm = _build_synthesized_primitive(
+                    parent, plan, arms_strategy=strat, image_strategy=image_strategy,
+                )
+                child_pyd = _orm_to_pydantic_primitive(child_orm)
+                try:
+                    breached_on, s = await _strategy_breaches(
+                        child_pyd, panel=panel, judge=judge, configs=configs,
+                        temperature=temperature, n_trials=n_trials,
+                    )
+                except ValueError as exc:
+                    logger.warning(
+                        "ladder render failed for parent=%s strategy=%s: %s",
+                        parent.primitive_id, strat, exc,
+                    )
+                    attempts.append((strat, "render_error"))
+                    if is_probe_cand:
+                        probe_attempted.add(strat)
+                    return None
+                spend += s
+                if is_probe_cand:
+                    probe_attempted.add(strat)
+                if breached_on is not None:
+                    return _breach_or_continue(strat, breached_on, child_orm)
+                attempts.append((strat, "no_breach"))
+                return None
+
+            # --- planner-free transform units (resolve variant + configs by prefix) ---
+            child_orm = None  # only CoJ persists a child
+            if label.startswith("image:"):
+                renderer = label[len("image:"):]
+                variant = _image_variant(parent, renderer)
+                unit_configs = vision_configs
+            elif label.startswith("coj:"):
+                op = label[len("coj:"):]
+                child_orm = _build_coj_primitive(parent, op)
+                variant = _orm_to_pydantic_primitive(child_orm)
+                unit_configs = configs
+            elif label.startswith("structured:"):
+                fmt = label[len("structured:"):]
+                variant = _structured_variant(parent, fmt)
+                unit_configs = configs
+            else:  # audio:
+                style = label[len("audio:"):]
+                variant = _audio_variant(parent, style)
+                unit_configs = audio_configs
+                if not unit_configs:
+                    return None  # no audio config ⇒ tier ineligible (no attempt)
+
+            try:
+                breached_on, s = await _strategy_breaches(
+                    variant, panel=panel, judge=judge, configs=unit_configs,
+                    temperature=temperature, n_trials=n_trials,
+                )
+            except (ValueError, RuntimeError) as exc:
+                logger.warning("ladder unit render failed parent=%s label=%s: %s",
+                               parent.primitive_id, label, exc)
+                attempts.append((label, "render_error"))
+                return None
+            spend += s
+            if breached_on is not None:
+                return _breach_or_continue(label, breached_on, child_orm)
+            attempts.append((label, "no_breach"))
+            return None
+
+        for label in cross_tier_order:
+            if _over_budget():
+                attempts.append(("budget", "stopped"))
+                return LadderResult(
+                    parent.primitive_id, None, None, attempts, None, spend_usd=spend
+                )
+            # Quota mode: stop once the candidate-attempt quota is satisfied (quota=0
+            # is unaffected — _breach_or_continue early-returns on the first breach).
+            if candidate_attempt_quota > 0 and _quota_met():
+                break
+            _res = await _run_unit(label)
+            if _res is not None:
+                return _res
+        # Quota mode preserved the first breach (if any) as the winner for stats.
+        if candidate_attempt_quota > 0 and probe_first is not None:
+            w_label, w_on, w_child = probe_first
+            return LadderResult(
+                parent.primitive_id, w_label, w_on, attempts, w_child, spend_usd=spend
+            )
+        return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
 
     # ---- Tier 1: the refused payload AS AN IMAGE (no planner needed) ----
     if image_renderers and not _over_budget():
