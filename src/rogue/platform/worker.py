@@ -56,8 +56,20 @@ class ScanWorker:
         if job is None:
             return False
 
-        # Flip the record to RUNNING before any work so a poller sees the scan has started.
-        await self.store.update(job.scan_id, status=ScanStatus.RUNNING, started_at=_now())
+        # Redelivery guard. The queue is at-least-once: a job can be re-leased after its visibility
+        # timeout (or because it was canceled). Re-read the record; if it's already terminal
+        # (COMPLETED/FAILED/CANCELED) the scan must NOT run again — ack the (duplicate) job and return
+        # without touching the engine, so a redelivery can't re-run finished work or revive a CANCELED scan.
+        record = await self.store.get(job.scan_id, org_id=job.org_id)
+        if record is not None and record.status.is_terminal:
+            await self.queue.ack(job.job_id)
+            return True
+
+        # Flip the record to RUNNING before any work so a poller sees the scan has started. Guard on
+        # QUEUED: if a racing transition (e.g. cancel) already moved it off QUEUED, this is a no-op.
+        await self.store.update(
+            job.scan_id, expected_status=ScanStatus.QUEUED, status=ScanStatus.RUNNING, started_at=_now()
+        )
 
         # Progress callback the engine fires per primitive — keeps the record's live counters fresh.
         async def cb(n_completed: int, n_total: int, current: str | None) -> None:
@@ -79,8 +91,11 @@ class ScanWorker:
         try:
             report = await self.engine.run(spec, progress=cb)
         except Exception as e:  # noqa: BLE001 — any engine failure is recorded, never escapes the worker.
+            # Guard on RUNNING: only finalize FAILED if the scan is still running. If it was CANCELED
+            # mid-run the write is a no-op and the record stays CANCELED.
             await self.store.update(
                 job.scan_id,
+                expected_status=ScanStatus.RUNNING,
                 status=ScanStatus.FAILED,
                 error=str(e)[:500],
                 completed_at=_now(),
@@ -92,8 +107,12 @@ class ScanWorker:
         score = scoring.score_for(report)
         report_id = memory._new_id("rep")
         await self.store.save_report(report_id=report_id, scan_id=job.scan_id, payload=report.to_dict())
+        # Guard on RUNNING: the terminal COMPLETED write applies ONLY if the scan is still running. If
+        # `cancel_scan` flipped it to CANCELED while the engine ran, this is a no-op and the returned
+        # record stays CANCELED — cancellation wins over the worker's completion.
         await self.store.update(
             job.scan_id,
+            expected_status=ScanStatus.RUNNING,
             status=ScanStatus.COMPLETED,
             progress=100,
             n_tests=report.n_tests,
@@ -105,6 +124,9 @@ class ScanWorker:
             report_id=report_id,
             completed_at=_now(),
         )
+        # Ack regardless of `finalized.status`: whether the scan finalized COMPLETED or was canceled
+        # mid-run (in which case the guarded write above was a no-op and it stays CANCELED), the job is
+        # done and must not be redelivered.
         await self.queue.ack(job.job_id)
         return True
 

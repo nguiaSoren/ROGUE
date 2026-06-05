@@ -35,8 +35,13 @@ class InMemoryScanStore(ScanStore):
             return None  # cross-tenant read → not found (no existence leak)
         return r
 
-    async def update(self, scan_id: str, **fields) -> ScanRecord:
+    async def update(self, scan_id: str, *, expected_status: ScanStatus | None = None, **fields) -> ScanRecord:
         r = self._scans[scan_id]
+        # Compare-and-set guard: if the caller pinned an `expected_status`, only apply the update when
+        # the record is still in that status. A mismatch (e.g. the scan was CANCELED mid-run) is a no-op
+        # that returns the record unchanged, so a stale terminal write can't clobber the current state.
+        if expected_status is not None and r.status != expected_status:
+            return r
         updated = r.model_copy(update=fields)
         self._scans[scan_id] = updated
         return updated
