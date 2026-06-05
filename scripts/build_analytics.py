@@ -13,6 +13,8 @@ Sections:
   CONTEXTUAL   family × model breach spread + crossover (per-model-ladder signal)
   ALLOCATION   reachability, starvation rate, rank-of-winner, avg ladder depth
   COST         cost per breach, cost per graduation
+  ATP          §10.10 contextual scheduler: benchmark deltas by order mode
+               (canonical→contextual rank/ASR/cost) + vendor/family prior warming
 """
 
 from __future__ import annotations
@@ -204,6 +206,69 @@ def cost(c, grad: int) -> dict:
     }
 
 
+def atp(c) -> dict:
+    """§10.10 ATP — the contextual scheduler's measured impact + the vendor/family prior warming.
+
+    ``by_order_mode`` aggregates ALL ATP benchmark runs (``benchmark_runs.ladder_order`` non-NULL,
+    i.e. runs recorded since the 2026-06-06 deploy) per order mode; ``median_winner_rank`` is the
+    mean of per-run medians, ``asr`` and ``cost_per_success`` are goal-weighted. The
+    ``canonical→contextual`` pair is the headline (production baseline vs the new default). The
+    ``prior_warming`` block tracks the migration-0025 vendor/family tags filling in as scans run on
+    the new code (0 = cold; rises with every contextual scan/sweep)."""
+    rows = c.execute(text("""
+        SELECT ladder_order AS mode, n_goals, n_breached, cost_usd, detail
+        FROM benchmark_runs WHERE ladder_order IS NOT NULL""")).all()
+    agg: dict = defaultdict(lambda: {"goals": 0, "breached": 0, "cost": 0.0, "ranks": []})
+    for r in rows:
+        m = agg[r.mode]
+        m["goals"] += int(r.n_goals or 0)
+        m["breached"] += int(r.n_breached or 0)
+        m["cost"] += float(r.cost_usd or 0)
+        det = r.detail if isinstance(r.detail, dict) else json.loads(r.detail or "{}")
+        mr = det.get("median_winner_rank")
+        if mr is not None:
+            m["ranks"].append(float(mr))
+    by_mode = {
+        mode: {
+            "goals": v["goals"],
+            "asr": round(v["breached"] / v["goals"], 3) if v["goals"] else None,
+            "median_winner_rank": round(sum(v["ranks"]) / len(v["ranks"]), 1) if v["ranks"] else None,
+            "cost_per_success_usd": round(v["cost"] / v["breached"], 3) if v["breached"] else None,
+        }
+        for mode, v in agg.items()
+    }
+    base, ctx = by_mode.get("canonical"), by_mode.get("contextual")
+    delta = None
+    if base and ctx:
+        delta = {
+            "median_winner_rank": [base["median_winner_rank"], ctx["median_winner_rank"]],
+            "asr": [base["asr"], ctx["asr"]],
+            "cost_per_success_usd": [base["cost_per_success_usd"], ctx["cost_per_success_usd"]],
+        }
+    # vendor/family prior warming (migration 0025 tags; cold until scans run on the new code)
+    t = c.execute(text("""SELECT count(*) AS total, count(target_vendor) AS tagged,
+                          count(*) FILTER (WHERE is_winner) AS winners FROM ladder_attempts""")).first()
+    by_vendor = {r.v: {"attempts": int(r.n), "breaches": int(r.br)} for r in c.execute(text("""
+        SELECT target_vendor AS v, count(*) AS n, count(*) FILTER (WHERE breached) AS br
+        FROM ladder_attempts WHERE target_vendor IS NOT NULL GROUP BY target_vendor""")).all()}
+    by_family = {r.f: {"attempts": int(r.n), "breaches": int(r.br)} for r in c.execute(text("""
+        SELECT target_family AS f, count(*) AS n, count(*) FILTER (WHERE breached) AS br
+        FROM ladder_attempts WHERE target_family IS NOT NULL GROUP BY target_family""")).all()}
+    return {
+        "default_mode": "contextual",
+        "by_order_mode": by_mode,
+        "canonical_to_contextual": delta,
+        "prior_warming": {
+            "ladder_attempts_total": int(t.total),
+            "vendor_tagged": int(t.tagged),
+            "vendor_tagged_pct": round(t.tagged / t.total, 3) if t.total else None,
+            "winners": int(t.winners),
+            "by_vendor": by_vendor,
+            "by_family": by_family,
+        },
+    }
+
+
 def regenerate(database_url: str | None = None, ts: str | None = None) -> dict:
     """Query live Neon → write data/analytics.json. Returns the report dict. No
     printing — safe to call from a harvest/reproduce end-hook. ``ts`` (the caller's
@@ -220,6 +285,7 @@ def regenerate(database_url: str | None = None, ts: str | None = None) -> dict:
             "allocation": allocation(c),
             "research": research_metrics(c),
             "cost": cost(c, cap["graduated"]),
+            "atp": atp(c),
         }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(rep, indent=2, default=str))
@@ -277,6 +343,18 @@ def main() -> int:
           f"scheduler_allocation_quality={res.get('scheduler_allocation_quality')}")
     print(f"\nCOST  total=${cst['total_breach_spend_usd']}  per_breach=${cst['cost_per_breach_usd']}  "
           f"per_graduation=${cst['cost_per_graduation_usd']}")
+    atpd = rep["atp"]
+    dlt = atpd.get("canonical_to_contextual")
+    if dlt:
+        print(f"\nATP  default={atpd['default_mode']}  canonical→contextual: "
+              f"rank {dlt['median_winner_rank'][0]}→{dlt['median_winner_rank'][1]}  "
+              f"ASR {100*(dlt['asr'][0] or 0):.0f}%→{100*(dlt['asr'][1] or 0):.0f}%  "
+              f"$/success {dlt['cost_per_success_usd'][0]}→{dlt['cost_per_success_usd'][1]}")
+    else:
+        print(f"\nATP  default={atpd['default_mode']}  (no canonical+contextual benchmark pair yet)")
+    pw = atpd["prior_warming"]
+    print(f"  prior warming: {pw['vendor_tagged']}/{pw['ladder_attempts_total']} attempts vendor-tagged "
+          f"({100*(pw['vendor_tagged_pct'] or 0):.0f}%)  winners={pw['winners']}")
     print(f"\nwrote {OUT.relative_to(_ROOT)}")
     return 0
 
