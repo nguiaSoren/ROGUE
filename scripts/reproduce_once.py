@@ -1100,6 +1100,9 @@ async def run_reproduction(
                                 candidate_ids=frozenset(
                                     escalation_plan.candidate_ids
                                 ),
+                                # §10.10 contextual mode — cross-tier blended order
+                                # (None for every other mode ⇒ fixed tier sequence).
+                                cross_tier_order=_ctx.cross_tier_order,
                             )
                             # §10.10 rank-of-winner KPI — how deep in the ladder the
                             # winner sat. This is the reorder's payoff metric: lower
@@ -1161,6 +1164,10 @@ async def run_reproduction(
                                     ),
                                     quota=_effective_quota,
                                     now=escalation_now,
+                                    # §10.10 vendor/family tagging — vendor/family is
+                                    # only unambiguous for a single-config panel; multi-
+                                    # config sweeps record NULL (counted globally only).
+                                    configs=configs,
                                 )
                                 session.commit()
                             except Exception as exc:  # noqa: BLE001

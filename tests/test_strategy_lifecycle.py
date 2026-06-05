@@ -332,6 +332,106 @@ def test_log_ladder_attempts_quota_mode_no_early_stop(db_session) -> None:
     assert row.candidate_attempt_quota == 1
 
 
+class _Cfg:
+    """Minimal stand-in for a config: log_ladder_attempts only reads .target_model."""
+
+    def __init__(self, target_model: str) -> None:
+        self.target_model = target_model
+
+
+def test_log_ladder_attempts_tags_vendor_family_for_single_config(db_session) -> None:
+    """§10.10 telemetry: a single-config ladder tags every attempt with the target's
+    vendor/family, and the winning attempt's row carries is_winner=True."""
+    from rogue.db.models import LadderAttempt
+
+    claude_cfg = _Cfg("anthropic/claude-haiku-4-5")
+    log_ladder_attempts(
+        db_session,
+        run_id="test-run-vf",
+        parent_id="parentVF",
+        attempts=[
+            ("image:mml:wr", "no_breach"),
+            ("crescendo", "breach"),
+        ],
+        winning_strategy="crescendo",
+        breached_on="anthropic/claude-haiku-4-5",
+        candidate_ids=frozenset(),
+        quota=0,
+        now=BASE,
+        configs=[claude_cfg],
+    )
+    db_session.commit()
+
+    rows = (
+        db_session.query(LadderAttempt)
+        .filter(LadderAttempt.run_id == "test-run-vf")
+        .order_by(LadderAttempt.attempt_index)
+        .all()
+    )
+    assert len(rows) == 2
+    img, winner = rows
+    # Every attempt tagged with the (single) target's vendor/family.
+    for r in rows:
+        assert r.target_vendor == "anthropic"
+        assert r.target_family == "claude"
+    # is_winner is the explicit causal-winner flag — only the breaching winner row.
+    assert img.is_winner is False
+    assert winner.is_winner is True
+    assert winner.entity_id == "crescendo"
+
+
+def test_log_ladder_attempts_leaves_vendor_family_null_for_multi_config(db_session) -> None:
+    """A multi-model panel is ambiguous (the short-circuiting ladder doesn't record
+    which model each attempt was scored against), so vendor/family stay NULL — counted
+    globally only by the priors aggregator."""
+    from rogue.db.models import LadderAttempt
+
+    log_ladder_attempts(
+        db_session,
+        run_id="test-run-vf-multi",
+        parent_id="parentVFM",
+        attempts=[("crescendo", "breach")],
+        winning_strategy="crescendo",
+        breached_on="anthropic/claude-haiku-4-5",
+        candidate_ids=frozenset(),
+        quota=0,
+        now=BASE,
+        configs=[
+            _Cfg("anthropic/claude-haiku-4-5"),
+            _Cfg("openai/gpt-5.4-nano"),
+        ],
+    )
+    db_session.commit()
+    row = db_session.query(LadderAttempt).filter(
+        LadderAttempt.run_id == "test-run-vf-multi"
+    ).one()
+    assert row.target_vendor is None and row.target_family is None
+    assert row.is_winner is True  # winner flag is independent of vendor/family tagging
+
+
+def test_log_ladder_attempts_no_configs_leaves_vendor_family_null(db_session) -> None:
+    """Back-compat: omitting ``configs`` (legacy callers) leaves vendor/family NULL."""
+    from rogue.db.models import LadderAttempt
+
+    log_ladder_attempts(
+        db_session,
+        run_id="test-run-vf-none",
+        parent_id="parentVFN",
+        attempts=[("image:mml:wr", "breach")],
+        winning_strategy="image:mml:wr",
+        breached_on="m",
+        candidate_ids=frozenset(),
+        quota=0,
+        now=BASE,
+    )
+    db_session.commit()
+    row = db_session.query(LadderAttempt).filter(
+        LadderAttempt.run_id == "test-run-vf-none"
+    ).one()
+    assert row.target_vendor is None and row.target_family is None
+    assert row.is_winner is True
+
+
 def test_select_candidates_least_tried_first(db_session) -> None:
     _add(db_session, "test-a", n_attempts_total=3)
     _add(db_session, "test-b", n_attempts_total=0)

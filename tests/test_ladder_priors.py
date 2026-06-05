@@ -24,6 +24,10 @@ import pytest
 from rogue.reproduce.ladder_priors import (
     ALPHA,
     BETA,
+    BLEND_W_FAMILY,
+    BLEND_W_GLOBAL,
+    BLEND_W_VENDOR,
+    EXPLORE_WEIGHT,
     FRESHNESS_TAU_DAYS,
     FRESHNESS_WEIGHT,
     STARVATION_WEIGHT,
@@ -31,13 +35,16 @@ from rogue.reproduce.ladder_priors import (
     ContextStat,
     ReachStat,
     StrategyValue,
+    VendorFamilyStat,
     ladder_order_mode,
+    order_by_blend,
     order_by_prior,
     order_by_starvation,
     order_by_value,
     starvation_adjusted_score,
     strategy_breach_rates,
     strategy_values,
+    vendor_family_strategy_rates,
     winning_model_distribution,
 )
 
@@ -237,6 +244,115 @@ def test_order_by_value_demotes_proven_unviable_keeps_unseen_eager():
 
 
 # --------------------------------------------------------------------------- #
+# §10.10 — Adaptive Technique Prioritization: contextual mode + VendorFamilyStat
+# --------------------------------------------------------------------------- #
+
+
+def test_contextual_is_a_valid_mode(monkeypatch):
+    monkeypatch.setenv("ROGUE_LADDER_ORDER", "contextual")
+    assert ladder_order_mode() == "contextual"
+
+
+def test_blend_weights_are_a_convex_combination():
+    # The rate part stays on the probability scale only if the weights sum to 1.
+    assert BLEND_W_GLOBAL + BLEND_W_VENDOR + BLEND_W_FAMILY == pytest.approx(1.0)
+
+
+def test_blend_score_matches_explicit_arithmetic():
+    # Hand-worked: global 8/10, vendor 1/2, family 0/0 (cold) + additive exploration.
+    s = VendorFamilyStat("x", 8, 10, 1, 2, 0, 0)
+    g = (8 + ALPHA) / (10 + ALPHA + BETA)          # 0.75
+    v = (1 + ALPHA) / (2 + ALPHA + BETA)           # 0.5
+    f = (0 + ALPHA) / (0 + ALPHA + BETA)           # 0.5 (cold)
+    bonus = EXPLORE_WEIGHT / math.sqrt(10 + 1)     # additive, decays w/ GLOBAL trials
+    assert s.global_rate == pytest.approx(g)
+    assert s.vendor_rate == pytest.approx(v)
+    assert s.family_rate == pytest.approx(f)
+    assert s.exploration_bonus == pytest.approx(bonus)
+    assert s.blend_score() == pytest.approx(
+        BLEND_W_GLOBAL * g + BLEND_W_VENDOR * v + BLEND_W_FAMILY * f + bonus
+    )
+
+
+def test_blend_cold_vendor_family_falls_back_to_half():
+    # First contextual run: vendor/family untagged → both rates Laplace to 0.5, so the
+    # blend is dominated by the global rate + exploration (graceful cold start).
+    cold = VendorFamilyStat("x", 6, 12, 0, 0, 0, 0)
+    assert cold.vendor_rate == 0.5
+    assert cold.family_rate == 0.5
+    rate_part = (
+        BLEND_W_GLOBAL * cold.global_rate + (BLEND_W_VENDOR + BLEND_W_FAMILY) * 0.5
+    )
+    assert cold.blend_score() == pytest.approx(rate_part + cold.exploration_bonus)
+
+
+def test_exploration_bonus_is_additive_and_decays_with_global_trials():
+    # Distinct from StrategyValue's MULTIPLICATIVE (≥1) factor: here it's an additive
+    # term, larger when global evidence is thin, →0 as it accrues.
+    thin = VendorFamilyStat("x", 0, 0, 0, 0, 0, 0)
+    thick = VendorFamilyStat("x", 50, 100, 0, 0, 0, 0)
+    assert thin.exploration_bonus == pytest.approx(EXPLORE_WEIGHT / math.sqrt(1))
+    assert thin.exploration_bonus > thick.exploration_bonus
+
+
+def test_order_by_blend_strong_global_outranks_weak():
+    stats = {
+        "image:typographic": VendorFamilyStat("image:typographic", 9, 10, 0, 0, 0, 0),
+        "image:ocr": VendorFamilyStat("image:ocr", 0, 10, 0, 0, 0, 0),
+    }
+    out = order_by_blend(("image:ocr", "image:typographic"), stats)
+    assert out[0] == "image:typographic"
+
+
+def test_order_by_blend_unseen_label_gets_fair_prior_not_buried():
+    # An UNSEEN label (absent from stats → 0.5 + full bonus) must beat a proven-weak
+    # 0/many incumbent — cold-start survivability across tiers.
+    stats = {
+        "image:ocr": VendorFamilyStat("image:ocr", 0, 20, 0, 0, 0, 0),  # ~0.045 global
+    }
+    out = order_by_blend(("image:ocr", "structured:json"), stats)  # json unseen
+    assert out[0] == "structured:json"
+    assert out[1] == "image:ocr"
+
+
+def test_order_by_blend_stable_tiebreak_preserves_input_order():
+    # Two all-unseen labels (equal scores) keep their original relative order.
+    out = order_by_blend(("crescendo", "acronym", "audio:fast"), {})
+    assert out == ("crescendo", "acronym", "audio:fast")
+
+
+def test_order_by_blend_promotes_cross_tier_winner():
+    # THE point of contextual mode: a planner strategy (crescendo) with a strong
+    # vendor_rate for THIS target rises above a weak tier-1 renderer.
+    stats = {
+        "crescendo": VendorFamilyStat(
+            "crescendo", global_breaches=4, global_trials=10,
+            vendor_breaches=9, vendor_trials=10, family_breaches=9, family_trials=10,
+        ),
+        "image:typographic": VendorFamilyStat(
+            "image:typographic", global_breaches=1, global_trials=10,
+            vendor_breaches=0, vendor_trials=8, family_breaches=0, family_trials=8,
+        ),
+    }
+    out = order_by_blend(("image:typographic", "crescendo"), stats)
+    assert out[0] == "crescendo"  # planner tier rose above tier-1 renderer
+
+
+def test_order_by_blend_default_stat_factory_override():
+    # A caller can substitute a colder/warmer default for unseen labels.
+    def pessimistic(lbl):  # ~0 global prior for unseen labels
+        return VendorFamilyStat(lbl, 0, 1000, 0, 0, 0, 0)
+
+    stats = {"image:ocr": VendorFamilyStat("image:ocr", 0, 10, 0, 0, 0, 0)}
+    out = order_by_blend(
+        ("structured:json", "image:ocr"), stats,
+        default_stat_factory=pessimistic,
+    )
+    # With a pessimistic default the unseen json now sinks below the (less weak) ocr.
+    assert out[0] == "image:ocr"
+
+
+# --------------------------------------------------------------------------- #
 # strategy_breach_rates — DB aggregation (skips cleanly without Postgres)
 # --------------------------------------------------------------------------- #
 
@@ -276,14 +392,19 @@ def db_session():
         LadderAttempt.__table__.drop(bind=engine, checkfirst=True)
 
 
-def _attempt(session, *, label, outcome, breached, config_id=None):
+def _attempt(
+    session, *, label, outcome, breached, config_id=None,
+    target_vendor=None, target_family=None,
+):
     from rogue.db.models import LadderAttempt
 
     session.add(LadderAttempt(
         run_id="test-prior-1", parent_id="p", attempt_index=0, ladder_depth=1,
         entity_type="base", entity_id=label, technique_id=None,
         candidate_attempt_quota=0, config_id=config_id, outcome=outcome,
-        breached=breached, stopped_run=False, created_at=NOW,
+        breached=breached, stopped_run=False,
+        target_vendor=target_vendor, target_family=target_family,
+        created_at=NOW,
     ))
 
 
@@ -348,3 +469,48 @@ def test_strategy_values_surfaces_attempts_and_freshness(db_session):
     assert sv.last_tried_at is not None  # max(created_at) surfaced for freshness
     # validity_rate reflects the orchestration drag (2 valid of 4 attempts, smoothed).
     assert sv.validity_rate == pytest.approx((2 + ALPHA) / (4 + ALPHA + BETA))
+
+
+def test_vendor_family_strategy_rates_scopes_counts_by_tag(db_session):
+    # image:mml:wr breaches against an anthropic/claude target and an
+    # openai/gpt target; vendor_* must count ONLY the matching-vendor rows, family_*
+    # ONLY the matching-family rows, global_* ALL of them. A NULL-tagged row counts
+    # globally but contributes to neither vendor nor family.
+    _attempt(db_session, label="image:mml:wr", outcome="breach", breached=True,
+             target_vendor="anthropic", target_family="claude")
+    _attempt(db_session, label="image:mml:wr", outcome="no_breach", breached=False,
+             target_vendor="anthropic", target_family="claude")
+    _attempt(db_session, label="image:mml:wr", outcome="breach", breached=True,
+             target_vendor="openai", target_family="gpt")
+    # NULL-tagged legacy row: counts globally only.
+    _attempt(db_session, label="image:mml:wr", outcome="breach", breached=True)
+    # An orch-failure against anthropic: excluded from valid trials entirely.
+    _attempt(db_session, label="image:mml:wr", outcome="refused", breached=False,
+             target_vendor="anthropic", target_family="claude")
+    db_session.commit()
+
+    stats = vendor_family_strategy_rates(
+        db_session, target_vendor="anthropic", target_family="claude",
+    )
+    s = stats["image:mml:wr"]
+    assert s.global_breaches == 3 and s.global_trials == 4  # refused excluded
+    assert s.vendor_breaches == 1 and s.vendor_trials == 2  # only anthropic valid rows
+    assert s.family_breaches == 1 and s.family_trials == 2  # only claude valid rows
+    assert s.global_rate == pytest.approx((3 + ALPHA) / (4 + ALPHA + BETA))
+    assert s.vendor_rate == pytest.approx((1 + ALPHA) / (2 + ALPHA + BETA))
+
+
+def test_vendor_family_strategy_rates_cold_when_no_tagged_rows(db_session):
+    # No vendor/family-tagged rows for this target → vendor/family counts 0 →
+    # rates Laplace to 0.5; global still populated (the expected first-run cold case).
+    _attempt(db_session, label="coj:base", outcome="breach", breached=True)
+    _attempt(db_session, label="coj:base", outcome="no_breach", breached=False)
+    db_session.commit()
+
+    stats = vendor_family_strategy_rates(
+        db_session, target_vendor="anthropic", target_family="claude",
+    )
+    s = stats["coj:base"]
+    assert s.global_trials == 2
+    assert s.vendor_trials == 0 and s.family_trials == 0
+    assert s.vendor_rate == 0.5 and s.family_rate == 0.5

@@ -57,17 +57,23 @@ __all__ = [
     "StrategyValue",
     "ReachStat",
     "ContextStat",
+    "VendorFamilyStat",
     "strategy_breach_rates",
     "strategy_values",
     "strategy_reachability",
     "contextual_breach_rates",
+    "vendor_family_strategy_rates",
     "winning_model_distribution",
     "starvation_adjusted_score",
     "order_by_prior",
     "order_by_value",
     "order_by_starvation",
+    "order_by_blend",
     "ladder_order_mode",
     "LADDER_ORDER_ENV",
+    "BLEND_W_GLOBAL",
+    "BLEND_W_VENDOR",
+    "BLEND_W_FAMILY",
 ]
 
 # Add-1 (Laplace) smoothing on a Beta(ALPHA, BETA) prior. ALPHA=BETA=1 ⇒ an unseen
@@ -85,7 +91,9 @@ DISCOVERY_C = float(os.environ.get("ROGUE_LADDER_DISCOVERY_C", "0.5"))
 # operative increment; ``fixed`` restores the legacy hand-coded order for ablation;
 # ``viability`` is §10.10 Phase 2 (the EV-weighted heuristic scheduler).
 LADDER_ORDER_ENV = "ROGUE_LADDER_ORDER"
-_VALID_MODES = ("canonical", "discovery", "viability", "starvation", "fixed")
+_VALID_MODES = (
+    "canonical", "discovery", "viability", "starvation", "contextual", "fixed",
+)
 
 # §10.10 Phase 2 — viability-aware allocation weights. The scheduler stops asking
 # "what breaches most?" and asks "what is worth spending evaluation budget on now?"
@@ -107,6 +115,22 @@ EXPLORE_WEIGHT = float(os.environ.get("ROGUE_LADDER_EXPLORE_WEIGHT", "0.5"))
 # inherently capped at (1 + W)×. mml:wr (starv 0) is unchanged — it loses its monopoly
 # only because starved peers rise, never because it is penalised for being good.
 STARVATION_WEIGHT = float(os.environ.get("ROGUE_LADDER_STARVATION_WEIGHT", "1.0"))
+
+# §10.10 — Adaptive Technique Prioritization (contextual mode) blend weights. The
+# contextual score linearly combines three Laplace-smoothed breach rates at widening
+# context scope: the per-strategy GLOBAL rate (pooled over every target), the
+# per-(strategy × target_vendor) rate, and the per-(strategy × target_family) rate.
+# Global is weighted highest because it is the densest, most reliable signal; vendor
+# and family are progressively sparser specialisations that nudge the order toward
+# what works against *this* target. The weights are a convex combination — they MUST
+# sum to 1.0 (asserted below) so blend_score stays a probability-scale rate before the
+# additive exploration term, and so re-tuning one weight visibly trades off the others.
+BLEND_W_GLOBAL = float(os.environ.get("ROGUE_LADDER_BLEND_W_GLOBAL", "0.5"))
+BLEND_W_VENDOR = float(os.environ.get("ROGUE_LADDER_BLEND_W_VENDOR", "0.3"))
+BLEND_W_FAMILY = float(os.environ.get("ROGUE_LADDER_BLEND_W_FAMILY", "0.2"))
+assert abs(BLEND_W_GLOBAL + BLEND_W_VENDOR + BLEND_W_FAMILY - 1.0) < 1e-9, (
+    "contextual blend weights must sum to 1.0"
+)
 
 
 @dataclass(frozen=True)
@@ -543,3 +567,165 @@ def strategy_reachability(
             budgeted=int(row.budgeted or 0),
         )
     return out
+
+
+@dataclass(frozen=True)
+class VendorFamilyStat:
+    """§10.10 — Adaptive Technique Prioritization: a per-strategy breach prior at three
+    nested context scopes, the substrate for ``contextual`` ordering.
+
+    Where ``BreachStat`` carries one pooled (global) breach rate and ``ContextStat``
+    keys on (target_model × family), this carries one *strategy* label evaluated at
+    three widening scopes simultaneously: GLOBAL (every target), VENDOR (only attempts
+    against the requested ``target_vendor``), and FAMILY (only attempts against the
+    requested ``target_family``). All three reuse the module's Beta(ALPHA, BETA) Laplace
+    prior, so an unseen cell scores 0.5 — vendor/family are far sparser than global, so
+    on the first contextual run (before vendor/family-tagged telemetry accumulates) both
+    specialised rates fall back to 0.5 and the blend degenerates to ``global +
+    exploration``. That cold-start is expected and self-corrects as tagged rows land.
+
+    Decay/exploration choice: the existing ``StrategyValue.exploration_bonus`` is a
+    *multiplicative* ``1 + C/√(n)`` factor because it scales a product of factors.
+    Here the score is a *convex sum* of rates, so exploration is instead an **additive**
+    optimism term ``EXPLORE_WEIGHT / √(global_trials + 1)`` — added (not multiplied) so
+    it lifts under-evidenced strategies on the same probability scale as the rates and
+    decays to 0 as evidence accrues. The GLOBAL trial count drives the decay (it is the
+    densest count; vendor/family are too sparse to gate exploration reliably).
+    """
+
+    label: str
+    global_breaches: int
+    global_trials: int
+    vendor_breaches: int
+    vendor_trials: int
+    family_breaches: int
+    family_trials: int
+
+    @property
+    def global_rate(self) -> float:
+        """Laplace-smoothed breach rate pooled over every target (unseen → 0.5)."""
+        return (self.global_breaches + ALPHA) / (self.global_trials + ALPHA + BETA)
+
+    @property
+    def vendor_rate(self) -> float:
+        """Laplace-smoothed breach rate against ``target_vendor`` (unseen → 0.5)."""
+        return (self.vendor_breaches + ALPHA) / (self.vendor_trials + ALPHA + BETA)
+
+    @property
+    def family_rate(self) -> float:
+        """Laplace-smoothed breach rate against ``target_family`` (unseen → 0.5)."""
+        return (self.family_breaches + ALPHA) / (self.family_trials + ALPHA + BETA)
+
+    @property
+    def exploration_bonus(self) -> float:
+        """ADDITIVE optimism term decaying with GLOBAL evidence (cold-start lift).
+
+        Unlike ``StrategyValue.exploration_bonus`` (a ≥1 multiplicative factor), this
+        is an additive term ``EXPLORE_WEIGHT / √(global_trials + 1)`` because
+        ``blend_score`` is a convex sum of rates, not a product — so the bonus must add
+        on the same scale. Reuses the module's ``EXPLORE_WEIGHT``; introduces no new
+        constant. → ``EXPLORE_WEIGHT`` at zero global trials, decaying toward 0."""
+        return EXPLORE_WEIGHT / math.sqrt(self.global_trials + 1)
+
+    def blend_score(self) -> float:
+        """Convex blend of the three scopes plus additive exploration:
+
+        ``W_GLOBAL·global_rate + W_VENDOR·vendor_rate + W_FAMILY·family_rate + bonus``.
+
+        The weights sum to 1.0 (asserted at import), so the rate part stays on the
+        probability scale; the exploration term then lifts under-evidenced strategies."""
+        return (
+            BLEND_W_GLOBAL * self.global_rate
+            + BLEND_W_VENDOR * self.vendor_rate
+            + BLEND_W_FAMILY * self.family_rate
+            + self.exploration_bonus
+        )
+
+
+def vendor_family_strategy_rates(
+    session: "Session", *, target_vendor: str, target_family: str,
+) -> dict[str, "VendorFamilyStat"]:
+    """§10.10 — per-strategy breach priors at GLOBAL / VENDOR / FAMILY scope, the
+    substrate for ``order_by_blend`` (contextual mode).
+
+    Aggregates ``ladder_attempts`` (over *valid* trials only — breach/no_breach, same
+    as ``strategy_breach_rates``) into one ``VendorFamilyStat`` per ``entity_id``:
+
+      - ``global_*`` — pooled over ALL attempts.
+      - ``vendor_*`` — only attempts whose ``target_vendor`` equals the given vendor.
+      - ``family_*`` — only attempts whose ``target_family`` equals the given family.
+
+    Rows with NULL ``target_vendor`` / ``target_family`` (legacy / un-backfilled
+    telemetry) still count GLOBALLY but contribute nothing to the vendor/family counts.
+    The keyed dict spans the union of ``entity_id``s seen. **Cold case:** before any
+    vendor/family-tagged rows exist, every vendor/family count is 0 → those rates
+    Laplace-smooth to 0.5 and the blend ≈ ``global + exploration``. Expected on the
+    first contextual run; it self-corrects as tagged telemetry accumulates.
+    """
+    from sqlalchemy import case, func
+
+    from rogue.db.models import LadderAttempt
+
+    valid = LadderAttempt.outcome.in_(("breach", "no_breach"))
+    valid_breach = case((LadderAttempt.breached, 1), else_=0)
+    valid_trial = case((valid, 1), else_=0)
+    is_vendor = LadderAttempt.target_vendor == target_vendor
+    is_family = LadderAttempt.target_family == target_family
+    q = (
+        session.query(
+            LadderAttempt.entity_id.label("label"),
+            func.sum(valid_breach).label("g_breaches"),
+            func.sum(valid_trial).label("g_trials"),
+            func.sum(case((is_vendor, valid_breach), else_=0)).label("v_breaches"),
+            func.sum(case((is_vendor, valid_trial), else_=0)).label("v_trials"),
+            func.sum(case((is_family, valid_breach), else_=0)).label("f_breaches"),
+            func.sum(case((is_family, valid_trial), else_=0)).label("f_trials"),
+        )
+        .group_by(LadderAttempt.entity_id)
+    )
+    out: dict[str, VendorFamilyStat] = {}
+    for row in q.all():
+        if row.label is None:
+            continue
+        out[row.label] = VendorFamilyStat(
+            label=row.label,
+            global_breaches=int(row.g_breaches or 0),
+            global_trials=int(row.g_trials or 0),
+            vendor_breaches=int(row.v_breaches or 0),
+            vendor_trials=int(row.v_trials or 0),
+            family_breaches=int(row.f_breaches or 0),
+            family_trials=int(row.f_trials or 0),
+        )
+    return out
+
+
+def order_by_blend(
+    labeled: "tuple[str, ...] | list[str]",
+    stats: dict[str, "VendorFamilyStat"],
+    *,
+    default_stat_factory: "Callable[[str], VendorFamilyStat] | None" = None,
+) -> tuple[str, ...]:
+    """§10.10 — order a HETEROGENEOUS, CROSS-TIER list of FULL strategy labels by
+    contextual ``blend_score`` (descending), most-promising first.
+
+    Unlike ``order_by_prior`` (which sorts the bare elements of a single tier under one
+    ``label_prefix``), ``labeled`` here is the already-resolved full-label execution set
+    spanning every tier — e.g. ``("image:mml:wr", "coj:...", "structured:json",
+    "audio:fast", "crescendo")`` — so a planner-tier strategy with a strong contextual
+    prior can rise above a tier-1 renderer. This is the whole point of contextual mode:
+    the cross-tier order is by *measured per-target efficacy*, not by tier position.
+
+    A label absent from ``stats`` gets a fresh zero-stat (all counts 0 → global/vendor/
+    family rate 0.5, full exploration bonus), so a newly-introduced strategy keeps the
+    fair 0.5 cold prior and is NOT buried behind a proven-weak (0/many) incumbent.
+    Override the cold default via ``default_stat_factory`` if a caller wants a different
+    prior. The sort is STABLE (``_stable_order``) — equal scores preserve input order.
+    """
+    factory = default_stat_factory or (
+        lambda lbl: VendorFamilyStat(lbl, 0, 0, 0, 0, 0, 0)
+    )
+
+    def _score(label: str) -> float:
+        return stats.get(label, factory(label)).blend_score()
+
+    return _stable_order(labeled, _score)

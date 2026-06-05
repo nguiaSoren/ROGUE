@@ -65,6 +65,63 @@ _SPECS: dict[str, ModelSpec] = {
 }
 
 
+# Known model *makers* (the org that built the weights), parsed off the "vendor/"
+# prefix of a target_model id. This is the VENDOR axis, deliberately DISTINCT from
+# the routing *provider*/backend in target_panel._PROVIDER_ROUTES (openrouter /
+# anthropic / groq) — e.g. mistralai, google and meta-llama all route through the
+# openrouter backend, yet are three different vendors. Adaptive prioritization
+# segments by vendor (who made the model), never by backend (how we reach it).
+_KNOWN_VENDORS: frozenset[str] = frozenset(
+    {"openai", "anthropic", "google", "mistralai", "meta-llama", "groq"}
+)
+
+# Known model *families* (brand line), parsed from the first hyphen-token of the
+# model part. groq/llama-* and meta-llama/llama-* both map to "llama".
+_KNOWN_FAMILIES: frozenset[str] = frozenset(
+    {"gpt", "claude", "gemini", "mistral", "llama"}
+)
+
+
+def extract_vendor(target_model: str) -> str:
+    """Return the model *maker* (vendor) parsed off a ``"vendor/model-name"`` id.
+
+    The vendor is the substring before the first ``"/"`` (e.g. ``"anthropic"`` from
+    ``"anthropic/claude-haiku-4-5"``), validated against the known vendor set
+    ``{openai, anthropic, google, mistralai, meta-llama, groq}``. Anything unknown
+    or with no slash → ``"unknown"`` (fail-safe; never raises).
+
+    Vendor ≠ provider: the vendor is *who built the model*. The routing provider /
+    backend (``openrouter`` / ``anthropic`` / ``groq`` in
+    ``target_panel._PROVIDER_ROUTES``) is *how ROGUE reaches it* — several vendors
+    (mistralai, google, meta-llama) share one backend. Keep the two distinct.
+    """
+    vendor, sep, _ = target_model.partition("/")
+    if not sep:
+        return "unknown"
+    vendor = vendor.strip().lower()
+    return vendor if vendor in _KNOWN_VENDORS else "unknown"
+
+
+def extract_model_family(target_model: str) -> str:
+    """Return the model *family* (brand line) parsed from a ``"vendor/model-name"`` id.
+
+    The family is the first hyphen-delimited token of the model part (after the
+    slash), lowercased, validated against ``{gpt, claude, gemini, mistral, llama}``.
+    Anything unknown or with no slash → ``"unknown"`` (fail-safe; never raises).
+
+    Note both ``groq/llama-3.1-8b-instant`` and ``meta-llama/llama-3.1-8b-instruct``
+    map to ``"llama"`` — the family is the model line, independent of vendor.
+
+    Family ≠ provider, same as :func:`extract_vendor`: this describes the model,
+    not the routing backend.
+    """
+    _, sep, model_part = target_model.partition("/")
+    if not sep:
+        return "unknown"
+    family = model_part.strip().lower().split("-", 1)[0]
+    return family if family in _KNOWN_FAMILIES else "unknown"
+
+
 def get_spec(model: str) -> ModelSpec | None:
     return _SPECS.get(model)
 
@@ -133,4 +190,6 @@ __all__ = [
     "supports_audio",
     "estimate_cost",
     "capabilities_for",
+    "extract_vendor",
+    "extract_model_family",
 ]

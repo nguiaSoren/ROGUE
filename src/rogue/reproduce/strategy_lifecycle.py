@@ -93,6 +93,7 @@ def log_ladder_attempts(
     candidate_ids: "frozenset[str] | set[str]",
     quota: int,
     now: datetime,
+    configs: "list | None" = None,
 ) -> None:
     """Append the orchestration trace for one parent's ladder to ``ladder_attempts``.
 
@@ -100,8 +101,29 @@ def log_ladder_attempts(
     the scheduler policy (``quota``). ``stopped_run`` marks the attempt that
     early-stopped the ladder — only meaningful at quota=0 (quota>0 suppresses
     early-stop). Telemetry-only; never raises into the caller's transaction.
+
+    **§10.10 Adaptive Technique Prioritization (vendor/family tagging).** ``configs``
+    is the panel this ladder ran against. When it is a SINGLE config (the per-target /
+    benchmark case — the one the contextual blend keys on), every attempt's
+    ``target_vendor`` / ``target_family`` is derived from that config's ``target_model``
+    via :func:`extract_vendor` / :func:`extract_model_family`. With a multi-model panel
+    (or no configs) the target a given attempt actually broke on is ambiguous — the
+    ladder short-circuits at the first breaching config inside ``_strategy_breaches`` and
+    doesn't surface which model each non-winning attempt was scored against — so vendor/
+    family are left NULL rather than guessed (``vendor_family_strategy_rates`` counts NULL
+    rows globally only, which is the correct, honest fallback). This per-attempt tagging
+    is what makes the contextual blend non-cold on FUTURE single-target runs.
     """
+    from rogue.adapters.model_specs import extract_model_family, extract_vendor
     from rogue.db.models import LadderAttempt
+
+    # Unambiguous target only when the ladder ran against exactly one config.
+    target_vendor: Optional[str] = None
+    target_family: Optional[str] = None
+    if configs is not None and len(configs) == 1:
+        _model = configs[0].target_model
+        target_vendor = extract_vendor(_model)
+        target_family = extract_model_family(_model)
 
     rows = []
     for idx, (label, outcome) in enumerate(attempts):
@@ -123,6 +145,9 @@ def log_ladder_attempts(
                 breached=breached,
                 # Early-stop only happens at quota=0 (quota>0 suppresses it).
                 stopped_run=bool(quota == 0 and is_winner),
+                target_vendor=target_vendor,
+                target_family=target_family,
+                is_winner=is_winner,
                 created_at=now,
             )
         )

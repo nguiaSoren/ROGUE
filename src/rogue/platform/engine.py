@@ -182,6 +182,9 @@ class DefaultScanEngine(ScanEngine):
                     budget_usd=per_goal,
                     candidate_attempt_quota=ctx.effective_quota,
                     candidate_ids=ctx.candidate_ids,
+                    # §10.10 contextual mode — cross-tier blended order (None ⇒ fixed
+                    # tier sequence). getattr keeps injected test-double ctxs working.
+                    cross_tier_order=getattr(ctx, "cross_tier_order", None),
                 )
             progressed["n"] += 1
             if progress is not None:
