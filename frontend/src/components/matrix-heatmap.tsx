@@ -102,7 +102,18 @@ export function MatrixHeatmap({
   // Two fully-independent axes (the 2×2):
   //   SCOPE    — this run (one day) vs all-time (every run day merged)
   //   ATTACKER — baseline (raw single-shot) vs + augmentations (persona + PAIR)
-  const [scope, setScope] = useState<"this-run" | "all-time">("this-run");
+  // Default SCOPE to All-time when THIS run is empty / almost-empty — a sparse run
+  // day (few or no breaching cells) would otherwise render a near-blank grid.
+  // All-time merges every run, so it shows the accumulated matrix; the user can
+  // still flip back to This run. Lazy initializer — computed once from the
+  // server-passed this-run baseline (`matrix`, before any ?date= override).
+  const THIS_RUN_MIN_BREACHING_CELLS = 3;
+  const [scope, setScope] = useState<"this-run" | "all-time">(() =>
+    matrix.cells.filter((c) => c.any_breach_rate > 0).length <
+    THIS_RUN_MIN_BREACHING_CELLS
+      ? "all-time"
+      : "this-run",
+  );
   const [showAugmented, setShowAugmented] = useState(false);
 
   // Show both toggle groups from the first paint. Before the background load
