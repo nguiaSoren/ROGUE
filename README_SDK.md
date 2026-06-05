@@ -186,7 +186,7 @@ report.to_html("scan.html")      # a standalone HTML report — the artifact to 
 
 `to_html()` writes a ~2 KB standalone page — a KPI header (tests / breaches / breach rate / top attack / cost) over a severity-sorted findings table — the artifact to drop into a ticket or a sales deck.
 
-It also carries the structured findings for programmatic use: `report.findings` (every `Finding`), `report.breached_findings()` (only the ones that broke through), `report.top_findings(n)` (worst first, by severity then success rate), and the headline properties `report.breach_rate`, `report.breach_pct`, and `report.top_attack`. Each `Finding` reports its `family`, `technique`, `vector`, `severity`, `title`, `success_rate` / `success_pct`, `n_trials`, `n_breach`, and a redacted `example_attack` / `example_response` pair. `ValidationResult` and `BenchmarkReport` offer the same `summary()` / `to_dict()` / `to_json()` exporters.
+It also carries the structured findings for programmatic use: `report.findings` (every `Finding`), `report.breached_findings()` (only the ones that broke through), `report.top_findings(n)` (worst first, by severity then success rate), and the headline properties `report.breach_rate`, `report.breach_pct`, and `report.top_attack`. Each `Finding` reports its `family`, `technique`, `vector`, `severity`, `title`, `success_rate` / `success_pct`, `n_trials`, `n_breach`, a plain-language `explanation` ("what this is + why it matters") and `remediation` ("how to fix") — both synthesized per attack family — and a redacted `example_attack` / `example_response` pair. `ValidationResult` and `BenchmarkReport` offer the same `summary()` / `to_dict()` / `to_json()` exporters.
 
 ## Command-line tool
 
