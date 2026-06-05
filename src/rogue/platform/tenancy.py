@@ -199,7 +199,7 @@ def _build_session(session_factory: Callable[[], object] | None):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
-    engine = create_engine(database_url)
+    engine = create_engine(database_url, pool_pre_ping=True, pool_recycle=300, pool_timeout=10)
     return sessionmaker(bind=engine)(), engine
 
 

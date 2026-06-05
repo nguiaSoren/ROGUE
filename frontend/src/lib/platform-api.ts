@@ -247,6 +247,11 @@ export type ScanReportJson = {
   findings: Finding[];
   /** 0–100 headline added by the report route on top of the SDK dataclass. */
   score?: number | null;
+  /** Banded headline level for `score` (critical/high/medium/low); from the report
+   *  route's `scoring.risk_level`. Absent on older runs — derive from `score` then. */
+  risk_level?: "critical" | "high" | "medium" | "low" | null;
+  /** One-line plain-English description of how `score` is computed (report caption). */
+  score_methodology?: string | null;
   /** Report-level "what to do next"; absent on older runs (panel degrades). */
   recommendations?: string[] | null;
 };

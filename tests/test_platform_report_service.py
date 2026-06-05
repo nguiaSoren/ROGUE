@@ -93,6 +93,14 @@ async def test_build_json_has_score_risk_level_and_findings():
     assert "weighted by severity" in out["score_methodology"]
     # Every finding carries a render-time remediation.
     assert all(f.get("remediation", "").strip() for f in out["findings"])
+    # Coverage block: derived scan-coverage framing for programmatic consumers (additive, not prose).
+    cov = out["coverage"]
+    assert cov["n_tests"] == 10
+    assert cov["n_breaches"] == 4
+    assert cov["breach_rate"] == pytest.approx(0.4)
+    # Two findings from distinct families → two human family labels exercised.
+    assert len(cov["families_tested"]) == 2
+    assert all(isinstance(fam, str) and fam.strip() for fam in cov["families_tested"])
 
 
 @pytest.mark.asyncio
@@ -116,9 +124,11 @@ async def test_build_html_contains_target_and_score():
     page = await svc.build_html(scan_id)
     assert "<html" in page
     assert TARGET in page
+    # The platform headline (Risk score + level) leads the page — rendered either natively by
+    # `ScanReport.to_html(score=, risk_level=)` (R1 contract) or via the legacy splice fallback.
     assert "Risk score" in page
     assert "100/100" in page
-    assert "(critical)" in page
+    assert "critical" in page
 
 
 @pytest.mark.asyncio
@@ -132,6 +142,30 @@ async def test_build_pdf_returns_pdf_bytes():
     assert isinstance(pdf, bytes)
     assert len(pdf) > 0
     assert pdf.startswith(b"%PDF")
+    # The CISO document is more than a bare table now: cover + headline + exec summary + a coverage /
+    # methodology section all materialize, so the body is comfortably larger than a stub.
+    assert len(pdf) > 2000
+
+
+def test_summary_prose_strips_markdown_and_bullets():
+    """The PDF lead-in keeps the headline + business framing as plain prose, dropping list/markup."""
+    md = (
+        "# ROGUE security scan — executive summary\n"
+        "\n"
+        "**Risk 100/100 (critical)** — 4/10 attacks breached the target.\n"
+        "\n"
+        "## Critical & high findings\n"
+        "\n"
+        "- **DAN / Persona Jailbreak** (critical, 100% success) — Harden the system prompt.\n"
+        "\n"
+        "**Business impact:** Exploitable critical weaknesses are present today.\n"
+    )
+    prose = DefaultReportService._summary_prose(md)
+    assert "**" not in prose
+    assert "Business impact:" not in prose
+    assert "DAN / Persona Jailbreak" not in prose  # the bullet list is dropped
+    assert "Risk 100/100 (critical)" in prose
+    assert "Exploitable critical weaknesses are present today." in prose
 
 
 @pytest.mark.asyncio

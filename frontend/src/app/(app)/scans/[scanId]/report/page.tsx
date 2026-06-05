@@ -6,7 +6,6 @@ import {
   type Finding,
 } from "@/lib/platform-api";
 import { getApiKey } from "@/lib/session";
-import { ScoreBadge } from "@/components/score-badge";
 
 /** Same-origin export proxy — the bearer is attached server-side by the route
  *  handler, never placed in a client href (see app/api/scans/[scanId]/report). */
@@ -143,10 +142,24 @@ function ReportBody({ report }: { report: ScanReportJson }) {
 
   return (
     <>
-      {/* Headline KPIs */}
+      {/* Headline — the risk score leads the report (report-views.md §1). */}
+      <RiskHeadline report={report} />
+
+      {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Kpi label="Risk score">
-          <ScoreBadge score={report.score} className="text-base px-3 py-1" />
+        <Kpi label="Tests">
+          <span className="text-2xl font-bold tabular-nums">
+            {report.n_tests}
+          </span>
+        </Kpi>
+        <Kpi label="Breaches">
+          <span
+            className={`text-2xl font-bold tabular-nums ${
+              report.n_breaches > 0 ? "text-rogue-red" : "text-rogue-green"
+            }`}
+          >
+            {report.n_breaches}
+          </span>
         </Kpi>
         <Kpi label="Breach rate">
           <span
@@ -155,11 +168,6 @@ function ReportBody({ report }: { report: ScanReportJson }) {
             }`}
           >
             {Math.round(report.breach_rate * 100)}%
-          </span>
-        </Kpi>
-        <Kpi label="Top attack">
-          <span className="text-sm font-bold">
-            {report.top_attack ?? "— none breached"}
           </span>
         </Kpi>
         <Kpi label="Cost">
@@ -191,6 +199,71 @@ function ReportBody({ report }: { report: ScanReportJson }) {
   );
 }
 
+/** Big, color-banded risk headline: score/100 + risk_level pill + methodology caption.
+ *  `risk_level` arrives from the report route; on older runs it's absent, so we derive
+ *  it from `score` with the same cut-points as `scoring.risk_level`. */
+function RiskHeadline({ report }: { report: ScanReportJson }) {
+  const score = report.score ?? null;
+  const level = report.risk_level ?? deriveRiskLevel(score);
+  const tint = level ? SCORE_TINT_TEXT[level] : "text-muted-foreground";
+  const topAttack = report.top_attack ?? null;
+  return (
+    <section className="rogue-card p-6 sm:p-7 space-y-3 animate-rogue-fade-up">
+      <div className="flex items-end gap-5 flex-wrap">
+        <div className="flex items-baseline gap-2">
+          <span className={`text-5xl font-bold tabular-nums leading-none ${tint}`}>
+            {score === null ? "—" : Math.round(score)}
+          </span>
+          <span className="text-lg font-mono text-muted-foreground">/100</span>
+        </div>
+        <div className="space-y-1.5">
+          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            Risk score
+          </p>
+          {level ? (
+            <SeverityBadge severity={level} className="text-xs" />
+          ) : (
+            <span className="font-mono text-xs text-muted-foreground">
+              not scored
+            </span>
+          )}
+        </div>
+        {topAttack && (
+          <div className="ml-auto text-right space-y-1">
+            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+              Top attack
+            </p>
+            <p className="text-sm font-bold break-words max-w-xs">{topAttack}</p>
+          </div>
+        )}
+      </div>
+      {report.score_methodology && (
+        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
+          {report.score_methodology}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Severity pill — reuses the page's `SEVERITY_CLASS` color vocabulary. */
+function SeverityBadge({
+  severity,
+  className = "",
+}: {
+  severity: Finding["severity"];
+  className?: string;
+}) {
+  const sev = SEVERITY_CLASS[severity] ?? SEVERITY_CLASS.low;
+  return (
+    <span
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono uppercase tracking-[0.15em] font-bold ${sev} ${className}`}
+    >
+      {severity}
+    </span>
+  );
+}
+
 function Kpi({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-md border border-border bg-card/30 px-4 py-3 space-y-1.5">
@@ -212,12 +285,19 @@ function FindingCard({ f, rank }: { f: Finding; rank: number }) {
         : "text-rogue-green";
   return (
     <article className={`rounded-lg border p-5 space-y-3 ${sev}`}>
-      <div className="flex items-baseline justify-between gap-4 flex-wrap">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-80">
-          #{rank} · {f.vector} · {f.severity}
-        </p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-70">
+            #{rank}
+          </span>
+          <SeverityBadge severity={f.severity} className="text-[10px]" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-70">
+            {f.vector}
+          </span>
+        </div>
         <p className={`font-mono text-sm font-bold tabular-nums ${rateClass}`}>
-          {Math.round(f.success_rate * 100)}% ({f.n_breach}/{f.n_trials})
+          breached {f.n_breach}/{f.n_trials} trials ·{" "}
+          {Math.round(f.success_rate * 100)}%
         </p>
       </div>
       <h3 className="text-base font-bold text-foreground leading-tight break-words">
@@ -299,6 +379,25 @@ const _SEVERITY_RANK: Record<string, number> = {
 };
 function severityRank(s: string): number {
   return _SEVERITY_RANK[s] ?? 0;
+}
+
+/** Big-number text tint per banded risk level (matches the matrix/brief vocabulary). */
+const SCORE_TINT_TEXT: Record<Finding["severity"], string> = {
+  critical: "text-rogue-red",
+  high: "text-orange-300",
+  medium: "text-yellow-300",
+  low: "text-rogue-green",
+};
+
+/** Derive the banded level from `score` when the report route didn't supply
+ *  `risk_level` (older runs). Cut-points mirror `scoring.risk_level`
+ *  (src/rogue/platform/scoring.py): ≥75 critical, ≥50 high, ≥25 medium, else low. */
+function deriveRiskLevel(score: number | null): Finding["severity"] | null {
+  if (score === null) return null;
+  if (score >= 75) return "critical";
+  if (score >= 50) return "high";
+  if (score >= 25) return "medium";
+  return "low";
 }
 
 /** Mirrors `_fmt_usd` (src/rogue/report.py:37). */

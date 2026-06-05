@@ -156,7 +156,7 @@ class PostgresJobQueue(JobQueue):
 def build_postgres_job_queue(database_url: str | None = None) -> PostgresJobQueue:
     """Convenience constructor: wire a `PostgresJobQueue` to `database_url` (or `$DATABASE_URL`)."""
     url = database_url or os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
-    engine = create_engine(url)
+    engine = create_engine(url, pool_pre_ping=True, pool_recycle=300, pool_timeout=10)
     session_factory = sessionmaker(bind=engine)
     return PostgresJobQueue(session_factory)
 

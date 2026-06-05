@@ -61,6 +61,8 @@ def test_summary_exact_labeled_format():
         "  33%",
         "Top Attack:",
         "  DAN / Persona Jailbreak",
+        # summary() spells out the top breaching finding's hit rate in human terms.
+        "  breached 2/4 trials (50%)",
         "Cost:",
         "  $1.23",
     ]
