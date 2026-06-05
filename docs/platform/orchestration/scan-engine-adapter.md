@@ -1,6 +1,8 @@
 # ScanEngine — the one execution path (Team B)
 
-> This is the single most important doc for the platform's core principle. Everything in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §2 reduces to one sentence: *there is exactly one place a scan executes.* That place is `rogue.scan.run_scan` (`src/rogue/scan.py:24`), which already exists and ships today. `ScanEngine` is the thin, ~30-line wrapper that lets the four surfaces — SDK, REST API, MCP, dashboard — converge on that one function without any of them reimplementing scan logic. If you find yourself writing a scan loop in this doc's code, stop: you are rebuilding the engine, and the architecture has failed (§2: "If two surfaces ever produce different results for the same target+pack, the architecture has failed").
+> This is the single most important doc for the platform's core principle. Everything in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §2 reduces to one sentence: *there is exactly one place a scan executes.* That place is `rogue.scan.run_scan` (`src/rogue/scan.py:24`), which already exists and ships today. `ScanEngine` is the wrapper that lets the four surfaces — SDK, REST API, MCP, dashboard — converge on that one function without any of them reimplementing scan logic. If you find yourself writing a scan loop in this doc's code, stop: you are rebuilding the engine, and the architecture has failed (§2: "If two surfaces ever produce different results for the same target+pack, the architecture has failed").
+
+Status: **BUILT (local).** Shipped as `DefaultScanEngine` in `src/rogue/platform/engine.py`, against the `ScanEngine` ABC in `src/rogue/platform/interfaces.py`. **Two things grew beyond this doc's original "~30-line wrapper" framing:** (1) the contract takes a whole **`ScanSpec`** (which carries the target + mode/pack/attacks/limits), not `(target, pack, config)`; and (2) the engine dispatches on `ScanSpec.mode` across **three** paths — `pack` (curated JSON pack → `run_scan`), `repertoire` (live harvested corpus → `run_scan`), and `ladder` (full escalation arsenal via `rogue.reproduce.escalation_ladder`). All three still bottom out at the same primitives + panel/judge machinery, so the one-engine invariant holds, but the ladder path is meaningfully more than a thin wrapper. The "~30 lines / Step 1–4" walk-through below describes the `pack`-mode core; read it as one of three modes.
 
 ## Where it lives
 
@@ -11,51 +13,45 @@
 Reproduced exactly from [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §4. This doc elaborates the implementation; it does not change the contract. If a change is needed, it changes in `ARCHITECTURE.md` first.
 
 ```python
-class ScanEngine:
-    async def run(self, target: TargetSpec, pack: str, config: ScanConfig,
-                  *, progress: ProgressCallback | None = None) -> ScanReport: ...
-    async def validate(self, target: TargetSpec) -> ValidationResult: ...
-    async def benchmark(self, target: TargetSpec, dataset: str, *, max_goals: int) -> BenchmarkReport: ...
+class ScanEngine(abc.ABC):
+    async def run(self, spec: ScanSpec, *, progress: ProgressCallback | None = None) -> ScanReport: ...
+    async def validate(self, spec: ScanSpec) -> ValidationResult: ...
+    async def benchmark(self, spec: ScanSpec, *, dataset: str, max_goals: int) -> BenchmarkReport: ...
 ```
+
+(The original doc showed `run(target, pack, config, …)`; the shipped contract folds all of that into the single `ScanSpec` argument. `ProgressCallback` is `Callable[[int, int, str | None], Awaitable[None]]` — `(n_completed, n_total, current_attack)`, **async**, three args.)
 
 `TargetSpec` and `ScanSpec` are the canonical request shapes from §5. `ScanReport` is the existing dataclass at `src/rogue/report.py:75` (`target, n_tests, n_breaches, cost_usd, findings[]`). `ValidationResult` (`src/rogue/report.py:193`) and `BenchmarkReport` (`src/rogue/report.py:236`) are likewise the existing dataclasses. The engine returns the engine's own types unchanged — persistence and the `ScanRecord`/`score` synthesis are the worker's and Team F's job, not the engine's.
 
-## `ScanEngine.run` — the ~30-line wrapper, line by line
+## `DefaultScanEngine.run` — pack-mode core, line by line
 
-The whole method is four steps and a return. Each step delegates to code that already exists; none of it is scan logic.
+In `pack` mode the method is four steps and a return — close to the original ~30-line shape. Each step delegates to code that already exists; none of it is scan logic. (Method/helper names below reflect the shipped `engine.py`: `_build_config`, `_adapter_extra`; the progress-panel is built inline. `repertoire`/`ladder` modes branch earlier — `_load_repertoire` / `_run_ladder` — and are not shown here.)
 
 ```python
-async def run(self, target: TargetSpec, pack: str, config: ScanConfig,
-              *, progress: ProgressCallback | None = None) -> ScanReport:
-    # (1) TargetSpec -> DeploymentConfig
-    dc = _deployment_config_from_target(target)
-
-    # (2) load the bundled attack pack, then apply ScanConfig filters/caps
-    primitives = filter_attacks(load_pack(pack), config.attacks)[: config.max_tests]
-
-    # (3) wire a progress-instrumented panel/judge, call the EXISTING engine
-    panel = _progress_panel(progress, len(primitives), adapter_extra=_adapter_extra(target))
-    report = await run_scan(
-        dc, primitives,
-        n_trials=config.n_trials,
-        budget=config.budget,
-        panel=panel,                 # <- the only seam where progress is threaded
-        judge_model=config.judge_model,
-    )
-    # (4) return the engine's ScanReport unchanged
-    return report
+async def run(self, spec: ScanSpec, *, progress: ProgressCallback | None = None) -> ScanReport:
+    config = self._build_config(spec)                         # (1) TargetSpec -> DeploymentConfig
+    if spec.mode == "ladder":
+        return await self._run_ladder(spec, config, progress) # (1b) full escalation arsenal
+    primitives = (self._load_repertoire(spec) if spec.mode == "repertoire"
+                  else filter_attacks(load_pack(spec.pack), spec.attacks)[: spec.max_tests])  # (2)
+    panel = _progress_panel(progress, len(primitives), adapter_extra=self._adapter_extra(spec))  # (3)
+    report = await run_scan(config, primitives, n_trials=spec.n_trials, budget=spec.budget,
+                            panel=panel, judge_model=self._judge_model)
+    return report                                             # (4) ScanReport unchanged
 ```
 
-Read that against `Client.scan` (`src/rogue/client.py:142-172`): it is *the same call*. The SDK does `filter_attacks(load_pack(pack), attacks)[:max_tests]` then `run_scan(self.config, primitives, n_trials=, budget=, adapter_extra=, judge=, judge_model=)`. `ScanEngine.run` differs in exactly two ways: it builds its `DeploymentConfig` from a `TargetSpec` instead of from constructor args, and it passes a progress-instrumented panel. Everything else is identical reuse. This is the de-duplication made concrete — the SDK and the engine are not two implementations, they are two callers of the same `run_scan`.
+Read the `pack` path against `Client.scan` (`src/rogue/client.py`): it is *the same call*. The SDK does `filter_attacks(load_pack(pack), attacks)[:max_tests]` then `run_scan(self.config, primitives, …)`. `DefaultScanEngine.run` differs in: it builds its `DeploymentConfig` from a `ScanSpec.target` instead of constructor args, it passes a progress-instrumented panel, and it adds the `repertoire`/`ladder` mode branches. The SDK and the engine are two callers of the same `run_scan`.
+
+The api_key seam: the engine reads `spec.target.api_key` directly into `adapter_extra` (`_adapter_extra`). On the hosted path the **worker** has already resolved the `api_key_ref` handle to the raw key just-in-time (see [./worker.md](./worker.md) §2-shipped) before calling `run`, so the engine itself never touches the secret store.
 
 ### Step 1 — `TargetSpec` → `DeploymentConfig`
 
 `TargetSpec` (§5) is `{ endpoint, provider, model, api_key_ref, system_prompt }`. There are exactly two branches, and both already have canonical implementations:
 
 - **`endpoint` set (custom OpenAI-compatible URL).** Use `make_endpoint_config(base_url, model, system_prompt=...)` (`src/rogue/reproduce/endpoint_scan.py:88`). It builds the ephemeral `DeploymentConfig` with `base_url` set, which is what routes `run_scan` through `CustomHTTPAdapter` (`src/rogue/scan.py:4-5` docstring: "a named provider, or `CustomHTTPAdapter` when `base_url` is set"). This is the platform's headline path — "point ROGUE at a customer's inference URL — no provider account, no bespoke integration" (`endpoint_scan.py:2-9`).
-- **`provider` set (known provider).** Mirror `Client.__init__`'s provider branch (`src/rogue/client.py:67-89`): qualify the model as `provider/model` (or fall back to `_DEFAULT_MODELS`), leave `base_url=None`, and build a `DeploymentConfig` with `target_model=` set. We do not duplicate `_DEFAULT_MODELS`; the cleanest implementation is for `_deployment_config_from_target` to construct a `Client(...)` and lift its `.config` — the SDK already does exactly this normalization, including the `provider/model` prefixing and the default-model lookup. Reusing `Client` here means the provider-resolution rules can never drift between SDK and platform.
+- **`provider` set (known provider).** The shipped `_build_config` mirrors `Client.__init__`'s normalization inline: qualify the model as `provider/model` (or fall back to `_default_model(provider)` — the engine's own default-model helper at `engine.py:373`), leave `base_url=None`, and construct a `DeploymentConfig(config_id="plat-scan-0001", customer_id="platform", target_model=…, system_prompt=…)`. (The original doc suggested lifting a `Client(...).config` to avoid duplicating defaults; the shipped engine instead carries its own small `_default_model` map — functionally equivalent, no `Client` round-trip.)
 
-`api_key_ref` is a Vault/KMS *handle*, never a raw secret (§5; Team C, [`../tenancy/secrets.md`](../tenancy/secrets.md)). The engine resolves it to a live key only at the moment it builds `adapter_extra={"api_key": ...}` for the panel, and never logs or persists it. Resolution is a call into Team C's secrets layer; the engine receives the resolved key from the worker's call context, so the engine module itself never imports the KMS client.
+`api_key_ref` is a secret-store *handle* (`secref_…`), never a raw secret (§5; Team C, [`../tenancy/secrets.md`](../tenancy/secrets.md)). **The engine does not resolve it** — the worker resolves the handle to a live key just-in-time and passes a `spec` carrying the raw `api_key` into `run`; `_adapter_extra` then puts it on `adapter_extra={"api_key": …}`. So the engine module never imports the secret store and never logs/persists the key.
 
 ### Step 2 — load the pack
 
@@ -69,33 +65,17 @@ Read that against `Client.scan` (`src/rogue/client.py:142-172`): it is *the same
 
 `run_scan` returns a `ScanReport` (`scan.py:104-110`). The engine returns it unchanged. No transformation, no persistence — the worker persists it and Team F renders it.
 
-## The progress callback — the one minimal additive change to `run_scan`
+## The progress callback (shipped)
 
-Today `run_scan` has **no** progress hook: it loops over primitives (`scan.py:57`) and only the final `ScanReport` is observable. The worker, though, must update `ScanRecord.progress (0-100)` and `n_completed` (§5) so the dashboard's live-scan UX ([`./scan-service.md`](./scan-service.md), [`../dashboard/live-scan-ux.md`](../dashboard/live-scan-ux.md)) can show a moving bar. We need per-primitive granularity, and we want it without touching the scan loop's logic.
+`ProgressCallback` is `Callable[[int, int, str | None], Awaitable[None]]` — `(n_completed, n_total, current_attack)`, **async**, three args (`src/rogue/platform/interfaces.py`). The worker passes a closure that writes `progress = int(100 * n_completed / n_total)`, `n_completed`, `n_tests`, and `top_attack=current_attack` to the `scan_runs` row each call (see [./worker.md](./worker.md) §2-shipped).
 
-Two options were considered.
+**Shipped reality — Option A (panel wrapper) was NOT used.** The original design (below) proposed a `_ProgressPanel` decorator so the proven `run_scan` loop stayed byte-for-byte unchanged. What actually shipped is different: in `pack`/`repertoire` mode `DefaultScanEngine.run` **re-implements the primitive loop inline** (`engine.py` ~lines 280–337: build/render each primitive, call `panel.run_attack` + `JudgeAgent.judge`, assemble `Finding`s, and `await progress(n_completed, n_total, technique_label(prim.family.value))` after each), rather than calling `rogue.scan.run_scan` with an injected progress panel. The `ladder` mode similarly drives `run_escalation_ladder_one` directly and fires `progress(progressed["n"], n_total, winning_strategy)`.
 
-**Option A — wrap the panel (preferred; zero change to `run_scan`).** `run_scan` calls `panel.run_attack(rendered, config, n_trials=...)` once per primitive (`scan.py:61`). `TargetPanel.run_attack` is at `src/rogue/reproduce/target_panel.py:170`. Wrap the real panel in a thin decorator whose `run_attack` calls through, then fires the progress callback on return:
+This is a real divergence from the "do not reimplement the scan loop" scope guard below: the engine shares the *primitives* (the same `TargetPanel`, `JudgeAgent`, `render`, `Finding`/`ScanReport` types) but not the literal `run_scan` function body. The one-engine invariant is preserved at the component level (same panel/judge/render path ⇒ same results), but the loop is duplicated. ⚑ Worth a deliberate decision: either fold the engine back onto `run_scan` (restoring Option A), or accept the duplicated loop and update the scope guard to say "share the panel/judge primitives" rather than "call `run_scan` verbatim." Today it is the latter, undocumented.
 
-```python
-class _ProgressPanel:
-    def __init__(self, inner, total, on_progress):
-        self._inner, self._total, self._cb, self._done = inner, total, on_progress, 0
-    async def run_attack(self, rendered, config, **kw):
-        responses = await self._inner.run_attack(rendered, config, **kw)
-        self._done += 1
-        if self._cb:
-            self._cb(self._done, self._total)   # n_completed, n_tests
-        return responses
-    async def aclose(self):
-        await self._inner.aclose()
-```
+The original two-options analysis is retained below for context:
 
-`run_scan` already accepts an injected `panel` (`scan.py:33,47-49`) and honors `owns_panel`/`aclose()` (`scan.py:47,98-100`), so the wrapper drops in with **no change to `run_scan` at all**. `ProgressCallback` is `Callable[[int, int], None]` (`(n_completed, n_tests)`); the worker derives `progress = round(100 * n_completed / n_tests)`. This is the recommended design: the engine stays a wrapper, the proven loop is untouched, and the seam is exactly the panel injection the engine already uses.
-
-**Option B — an `on_progress` param on `run_scan` (rejected as the default).** Add an optional `on_progress: Callable[[int, int], None] | None = None` and fire it at the end of each loop iteration (after the `findings.append` at `scan.py:97`). Strictly additive and defaulting to `None` keeps the existing 19-test suite green and every current caller unchanged. It is marginally more direct, but it edits the engine's hot path for an observability concern that Option A satisfies from outside. Choose Option B only if a future need arises for sub-primitive progress (per-trial) that the panel wrapper can't express. For Week-1, ship Option A.
-
-Either way the rule holds: the callback is *additive and optional*, the scan logic is byte-for-byte the same, and `progress=None` (the SDK path) is exactly today's behavior.
+> **Option A — wrap the panel.** `run_scan` calls `panel.run_attack(...)` once per primitive; a `_ProgressPanel` decorator fires the callback on return, with zero change to `run_scan`. **Option B — an `on_progress` param on `run_scan`**, fired at the end of each loop iteration. Both keep the proven loop intact. *(Neither is what shipped; the engine grew its own loop instead — see above.)*
 
 ## `validate` and `benchmark` — same reuse discipline
 
@@ -142,10 +122,7 @@ The hosted surfaces (API, MCP, dashboard) share one path top to bottom: `ScanSer
 
 `DeploymentConfig` on the **Pydantic/wire side** has `base_url` (`src/rogue/schemas/deployment_config.py:53`), and the whole custom-endpoint scan rides on it (`endpoint_scan.py:96-105` sets it; `scan.py:103` and `client.py:88` read it). But the **ORM side** has no `base_url` column — a grep of `src/rogue/db/models.py` finds none. So today a custom-endpoint `DeploymentConfig` is purely **ephemeral**: `make_endpoint_config` mints an in-memory object with `config_id="adhoc-endpoint-scan"`, `customer_id="adhoc"` (`endpoint_scan.py:96-105`), it is fed to `run_scan`, and it is never persisted. The SDK and the current single-tenant API never store the target's `base_url`.
 
-For hosted, multi-tenant scanning this gap must close, but **not** by the engine — the engine stays ephemeral-config-only. The gap is Team C's:
-
-- A persisted target needs `base_url` (and `provider`, `model`, `system_prompt`, `api_key_ref`) stored on a tenant-scoped row so a `TargetSpec` can be reconstructed for a re-run, an audit, or a trend. Today there is nowhere to put `base_url`.
-- This is a Team C migration (0022+), specified in [`../tenancy/data-model.md`](../tenancy/data-model.md): a `targets` (or columns on `deployment_configs`) addition carrying `base_url` + the `api_key_ref` handle, org/project-scoped. The engine then receives a fully-formed `TargetSpec` from the worker and never touches the table.
+**Shipped resolution.** The hosted path closed this gap without a dedicated `targets` table or a `base_url` ORM column: the full `ScanSpec` (target's `endpoint`/`base_url`, `provider`, `model`, `system_prompt`, and the `api_key_ref` handle) is persisted as the **`scan_jobs.payload` JSON** and a redacted snapshot as the **`scan_runs.target` JSON** column (`src/rogue/platform/models.py`). The worker rehydrates the `ScanSpec` from `payload` (`ScanSpec.model_validate(...)`) and hands the engine a fully-formed `TargetSpec` — so `base_url` survives the request as JSON, not as a typed column. The engine still builds an **ephemeral** `DeploymentConfig` and never reads/writes the DB. (The original "Team C migration adds a `targets` table / `base_url` column" plan was not taken; the JSON-payload approach shipped instead.)
 
 The boundary: the engine consumes a `TargetSpec` and builds an **ephemeral** `DeploymentConfig` exactly as the SDK does — it does not read or write the DB. Persisting the target (so the `base_url` survives the request) is data-model work owned by Team C. Flagging it here because the engine is where the ephemeral-vs-persisted seam is most visible, and a reader of this doc must not "fix" it by adding DB writes to the engine.
 

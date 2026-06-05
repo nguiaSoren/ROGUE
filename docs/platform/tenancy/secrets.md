@@ -39,30 +39,39 @@ SecretService.resolve("secref_01J...", org_id) ──► plaintext  (held in-fra
 DeploymentConfig.api_key = plaintext ──► adapter HTTP call ──► dropped on return
 ```
 
-`SecretService` is the only code that ever sees both the ciphertext and the plaintext. Every other layer traffics in `secref_*`.
+The `SecretStore` is the only code that ever sees both the ciphertext and the plaintext. Every other layer traffics in `secref_*`.
+
+**Shipped interface** (`src/rogue/platform/secrets.py`) — the abstract class is `SecretStore`, with an `InMemorySecretStore` (tests/single-process) and a `PostgresSecretStore` (Fernet) impl. The methods are **synchronous** and simpler than the design below — there is **no `rotate`/`revoke`** yet (just `delete`); `resolve` returns `None` (fails closed) on org mismatch rather than raising:
 
 ```python
-class SecretService:
-    async def put(self, *, org_id: str, label: str, plaintext: str) -> str:        # -> "secref_<ulid>"
-    async def resolve(self, ref: str, *, org_id: str) -> str:                        # plaintext; fails closed on org mismatch / revoked
-    async def rotate(self, ref: str, *, org_id: str, new_plaintext: str) -> None:    # re-wrap, bump version
-    async def revoke(self, ref: str, *, org_id: str) -> None:                        # tombstone; subsequent resolve raises
+class SecretStore(abc.ABC):
+    def put(self, raw: str, *, org_id: str) -> str: ...          # -> "secref_<ulid>"
+    def resolve(self, secref: str, *, org_id: str) -> str | None: ...  # None on org mismatch / missing
+    def delete(self, secref: str) -> None: ...
 ```
 
-## 3. Envelope encryption — what's stored, and where
+`DefaultScanService` (with a wired `secret_store`) calls `put` on the way in; the `ScanWorker` calls `resolve` just-in-time. `build_postgres_secret_store(database_url, encryption_key)` returns `None` when `SECRET_ENCRYPTION_KEY` is unset (raw-passthrough fallback). The async/`label`/`rotate`/`revoke` interface below is the original design; treat it as future hardening.
 
-Tenant secrets are encrypted at rest with **envelope encryption**, the standard two-tier scheme: a per-secret **data key (DEK)** encrypts the plaintext; a **key-encryption key (KEK)** held in the key manager encrypts the DEK. ROGUE's plaintext is itself stored — only the wrapped DEK + ciphertext live in Postgres.
+## 3. Encryption at rest — what's stored, and where
+
+**Shipped (v1):** a single-tier **Fernet** scheme. The KEK is one env-held key (`SECRET_ENCRYPTION_KEY`, a `Fernet.generate_key()` value); `PostgresSecretStore` does `fernet.encrypt(raw)` and stores the ciphertext in a **dedicated `secrets` table** (migration 0023), **not** `api_keys`. The shipped `Secret` ORM is minimal: `secret_id` (`secref_…`, PK), `org_id`, `ciphertext` (LargeBinary), `created_at` — there is **no** `wrapped_dek`/`kek_id`/`key_version`/`nonce`/`label`/`revoked_at` column (those belong to the envelope design below). A `scan_runs` row carries only the `secref_` handle (inside its `target`/`spec` JSON), never ciphertext.
+
+The **envelope-encryption / KMS / Vault** scheme below is future hardening, not shipped:
+
+Tenant secrets would be encrypted at rest with **envelope encryption**, the standard two-tier scheme: a per-secret **data key (DEK)** encrypts the plaintext; a **key-encryption key (KEK)** held in the key manager encrypts the DEK. Only the wrapped DEK + ciphertext live in Postgres.
 
 - **Backend, two interchangeable options** (pick one at deploy; the `SecretService` interface is identical):
   - **AWS KMS** — `GenerateDataKey` returns `{plaintext_dek, encrypted_dek}`; we AES-256-GCM the secret under `plaintext_dek`, store `encrypted_dek` + ciphertext, discard `plaintext_dek`. Decrypt path: `Decrypt(encrypted_dek)` → AES-GCM-open.
   - **HashiCorp Vault Transit** — Vault holds the key and does the crypto; we send plaintext to `transit/encrypt/rogue-tenant` and store the returned `vault:v1:...` blob. No DEK lands on our side at all (strongest option; preferred if Vault is already in the stack).
-- **Where the ciphertext lives** ([./data-model.md](./data-model.md), `api_keys` table): a `ciphertext BYTEA NOT NULL` column holds the AES-GCM (or Vault) blob; `wrapped_dek BYTEA` holds the KMS-encrypted DEK (NULL for Vault Transit, which is self-describing); `kek_id TEXT` / `key_version INT` record which KEK + version wrapped it (for rotation, §5); `nonce BYTEA`, `org_id`, `label`, `created_at`, `revoked_at`. The plaintext column **does not exist** — there is nowhere in the schema to accidentally store it.
+- **Where the ciphertext would live** (envelope design): a `ciphertext`/`wrapped_dek`/`kek_id`/`key_version`/`nonce` column set. **In the shipped v1 the ciphertext lives in the dedicated `secrets` table** (single Fernet blob, columns listed above), not in `api_keys`. Either way the plaintext column does not exist — there is nowhere in the schema to accidentally store it.
 - **`scan_runs` carries only the handle.** Per [./data-model.md](./data-model.md), a `scan_runs` row references the target by `api_key_ref` (the `secref_*` string), never a foreign key that could be joined back to plaintext and never the ciphertext. A dump of `scan_runs` leaks nothing.
 - **Platform secrets are not enveloped.** `DATABASE_URL` and our provider keys come from the process environment via the settings module (§4); they are protected by the deploy platform's env-var secret store (Render/Vercel), not this Postgres path. Mixing the two is a design error — platform secrets in `api_keys` would give every tenant a column to subpoena.
 
 ## 4. The settings module — `src/rogue/config.py`
 
-Today `config.py` is a one-line stub (`config.py:1`) and **every** platform secret is read ad-hoc via `os.environ.get` at the call site. This is real and widespread: 21 modules under `src/rogue/` read `os.environ` directly. Concrete instances this module consolidates:
+**Shipped:** `src/rogue/config.py` is now implemented (~166 lines) — a `pydantic-settings` `Settings` object with `get_settings()` and a `redacted_dict()` log-safe view, every credential a `SecretStr`. **However the migration of callers is NOT done** (the module's own docstring says so): the 21-odd `os.environ.get` call sites across `src/rogue/` have not yet been switched to `get_settings()`. So the seam exists; the consolidation is pending. The original write-up of the problem and the field list follows.
+
+Historically `config.py` was a one-line stub and **every** platform secret was read ad-hoc via `os.environ.get` at the call site. Concrete instances this module is meant to consolidate (still un-migrated):
 
 - `api/main.py:74` and `mcp_server/server.py:78` define the **same** `DEFAULT_DATABASE_URL` fallback string and the **same** `_database_url()` helper — duplicated verbatim across two files (the `66`/`78` lines).
 - `reproduce/judge.py:232` reads `JUDGE_MODEL` (and `:241` `JUDGE_FALLBACK_MODEL`) inline.
@@ -143,9 +152,9 @@ A tenant secret (or a platform key) must never surface in **logs, `scan_runs` ro
 - **The `api_keys` / `scan_runs` column definitions** are [./data-model.md](./data-model.md); this doc specifies what those columns must *hold* (ciphertext, wrapped DEK, key version, handle) and why, not their full DDL.
 - **The scan execution path** is unchanged — `ScanEngine.run` (ARCHITECTURE.md §4) gains exactly one new call, `SecretService.resolve`, just before it builds `DeploymentConfig`; no scanning logic moves here.
 
-## 8. Build order (within Team C)
+## 8. Build status (within Team C)
 
-1. **Settings module** — implement `src/rogue/config.py` (§4); migrate `api/main.py`/`mcp_server/server.py` `DATABASE_URL` first (removes the duplication), then judge/adapters/notify. Lowest risk, immediate cleanup, no DB.
-2. **`api_keys` columns** — add `ciphertext`/`wrapped_dek`/`nonce`/`kek_id`/`key_version`/`revoked_at` (migration 0022+, the next number after the committed 0021; coordinate with Team B's 0022 scan tables — see ARCHITECTURE.md §7).
-3. **`SecretService`** — `local` backend first (dev: a static KEK, so the whole flow is testable without cloud creds), then KMS/Vault behind the same interface.
-4. **`ScanEngine.resolve` hook** + the report/log scrubber (§6) — wire JIT resolution and prove, with a test, that an injected credential in a `model_response` comes out `‹redacted-secret›` in the persisted report.
+1. **Settings module** — ✅ `src/rogue/config.py` implemented (§4). ⬜ caller migration off `os.environ.get` still pending.
+2. **`secrets` table** — ✅ shipped as migration **0023_secrets** (`secret_id`/`org_id`/`ciphertext`/`created_at`). The envelope columns (`wrapped_dek`/`kek_id`/`key_version`/`nonce`/`revoked_at`) were **not** added — v1 is single Fernet blob.
+3. **`SecretStore`** — ✅ `InMemorySecretStore` + Fernet `PostgresSecretStore` shipped (`secrets.py`). The single env-held Fernet KEK is the "local backend"; ⬜ KMS/Vault and `rotate`/`revoke` remain future work.
+4. **JIT resolution hook** — ✅ wired through `DefaultScanService.put` → `ScanWorker.resolve` (not a new `ScanEngine.resolve` call; the worker resolves before invoking the engine). ⬜ the report/log secret-scrubber (§6) is design, not confirmed built.

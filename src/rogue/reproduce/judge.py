@@ -355,7 +355,7 @@ class JudgeAgent:
         model_response: str,
         primitive: AttackPrimitive,
     ) -> str:
-        """Render the user-turn template defined at the bottom of `judge_v1.md`.
+        """Render the user-turn template defined at the bottom of the active rubric (`judge_v{N}.md`).
 
         The rendered attack payload is reconstructed by joining the user-turn
         contents from `rendered.messages` (the judge does not need to see the

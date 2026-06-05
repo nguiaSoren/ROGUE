@@ -60,7 +60,7 @@ The product is two operable surfaces over one engine. The **dashboard** is the h
 
 **Where:** `/scans/new`, the **Full repertoire** corpus button (`mode: "repertoire"`; the **Pack** dropdown disables, since the corpus is the whole live library).
 
-**What it does / on screen:** Runs ROGUE's *entire harvested corpus* — every attack primitive continuously scraped from 15+ open-web sources via Bright Data — against the target, capped at Max tests. This is the differentiator made operable: the attacks you're tested with are the attacks adversaries are *posting right now*, not a frozen benchmark. Because the corpus is the whole live library, the Pack dropdown greys out. The cap keeps cost bounded while still exercising the breadth of the threat database.
+**What it does / on screen:** Runs ROGUE's *entire harvested corpus* — every attack primitive continuously scraped from 19 open-web sources via Bright Data — against the target, capped at Max tests. This is the differentiator made operable: the attacks you're tested with are the attacks adversaries are *posting right now*, not a frozen benchmark. Because the corpus is the whole live library, the Pack dropdown greys out. The cap keeps cost bounded while still exercising the breadth of the threat database.
 
 **Marketing hook:** "Tested against the open web's freshest jailbreaks — ROGUE harvests new attacks daily and throws the whole living arsenal at your model. Your benchmark updates itself."
 
@@ -108,23 +108,23 @@ The product is two operable surfaces over one engine. The **dashboard** is the h
 
 **Where:** `/scans/[scanId]/report` (`frontend/src/app/(app)/scans/[scanId]/report/page.tsx`), the `RiskHeadline` + `Kpi` row; score band in `frontend/src/components/score-badge.tsx`.
 
-**What it does / on screen:** When a scan completes, "View report →" links here. The page leads with the **risk headline** — a giant `N/100` score, color-banded (≥75 critical / ≥50 high / ≥25 medium / else low), with a severity pill, the **top attack** name on the right, and a one-line methodology caption explaining how the score is computed (the page never recomputes a rate — everything arrives pre-derived from the platform). Below it, a four-tile **KPI row**: Tests, Breaches (red if any), Breach rate (as a %), and Cost. If a scan completed with nothing reproduced, the findings area shows a green "No vulnerabilities reproduced across N tests." A scan that isn't done yet shows "Report not ready" with a link back to the live view, not a hard error.
+**What it does / on screen:** When a scan completes, "View report →" links here. The page leads with the **risk headline** — a giant `N/100` score, color-banded (≥75 critical / ≥50 high / ≥25 medium / else low), with a severity pill, the **top attack** name on the right, and a one-line methodology caption explaining how the score is computed (the page never recomputes a rate — everything arrives pre-derived from the platform). Directly beneath it, a branded **executive-summary** card renders the report's top-level `executive_summary` markdown — the forward-to-your-boss overview, the first thing read after the score (the same exec narrative the MCP `create_executive_summary` tool returns; absent on older runs, in which case the card simply doesn't show). Below that, a four-tile **KPI row**: Tests, Breaches (red if any), Breach rate (as a %), and Cost. If a scan completed with nothing reproduced, the findings area shows a green "No vulnerabilities reproduced across N tests." A scan that isn't done yet shows "Report not ready" with a link back to the live view, not a hard error.
 
-**Marketing hook:** "One number your CISO can read in three seconds: a 0–100 risk score, banded and explained, leading every report."
+**Marketing hook:** "One number your CISO can read in three seconds, then an executive summary they can forward as-is: a 0–100 risk score and a written verdict leading every report."
 
-**Video idea:** A completed scan's report fades up — the big red "82 /100 CRITICAL" headline lands first, then the KPI tiles count up (Tests, Breaches, 41% breach rate, $4.20).
+**Video idea:** A completed scan's report fades up — the big red "82 /100 CRITICAL" headline lands first, the executive-summary card resolves beneath it, then the KPI tiles count up (Tests, Breaches, 41% breach rate, $4.20).
 
 ---
 
-### 10. Severity-grouped findings — worst-first, with the exact attack and the model's own words
+### 10. Severity-grouped findings — worst-first, explained, with the exact attack and the model's own words
 
 **Where:** `/scans/[scanId]/report`, the `FindingCard` list (sorted by severity then success rate).
 
-**What it does / on screen:** Below the KPIs, the findings — only the attacks that actually breached, sorted worst-first (critical → low, then by success rate). Each finding is a severity-tinted card with a rank (#1, #2…), a severity pill, the vector, and a hard number: `breached 4/5 trials · 80%` (red ≥70%, orange ≥30%, green below). The card titles the attack, names its family and technique, and carries **two collapsible evidence sections**: **Example attack** (the literal payload that broke the model, in a monospace block) and **Model response** (an excerpt of what your model actually said back, in a quoted block). Evidence is collapsed by default so the page reads clean, expandable when you want proof.
+**What it does / on screen:** Below the KPIs, the findings — only the attacks that actually breached, sorted worst-first (critical → low, then by success rate). Each finding is a severity-tinted card with a rank (#1, #2…), a severity pill, the vector, and a hard number: `breached 4/5 trials · 80%` (red ≥70%, orange ≥30%, green below). The card titles the attack and names its family and technique, then carries a **"What this is"** block — the finding's plain-language `explanation`, so a non-expert grasps the risk before the fix or the proof. Below the explanation and remediation (next entry) sits a **single collapsible evidence section** — "Evidence — attack & model response" — that holds both the **Attack sent →** (the literal payload that broke the model, in a monospace block) and the **Model response** (an excerpt of what your model actually said back). It's collapsed by default so the page reads clean; because the finding breached, the summary line carries a red **"breached"** flag and the response is tinted red, so the evidence reads as confirmed proof, not a benign sample.
 
-**Marketing hook:** "Not a verdict — *evidence*. Every finding shows the exact payload that broke your model and the model's own words back. Worst-first, with a breach rate you can act on."
+**Marketing hook:** "Not a verdict — *evidence*, explained. Every finding says what it is in plain language, then shows the exact payload that broke your model and the model's own words back, flagged as a breach. Worst-first, with a rate you can act on."
 
-**Video idea:** Click a critical finding's "Example attack" to reveal the jailbreak payload, then "Model response" to reveal the model complying — the receipts, side by side.
+**Video idea:** Read a critical finding's "What this is" line, then expand its evidence to reveal the jailbreak payload and the model complying — the breach flag pulsing red beside it.
 
 ---
 
@@ -132,7 +132,7 @@ The product is two operable surfaces over one engine. The **dashboard** is the h
 
 **Where:** `/scans/[scanId]/report`, the per-finding `remediation` block + the report-level `RecommendationsPanel`.
 
-**What it does / on screen:** Each finding card ends with a bordered **Remediation** block — a concrete, finding-specific fix surfaced by the report route (degrades gracefully on older runs that lack it). Below all the findings, a report-level **Recommendations** panel lists "what to do next" as bullets; when the platform doesn't supply them, it falls back to a sensible one-liner ("N findings reproduced — prioritize the top attack (…)" or, for a clean scan, "keep monitoring as the threat corpus grows"). Together they turn a list of breaches into a to-do list.
+**What it does / on screen:** Each finding card carries a green-accented **"How to fix"** block — a concrete, finding-specific remediation surfaced by the report route, visually distinct from the "What this is" explanation above it (green = the "do this" instruction) and sitting just above the evidence (degrades gracefully on older runs that lack it). Below all the findings, a report-level **Recommendations** panel lists "what to do next" as bullets; when the platform doesn't supply them, it falls back to a sensible one-liner ("N findings reproduced — prioritize the top attack (…)" or, for a clean scan, "keep monitoring as the threat corpus grows"). Together they turn a list of breaches into a to-do list.
 
 **Marketing hook:** "Every breach comes with a fix. Per-finding remediation plus a prioritized action list — so the report ends with what to change, not just what's broken."
 
@@ -168,7 +168,7 @@ The product is two operable surfaces over one engine. The **dashboard** is the h
 
 **Where:** `/scans/[scanId]/report`, the **JSON** export button → `/api/scans/{id}/report?format=json`; shape is `ScanReportJson` in `frontend/src/lib/platform-api.ts`.
 
-**What it does / on screen:** The **JSON** button hands back the full structured report — `target`, `n_tests`, `n_breaches`, `breach_rate`, `top_attack`, `cost_usd`, `score`, `risk_level`, `score_methodology`, `recommendations[]`, and the full `findings[]` array (each with family, technique, vector, severity, success rate, trial counts, example attack/response, and remediation). This is the integration seam: pipe it into your own dashboards, gate a CI run on `breach_rate`, or diff scores across releases.
+**What it does / on screen:** The **JSON** button hands back the full structured report — `target`, `n_tests`, `n_breaches`, `breach_rate`, `top_attack`, `cost_usd`, `score`, `risk_level`, `score_methodology`, `executive_summary`, `recommendations[]`, and the full `findings[]` array (each with family, technique, vector, severity, success rate, trial counts, an `explanation`, example attack/response, and remediation). This is the integration seam: pipe it into your own dashboards, gate a CI run on `breach_rate`, or diff scores across releases.
 
 **Marketing hook:** "Every report is also an API response — export the full structured JSON to gate CI on breach rate, trend your score across releases, or feed your own dashboards."
 
@@ -268,6 +268,6 @@ The product is two operable surfaces over one engine. The **dashboard** is the h
 
 The full operable surface, twenty-one capabilities across two surfaces:
 
-**Dashboard (human):** (1) key-based sign-in with browser-invisible secret · (2) per-tenant scans dashboard · (3) launch a scan (provider *or* custom endpoint) · (4) Curated-pack mode · (5) Full-repertoire mode (live-harvested corpus) · (6) Full-ladder mode (escalation arsenal) · (7) live progress (breach counter / current-attack / spend / ETA) · (8) cancel-with-banked-progress · (9) 0–100 risk-score report headline · (10) severity-grouped findings with attack/response evidence · (11) per-finding remediation + recommendations · (12) HTML export · (13) CISO-ready PDF export · (14) structured JSON export · (15) pre-flight validate/test-connection (endpoint live, dashboard button near-term).
+**Dashboard (human):** (1) key-based sign-in with browser-invisible secret · (2) per-tenant scans dashboard · (3) launch a scan (provider *or* custom endpoint) · (4) Curated-pack mode · (5) Full-repertoire mode (live-harvested corpus) · (6) Full-ladder mode (escalation arsenal) · (7) live progress (breach counter / current-attack / spend / ETA) · (8) cancel-with-banked-progress · (9) 0–100 risk-score report headline + executive summary · (10) severity-grouped findings — explained, with breach-flagged attack/response evidence · (11) per-finding "how to fix" + recommendations · (12) HTML export · (13) CISO-ready PDF export · (14) structured JSON export · (15) pre-flight validate/test-connection (endpoint live, dashboard button near-term).
 
 **MCP (agent):** (16) six read-only threat-DB queries · (17) validate/scan/poll/cancel/list action tools · (18) report + CISO exec-summary tools · (19) standard-dataset benchmarking · (20) Slack + Jira integration routing (idempotent, secret-free) · (21) the composed "agent as security consultant" lifecycle.

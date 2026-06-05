@@ -92,8 +92,8 @@ These take a customer `TargetSpec`, cost real money, and write durable per-tenan
 
 ### Benchmark
 
-- **`run_benchmark(endpoint?/provider?, dataset, ...)`** — run the target against a standard benchmark dataset (e.g. AdvBench / JailbreakBench). Start+poll like `start_scan` — returns a `scan_id`-shaped handle whose terminal record carries the benchmark `score`/trend; read it back with `get_benchmark` (or `get_scan_status`).
-- **`get_benchmark(scan_id)`** — read a benchmark run's status and, when terminal, its score against the dataset.
+- **`run_benchmark(endpoint?/provider?, dataset, max_goals?, ...)`** — run the target against a standard benchmark dataset (e.g. AdvBench / JailbreakBench). Start+poll like `start_scan` — returns `{benchmark_id, status}` (status `"queued"`); read it back with `get_benchmark`.
+- **`get_benchmark(benchmark_id)`** — read a benchmark run's status and, when terminal, its result (`dataset`, `n_goals`, `n_success`, `asr`, `cost_per_success`, `winner_rank`, …) against the dataset.
 
 ### Workflow
 

@@ -86,7 +86,7 @@ Defined once in `models/report.py`; mirrored in `MockTransport` so mock reports 
 - **Wave 3 — assemble + verify:** wired `utils/__init__` exports + telemetry env-enable, isolated
   `uv` venv, full suite + ruff, headline example + installed `rogue` CLI through the real package.
 
-**Verification:** `uv run pytest` → **318 passed, 1 skipped**; `uv run ruff check src tests` → clean;
+**Verification:** `uv run pytest` → **324 passed, 1 skipped**; `uv run ruff check src tests` → clean;
 `examples/*.py` and the installed `rogue` console script run offline against `MockTransport`.
 
 ## Deliverable → location map

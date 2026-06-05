@@ -2,7 +2,12 @@
 
 > Team D, the Dashboard box of [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §6. This doc owns the **page tree and routing** of the authenticated, multi-tenant dashboard: the App Router segment layout, the marketing-vs-authed split, how a session attaches its credential to the API client, the server-component data-fetching shape, and how the existing single-tenant pages (`/matrix`, `/feed`, `/brief`, `/analytics`) relate to the new org-scoped product. Two sibling docs own the depth that would bloat this one: the streaming progress UI of a running scan lives in [`./live-scan-ux.md`](./live-scan-ux.md), and the rendered report surface (the HTML/PDF/exec views Team F produces) lives in [`./report-views.md`](./report-views.md). The credential this doc threads through `lib/api.ts` — sessions, keys, the bearer — is specified by Team C in [`../api/auth-and-keys.md`](../api/auth-and-keys.md); the routes the pages call are catalogued in [`../api/overview.md`](../api/overview.md). This doc never redefines `ScanRecord`, `ScanStatus`, `score`, or any endpoint — it consumes the vocabulary from ARCHITECTURE §5 and the contracts from those docs.
 
-Status: design spec, not yet built. The app we extend is live at `rogue-eosin.vercel.app` (Next.js 16.2.6, React 19, App Router); the pages below are the Week-2 "make it SaaS" deliverable on the ARCHITECTURE §7 roadmap. We build **on** the existing app — we do not scaffold a new one.
+Status: **PARTIALLY BUILT (local); narrower than this spec.** The authenticated **`(app)` route group shipped** with the scan-centric pages — but the broader page tree below is mostly unrealized. **Shipped under `frontend/src/app/`:**
+- `(app)/layout.tsx`, `(app)/scans/page.tsx` (list), `(app)/scans/new/page.tsx` (create), `(app)/scans/[scanId]/page.tsx` (detail/live), `(app)/scans/[scanId]/report/page.tsx` (report view).
+- `sign-in/page.tsx` (a top-level route, **not** an `(auth)/` group).
+- The legacy pages — `/` (landing), `/matrix`, `/matrix/cell`, `/feed`, `/brief`, `/analytics` — **stayed at the top level; they were NOT moved into a `(marketing)/` route group.**
+
+**Not built:** the `(marketing)/` and `(auth)/` route groups; `(app)/dashboard`, `(app)/reports`, `(app)/reports/[id]`, `(app)/benchmarks`, and `(app)/settings/*`. The route param is `[scanId]` (not `[id]`), and the report view is a nested route `(app)/scans/[scanId]/report` rather than a top-level `/reports/[id]`. Treat the tree and layout-refactor below as the intended design; the shipped surface is the scan list/create/detail/report flow inside `(app)`.
 
 ---
 

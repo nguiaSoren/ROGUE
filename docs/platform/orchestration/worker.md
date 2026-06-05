@@ -2,9 +2,47 @@
 
 > Team B (Scan Orchestration). The `ScanWorker` is the consumer side of the orchestration triangle: it leases a job off the queue, executes the scan through the single `ScanEngine` execution path, streams progress, persists results, and releases the job. It is the only process that ever calls `ScanEngine.run`. The web dyno enqueues and reads status; it never scans. This document specifies the worker loop, its progress-reporting mechanism, its concurrency and rate-limit model, and how it is deployed. It uses the `ScanStatus` / `ScanRecord` / `ScanSpec` / `TargetSpec` vocabulary and the `ScanEngine` / `ScanService` contracts defined in [../ARCHITECTURE.md](../ARCHITECTURE.md) §4–§5 verbatim — nothing here redefines them.
 
-Status: **design spec, not yet built.** The engine it drives (`rogue.scan.run_scan` at `src/rogue/scan.py:24`, `TargetPanel.run_attack` at `src/rogue/reproduce/target_panel.py:170`) exists today; the worker is the new Week-1 layer that turns it into a hosted, queue-backed service.
+Status: **BUILT (local), simpler than this spec.** Shipped as `ScanWorker` in `src/rogue/platform/worker.py`. The shipped worker is deliberately minimal — a **single-task** `run_once` / `run_forever` loop, no concurrency pool, no provider semaphore, no lease heartbeat, no per-scan wall-clock timeout, no cooperative mid-run cancellation, and **no Redis** (progress writes straight into the `scan_runs` row via the `ScanStore`). The richer concurrency/heartbeat/cancel machinery described in §2 and §5–§9 below is **original design, not built** — read those sections as the intended future shape, not current behavior. Where they conflict with the shipped loop, the shipped loop (summarized in §2-shipped immediately below) wins.
 
 Lives at `src/rogue/platform/worker.py`. Related docs: the queue it leases from is [./job-queue.md](./job-queue.md); the engine wrapper it calls is [./scan-engine-adapter.md](./scan-engine-adapter.md); the service that enqueues the jobs and serves their status is [./scan-service.md](./scan-service.md); the live progress it writes is consumed by [../dashboard/live-scan-ux.md](../dashboard/live-scan-ux.md).
+
+### §2-shipped — the loop that actually runs
+
+```python
+async def run_once(self) -> bool:
+    job = await self.queue.lease(worker_id=self.worker_id)   # PostgresJobQueue SKIP-LOCKED lease
+    if job is None:
+        return False
+    await self.store.update(job.scan_id, status=RUNNING, started_at=now())
+
+    async def cb(n_completed, n_total, current):             # progress → straight to scan_runs row
+        await self.store.update(job.scan_id, progress=int(100*n_completed/max(1,n_total)),
+                                n_completed=n_completed, n_tests=n_total, top_attack=current)
+
+    spec = job.spec
+    if self.secret_store and spec.target.api_key_ref and not spec.target.api_key:
+        raw = self.secret_store.resolve(spec.target.api_key_ref, org_id=job.org_id)  # JIT key resolve
+        spec = spec.model_copy(update={"target": spec.target.model_copy(update={"api_key": raw})})
+
+    try:
+        report = await self.engine.run(spec, progress=cb)    # the ONE execution path; takes a ScanSpec
+    except Exception as e:
+        await self.store.update(job.scan_id, status=FAILED, error=str(e)[:500], completed_at=now())
+        await self.queue.fail(job.job_id, error=str(e), retry=False)   # currently no auto-retry
+        return True
+
+    score = scoring.score_for(report)                        # worker DOES compute the headline score
+    report_id = memory._new_id("rep")
+    await self.store.save_report(report_id=report_id, scan_id=job.scan_id, payload=report.to_dict())
+    await self.store.update(job.scan_id, status=COMPLETED, progress=100, n_tests=report.n_tests,
+                            n_completed=report.n_tests, n_breaches=report.n_breaches,
+                            top_attack=report.top_attack, score=score, cost_usd=report.cost_usd,
+                            report_id=report_id, completed_at=now())
+    await self.queue.ack(job.job_id)
+    return True
+```
+
+`run_forever(poll_interval=1.0, stop_event=None)` loops `run_once`, sleeping `poll_interval` when the queue is empty. `main()` (entrypoint `python -m rogue.platform.worker`) wires `PostgresScanStore` + `PostgresJobQueue` + `DefaultScanEngine`. Key shipped facts that diverge from the design below: the engine is called `engine.run(spec, progress=cb)` (one `ScanSpec` arg, **not** `(target, pack, config)`); progress goes to **Postgres**, not Redis; the worker **does** compute `score` (`scoring.score_for`, not deferred to Team F); there is exactly one in-flight job per `run_once` call.
 
 ---
 
@@ -71,6 +109,8 @@ loop forever:
 
 ## 3. Progress reporting
 
+> **Shipped note:** progress is written **to the `scan_runs` Postgres row** on every callback (see §2-shipped), not to Redis. The `_on_progress`/Redis-mirror mechanism in this section is original design; ignore the Redis specifics. The callback signature that shipped is `cb(n_completed, n_total, current)`.
+
 `ScanRecord` carries `progress: int (0-100)` and the worker also surfaces a current-attack label, both of which the dashboard polls live (ARCHITECTURE.md §5; [../dashboard/live-scan-ux.md](../dashboard/live-scan-ux.md)). The engine produces this for free because `run_scan` is a flat loop over primitives (`src/rogue/scan.py:57`) — one iteration per attack primitive. The mechanism:
 
 1. **The seam.** `ScanEngine.run` accepts `progress: ProgressCallback | None` (ARCHITECTURE.md §4). The worker passes a closure bound to the `run`. The engine wrapper ([./scan-engine-adapter.md](./scan-engine-adapter.md)) is responsible for invoking it once per completed primitive — i.e. just after the `responses = await panel.run_attack(...)` / judge step for each `prim` in the `run_scan` loop. `run_scan` itself has no callback today; the wrapper adds it by injecting a `panel`/`judge` pair (it already accepts injected `panel`/`judge` at `src/rogue/scan.py:32`–`33`) or by iterating primitives in the wrapper and calling the engine per-slice. Either way **no scanning logic is reimplemented** — the callback is a side-channel, not a fork of the loop.
@@ -85,7 +125,7 @@ Progress is **monotonic and best-effort**: a dropped callback write loses one ti
 
 ## 4. Persisting results
 
-On the `completed` branch the worker turns the in-memory `ScanReport` (`target, n_tests, n_breaches, cost_usd, findings[]`, `src/rogue/report.py:75`) into durable rows via `store.persist_report`, which returns a `rep_<ulid>`. That id goes onto the `scan_runs` row as `report_id`; `ReportService` (Team F) later reads those rows to render JSON/HTML/PDF. The worker computes the headline `score` only if Team F's `compute_risk_score` is import-cheap; otherwise it stores `findings` raw and leaves `score` for the report layer (ARCHITECTURE.md §5 names Team F as the formula owner — the worker must not invent a second score).
+On the `completed` branch the worker persists the report and finalizes the row. **Shipped shape** (see §2-shipped): it calls `store.save_report(report_id, scan_id, payload=report.to_dict())` with a `report_id = "rep_" + ulid()` it mints (the report payload is the whole `ScanReport.to_dict()` JSON blob in the `reports` table), then writes that `report_id` onto the `scan_runs` row. **The worker DOES compute the headline `score`** here via `scoring.score_for(report)` (`src/rogue/platform/scoring.py`) and writes it on the same terminal update — it is not deferred to Team F. `ReportService` ([../reports/report-service.md](../reports/report-service.md)) later reads the persisted payload to render JSON/HTML/PDF.
 
 The terminal `mark(...)` and `persist_report` must both land in Postgres **before** `queue.ack` (§2/§7). Ordering: persist report rows → write terminal `scan_runs` → `ack`. A crash between persist and ack re-leases the job; the loop's `run.status != queued` guard (§2) then sees a non-`queued`/already-`completed` row and acks the duplicate without re-running.
 
@@ -136,7 +176,7 @@ The worker is a **separate Render service**, distinct from the web dyno that ser
 # worker service (Render):  python -m rogue.platform.worker
 ```
 
-`src/rogue/platform/worker.py` exposes a `__main__` that reads `WORKER_CONCURRENCY`, `ROGUE_PROVIDER_CONCURRENCY`, `LEASE_TTL`, `SCAN_MAX_SECONDS`, the `DATABASE_URL`, the Redis URL, and the provider API keys from the environment, builds the pool, and runs the loop. Rationale for the split:
+`src/rogue/platform/worker.py` exposes a `main()` / `__main__` that wires `PostgresScanStore` + `PostgresJobQueue` + `DefaultScanEngine` from `DATABASE_URL` (+ the encryption key for the secret store and the provider API keys) and runs the single-task loop. There is **no** Redis URL and no `WORKER_CONCURRENCY` / `ROGUE_PROVIDER_CONCURRENCY` / `LEASE_TTL` / `SCAN_MAX_SECONDS` env wiring in the shipped entrypoint — those are part of the unbuilt concurrency design above. Rationale for the web/worker split:
 
 - **Resource isolation.** A wide scan is CPU/IO-heavy and long-lived; running it in the web dyno would block request threads and starve `GET /v1/scans/{id}` — which is exactly the polling endpoint that needs to stay snappy *during* a scan. ARCHITECTURE.md §2/§7 mandate "scans run in a worker, never the request thread."
 - **Independent scaling.** Worker replicas scale on queue depth; web replicas scale on request rate. They share Redis (queue + `ScanRecord` mirror) and Postgres (`scan_runs`, report rows) but nothing else. Multiple worker replicas are safe: the queue lease guarantees exactly-one active processor per job, and the shared provider semaphore is per-process — so the global provider concurrency ceiling is `replicas × ROGUE_PROVIDER_CONCURRENCY`, which the operator must size against the provider's account limit (a documented multi-replica caveat, not a bug).
