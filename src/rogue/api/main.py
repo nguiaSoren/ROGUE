@@ -247,12 +247,18 @@ try:  # pragma: no cover - exercised at process start
         _PLATFORM["secret_store"] = secret_store
         if secret_store is None:
             logger.warning(
-                "SECRET_ENCRYPTION_KEY unset — hosted scans persist the raw target key in scan_jobs; "
-                "set it to encrypt target credentials at rest (see rogue.platform.secrets)."
+                "SECRET_ENCRYPTION_KEY unset — hosted scans that carry a raw target api_key will be "
+                "REFUSED (fail-closed) rather than persist the credential in plaintext; "
+                "provider/keyless scans still run. Set it to encrypt target credentials at rest "
+                "(see rogue.platform.secrets)."
             )
         from rogue.platform.integration_store import build_postgres_integration_store
 
-        scan_service = DefaultScanService(store, queue, secret_store=secret_store)
+        # Durable hosted path persists the spec to scan_jobs → require encryption (fail-closed): a
+        # raw target key with no secret store is refused, never written in plaintext.
+        scan_service = DefaultScanService(
+            store, queue, secret_store=secret_store, require_secret_store=True
+        )
         report_service = DefaultReportService(store)
         benchmark_service = DefaultBenchmarkService(engine=engine)
         # Per-org stored integrations (Slack/Jira) — needs the secret store to encrypt creds; None
