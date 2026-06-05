@@ -87,9 +87,9 @@ def test_discovery_bonus_decays_with_trials():
 # --------------------------------------------------------------------------- #
 
 
-def test_mode_defaults_to_canonical(monkeypatch):
+def test_mode_defaults_to_contextual(monkeypatch):
     monkeypatch.delenv("ROGUE_LADDER_ORDER", raising=False)
-    assert ladder_order_mode() == "canonical"
+    assert ladder_order_mode() == "contextual"
 
 
 def test_mode_respects_env_and_rejects_garbage(monkeypatch):
@@ -98,7 +98,7 @@ def test_mode_respects_env_and_rejects_garbage(monkeypatch):
     monkeypatch.setenv("ROGUE_LADDER_ORDER", "FIXED")
     assert ladder_order_mode() == "fixed"
     monkeypatch.setenv("ROGUE_LADDER_ORDER", "nonsense")
-    assert ladder_order_mode() == "canonical"  # invalid → safe default
+    assert ladder_order_mode() == "contextual"  # invalid → safe default
 
 
 # --------------------------------------------------------------------------- #

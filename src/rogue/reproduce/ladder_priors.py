@@ -87,9 +87,10 @@ BETA = 1.0
 # accrues trials, so discovery converges toward the canonical exploit order.
 DISCOVERY_C = float(os.environ.get("ROGUE_LADDER_DISCOVERY_C", "0.5"))
 
-# Mode selector. Default ``canonical`` — the deterministic greedy reorder is the
-# operative increment; ``fixed`` restores the legacy hand-coded order for ablation;
-# ``viability`` is §10.10 Phase 2 (the EV-weighted heuristic scheduler).
+# Mode selector. Default ``contextual`` — the cross-tier + vendor-conditioned
+# scheduler (§10.10). ``canonical`` rolls back to the deterministic greedy reorder;
+# ``fixed`` restores the legacy hand-coded order for ablation; ``viability`` is the
+# §10.10 Phase 2 EV-weighted heuristic scheduler.
 LADDER_ORDER_ENV = "ROGUE_LADDER_ORDER"
 _VALID_MODES = (
     "canonical", "discovery", "viability", "starvation", "contextual", "fixed",
@@ -224,9 +225,13 @@ class StrategyValue:
 
 
 def ladder_order_mode() -> str:
-    """Resolve the ordering mode from ``ROGUE_LADDER_ORDER`` (default canonical)."""
-    mode = os.environ.get(LADDER_ORDER_ENV, "canonical").strip().lower()
-    return mode if mode in _VALID_MODES else "canonical"
+    """Resolve the ordering mode from ``ROGUE_LADDER_ORDER`` (default contextual).
+
+    ``contextual`` is the default scheduler — the cross-tier + vendor-conditioned
+    reorder. Roll back to the legacy deterministic greedy reorder with
+    ``ROGUE_LADDER_ORDER=canonical`` (or ``fixed`` for the hand-coded order)."""
+    mode = os.environ.get(LADDER_ORDER_ENV, "contextual").strip().lower()
+    return mode if mode in _VALID_MODES else "contextual"
 
 
 def _stable_order(
