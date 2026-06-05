@@ -139,7 +139,8 @@ export type HealthResponse = {
   status: string;
   db: string;
   n_primitives?: number;
-  n_breaches?: number;
+  n_breaches?: number; // legacy misnomer: total breach_results rows = TRIALS judged
+  n_breached?: number; // actual breaches (verdict ∈ {full,partial}_breach)
   n_configs?: number;
   now: string;
 };
