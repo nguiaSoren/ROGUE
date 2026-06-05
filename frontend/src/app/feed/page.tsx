@@ -205,7 +205,7 @@ function SystemStatusWidget({
         </li>
         <li className="flex justify-between">
           <span className="text-muted-foreground">breaches</span>
-          <span className="tabular-nums">{health?.n_breaches ?? "—"}</span>
+          <span className="tabular-nums">{health?.n_breached ?? "—"}</span>
         </li>
       </ul>
     </div>

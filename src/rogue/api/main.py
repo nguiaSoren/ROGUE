@@ -437,8 +437,17 @@ def health() -> dict[str, Any]:
             n_primitives = db.execute(
                 select(text("COUNT(*)")).select_from(AttackPrimitiveORM)
             ).scalar() or 0
+            # NOTE: n_breaches is a misnomer kept for back-compat — it counts ALL
+            # breach_results rows (= TRIALS judged), not breaches. n_breached is the
+            # true count of trials whose verdict was a breach. Label UIs accordingly.
             n_breaches = db.execute(
                 select(text("COUNT(*)")).select_from(BreachResultORM)
+            ).scalar() or 0
+            n_breached = db.execute(
+                text(
+                    "SELECT COUNT(*) FROM breach_results "
+                    "WHERE verdict IN ('full_breach','partial_breach')"
+                )
             ).scalar() or 0
             n_configs = db.execute(
                 select(text("COUNT(*)")).select_from(DeploymentConfigORM)
@@ -447,7 +456,8 @@ def health() -> dict[str, Any]:
                 "status": "ok",
                 "db": "up",
                 "n_primitives": int(n_primitives),
-                "n_breaches": int(n_breaches),
+                "n_breaches": int(n_breaches),  # = trials judged (legacy name)
+                "n_breached": int(n_breached),  # = actual breaches
                 "n_configs": int(n_configs),
                 "now": datetime.now(timezone.utc).isoformat(),
             }
