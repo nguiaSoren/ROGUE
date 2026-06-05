@@ -13,6 +13,8 @@ Everything about the ROGUE website: what it is, how you move through it, what yo
 | [`06_capabilities_threat_intel.md`](06_capabilities_threat_intel.md) | **Capability catalog (2/3)** — ~44 capabilities across `/matrix` (heatmap, toggles, cell-drawer drill-down), `/feed` (live SSE, attack replay), `/brief`, `/analytics`, each as a filmable beat. |
 | [`07_capabilities_product_scanning_reports.md`](07_capabilities_product_scanning_reports.md) | **Capability catalog (3/3)** — the product: sign-in, the 3 scan modes (pack/repertoire/ladder), live progress, the report + HTML/PDF/JSON exports, and operating ROGUE from an IDE via MCP. |
 | [`08_brand_kit.md`](08_brand_kit.md) | Designer brand kit: exact hex palette, fonts, the (text) wordmark + logo situation, motion principles, the grid/spotlight background recipe, do/don'ts. |
+| [`09_filming_and_capture_notes.md`](09_filming_and_capture_notes.md) | **Read before shooting** — accuracy caveats (which "live" elements are truly live vs ISR-cached, the attack-replay is illustrative) + how to capture the site in its best state (`?intro` replay, run a real breaching scan, fresh data). |
+| [`10_logo_and_og_creative_brief.md`](10_logo_and_og_creative_brief.md) | The one missing asset: a precise creative brief for a **logomark / wordmark / favicon / OG image** — locked brand constraints, 7 concept directions (recommended: the signal-dot ping or the breach-cell), OG spec, do/don'ts, and paste-ready generation prompts. |
 
 **The capability catalog (05–07) is the "everything" layer** — one entry per distinct thing the site does (≈86 capabilities total), each framed as a marketable beat with a one-line video idea, so no feature is missed when planning videos.
 
