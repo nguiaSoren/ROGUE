@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# uv / venv
+.venv/
+.python-version
+
+# test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# local report exports from examples
+*.pdf
+report.md
