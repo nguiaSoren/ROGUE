@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from rogue.platform.memory import InMemoryJobQueue, InMemoryScanStore
-from rogue.platform.scan_service import DefaultScanService
+from rogue.platform.scan_service import DefaultScanService, SecretStoreRequiredError
 from rogue.platform.schemas import ScanSpec, ScanStatus, TargetSpec
 
 
@@ -57,6 +57,71 @@ async def test_create_scan_redacts_target(service):
     assert record.target["has_api_key"] is True
     assert "sk-secret" not in str(record.target)
     assert record.target["system_prompt_len"] == len("be helpful")
+
+
+class _FakeSecretStore:
+    """Minimal secret store: hands back a `secref_` handle, records what it was given."""
+
+    def __init__(self) -> None:
+        self.stored: list[tuple[str, str]] = []
+
+    def put(self, raw: str, *, org_id: str) -> str:
+        self.stored.append((org_id, raw))
+        return f"secref_{len(self.stored)}"
+
+
+@pytest.mark.asyncio
+async def test_fail_closed_refuses_raw_key_without_secret_store():
+    # Durable wiring (require_secret_store=True) with NO secret store must REFUSE a raw key —
+    # never silently persist it. And nothing should be written or enqueued.
+    store, queue = InMemoryScanStore(), InMemoryJobQueue()
+    svc = DefaultScanService(store, queue, require_secret_store=True)
+
+    with pytest.raises(SecretStoreRequiredError):
+        await svc.create_scan(_spec(api_key="sk-secret"), org_id="org_1")
+
+    assert await store.list(org_id="org_1") == []
+    assert await queue.lease(worker_id="w1") is None
+
+
+@pytest.mark.asyncio
+async def test_fail_closed_allows_keyless_scan():
+    # Fail-closed only gates KEY-bearing scans — a provider/keyless scan still runs without a store.
+    store, queue = InMemoryScanStore(), InMemoryJobQueue()
+    svc = DefaultScanService(store, queue, require_secret_store=True)
+
+    record = await svc.create_scan(_spec(), org_id="org_1")  # provider only, no api_key
+    assert record.status is ScanStatus.QUEUED
+    assert await queue.lease(worker_id="w1") is not None
+
+
+@pytest.mark.asyncio
+async def test_require_secret_store_encrypts_raw_key():
+    # With a secret store present, the raw key is encrypted to a handle and never enqueued raw.
+    store, queue = InMemoryScanStore(), InMemoryJobQueue()
+    secrets = _FakeSecretStore()
+    svc = DefaultScanService(store, queue, secret_store=secrets, require_secret_store=True)
+
+    await svc.create_scan(_spec(api_key="sk-secret"), org_id="org_1")
+
+    assert secrets.stored == [("org_1", "sk-secret")]
+    job = await queue.lease(worker_id="w1")
+    assert job is not None
+    assert job.spec.target.api_key is None
+    assert job.spec.target.api_key_ref == "secref_1"
+
+
+@pytest.mark.asyncio
+async def test_in_process_default_passes_raw_key_through():
+    # Default (require_secret_store=False) is the in-process SDK/test mode: a raw key passes through
+    # (nothing is persisted durably), so it must NOT raise.
+    store, queue = InMemoryScanStore(), InMemoryJobQueue()
+    svc = DefaultScanService(store, queue)  # default: not durable, no store
+
+    record = await svc.create_scan(_spec(api_key="sk-secret"), org_id="org_1")
+    assert record.status is ScanStatus.QUEUED
+    job = await queue.lease(worker_id="w1")
+    assert job is not None and job.spec.target.api_key == "sk-secret"
 
 
 @pytest.mark.asyncio

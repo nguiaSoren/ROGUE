@@ -15,10 +15,23 @@ from .memory import _new_id
 from .schemas import ScanRecord, ScanSpec, ScanStatus
 
 
+class SecretStoreRequiredError(RuntimeError):
+    """Raised by a durable (hosted) `ScanService` when a scan carries a raw target api_key but no
+    secret store is configured (``SECRET_ENCRYPTION_KEY`` unset) — refusing to persist the
+    credential in plaintext. Fail-closed: a misconfiguration breaks loudly, never leaks silently."""
+
+
 class DefaultScanService(ScanService):
     """Queue-backed `ScanService`. Owns no execution — it only writes records and enqueues jobs."""
 
-    def __init__(self, store: ScanStore, queue: JobQueue, *, secret_store=None) -> None:
+    def __init__(
+        self,
+        store: ScanStore,
+        queue: JobQueue,
+        *,
+        secret_store=None,
+        require_secret_store: bool = False,
+    ) -> None:
         self._store = store
         self._queue = queue
         # When wired (hosted path), a raw target api_key is encrypted into the secret store and the
@@ -26,6 +39,11 @@ class DefaultScanService(ScanService):
         # When None (SDK in-process / tests), the raw key passes through unchanged (no persistence
         # concern there).
         self._secret_store = secret_store
+        # Fail-closed switch for DURABLE wiring (the Postgres-backed hosted path persists the spec to
+        # scan_jobs). When True, a raw api_key that cannot be encrypted (no secret_store) is REFUSED,
+        # not silently persisted. Left False for the in-process SDK/test path, where nothing is
+        # persisted so a raw key passing through is not a leak.
+        self._require_secret_store = require_secret_store
         # Process-local idempotency map keyed (org_id, idempotency_key) → scan_id. This is a
         # best-effort dedup for the in-memory single-process mode; the Postgres store enforces it
         # durably in prod via the scan_runs.idempotency_key column, so the pinned `ScanRecord`
@@ -49,11 +67,22 @@ class DefaultScanService(ScanService):
             raise ValueError("ScanSpec.target needs either endpoint=... or provider=...")
 
         # Encrypt the raw target key into the secret store and swap it for a handle BEFORE anything is
-        # persisted or enqueued, so the raw key never enters scan_runs/scan_jobs.
-        if self._secret_store is not None and target.api_key and not target.api_key_ref:
-            secref = self._secret_store.put(target.api_key, org_id=org_id)
-            target = target.model_copy(update={"api_key": None, "api_key_ref": secref})
-            spec = spec.model_copy(update={"target": target})
+        # persisted or enqueued, so the raw key never enters scan_runs/scan_jobs. If it cannot be
+        # encrypted (no secret_store) and this is a durable/hosted service, FAIL CLOSED — refuse
+        # rather than silently persist the customer's credential in plaintext.
+        if target.api_key and not target.api_key_ref:
+            if self._secret_store is not None:
+                secref = self._secret_store.put(target.api_key, org_id=org_id)
+                target = target.model_copy(update={"api_key": None, "api_key_ref": secref})
+                spec = spec.model_copy(update={"target": target})
+            elif self._require_secret_store:
+                raise SecretStoreRequiredError(
+                    "Refusing to enqueue a scan carrying a raw target api_key with no secret store "
+                    "configured (SECRET_ENCRYPTION_KEY unset) — the key would be persisted to "
+                    "scan_jobs in plaintext. Set SECRET_ENCRYPTION_KEY on the API and worker to "
+                    "encrypt target credentials at rest."
+                )
+            # else: in-process SDK / tests — raw key passes through unchanged (nothing is persisted).
 
         # Idempotent replay: same (org, key) returns the original record, no new job enqueued.
         if idempotency_key is not None:
@@ -119,4 +148,4 @@ class DefaultScanService(ScanService):
         return await self._store.list(org_id=org_id, project_id=project_id, limit=limit)
 
 
-__all__ = ["DefaultScanService"]
+__all__ = ["DefaultScanService", "SecretStoreRequiredError"]
