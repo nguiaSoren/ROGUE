@@ -6,13 +6,14 @@ import { BriefDownloads } from "@/components/brief-downloads";
 /**
  * /brief — Threat Brief.
  *
- * Top of the page: an executive-snapshot panel (net Δ vs yesterday, top-3
- * worst new attackers, a "recommended action" line). Then tier chips, then
- * the full markdown brief.
+ * Reads like a daily CISO threat brief: a dated masthead with export actions,
+ * an at-a-glance KPI snapshot strip (new breaches by severity + net movement),
+ * the JSON-driven executive snapshot, then the full long-form markdown report
+ * in a branded reading container.
  *
  * We fetch BOTH the JSON and markdown forms in parallel. The JSON feeds the
- * snapshot, the markdown feeds the long-form report below. They come from
- * the same disk artifact so values cannot disagree.
+ * snapshot + KPI strip, the markdown feeds the long-form report below. They
+ * come from the same disk artifact so values cannot disagree.
  */
 export default async function BriefPage() {
   // The markdown brief is the critical fetch — do NOT swallow its failure. If it
@@ -34,67 +35,167 @@ export default async function BriefPage() {
 
   const summary = briefJson?.summary;
 
+  // KPI strip values: prefer the JSON summary, fall back to scraping the markdown
+  // so the strip is still populated on days the JSON form failed to fetch.
+  const newCritical = summary?.new_critical ?? extractCount(briefMarkdown.markdown, "CRITICAL");
+  const newHigh = summary?.new_high ?? extractCount(briefMarkdown.markdown, "HIGH");
+  const newMedium = summary?.new_medium ?? extractCount(briefMarkdown.markdown, "MEDIUM");
+  const newLow = summary?.new_low ?? extractCount(briefMarkdown.markdown, "LOW");
+  const newlyDefended = summary?.newly_defended ?? 0;
+  const newBreaching = newCritical + newHigh + newMedium + newLow;
+  const netDelta = summary?.net_delta ?? newBreaching - newlyDefended;
+
+  // One-line masthead summary — the "read it in 3 seconds" headline.
+  const headline = buildHeadline({
+    newCritical,
+    newHigh,
+    newBreaching,
+    newlyDefended,
+  });
+
+  // Human-friendly long date for the masthead (falls back to the raw date).
+  const longDate = formatLongDate(briefMarkdown.target_date);
+
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
-        <header className="flex items-start justify-between gap-6 flex-wrap animate-rogue-fade-up">
-          <div className="space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green flex items-center gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
-              /brief · {briefMarkdown.target_date}
-            </p>
-            <h1 className="text-4xl font-bold tracking-tight">Threat Brief</h1>
-            <p className="text-sm text-muted-foreground">
-              {briefMarkdown.from_disk
-                ? "Daily snapshot · regenerable from the breach matrix on demand."
-                : "Rendered live from today's breach matrix (no disk snapshot yet)."}
-            </p>
+        {/* Masthead */}
+        <header className="rogue-card border border-border rounded-xl bg-card/40 backdrop-blur-sm p-6 md:p-8 animate-rogue-fade-up">
+          <div className="flex items-start justify-between gap-6 flex-wrap">
+            <div className="space-y-3 min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-rogue-green flex items-center gap-2">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
+                daily threat brief
+              </p>
+              <div className="space-y-1">
+                <h1 className="text-4xl font-bold tracking-tight">Threat Brief</h1>
+                <p className="font-mono text-xs text-muted-foreground uppercase tracking-[0.18em]">
+                  {longDate}
+                </p>
+              </div>
+              <p className="text-sm text-foreground/90 leading-relaxed max-w-xl">
+                {headline}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {briefMarkdown.from_disk
+                  ? "Daily snapshot · regenerable from the breach matrix on demand."
+                  : "Rendered live from today's breach matrix (no disk snapshot yet)."}
+              </p>
+            </div>
+            <BriefDownloads
+              date={briefMarkdown.target_date}
+              markdown={briefMarkdown.markdown}
+              json={briefJson}
+            />
           </div>
-          <BriefDownloads
-            date={briefMarkdown.target_date}
-            markdown={briefMarkdown.markdown}
-            json={briefJson}
-          />
         </header>
 
-        {/* Executive snapshot — JSON-driven */}
-        <BriefExecSnapshot json={briefJson} />
-
-        {/* Tier chips */}
+        {/* At-a-glance KPI snapshot strip */}
         <section
-          className="grid grid-cols-2 sm:grid-cols-4 gap-2 animate-rogue-fade-up"
-          style={{ animationDelay: "0.2s" }}
+          className="space-y-3 animate-rogue-fade-up"
+          style={{ animationDelay: "0.1s" }}
         >
-          <TierChip
-            label="CRITICAL"
-            count={summary?.new_critical ?? extractCount(briefMarkdown.markdown, "CRITICAL")}
-            tint="red"
-          />
-          <TierChip
-            label="HIGH"
-            count={summary?.new_high ?? extractCount(briefMarkdown.markdown, "HIGH")}
-            tint="orange"
-          />
-          <TierChip
-            label="MEDIUM"
-            count={summary?.new_medium ?? extractCount(briefMarkdown.markdown, "MEDIUM")}
-            tint="yellow"
-          />
-          <TierChip
-            label="LOW"
-            count={summary?.new_low ?? extractCount(briefMarkdown.markdown, "LOW")}
-            tint="blue"
-          />
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            at a glance · vs yesterday
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiCard
+              label="Newly breaching"
+              value={newBreaching}
+              sub="new attacks bypassing guardrails"
+              tint={newBreaching > 0 ? "red" : "green"}
+              highlight={newBreaching > 0}
+            />
+            <KpiCard
+              label="New CRITICAL"
+              value={newCritical}
+              sub="highest-severity tier"
+              tint={newCritical > 0 ? "red" : "green"}
+              highlight={newCritical > 0}
+            />
+            <KpiCard
+              label="Newly defended"
+              value={newlyDefended}
+              sub="attacks now refused"
+              tint="green"
+            />
+            <KpiCard
+              label="Net Δ"
+              value={netDelta}
+              signed
+              sub="movement vs yesterday"
+              tint={netDelta > 0 ? "red" : netDelta < 0 ? "green" : "neutral"}
+            />
+          </div>
+
+          {/* Per-tier breakdown chips */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <TierChip label="CRITICAL" count={newCritical} tint="red" />
+            <TierChip label="HIGH" count={newHigh} tint="orange" />
+            <TierChip label="MEDIUM" count={newMedium} tint="yellow" />
+            <TierChip label="LOW" count={newLow} tint="blue" />
+          </div>
         </section>
 
-        <article
-          className="border border-border rounded-lg p-6 md:p-8 bg-card/40 backdrop-blur-sm animate-rogue-fade-up"
-          style={{ animationDelay: "0.3s" }}
+        {/* Executive snapshot — JSON-driven (net Δ, top-3 attackers, action) */}
+        <BriefExecSnapshot json={briefJson} />
+
+        {/* Full long-form report */}
+        <section
+          className="space-y-3 animate-rogue-fade-up"
+          style={{ animationDelay: "0.35s" }}
         >
-          <BriefMarkdown source={briefMarkdown.markdown} />
-        </article>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            full report
+          </p>
+          <article className="border border-border rounded-xl p-6 md:p-10 bg-card/40 backdrop-blur-sm">
+            <div className="max-w-prose mx-auto">
+              <BriefMarkdown source={briefMarkdown.markdown} />
+            </div>
+          </article>
+        </section>
       </div>
     </main>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  tint,
+  signed = false,
+  highlight = false,
+}: {
+  label: string;
+  value: number;
+  sub: string;
+  tint: "red" | "green" | "neutral";
+  signed?: boolean;
+  highlight?: boolean;
+}) {
+  const tintClass =
+    tint === "red"
+      ? "text-rogue-red"
+      : tint === "green"
+        ? "text-rogue-green"
+        : "text-muted-foreground";
+  const cardClass = highlight
+    ? "rogue-card rogue-card-critical animate-rogue-pulse-critical"
+    : "rogue-card";
+  const display = signed && value > 0 ? `+${value}` : String(value);
+  return (
+    <div
+      className={`${cardClass} border border-border rounded-lg p-4 bg-card/40 backdrop-blur-sm`}
+    >
+      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </p>
+      <p className={`text-3xl font-bold mt-2 tabular-nums ${tintClass}`}>{display}</p>
+      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+    </div>
   );
 }
 
@@ -121,6 +222,46 @@ function TierChip({
       <p className="text-2xl font-bold mt-1 tabular-nums">{count}</p>
     </div>
   );
+}
+
+/** A one-line CISO-style summary for the masthead. */
+function buildHeadline({
+  newCritical,
+  newHigh,
+  newBreaching,
+  newlyDefended,
+}: {
+  newCritical: number;
+  newHigh: number;
+  newBreaching: number;
+  newlyDefended: number;
+}): string {
+  if (newCritical > 0) {
+    return `${newCritical} new CRITICAL attack${newCritical === 1 ? "" : "s"} bypassed guardrails since yesterday — patch system prompts now.`;
+  }
+  if (newHigh > 0) {
+    return `${newHigh} new HIGH-tier attack${newHigh === 1 ? "" : "s"} surfaced — review and prioritize for the next patch window.`;
+  }
+  if (newBreaching > 0) {
+    return `${newBreaching} newly-breaching attack${newBreaching === 1 ? "" : "s"} since yesterday, none critical.`;
+  }
+  if (newlyDefended > 0) {
+    return `No new breaches today — ${newlyDefended} previously-breaching attack${newlyDefended === 1 ? "" : "s"} now defended.`;
+  }
+  return "Steady state — no critical movers since yesterday. Continue daily polling cadence.";
+}
+
+/** "2026-06-05" → "Friday, June 5, 2026"; passes through anything unparseable. */
+function formatLongDate(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function extractCount(md: string, tier: string): number {
