@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { Section } from "@/components/marketing/section";
 import { CtaRow } from "@/components/marketing/cta-row";
-import { WorkflowWalkthrough } from "@/components/marketing/workflow-walkthrough";
 import { DashboardPreview } from "@/components/marketing/preview/dashboard-preview";
 import { FindingsPreview } from "@/components/marketing/preview/findings-preview";
 import { ReportPreview } from "@/components/marketing/preview/report-preview";
@@ -16,10 +15,9 @@ export const metadata = {
 
 /**
  * /product — the "see the product" tour. Composes the native marketing
- * previews into a single narrative walkthrough: the OpenAI→ladder→jailbreak→Jira
- * flow up top, then a section per faux app-window preview (dashboard, findings,
- * report, MCP). Server component; every preview is self-contained with example
- * data, so there is no client state here.
+ * previews into a single narrative walkthrough: a section per faux app-window
+ * preview (dashboard, findings, report, MCP). Server component; every preview is
+ * self-contained with example data, so there is no client state here.
  */
 export default function ProductPage() {
   return (
@@ -45,12 +43,7 @@ export default function ProductPage() {
           </div>
         </Section>
 
-        {/* 2. WORKFLOW WALKTHROUGH ------------------------------------ */}
-        <Section className="animate-rogue-fade-up">
-          <WorkflowWalkthrough />
-        </Section>
-
-        {/* 3. DASHBOARD ---------------------------------------------- */}
+        {/* 2. DASHBOARD ---------------------------------------------- */}
         <Section
           eyebrow="live scans"
           title="Run a scan, watch it live."
@@ -60,7 +53,7 @@ export default function ProductPage() {
           <DashboardPreview className="mx-auto max-w-4xl" />
         </Section>
 
-        {/* 4. FINDINGS ----------------------------------------------- */}
+        {/* 3. FINDINGS ----------------------------------------------- */}
         <Section
           eyebrow="findings"
           title="Every breach, ranked worst-first."
@@ -70,7 +63,7 @@ export default function ProductPage() {
           <FindingsPreview className="mx-auto max-w-4xl" />
         </Section>
 
-        {/* 5. REPORT ------------------------------------------------- */}
+        {/* 4. REPORT ------------------------------------------------- */}
         <Section
           eyebrow="reporting"
           title="A report your CISO can read."
@@ -80,7 +73,7 @@ export default function ProductPage() {
           <ReportPreview className="mx-auto max-w-4xl" />
         </Section>
 
-        {/* 6. MCP ---------------------------------------------------- */}
+        {/* 5. MCP ---------------------------------------------------- */}
         <Section
           eyebrow="the signature move"
           title="Red-team from inside your IDE."
@@ -90,7 +83,7 @@ export default function ProductPage() {
           <McpPreview className="mx-auto max-w-4xl" />
         </Section>
 
-        {/* 7. CLOSING ------------------------------------------------ */}
+        {/* 6. CLOSING ------------------------------------------------ */}
         <Section className="animate-rogue-fade-up">
           <div className="rogue-card border border-border rounded-xl p-8 md:p-12 bg-card/40 backdrop-blur-sm space-y-6">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight max-w-2xl">
