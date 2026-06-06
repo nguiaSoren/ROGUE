@@ -71,6 +71,8 @@ export function Nav() {
             <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>
             <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>
             <NavLink href="/security" active={pathname === "/security"}>security</NavLink>
+            <NavLink href="/resources" active={pathname === "/resources"}>resources</NavLink>
+            <NavLink href="/about" active={pathname === "/about"}>about</NavLink>
           </span>
           <LivePill count={count} dbUp={dbUp} />
           <Link

@@ -1,3 +1,4 @@
+import { Check, Minus } from "lucide-react";
 import { Section } from "@/components/marketing/section";
 import { PricingCard } from "@/components/marketing/pricing-card";
 import { CtaRow } from "@/components/marketing/cta-row";
@@ -7,35 +8,37 @@ import { PROOF_POINTS } from "@/lib/proof";
 export const metadata = {
   title: "Pricing — ROGUE",
   description:
-    "Continuous open-web red-team, priced to the depth you need. Starter, Team, and Enterprise tiers for evaluating and hardening your LLM deployments.",
+    "Continuous open-web red-team, priced to the depth you need. Free, Pro, and Enterprise tiers for evaluating and hardening your LLM deployments.",
 };
 
 const TIERS = [
   {
-    name: "Starter",
-    blurb: "For internal evaluations",
-    price: "Free during beta",
+    name: "Free",
+    blurb: "For evaluations",
+    price: "$0",
+    period: undefined,
     features: [
-      "Scan a single endpoint",
-      "Core jailbreak pack",
-      "Sample reports",
+      "10 scans / month",
+      "1 deployment config",
+      "Public-data attack packs",
       "Community support",
+      "Integrations: MCP + Slack",
     ],
-    ctaLabel: "Request a demo",
+    ctaLabel: "Start free",
     ctaHref: "/request-demo",
     featured: false,
   },
   {
-    name: "Team",
-    blurb: "For product & security teams running continuous red-team",
-    price: "Custom",
+    name: "Pro",
+    blurb: "For product & security teams",
+    price: "$999",
+    period: "/month",
     features: [
-      "Multiple deployment configs",
-      "Full repertoire + escalation ladder",
-      "Scheduled scans",
-      "Daily threat-brief diff",
-      "Slack / Jira delivery",
-      "API access",
+      "Unlimited scans",
+      "5 deployment configs",
+      "Private deployments",
+      "Priority support",
+      "Integrations: MCP + Slack + SOAR/SIEM (coming soon)",
     ],
     ctaLabel: "Request a demo",
     ctaHref: "/request-demo",
@@ -43,16 +46,17 @@ const TIERS = [
   },
   {
     name: "Enterprise",
-    blurb: "Custom deployment",
-    price: "Contact sales",
+    blurb: "For regulated & large-scale orgs",
+    price: "Custom",
+    period: undefined,
     features: [
-      "Private / self-hosted deployment",
-      "SSO",
-      "Org isolation",
-      "Private scans",
-      "MCP server access",
-      "Priority support",
-      "Custom SLAs",
+      "Unlimited scans",
+      "Unlimited deployment configs",
+      "Private / self-hosted",
+      "Dedicated support",
+      "RBAC + SSO",
+      "Audit-ready compliance reports",
+      "All integrations",
     ],
     ctaLabel: "Talk to sales",
     ctaHref: "/request-demo",
@@ -60,36 +64,95 @@ const TIERS = [
   },
 ] as const;
 
+/**
+ * Comparison-table rows. Each cell is either a string label, `true` (check),
+ * or `false` (dash). Columns are [Free, Pro, Enterprise].
+ */
+type Cell = string | boolean;
+const COMPARISON: ReadonlyArray<{
+  label: string;
+  cells: readonly [Cell, Cell, Cell];
+}> = [
+  { label: "Price", cells: ["$0", "$999 / month", "Custom"] },
+  { label: "Scans / month", cells: ["10", "Unlimited", "Unlimited"] },
+  { label: "Deployment configs", cells: ["1", "5", "Unlimited"] },
+  {
+    label: "Data",
+    cells: ["Public packs", "Public + private", "Public + private / self-hosted"],
+  },
+  { label: "Support", cells: ["Community", "Priority", "Dedicated"] },
+  {
+    label: "Integrations",
+    cells: [
+      "MCP + Slack",
+      "MCP + Slack + SOAR/SIEM (soon)",
+      "All (SOAR/SIEM soon)",
+    ],
+  },
+  { label: "RBAC", cells: [false, false, true] },
+  { label: "SSO", cells: [false, false, true] },
+  {
+    label: "Compliance",
+    cells: [false, false, "Audit-ready (SOC 2 / ISO on roadmap)"],
+  },
+] as const;
+
 const FAQ = [
   {
-    q: "How does ROGUE connect to my model?",
+    q: "How does a scan connect to my model?",
     a: "Point ROGUE at any HTTP endpoint — a hosted model, a gateway, or your own API. You provide a DeploymentConfig (model × system prompt × tools); ROGUE drives it like a black box and grades every response. No SDK or code change on your side.",
   },
   {
-    q: "Which providers are supported?",
-    a: "OpenAI, Anthropic, and Gemini out of the box, plus any custom HTTP API that speaks chat-style requests. The provider layer is pluggable, so adding a new target is a thin adapter, not a rewrite.",
+    q: "What counts as a scan?",
+    a: "One scan is a full red-team run against a single deployment config: ROGUE replays the attack repertoire, escalates the ones that land, judges every response, and ships you a scored report. Free includes 10 scans a month; Pro and Enterprise are unlimited.",
+  },
+  {
+    q: "Can I self-host?",
+    a: "Yes — on Enterprise. We support private and self-hosted deployments so the engine runs inside your own environment with your network controls. Free and Pro run on our hosted platform.",
   },
   {
     q: "Do you store my model weights?",
     a: "No. ROGUE never sees or stores model weights. It interacts with your deployment only over its public or private API surface — prompts in, responses out — and retains the transcripts needed to produce your report.",
   },
   {
-    q: "What's in a report?",
-    a: "A headline risk score, the ranked findings (which attack families breached, with the exact prompts that worked and 95% confidence intervals), and concrete remediation guidance for each finding — the artifact you'd actually send to a stakeholder.",
+    q: "What about SOC 2?",
+    a: "SOC 2 and ISO 27001 are on our roadmap — we are not certified today and don't claim to be. What we provide now are audit-ready reports and compliance-supporting evidence: every breach is reproduced with the exact prompt, the judge verdict, and confidence intervals, so the artifact stands up to scrutiny.",
   },
   {
-    q: "How is pricing determined?",
-    a: "By depth, not seats: the number of deployment configs you cover, how often scans run, and the breadth of the attack repertoire and delivery integrations you need. Pricing is in beta — request a demo and we'll scope it to your stack.",
+    q: "Which providers are supported?",
+    a: "OpenAI, Anthropic, and Gemini out of the box, plus any custom HTTP API that speaks chat-style requests. The provider layer is pluggable, so adding a new target is a thin adapter, not a rewrite.",
   },
 ] as const;
 
+/** Renders one comparison-table cell — check, dash, or label text. */
+function CompCell({ value }: { value: Cell }) {
+  if (value === true) {
+    return (
+      <Check
+        className="size-4 text-rogue-green"
+        aria-label="Included"
+      />
+    );
+  }
+  if (value === false) {
+    return (
+      <Minus
+        className="size-4 text-muted-foreground/50"
+        aria-label="Not included"
+      />
+    );
+  }
+  return <span className="leading-relaxed">{value}</span>;
+}
+
 /**
- * /pricing — three tiers, a proof strip, and an FAQ.
+ * /pricing — concrete tiers (Free / Pro / Enterprise), a comparison table,
+ * a proof strip, and an FAQ.
  *
- * Pricing figures are placeholders ("Free during beta", "Custom",
- * "Contact sales") per the founder; no committed dollar amounts.
- *
- * Server component. Outer wrapper mirrors the homepage.
+ * Server component. Outer wrapper mirrors the homepage. Pricing figures are
+ * committed real numbers. Compliance is framed honestly: audit-ready evidence
+ * today, SOC 2 / ISO 27001 on the roadmap (NOT certified). SOAR/SIEM
+ * integrations are labeled "coming soon".
  */
 export default function PricingPage() {
   const proof = PROOF_POINTS.slice(0, 4);
@@ -108,8 +171,8 @@ export default function PricingPage() {
           <p className="text-base text-muted-foreground leading-relaxed">
             ROGUE is a continuous open-web red-team for your LLM deployments —
             harvested live attacks, reproduced against your stack, scored, and
-            shipped as a daily threat brief. Pick the tier that matches how deep
-            you want to go.
+            shipped as a report. Start free, scale on Pro, go private on
+            Enterprise.
           </p>
         </header>
 
@@ -122,6 +185,7 @@ export default function PricingPage() {
                 name={tier.name}
                 blurb={tier.blurb}
                 price={tier.price}
+                period={tier.period}
                 features={[...tier.features]}
                 ctaLabel={tier.ctaLabel}
                 ctaHref={tier.ctaHref}
@@ -130,10 +194,69 @@ export default function PricingPage() {
             ))}
           </div>
           <p className="mt-6 text-sm text-muted-foreground">
-            Pricing is in beta — figures above are placeholders. Request a demo
-            and we&apos;ll scope a plan to your deployments.
+            All plans include the same proven engine. SOAR/SIEM integrations
+            (Splunk, Palo Alto) are coming soon; MCP, Slack, Jira, and the API
+            are available today.
           </p>
         </section>
+
+        {/* COMPARISON TABLE ------------------------------------------ */}
+        <Section
+          eyebrow="compare"
+          title="What's in each plan."
+          lede="The same core engine across every tier — the plan sets how many configs you cover, how often you scan, and the controls your org needs."
+        >
+          <div className="rogue-card border border-border rounded-xl bg-card/40 backdrop-blur-sm overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-5 py-4 text-left font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Feature
+                  </th>
+                  {TIERS.map((tier) => (
+                    <th
+                      key={tier.name}
+                      className={
+                        "px-5 py-4 text-left font-bold tracking-tight " +
+                        (tier.featured ? "text-rogue-green" : "text-foreground")
+                      }
+                    >
+                      {tier.name}
+                      {tier.featured && (
+                        <span className="ml-2 align-middle font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-rogue-green">
+                          Most popular
+                        </span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON.map((row) => (
+                  <tr
+                    key={row.label}
+                    className="border-b border-border/60 last:border-b-0"
+                  >
+                    <th
+                      scope="row"
+                      className="px-5 py-4 text-left font-medium text-foreground align-top"
+                    >
+                      {row.label}
+                    </th>
+                    {row.cells.map((cell, i) => (
+                      <td
+                        key={i}
+                        className="px-5 py-4 text-left text-muted-foreground align-top"
+                      >
+                        <CompCell value={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
 
         {/* PROOF STRIP ----------------------------------------------- */}
         <Section
@@ -187,6 +310,15 @@ export default function PricingPage() {
             </p>
           </div>
           <CtaRow />
+          <p className="text-sm text-muted-foreground">
+            Need a custom plan?{" "}
+            <a
+              href="/request-demo"
+              className="text-rogue-green hover:underline underline-offset-4"
+            >
+              Contact sales →
+            </a>
+          </p>
         </section>
       </div>
     </main>
