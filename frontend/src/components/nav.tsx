@@ -57,17 +57,32 @@ export function Nav() {
             · open-web threat intel
           </span>
         </Link>
-        <nav className="flex items-center gap-4 md:gap-6 text-xs uppercase tracking-widest">
-          <NavLink href="/feed" active={pathname === "/feed"}>/feed</NavLink>
-          <NavLink href="/matrix" active={pathname === "/matrix"}>/matrix</NavLink>
-          <NavLink href="/analytics" active={pathname === "/analytics"}>/analytics</NavLink>
-          <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
+        <nav className="flex items-center gap-3 md:gap-5 text-xs uppercase tracking-widest">
+          {/* Threat-intel links — hidden on small screens */}
+          <span className="hidden lg:flex items-center gap-5">
+            <NavLink href="/feed" active={pathname === "/feed"}>/feed</NavLink>
+            <NavLink href="/matrix" active={pathname === "/matrix"}>/matrix</NavLink>
+            <NavLink href="/analytics" active={pathname === "/analytics"}>/analytics</NavLink>
+            <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
+          </span>
+          {/* Commercial links */}
+          <span className="hidden md:flex items-center gap-5">
+            <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>
+            <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>
+            <NavLink href="/security" active={pathname === "/security"}>security</NavLink>
+          </span>
           <LivePill count={count} dbUp={dbUp} />
           <Link
             href="/scans"
-            className="rounded border border-rogue-green/50 px-3 py-1 text-rogue-green transition-colors hover:bg-rogue-green/10"
+            className="hidden sm:inline-block rounded border border-rogue-green/50 px-3 py-1 text-rogue-green transition-colors hover:bg-rogue-green/10"
           >
             dashboard
+          </Link>
+          <Link
+            href="/request-demo"
+            className="rounded bg-rogue-green px-3 py-1 font-semibold text-[#050508] transition-opacity hover:opacity-90"
+          >
+            request demo
           </Link>
         </nav>
       </div>
