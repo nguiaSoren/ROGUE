@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useSseFeed } from "@/components/sse-feed-provider";
+import { COMMERCIAL } from "@/lib/flags";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -77,6 +78,7 @@ export function Nav() {
           {/* Commercial links */}
           <span className="hidden md:flex items-center gap-5">
             <NavLink href="/product" active={pathname === "/product"}>product</NavLink>
+            {COMMERCIAL && <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>}
             <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>
             <NavLink href="/security" active={pathname === "/security"}>security</NavLink>
             <NavLink href="/resources" active={pathname === "/resources"}>resources</NavLink>
@@ -126,6 +128,7 @@ export function Nav() {
             <MobileLink href="/brief" active={pathname === "/brief"} onClick={closeMenu}>/brief</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/product" active={pathname === "/product"} onClick={closeMenu}>product</MobileLink>
+            {COMMERCIAL && <MobileLink href="/pricing" active={pathname === "/pricing"} onClick={closeMenu}>pricing</MobileLink>}
             <MobileLink href="/enterprise" active={pathname === "/enterprise"} onClick={closeMenu}>enterprise</MobileLink>
             <MobileLink href="/security" active={pathname === "/security"} onClick={closeMenu}>security</MobileLink>
             <MobileLink href="/resources" active={pathname === "/resources"} onClick={closeMenu}>resources</MobileLink>

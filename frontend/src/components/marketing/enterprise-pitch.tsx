@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { COMMERCIAL } from "@/lib/flags"
 
 interface EnterprisePitchProps {
   className?: string
@@ -143,7 +144,7 @@ export function EnterprisePitch({ className }: EnterprisePitchProps) {
           Request a demo
         </Link>
         <Link
-          href="/early-access"
+          href={COMMERCIAL ? "/pricing" : "/early-access"}
           className={cn(
             "inline-flex items-center justify-center rounded-lg px-6 py-3 border border-border",
             "font-mono text-sm font-bold tracking-[0.15em] uppercase text-foreground",
@@ -151,7 +152,7 @@ export function EnterprisePitch({ className }: EnterprisePitchProps) {
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rogue-green/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           )}
         >
-          Early access
+          {COMMERCIAL ? "See pricing" : "Early access"}
         </Link>
       </div>
     </section>

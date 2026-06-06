@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { COMMERCIAL } from "@/lib/flags";
 import { AugmentationShowcase } from "@/components/augmentation-showcase";
 import { CinematicHero } from "@/components/cinematic-hero";
 import { HowRogueThinks } from "@/components/how-rogue-thinks";
@@ -242,10 +243,10 @@ export default async function Home() {
           </div>
           <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
             <Link
-              href="/early-access"
+              href={COMMERCIAL ? "/pricing" : "/early-access"}
               className="transition-colors hover:text-rogue-green"
             >
-              Early access
+              {COMMERCIAL ? "View pricing" : "Early access"}
             </Link>
           </div>
         </section>
