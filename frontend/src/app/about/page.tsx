@@ -8,12 +8,14 @@ import { PROOF_POINTS } from "@/lib/proof";
 export const metadata = {
   title: "About — ROGUE",
   description:
-    "ROGUE is the first autonomous open-web LLM red-team agent — built solo by Soren Nguia, awarded the Grand Prize at the Bright Data × lablab.ai hackathon, and now a hosted platform live in production. Our mission: make LLM deployments secure by default.",
+    "ROGUE is an autonomous open-web LLM red-team agent — built solo by Soren Nguia for the Bright Data × lablab.ai hackathon, now a hosted platform live in production. Mission: make LLM deployments secure by default.",
 };
 
 /**
  * /about — the story, mission, and verified numbers behind ROGUE. Strictly
- * factual: solo-build, Grand Prize, and live-in-production are the only claims.
+ * factual: solo-build + hackathon origin + live-in-production. The Grand Prize
+ * is the founder's PRIOR award (Yonsei CS Exhibition 2024, for the GPTFuzz
+ * LLM-security fuzzer) — NOT a ROGUE/hackathon award; attributed accordingly.
  * Contact is email only (no social links, per founder decision). Server
  * component. All proof numbers come from src/lib/proof.ts.
  */
@@ -39,16 +41,12 @@ export default function AboutPage() {
                 Bright Data × lablab.ai &ldquo;Web Data UNLOCKED&rdquo;
                 hackathon
               </span>{" "}
-              in May 2026 — as the first autonomous open-web LLM red-team agent.
+              in May 2026 — an autonomous open-web LLM red-team agent.
             </p>
             <p className="text-base text-muted-foreground leading-relaxed">
-              It was{" "}
-              <span className="text-rogue-green font-medium">
-                awarded the Grand Prize
-              </span>{" "}
-              for LLM security tooling. Since then it has been extended into a
-              hosted, multi-tenant platform — SDK, REST API, dashboard, and an
-              MCP server — that is permanently live in production.
+              Since the hackathon it has been extended into a hosted,
+              multi-tenant platform — SDK, REST API, dashboard, and an MCP
+              server — that is permanently live in production.
             </p>
             <div className="rogue-card border border-border rounded-xl p-5 md:p-6 bg-card/40 backdrop-blur-sm flex gap-4">
               <Trophy
@@ -58,11 +56,12 @@ export default function AboutPage() {
               />
               <div>
                 <p className="text-base font-semibold text-foreground">
-                  Grand Prize · Bright Data × lablab.ai, May 2026
+                  Grand Prize · Yonsei University CS Exhibition, 2024
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                  Founded and built by an AI / AI-systems engineer based in
-                  Seoul, South Korea.
+                  Awarded to the founder for GPTFuzz optimization — an
+                  LLM-security fuzzer. ROGUE is his next LLM-security project,
+                  built and run live solo from Seoul, South Korea.
                 </p>
               </div>
             </div>
