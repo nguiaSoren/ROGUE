@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Trophy, Zap, Database, ArrowUpRight, PlayCircle } from "lucide-react"
+import { Plug, Zap, Database, ArrowUpRight, PlayCircle } from "lucide-react"
 
 import { Section } from "@/components/marketing/section"
 import { StatCard } from "@/components/marketing/stat-card"
@@ -41,14 +41,14 @@ export function TractionBand({ className }: { className?: string }) {
   ]
 
   const milestones: ReadonlyArray<{
-    icon: typeof Trophy
+    icon: typeof Zap
     title: string
     body: string
   }> = [
     {
-      icon: Trophy,
-      title: "Grand Prize",
-      body: 'Bright Data × lablab.ai "Web Data UNLOCKED" hackathon — awarded for LLM security tooling.',
+      icon: Plug,
+      title: "Its own MCP server",
+      body: "Query live attacks from Claude, Cursor, or Windsurf — ROGUE is a Model Context Protocol server, not just a dashboard.",
     },
     {
       icon: Zap,
@@ -61,11 +61,11 @@ export function TractionBand({ className }: { className?: string }) {
     <Section
       eyebrow="traction"
       title="Real results, not logos."
-      lede="No customer testimonials, no borrowed credibility. Here's the verifiable evidence the engine is real — an award, a live deployment, a published dataset, and measured numbers you can check."
+      lede="No customer testimonials, no borrowed credibility. Here's the verifiable evidence the engine is real — a live deployment, its own MCP server, a published dataset, and measured numbers you can check."
       className={className}
     >
       <div className="space-y-8">
-        {/* Headline milestones — award + live deployment */}
+        {/* Headline milestones — MCP differentiator + live deployment */}
         <div className="grid gap-4 md:grid-cols-2">
           {milestones.map(({ icon: Icon, title, body }) => (
             <div
