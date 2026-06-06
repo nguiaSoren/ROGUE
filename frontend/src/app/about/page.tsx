@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Trophy, Target, Radar, Mail, ArrowRight } from "lucide-react";
+import { Trophy, Target, Radar, Mail, ArrowRight, FlaskConical } from "lucide-react";
 import { Section } from "@/components/marketing/section";
 import { CtaRow } from "@/components/marketing/cta-row";
 import { StatCard } from "@/components/marketing/stat-card";
@@ -65,6 +65,34 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </Section>
+
+        {/* 2b. WHY THIS EXISTS — honest framing: solo research/engineering
+            build, early access, no customers yet. Preempts the "overselling a
+            customerless SaaS" read for a technical / hiring audience. ------- */}
+        <Section
+          eyebrow="why this exists"
+          title="A solo research build, in the open."
+        >
+          <div className="rogue-card border border-border rounded-xl p-5 md:p-6 bg-card/40 backdrop-blur-sm max-w-3xl flex gap-4">
+            <FlaskConical
+              className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <p className="text-base text-muted-foreground leading-relaxed">
+              ROGUE is a solo research-and-engineering project, not a funded
+              company. It began as a six-day hackathon build and kept getting
+              extended — into a hosted platform, an MCP server, a benchmark
+              layer, a self-recalibrating judge — to see how far one engineer
+              can take a continuous open-web red-team, end to end and in
+              production. It&rsquo;s in{" "}
+              <span className="text-foreground font-medium">early access</span>:
+              a real, running system with real measurements, and no paying
+              customers yet. Every figure on this site traces to something
+              measured; where the evidence is thin, it says so.
+            </p>
           </div>
         </Section>
 

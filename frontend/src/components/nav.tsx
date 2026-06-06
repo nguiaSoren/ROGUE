@@ -77,7 +77,6 @@ export function Nav() {
           {/* Commercial links */}
           <span className="hidden md:flex items-center gap-5">
             <NavLink href="/product" active={pathname === "/product"}>product</NavLink>
-            <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>
             <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>
             <NavLink href="/security" active={pathname === "/security"}>security</NavLink>
             <NavLink href="/resources" active={pathname === "/resources"}>resources</NavLink>
@@ -127,7 +126,6 @@ export function Nav() {
             <MobileLink href="/brief" active={pathname === "/brief"} onClick={closeMenu}>/brief</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/product" active={pathname === "/product"} onClick={closeMenu}>product</MobileLink>
-            <MobileLink href="/pricing" active={pathname === "/pricing"} onClick={closeMenu}>pricing</MobileLink>
             <MobileLink href="/enterprise" active={pathname === "/enterprise"} onClick={closeMenu}>enterprise</MobileLink>
             <MobileLink href="/security" active={pathname === "/security"} onClick={closeMenu}>security</MobileLink>
             <MobileLink href="/resources" active={pathname === "/resources"} onClick={closeMenu}>resources</MobileLink>
