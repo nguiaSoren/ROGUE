@@ -934,6 +934,31 @@ class PrimitiveGrammarLabel(Base):
     )
 
 
+class DemoRequest(Base):
+    """A demo-request lead captured from the marketing site (``/api/demo-request``).
+
+    Append-only lead-capture store — no FK into the threat-DB graph, deliberately
+    standalone. Purely additive (§13-safe). The wire body lives in
+    ``rogue.api.demo.DemoRequestBody``; this is its storage twin.
+    """
+
+    __tablename__ = "demo_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    deployment_type: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        server_default=func.now(),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -954,4 +979,5 @@ __all__ = [
     "TargetEmbedding",
     "RetrievalMetric",
     "PrimitiveGrammarLabel",
+    "DemoRequest",
 ]

@@ -1,4 +1,11 @@
 import Link from "next/link";
+import {
+  Boxes,
+  ShieldAlert,
+  Swords,
+  Gauge,
+  ScrollText,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { AugmentationLab } from "@/components/augmentation-lab";
 import { AugmentationShowcase } from "@/components/augmentation-showcase";
@@ -10,6 +17,10 @@ import { McpConnect } from "@/components/mcp-connect";
 import { MiniMatrix } from "@/components/mini-matrix";
 import { ProductPitch } from "@/components/product-pitch";
 import { SourcesMarquee } from "@/components/sources-marquee";
+import { Section } from "@/components/marketing/section";
+import { StatCard } from "@/components/marketing/stat-card";
+import { CtaRow } from "@/components/marketing/cta-row";
+import { PROOF_POINTS } from "@/lib/proof";
 
 /**
  * Cinematic home — the demo entry. Designed for a 5-second pitch and a
@@ -117,6 +128,42 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* 4b. BUILT FOR — one engine, five teams --------------------- */}
+        <Section
+          eyebrow="built for"
+          title="One engine, five teams."
+          lede="Point ROGUE at an endpoint and every team that touches an LLM gets the answer they need from the same scored report."
+          className="!px-0 animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <PersonaCard
+              icon={<Boxes className="w-5 h-5" />}
+              title="AI Product Teams"
+              benefit="Ship features knowing your assistant won't be talked into off-script behavior in prod."
+            />
+            <PersonaCard
+              icon={<ShieldAlert className="w-5 h-5" />}
+              title="Security Teams"
+              benefit="Continuous open-web red-team coverage without standing up an offensive crew."
+            />
+            <PersonaCard
+              icon={<Swords className="w-5 h-5" />}
+              title="Red Teams"
+              benefit="358 reproducible attack primitives and an adaptive ladder to attack your own configs faster."
+            />
+            <PersonaCard
+              icon={<Gauge className="w-5 h-5" />}
+              title="Model Risk Teams"
+              benefit="Quantified breach rates per model × prompt × tool, with 95% CIs you can sign off on."
+            />
+            <PersonaCard
+              icon={<ScrollText className="w-5 h-5" />}
+              title="Compliance Teams"
+              benefit="A CISO-readable threat brief mapped to OWASP LLM Top 10 and MITRE ATLAS."
+            />
+          </div>
+        </Section>
+
         {/* 5. CONNECT VIA MCP — query it yourself, one click ----------- */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
@@ -159,6 +206,25 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
+        {/* 8b. PROOF BAND — defensible, verified numbers -------------- */}
+        <Section
+          eyebrow="the receipts"
+          title="Numbers we can defend."
+          lede="Every figure traces to a published line in the corpus or plan — no inflated ASR headlines, just what holds up under a recalibrated judge."
+          className="!px-0 animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {PROOF_POINTS.map((p) => (
+              <StatCard
+                key={p.label}
+                value={p.value}
+                label={p.label}
+                sublabel={p.sublabel}
+              />
+            ))}
+          </div>
+        </Section>
+
         {/* 9. DEEP-DIVE LINKS ------------------------------------------ */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
@@ -191,12 +257,63 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* 10. CLOSING CTA — conversion close ------------------------- */}
+        <section className="rogue-card border border-border rounded-2xl p-8 md:p-12 bg-card/40 backdrop-blur-sm text-center animate-rogue-fade-up">
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
+            get started
+          </p>
+          <h2 className="mt-3 text-3xl md:text-4xl font-bold tracking-tight">
+            See ROGUE break your stack.
+          </h2>
+          <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Point us at an endpoint and get a scored security report back. Book a
+            walkthrough, or run a scan yourself right now.
+          </p>
+          <CtaRow className="mt-8 justify-center" />
+          <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <Link
+              href="/scans/new"
+              className="transition-colors hover:text-rogue-green"
+            >
+              Run a scan
+            </Link>
+            <Link
+              href="/pricing"
+              className="transition-colors hover:text-rogue-green"
+            >
+              View pricing
+            </Link>
+          </div>
+        </section>
+
       </div>
     </main>
   );
 }
 
 // --------------------------------------------------------------------------
+
+function PersonaCard({
+  icon,
+  title,
+  benefit,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  benefit: string;
+}) {
+  return (
+    <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+      <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-rogue-green">
+        {icon}
+      </div>
+      <p className="text-lg font-bold mt-3">{title}</p>
+      <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+        {benefit}
+      </p>
+    </div>
+  );
+}
 
 function PageLink({
   href,

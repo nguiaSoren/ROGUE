@@ -1748,3 +1748,13 @@ def bandit_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
         "top_arms": warm[:3],
         "bottom_arms": warm[-3:] if len(warm) >= 3 else [],
     }
+
+
+# --------------------------------------------------------------------------- #
+# Demo-request lead capture (`POST /api/demo-request`). Imported at the bottom
+# so `get_session` / `app` are already defined — the demo router imports
+# `get_session` from this module, so a top-of-file import would be circular.
+# --------------------------------------------------------------------------- #
+from rogue.api import demo as _demo_router  # noqa: E402
+
+app.include_router(_demo_router.router)
