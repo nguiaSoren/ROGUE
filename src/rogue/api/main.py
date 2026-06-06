@@ -430,6 +430,12 @@ def health() -> dict[str, Any]:
     pings never ran this handler, so Neon kept cold-suspending. With HEAD allowed
     the handler runs (body discarded), the monitor sees 200, and the 5-min ping
     keeps Neon warm."""
+    # Active escalation-ladder scheduler mode (env-only, no DB). Surfaced here so the
+    # production scheduler can be confirmed externally — `contextual` is the default
+    # (§10.10, shipped 2026-06-06); `canonical` etc. mean someone set ROGUE_LADDER_ORDER.
+    from rogue.reproduce.ladder_priors import ladder_order_mode
+
+    ladder_order = ladder_order_mode()
     try:
         # Pull the session manually here so health doesn't error when DB
         # is briefly down — return `db: down` instead of 500.
@@ -455,6 +461,7 @@ def health() -> dict[str, Any]:
             return {
                 "status": "ok",
                 "db": "up",
+                "ladder_order": ladder_order,
                 "n_primitives": int(n_primitives),
                 "n_breaches": int(n_breaches),  # = trials judged (legacy name)
                 "n_breached": int(n_breached),  # = actual breaches
@@ -465,10 +472,11 @@ def health() -> dict[str, Any]:
         return {
             "status": "ok",
             "db": "down",
+            "ladder_order": ladder_order,
             "error": f"{type(exc).__name__}: {exc}",
             "now": datetime.now(timezone.utc).isoformat(),
         }
-    return {"status": "ok", "db": "unknown"}  # unreachable but typing-safe
+    return {"status": "ok", "db": "unknown", "ladder_order": ladder_order}  # unreachable but typing-safe
 
 
 # --------------------------------------------------------------------------- #
