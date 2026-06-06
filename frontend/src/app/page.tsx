@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { AugmentationLab } from "@/components/augmentation-lab";
 import { AugmentationShowcase } from "@/components/augmentation-showcase";
 import { CinematicHero } from "@/components/cinematic-hero";
 import { HowRogueThinks } from "@/components/how-rogue-thinks";
 import { IntroOverlay } from "@/components/intro-overlay";
 import { LiveAttackTicker } from "@/components/live-attack-ticker";
 import { MiniMatrix } from "@/components/mini-matrix";
-import { ProductPitch } from "@/components/product-pitch";
 import { SourcesMarquee } from "@/components/sources-marquee";
 import { Section } from "@/components/marketing/section";
 import { CtaRow } from "@/components/marketing/cta-row";
@@ -27,19 +25,18 @@ import { ThreatReportDownload } from "@/components/marketing/threat-report-downl
  * 5-minute deep-dive.
  *
  * Reading order:
- *   1. CINEMATIC HERO — rotating-word headline, hero stat trio, one CTA.
- *   2. PRODUCT PITCH — the offer: point ROGUE at an endpoint → scored report.
- *   3. SOURCES MARQUEE — 19 sources × 5 BD products.
- *   4. AHA MOMENT — "freshest threats" ticker + mini-matrix side-by-side.
- *   5. USE CASES — who uses ROGUE (problem/solution personas).
- *   6. WORKFLOW WALKTHROUGH — concrete end-to-end story.
- *   7. INTEGRATIONS — connects to the tools your team already uses (MCP-aware).
- *   8. PRODUCT PREVIEW — a real scored report + a live MCP session.
- *   9. ENTERPRISE PITCH — security platform for teams deploying LLMs at scale.
- *  10. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
- *  11. AUGMENTATION SHOWCASE + LAB — the §10.7 results, static then interactive.
- *  12. TRACTION BAND — real results, not logos (award / live / dataset / numbers).
- *  13. EARLY ACCESS, DEEP-DIVE LINKS, threat-intel + newsletter, closing CTA.
+ *   1. CINEMATIC HERO — rotating-word headline (states the offer), stat trio, CTA.
+ *   2. SOURCES MARQUEE — 19 sources × 5 BD products.
+ *   3. AHA MOMENT — "freshest threats" ticker + mini-matrix side-by-side.
+ *   4. USE CASES — who uses ROGUE (problem/solution personas).
+ *   5. WORKFLOW WALKTHROUGH — the concrete end-to-end story (endpoint → report).
+ *   6. INTEGRATIONS — connects to the tools your team already uses (MCP-aware).
+ *   7. PRODUCT PREVIEW — a real scored report + a live MCP session.
+ *   8. ENTERPRISE PITCH — security platform for teams deploying LLMs at scale.
+ *   9. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
+ *  10. AUGMENTATION SHOWCASE — the §10.7 results.
+ *  11. TRACTION BAND — real results, not logos (award / live / dataset / numbers).
+ *  12. EARLY ACCESS, DEEP-DIVE LINKS, threat-intel + newsletter, closing CTA.
  *
  * Server component. All data fetched in parallel via Promise.allSettled —
  * the page renders even if a backend endpoint is offline.
@@ -93,14 +90,7 @@ export default async function Home() {
           nConfigs={health?.n_configs ?? null}
         />
 
-        {/* 2. PRODUCT PITCH — what you actually buy (give us an endpoint
-            → get a security report). Placed right after the hero so the
-            offer reads before the supporting threat-intel proof. -------- */}
-        <ProductPitch
-          nAttacks={health?.n_primitives ?? attacks?.count ?? null}
-        />
-
-        {/* 3. BRIGHT DATA SPOTLIGHT ------------------------------------ */}
+        {/* 2. BRIGHT DATA SPOTLIGHT ------------------------------------ */}
         <SourcesMarquee bandit={bandit} />
 
         {/* 4. AHA MOMENT — fresh threats + mini-matrix ----------------- */}
@@ -189,14 +179,6 @@ export default async function Home() {
         {/* 7. AUGMENTATION SHOWCASE ------------------------------------ */}
         <AugmentationShowcase
           bandit={bandit}
-          persona={persona}
-          escalation={escalation}
-          mutation={mutation}
-          stubbornness={stubbornness}
-        />
-
-        {/* 8. AUGMENTATION LAB — interactive --------------------------- */}
-        <AugmentationLab
           persona={persona}
           escalation={escalation}
           mutation={mutation}
