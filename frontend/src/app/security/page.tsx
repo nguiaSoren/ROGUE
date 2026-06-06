@@ -107,15 +107,12 @@ export default function SecurityPage() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               Email a description of the issue, reproduction steps, and any
               proof-of-concept to{" "}
-              <span className="font-mono text-foreground">
-                security@
-                <span className="text-muted-foreground">
-                  {"<your-domain>"}
-                </span>
-              </span>{" "}
-              <span className="text-xs text-muted-foreground/70">
-                (configure this address before launch)
-              </span>
+              <a
+                href="mailto:nguiasoren@gmail.com?subject=ROGUE%20security%20disclosure"
+                className="font-mono text-rogue-green underline-offset-4 hover:underline"
+              >
+                nguiasoren@gmail.com
+              </a>
               . We aim to acknowledge reports promptly and will keep you updated
               as we investigate. Please give us reasonable time to remediate
               before any public disclosure.
