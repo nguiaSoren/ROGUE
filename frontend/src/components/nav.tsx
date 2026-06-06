@@ -67,6 +67,7 @@ export function Nav() {
           </span>
           {/* Commercial links */}
           <span className="hidden md:flex items-center gap-5">
+            <NavLink href="/product" active={pathname === "/product"}>product</NavLink>
             <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>
             <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>
             <NavLink href="/security" active={pathname === "/security"}>security</NavLink>

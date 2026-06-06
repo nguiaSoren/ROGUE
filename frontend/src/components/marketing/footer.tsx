@@ -1,7 +1,10 @@
 import Link from "next/link";
 
+import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
+
 /**
- * Global marketing footer. Server component — no interactivity, no "use client".
+ * Global marketing footer. Server component — hosts the (client) newsletter
+ * signup but is otherwise non-interactive.
  *
  * Matches the ROGUE dark terminal house style: mono eyebrows, rogue-green
  * wordmark, subtle bordered columns over the deep blue-black background.
@@ -55,11 +58,14 @@ export function Footer() {
             </Link>
           </div>
 
-          {/* Link columns */}
-          <div className="md:col-span-8 grid grid-cols-2 gap-8 sm:grid-cols-3">
+          {/* Link columns + newsletter */}
+          <div className="md:col-span-8 grid grid-cols-2 gap-8 sm:grid-cols-4">
             <FooterColumn title="Product" links={PRODUCT} />
             <FooterColumn title="Company" links={COMPANY} />
             <FooterColumn title="Developers" links={DEVELOPERS} />
+            <div className="col-span-2 sm:col-span-1">
+              <NewsletterSignup variant="footer" />
+            </div>
           </div>
         </div>
 

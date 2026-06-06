@@ -99,8 +99,9 @@ def test_models_metadata_has_expected_tables() -> None:
     ``target_embeddings`` and ``retrieval_metrics`` (Technique Retrieval System,
     migration 0026) added 2026-06-06. ``primitive_grammar_labels`` (grammar-component
     study, migration 0027) added 2026-06-06. ``demo_requests`` (website
-    demo-request lead capture, migration 0028) added 2026-06-06. Add new
-    entries here when migrations add tables.
+    demo-request lead capture, migration 0028) added 2026-06-06.
+    ``newsletter_subscribers`` (website newsletter sign-up, migration 0029) added
+    2026-06-06. Add new entries here when migrations add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
     from rogue.db.models import Base
@@ -120,6 +121,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "ladder_attempts",
         "ladder_rotation_membership",
         "memberships",
+        "newsletter_subscribers",
         "organizations",
         "pair_refinement_steps",
         "primitive_grammar_labels",

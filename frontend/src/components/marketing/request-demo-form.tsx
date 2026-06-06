@@ -29,6 +29,10 @@ import { cn } from "@/lib/utils";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
+// Optional Calendly inline embed. When set, the form shows a "book a slot
+// directly" iframe below it; when unset it's form-only (today's behavior).
+const CALENDLY_URL = process.env.NEXT_PUBLIC_CALENDLY_URL;
+
 // Render's free tier cold-boots on the first request after idle — the POST can
 // take several seconds. Cap it generously so a real cold start succeeds, but
 // still bail rather than hang the UI forever.
@@ -154,11 +158,12 @@ export function RequestDemoForm() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      noValidate
-      className="rogue-card border border-border rounded-xl p-6 bg-card/40 max-w-xl space-y-5"
-    >
+    <div className="max-w-xl space-y-8">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="rogue-card border border-border rounded-xl p-6 bg-card/40 space-y-5"
+      >
       <div className="space-y-1.5">
         <FieldLabel htmlFor="rd-name">Name</FieldLabel>
         <Input id="rd-name" name="name" autoComplete="name" disabled={submitting} />
@@ -247,6 +252,24 @@ export function RequestDemoForm() {
           </p>
         )}
       </div>
-    </form>
+      </form>
+
+      {CALENDLY_URL && (
+        <div className="space-y-3">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Or book a slot directly
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-border bg-card/40">
+            <iframe
+              src={CALENDLY_URL}
+              title="Book a demo with ROGUE"
+              className="w-full"
+              style={{ height: 680, border: 0 }}
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
