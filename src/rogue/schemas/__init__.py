@@ -58,6 +58,13 @@ from .technique_spec import (
     StrategyStatus,
     TechniqueSpec,
 )
+from .technique_profile import TechniqueProfile
+from .target_fingerprint import TargetFingerprint
+from .grammar_node import (
+    GrammarNode,
+    GRAMMAR_NODE_META,
+    GrammarLabel,
+)
 
 __all__ = [
     # attack primitive
@@ -96,4 +103,11 @@ __all__ = [
     "RendererOrigin",
     "LIFECYCLE_ORDER",
     "SYNTHESIS_ONLY_STATES",
+    # technique retrieval system — profiles + target fingerprints
+    "TechniqueProfile",
+    "TargetFingerprint",
+    # grammar-node vocabulary (structural predictive-power study)
+    "GrammarNode",
+    "GRAMMAR_NODE_META",
+    "GrammarLabel",
 ]

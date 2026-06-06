@@ -676,6 +676,10 @@ def build_escalation_context(
             + [f"audio:{s}" for s in audio_styles_tier]
             + list(plan.rotation)
         )
+        # ── Technique Retrieval — ACTIVATION SEAM (E8), STUB ONLY this session ──
+        # This is where retrieval would NARROW the candidate field before the
+        # contextual scheduler ranks it. Disabled now: full_labels is left intact.
+        # TODO(retrieval activation, Weeks 6-7): when ROGUE_RETRIEVAL_TOPK>0, intersect full_labels with retriever top-K here.
         cross_tier_order = order_by_blend(full_labels, stats)
         logger.info(
             "§10.10 contextual cross-tier order [vendor=%s family=%s]: %s",
@@ -1096,6 +1100,88 @@ class LadderStats:
     breaches: list[str] = field(default_factory=list)
 
 
+# ── Technique Retrieval — SHADOW MODE (E8) ──────────────────────────────────
+# Off by default. When ROGUE_RETRIEVAL_SHADOW=1, the outer ladder loop calls the
+# helper below AFTER a parent's ladder returns, to log how the retriever WOULD
+# have ranked the technique that actually won. It only WRITES telemetry — it never
+# changes which techniques run or their order. The whole block is wrapped in
+# try/except by the caller so retrieval errors can never break a ladder run.
+
+#: Default retrieval top-K used for the shadow ``retrieval_hit`` / ``retrieved_rank``
+#: measurement. Read from ROGUE_RETRIEVAL_TOPK; "0" (the default) means activation is
+#: DISABLED — but shadow logging still measures against the retriever's MIN_K floor.
+_SHADOW_DEFAULT_TOPK = 50
+
+
+def _record_retrieval_shadow(
+    session,
+    parent: AttackPrimitive,
+    configs: list,
+    ladder_result: LadderResult,
+    *,
+    run_id: str,
+) -> None:
+    """Shadow-mode telemetry: record one ``RetrievalMetric`` for this parent's winner.
+
+    Pure side-channel — builds the target fingerprint, runs ``TechniqueRetriever``
+    over it, and records where the eventual winning label ranked in the retrieval.
+    Does NOT alter ladder execution in any way. Only called when ROGUE_RETRIEVAL_SHADOW
+    == "1"; the caller wraps this in try/except so it can never break a run.
+
+    No-ops cleanly when the ladder exhausted without a winner (nothing to measure).
+    """
+    winner = ladder_result.winning_strategy
+    if winner is None:
+        return  # ladder exhausted — no winning label to score the retrieval against.
+
+    from rogue.db.models import RetrievalMetric
+    from rogue.retrieval.embed import deterministic_embed_fn
+    from rogue.retrieval.retriever import TechniqueRetriever
+    from rogue.retrieval.target_fingerprint import build_target_fingerprint
+
+    # The target is the config that broke if known, else the single/first config.
+    target_model = ladder_result.breached_on or (
+        configs[0].target_model if configs else "unknown"
+    )
+    deployment_config = configs[0] if len(configs) == 1 else None
+
+    fingerprint = build_target_fingerprint(
+        target_model, session=session, deployment_config=deployment_config,
+    )
+
+    topk = int(os.environ.get("ROGUE_RETRIEVAL_TOPK", "0") or "0")
+    k = topk if topk > 0 else _SHADOW_DEFAULT_TOPK
+    retriever = TechniqueRetriever(session, embed_fn=deterministic_embed_fn())
+    results = retriever.retrieve(fingerprint, k=k)
+
+    # retrieved_rank: 1-based rank of the winning label in the retrieval (None if absent).
+    retrieved_rank = next(
+        (r.rank for r in results if r.label == winner), None,
+    )
+    # winner_rank: the order the winner actually EXECUTED at in the ladder (1-based
+    # index of the winning strategy in attempts), or None if not derivable.
+    winner_rank = next(
+        (i for i, (strat, _outcome) in enumerate(ladder_result.attempts, start=1)
+         if strat == winner),
+        None,
+    )
+    retrieval_hit = retrieved_rank is not None
+
+    session.add(
+        RetrievalMetric(
+            run_id=run_id,
+            parent_id=ladder_result.parent_id,
+            target_key=fingerprint.target_key,
+            label=winner,
+            retrieved_rank=retrieved_rank,
+            winner_rank=winner_rank,
+            retrieval_hit=retrieval_hit,
+            k=k,
+        )
+    )
+    session.commit()
+
+
 async def run_escalation_ladder(
     *,
     database_url: str,
@@ -1116,6 +1202,7 @@ async def run_escalation_ladder(
     panel: TargetPanel | None = None,
     judge: JudgeAgent | None = None,
     configs: list | None = None,
+    run_id: str | None = None,
 ) -> LadderStats:
     """Sweep EVADE-band parents through the escalation ladder; persist winners.
 
@@ -1138,6 +1225,10 @@ async def run_escalation_ladder(
     if image_strategy:
         # Multimodal escalation only makes sense against vision-capable targets.
         configs = [c for c in configs if supports_image(c.target_model)]
+
+    # Stable run id for shadow-mode telemetry (E8). Resolved once; only ever READ
+    # inside the flag-gated shadow branch — has no effect when the flag is off.
+    _shadow_run_id = run_id or uuid.uuid4().hex[:12]
 
     engine = create_engine(database_url)
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -1182,6 +1273,25 @@ async def run_escalation_ladder(
                     image_renderers=image_renderers, coj_operations=coj_operations,
                     structured_formats=structured_formats, audio_styles=audio_styles,
                 )
+                # ── Technique Retrieval — SHADOW MODE (E8), flag-gated ──────────
+                # OFF by default: when ROGUE_RETRIEVAL_SHADOW != "1" this branch is
+                # never entered, so there is ZERO added work on the existing code
+                # path. When "1", it only WRITES telemetry (one RetrievalMetric row)
+                # — it never changes which techniques run or their order. Wrapped in
+                # try/except so a retrieval error can NEVER break a ladder run.
+                if os.environ.get("ROGUE_RETRIEVAL_SHADOW") == "1":
+                    try:
+                        _record_retrieval_shadow(
+                            session, parent, configs, res, run_id=_shadow_run_id,
+                        )
+                    except Exception:  # noqa: BLE001 — shadow logging is best-effort.
+                        logger.exception(
+                            "retrieval shadow failed: parent=%s", res.parent_id,
+                        )
+                        try:
+                            session.rollback()
+                        except Exception:  # noqa: BLE001
+                            pass
                 if res.winning_strategy is None:
                     stats.exhausted += 1
                     logger.info("ladder exhausted: parent=%s attempts=%s",
@@ -1422,6 +1532,7 @@ def main(argv: list[str] | None = None) -> int:
                 n_trials=args.n_trials,
                 image_strategy=args.image_strategy,
                 planner_model=args.planner_model,
+                run_id=run_id,
             ),
         )
         logger.info(

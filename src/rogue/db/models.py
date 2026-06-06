@@ -32,6 +32,8 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -39,6 +41,7 @@ from rogue.schemas import (
     AttackFamily,
     AttackVector,
     BrightDataProduct,
+    GrammarNode,
     JudgeVerdict,
     Modality,
     RendererOrigin,
@@ -782,6 +785,155 @@ class BenchmarkRun(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class TechniqueEmbedding(Base):
+    """Technique Retrieval — one row per ladder strategy ``label`` (the retrieval key).
+
+    Stores the embedding of a technique (ladder strategy) and its serialized
+    ``TechniqueProfile`` so the retriever can vector-search the repertoire for the
+    techniques most relevant to a given target. The ``label`` (ladder strategy label)
+    is the primary key — the stable retrieval key; ``technique_id`` is the strategy
+    ULID when one is available. Append-on-rebuild; the embedding column carries an
+    ivfflat cosine ANN index.
+    """
+
+    __tablename__ = "technique_embeddings"
+
+    label: Mapped[str] = mapped_column(String(80), primary_key=True)
+    technique_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    embedding: Mapped[Optional[list[float]]] = mapped_column(
+        Vector(1536), nullable=True
+    )
+    profile: Mapped[dict] = mapped_column(JSON, default=dict)
+    modalities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_technique_embeddings_embedding",
+            "embedding",
+            postgresql_using="ivfflat",
+            postgresql_with={"lists": 100},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+
+class TargetEmbedding(Base):
+    """Technique Retrieval — one row per target (the ``target_model`` string).
+
+    Stores the embedding of a target's behavioural fingerprint and its serialized
+    ``TargetFingerprint`` so the retriever can match a target to the techniques most
+    likely to break it. ``target_key`` (the ``target_model`` string) is the primary
+    key. The embedding column carries an ivfflat cosine ANN index.
+    """
+
+    __tablename__ = "target_embeddings"
+
+    target_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    embedding: Mapped[Optional[list[float]]] = mapped_column(
+        Vector(1536), nullable=True
+    )
+    fingerprint: Mapped[dict] = mapped_column(JSON, default=dict)
+    version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_target_embeddings_embedding",
+            "embedding",
+            postgresql_using="ivfflat",
+            postgresql_with={"lists": 100},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+
+class RetrievalMetric(Base):
+    """Technique Retrieval — shadow-mode telemetry, one row per (run × winner).
+
+    Append-only log of how the retriever WOULD have ranked the technique that
+    actually won, so retrieval quality can be measured offline before the retriever
+    drives execution. ``retrieved_rank`` is the rank the retriever gave the eventual
+    winner (NULL if the winner was not in the retrieved top-K); ``winner_rank`` is the
+    rank the winner actually executed at; ``retrieval_hit`` is True iff the winner was
+    within the retrieved top-K. No hard FKs — analytics-only.
+    """
+
+    __tablename__ = "retrieval_metrics"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(40), index=True)
+    parent_id: Mapped[str] = mapped_column(String(40), index=True)
+    target_key: Mapped[str] = mapped_column(String(100))
+    label: Mapped[str] = mapped_column(String(80))
+    retrieved_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    winner_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    retrieval_hit: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    k: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class PrimitiveGrammarLabel(Base):
+    """Grammar-component study — one row per (primitive × grammar node × source).
+
+    Append-only labeling store sitting BELOW the frozen ``AttackFamily`` taxonomy:
+    decomposes each ``AttackPrimitive`` into the reusable structural ``GrammarNode``s
+    it exhibits (see ``rogue.schemas.GrammarNode``). One primitive carries multiple
+    rows (one per assigned node); the same (primitive, node) pair may appear once per
+    ``source`` (``heuristic`` | ``manual`` | ``llm``), so a human/LLM label can coexist
+    with — and be compared against — the heuristic one. The ORM twin of
+    ``rogue.schemas.GrammarLabel``. The ``grammar_node`` enum is the SAME Postgres enum
+    type the migration creates, serialized by VALUE via ``_enum_values`` (never by
+    NAME), so the storage vocabulary can never drift from the wire vocabulary.
+    """
+
+    __tablename__ = "primitive_grammar_labels"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    primitive_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("attack_primitives.primitive_id"),
+        index=True,
+    )
+    node: Mapped[GrammarNode] = mapped_column(
+        SAEnum(GrammarNode, name="grammar_node", values_callable=_enum_values),
+        index=True,
+    )
+    # heuristic | manual | llm — how this label was produced.
+    source: Mapped[str] = mapped_column(String(20), default="heuristic")
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        server_default=func.now(),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "primitive_id",
+            "node",
+            "source",
+            name="uq_grammar_label_pid_node_source",
+        ),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -798,4 +950,8 @@ __all__ = [
     "FetchCache",
     "PrimitiveImage",
     "BenchmarkRun",
+    "TechniqueEmbedding",
+    "TargetEmbedding",
+    "RetrievalMetric",
+    "PrimitiveGrammarLabel",
 ]
