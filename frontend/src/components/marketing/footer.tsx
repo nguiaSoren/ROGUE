@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
+import { COMMERCIAL } from "@/lib/flags";
 
 /**
  * Global marketing footer. Server component — hosts the (client) newsletter
@@ -14,6 +15,7 @@ type FooterLink = { label: string; href: string; external?: boolean };
 
 const PRODUCT: FooterLink[] = [
   { label: "Overview", href: "/" },
+  ...(COMMERCIAL ? [{ label: "Pricing", href: "/pricing" }] : []),
   { label: "Live feed", href: "/feed" },
   { label: "Breach matrix", href: "/matrix" },
   { label: "Threat brief", href: "/brief" },
