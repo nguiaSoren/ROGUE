@@ -21,12 +21,14 @@ const PRODUCT: FooterLink[] = [
 ];
 
 const COMPANY: FooterLink[] = [
+  { label: "About", href: "/about" },
   { label: "Enterprise", href: "/enterprise" },
   { label: "Security", href: "/security" },
   { label: "Case studies", href: "/case-studies" },
 ];
 
 const DEVELOPERS: FooterLink[] = [
+  { label: "Resources", href: "/resources" },
   { label: "Sample report", href: "/sample-report.html", external: true },
   { label: "MCP server · IDE", href: "/enterprise" },
 ];

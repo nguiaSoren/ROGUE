@@ -1,11 +1,4 @@
 import Link from "next/link";
-import {
-  Boxes,
-  ShieldAlert,
-  Swords,
-  Gauge,
-  ScrollText,
-} from "lucide-react";
 import { api } from "@/lib/api";
 import { AugmentationLab } from "@/components/augmentation-lab";
 import { AugmentationShowcase } from "@/components/augmentation-showcase";
@@ -13,20 +6,21 @@ import { CinematicHero } from "@/components/cinematic-hero";
 import { HowRogueThinks } from "@/components/how-rogue-thinks";
 import { IntroOverlay } from "@/components/intro-overlay";
 import { LiveAttackTicker } from "@/components/live-attack-ticker";
-import { McpConnect } from "@/components/mcp-connect";
 import { MiniMatrix } from "@/components/mini-matrix";
 import { ProductPitch } from "@/components/product-pitch";
 import { SourcesMarquee } from "@/components/sources-marquee";
 import { Section } from "@/components/marketing/section";
-import { StatCard } from "@/components/marketing/stat-card";
 import { CtaRow } from "@/components/marketing/cta-row";
+import { EnterprisePitch } from "@/components/marketing/enterprise-pitch";
+import { UseCasesSection } from "@/components/marketing/use-cases-section";
+import { IntegrationsSection } from "@/components/marketing/integrations-section";
+import { TractionBand } from "@/components/marketing/traction-band";
 import { WorkflowWalkthrough } from "@/components/marketing/workflow-walkthrough";
 import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
 import { EarlyAccessSection } from "@/components/marketing/early-access-section";
 import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { ThreatReportDownload } from "@/components/marketing/threat-report-download";
-import { PROOF_POINTS } from "@/lib/proof";
 
 /**
  * Cinematic home — the demo entry. Designed for a 5-second pitch and a
@@ -37,11 +31,15 @@ import { PROOF_POINTS } from "@/lib/proof";
  *   2. PRODUCT PITCH — the offer: point ROGUE at an endpoint → scored report.
  *   3. SOURCES MARQUEE — 19 sources × 5 BD products.
  *   4. AHA MOMENT — "freshest threats" ticker + mini-matrix side-by-side.
- *   5. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
- *   6. AUGMENTATION SHOWCASE — 5 hero-stat cards (the §10.7 results).
- *   7. AUGMENTATION LAB — interactive: pick a config, toggle augmentations,
- *      watch the estimated breach rate stack.
- *   8. DEEP-DIVE LINKS — /feed /matrix /brief.
+ *   5. USE CASES — who uses ROGUE (problem/solution personas).
+ *   6. WORKFLOW WALKTHROUGH — concrete end-to-end story.
+ *   7. INTEGRATIONS — connects to the tools your team already uses (MCP-aware).
+ *   8. PRODUCT PREVIEW — a real scored report + a live MCP session.
+ *   9. ENTERPRISE PITCH — security platform for teams deploying LLMs at scale.
+ *  10. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
+ *  11. AUGMENTATION SHOWCASE + LAB — the §10.7 results, static then interactive.
+ *  12. TRACTION BAND — real results, not logos (award / live / dataset / numbers).
+ *  13. EARLY ACCESS, DEEP-DIVE LINKS, threat-intel + newsletter, closing CTA.
  *
  * Server component. All data fetched in parallel via Promise.allSettled —
  * the page renders even if a backend endpoint is offline.
@@ -134,41 +132,10 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 4b. BUILT FOR — one engine, five teams --------------------- */}
-        <Section
-          eyebrow="built for"
-          title="One engine, five teams."
-          lede="Point ROGUE at an endpoint and every team that touches an LLM gets the answer they need from the same scored report."
-          className="!px-0 animate-rogue-fade-up"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <PersonaCard
-              icon={<Boxes className="w-5 h-5" />}
-              title="AI Product Teams"
-              benefit="Ship features knowing your assistant won't be talked into off-script behavior in prod."
-            />
-            <PersonaCard
-              icon={<ShieldAlert className="w-5 h-5" />}
-              title="Security Teams"
-              benefit="Continuous open-web red-team coverage without standing up an offensive crew."
-            />
-            <PersonaCard
-              icon={<Swords className="w-5 h-5" />}
-              title="Red Teams"
-              benefit="358 reproducible attack primitives and an adaptive ladder to attack your own configs faster."
-            />
-            <PersonaCard
-              icon={<Gauge className="w-5 h-5" />}
-              title="Model Risk Teams"
-              benefit="Quantified breach rates per model × prompt × tool, with 95% CIs you can sign off on."
-            />
-            <PersonaCard
-              icon={<ScrollText className="w-5 h-5" />}
-              title="Compliance Teams"
-              benefit="A CISO-readable threat brief mapped to OWASP LLM Top 10 and MITRE ATLAS."
-            />
-          </div>
-        </Section>
+        {/* 4b. USE CASES — who uses ROGUE (problem/solution personas).
+            Replaces the lighter "one engine, five teams" strip; the full
+            5-persona breadth still lives on /enterprise. ---------------- */}
+        <UseCasesSection className="!px-0 animate-rogue-fade-up" />
 
         {/* 4c. WORKFLOW WALKTHROUGH — the concrete end-to-end story
             (connect endpoint → ladder scan → jailbreak → filed ticket).
@@ -178,22 +145,10 @@ export default async function Home() {
           <WorkflowWalkthrough />
         </section>
 
-        {/* 5. CONNECT VIA MCP — query it yourself, one click ----------- */}
-        <section className="space-y-4 animate-rogue-fade-up">
-          <div className="space-y-1">
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
-              query it yourself
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
-              Connect ROGUE to your IDE.
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-              ROGUE is also a live MCP server — ask Claude Desktop, Cursor, or
-              Windsurf about the threat DB directly. One click connects it.
-            </p>
-          </div>
-          <McpConnect />
-        </section>
+        {/* 5. INTEGRATIONS — connects to the tools your team already uses
+            (enterprise-friendly reframe of the MCP pitch; keeps the MCP
+            connector differentiator without leading with jargon). ------- */}
+        <IntegrationsSection className="!px-0 animate-rogue-fade-up" />
 
         {/* 5b. PRODUCT PREVIEW TEASER — make it concrete: a real scored
             report + the MCP session, side-by-side on desktop, stacked on
@@ -217,6 +172,11 @@ export default async function Home() {
             </Link>
           </div>
         </Section>
+
+        {/* 5c. ENTERPRISE PITCH — security platform for teams at scale.
+            Sits after the concrete preview so the enterprise framing lands
+            on a reader who's seen what the product returns. -------------- */}
+        <EnterprisePitch className="!px-0 animate-rogue-fade-up" />
 
         {/* 6. HOW ROGUE THINKS ------------------------------------------ */}
         <HowRogueThinks
@@ -243,24 +203,10 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
-        {/* 8b. PROOF BAND — defensible, verified numbers -------------- */}
-        <Section
-          eyebrow="the receipts"
-          title="Numbers we can defend."
-          lede="Every figure traces to a published line in the corpus or plan — no inflated ASR headlines, just what holds up under a recalibrated judge."
-          className="!px-0 animate-rogue-fade-up"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {PROOF_POINTS.map((p) => (
-              <StatCard
-                key={p.label}
-                value={p.value}
-                label={p.label}
-                sublabel={p.sublabel}
-              />
-            ))}
-          </div>
-        </Section>
+        {/* 8b. TRACTION BAND — real results, not logos. Richer social-proof
+            band (award + live deployment + open dataset + measured numbers)
+            that supersedes the old inline PROOF_POINTS→StatCard strip. ---- */}
+        <TractionBand className="!px-0 animate-rogue-fade-up" />
 
         {/* 8c. EARLY ACCESS — the honest "who's using it" answer: no logos
             yet, we're onboarding first partners. Self-contained, max-w-7xl. */}
@@ -344,28 +290,6 @@ export default async function Home() {
 }
 
 // --------------------------------------------------------------------------
-
-function PersonaCard({
-  icon,
-  title,
-  benefit,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  benefit: string;
-}) {
-  return (
-    <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
-      <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-rogue-green">
-        {icon}
-      </div>
-      <p className="text-lg font-bold mt-3">{title}</p>
-      <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-        {benefit}
-      </p>
-    </div>
-  );
-}
 
 function PageLink({
   href,

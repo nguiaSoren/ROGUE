@@ -18,6 +18,8 @@ import {
 import { Section } from "@/components/marketing/section";
 import { StatCard } from "@/components/marketing/stat-card";
 import { CtaRow } from "@/components/marketing/cta-row";
+import { EnterprisePitch } from "@/components/marketing/enterprise-pitch";
+import { IntegrationsSection } from "@/components/marketing/integrations-section";
 import { PROOF_POINTS } from "@/lib/proof";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +60,9 @@ export default function EnterprisePage() {
           </div>
         </Section>
 
+        {/* 1b. ENTERPRISE PITCH — honest feature checklist ------------ */}
+        <EnterprisePitch className="animate-rogue-fade-up" />
+
         {/* 2. FOUR DEPLOYMENT MODES ----------------------------------- */}
         <Section
           eyebrow="deployment modes"
@@ -81,6 +86,9 @@ export default function EnterprisePage() {
         >
           <ArchitectureFlow />
         </Section>
+
+        {/* 3b. INTEGRATIONS ------------------------------------------- */}
+        <IntegrationsSection className="animate-rogue-fade-up" />
 
         {/* 4. BUILT FOR ----------------------------------------------- */}
         <Section
