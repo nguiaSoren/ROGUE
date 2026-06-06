@@ -9,7 +9,6 @@ import { MiniMatrix } from "@/components/mini-matrix";
 import { SourcesMarquee } from "@/components/sources-marquee";
 import { Section } from "@/components/marketing/section";
 import { CtaRow } from "@/components/marketing/cta-row";
-import { EnterprisePitch } from "@/components/marketing/enterprise-pitch";
 import { UseCasesSection } from "@/components/marketing/use-cases-section";
 import { IntegrationsSection } from "@/components/marketing/integrations-section";
 import { TractionBand } from "@/components/marketing/traction-band";
@@ -17,8 +16,6 @@ import { WorkflowWalkthrough } from "@/components/marketing/workflow-walkthrough
 import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
 import { EarlyAccessSection } from "@/components/marketing/early-access-section";
-import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
-import { ThreatReportDownload } from "@/components/marketing/threat-report-download";
 
 /**
  * Cinematic home — the demo entry. Designed for a 5-second pitch and a
@@ -31,12 +28,11 @@ import { ThreatReportDownload } from "@/components/marketing/threat-report-downl
  *   4. USE CASES — who uses ROGUE (problem/solution personas).
  *   5. WORKFLOW WALKTHROUGH — the concrete end-to-end story (endpoint → report).
  *   6. INTEGRATIONS — connects to the tools your team already uses (MCP-aware).
- *   7. PRODUCT PREVIEW — a real scored report + a live MCP session.
- *   8. ENTERPRISE PITCH — security platform for teams deploying LLMs at scale.
- *   9. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
- *  10. AUGMENTATION SHOWCASE — the §10.7 results.
- *  11. TRACTION BAND — real results, not logos (award / live / dataset / numbers).
- *  12. EARLY ACCESS, DEEP-DIVE LINKS, threat-intel + newsletter, closing CTA.
+ *   7. PRODUCT PREVIEW — a real scored report + a live MCP session (teaser → /product).
+ *   8. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
+ *   9. AUGMENTATION SHOWCASE — the §10.7 results.
+ *  10. TRACTION BAND — real results, not logos (award / live / dataset / numbers).
+ *  11. EARLY ACCESS, DEEP-DIVE LINKS, closing CTA.
  *
  * Server component. All data fetched in parallel via Promise.allSettled —
  * the page renders even if a backend endpoint is offline.
@@ -163,11 +159,6 @@ export default async function Home() {
           </div>
         </Section>
 
-        {/* 5c. ENTERPRISE PITCH — security platform for teams at scale.
-            Sits after the concrete preview so the enterprise framing lands
-            on a reader who's seen what the product returns. -------------- */}
-        <EnterprisePitch className="!px-0 animate-rogue-fade-up" />
-
         {/* 6. HOW ROGUE THINKS ------------------------------------------ */}
         <HowRogueThinks
           nSources={19}
@@ -226,13 +217,6 @@ export default async function Home() {
               desc="Today's CISO-readable diff vs yesterday. Markdown + JSON exports. The artifact you'd actually send."
             />
           </div>
-        </section>
-
-        {/* 9b. THREAT INTEL + NEWSLETTER — concrete artifacts to take away
-            plus a low-commitment subscribe, adjacent on desktop. ---------- */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-rogue-fade-up">
-          <ThreatReportDownload />
-          <NewsletterSignup variant="section" />
         </section>
 
         {/* 10. CLOSING CTA — conversion close ------------------------- */}
