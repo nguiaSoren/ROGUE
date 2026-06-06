@@ -48,16 +48,16 @@ function ToolCallCard({ call }: { call: ToolCall }) {
     >
       <div className="flex items-center gap-2">
         <Glyph
-          className="size-3.5 shrink-0 text-rogue-green/70"
+          className="mt-0.5 size-3.5 shrink-0 self-start text-rogue-green/70"
           aria-hidden="true"
         />
-        <code className="font-mono text-[13px] leading-none text-foreground">
+        <code className="min-w-0 flex-1 break-words font-mono text-[12px] sm:text-[13px] leading-tight text-foreground">
           <span className="text-rogue-green">{call.name}</span>
           {call.args !== undefined && (
             <span className="text-muted-foreground">({call.args})</span>
           )}
         </code>
-        <span className="ml-auto flex items-center gap-1.5">
+        <span className="mt-0.5 flex shrink-0 items-center gap-1.5 self-start">
           {running ? (
             <>
               <Loader2
@@ -76,7 +76,7 @@ function ToolCallCard({ call }: { call: ToolCall }) {
           )}
         </span>
       </div>
-      <div className="mt-1.5 pl-[22px] font-mono text-[11.5px] leading-relaxed text-muted-foreground">
+      <div className="mt-1.5 break-words pl-[22px] font-mono text-[11.5px] leading-relaxed text-muted-foreground">
         <span className="select-none text-rogue-green/50">← </span>
         {call.result}
       </div>
@@ -142,11 +142,11 @@ export function McpPreview({ className }: McpPreviewProps) {
           <span className="size-3 rounded-full bg-[#febc2e]" />
           <span className="size-3 rounded-full bg-[#28c840]" />
         </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Terminal className="size-3.5" aria-hidden="true" />
-          <span className="font-mono text-xs">Cursor — rogue-mcp</span>
+        <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+          <Terminal className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate font-mono text-[11px] sm:text-xs">Cursor — rogue-mcp</span>
         </div>
-        <span className="ml-auto flex items-center gap-1.5 rounded-full border border-rogue-green/30 bg-rogue-green/5 px-2 py-0.5">
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-rogue-green/30 bg-rogue-green/5 px-2 py-0.5">
           <span className="size-1.5 animate-rogue-pulse-green rounded-full bg-rogue-green" />
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-rogue-green/90">
             MCP · rogue

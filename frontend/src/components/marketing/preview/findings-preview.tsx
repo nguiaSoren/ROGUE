@@ -270,7 +270,7 @@ export function FindingsPreview({ className }: { className?: string }) {
           <span className="h-3 w-3 rounded-full bg-rogue-green/70" />
         </div>
         <div className="flex min-w-0 flex-1 items-center justify-center">
-          <div className="flex items-center gap-2 truncate rounded-md border border-border bg-background/60 px-3 py-1 font-mono text-[11px] text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-1 font-mono text-[10px] sm:text-[11px] text-muted-foreground">
             <Lock className="h-3 w-3 shrink-0 text-rogue-green" aria-hidden />
             <span className="truncate">
               app.rogue · scans / scan_8f3a2 / findings

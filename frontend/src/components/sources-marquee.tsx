@@ -102,8 +102,8 @@ export function SourcesMarquee({
 
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6 items-start">
           {/* The hero number */}
-          <div className="space-y-1">
-            <p className="text-6xl md:text-7xl font-bold tabular-nums leading-none text-rogue-green">
+          <div className="space-y-1 min-w-0">
+            <p className="text-5xl sm:text-6xl md:text-7xl font-bold tabular-nums leading-none text-rogue-green">
               {hotYield ?? "—"}
             </p>
             <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-foreground mt-2">

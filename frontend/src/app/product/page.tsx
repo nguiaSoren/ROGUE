@@ -29,7 +29,7 @@ export default function ProductPage() {
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
               the product
             </p>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               See exactly what ROGUE does to your stack.
             </h1>
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">

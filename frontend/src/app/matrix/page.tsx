@@ -101,14 +101,14 @@ export default async function MatrixPage() {
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-7xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         {/* Header */}
         <header className="flex items-start justify-between gap-6 flex-wrap animate-rogue-fade-up">
           <div className="space-y-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
               /matrix · {matrix.target_date}
             </p>
-            <h1 className="text-4xl font-bold tracking-tight">Breach Matrix</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Breach Matrix</h1>
             <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
               Max any-breach rate per attack{" "}
               <Term name="family">family</Term> ×{" "}

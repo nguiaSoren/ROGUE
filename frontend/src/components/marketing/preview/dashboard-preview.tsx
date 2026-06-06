@@ -84,16 +84,16 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
           <span className="h-3 w-3 rounded-full bg-orange-400/70" />
           <span className="h-3 w-3 rounded-full bg-rogue-green/70" />
         </div>
-        <div className="flex-1 truncate text-center font-mono text-[11px] text-muted-foreground">
+        <div className="min-w-0 flex-1 truncate text-center font-mono text-[10px] sm:text-[11px] text-muted-foreground">
           app.rogue · scans / {EXAMPLE.scanId}
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/30 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+        <span className="hidden shrink-0 items-center gap-1.5 rounded-md border border-border bg-card/30 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground sm:inline-flex">
           Example scan · illustrative
         </span>
       </div>
 
       {/* ── Dashboard body. ── */}
-      <div className="bg-black/20 p-5 sm:p-6 space-y-5">
+      <div className="bg-black/20 p-4 sm:p-6 space-y-5">
         {/* Header row. */}
         <div className="space-y-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
@@ -108,8 +108,8 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
         </div>
 
         {/* Risk headline — the score leads. */}
-        <section className="rounded-xl border border-border bg-card/40 backdrop-blur-sm p-5 space-y-3">
-          <div className="flex items-end gap-5 flex-wrap">
+        <section className="rounded-xl border border-border bg-card/40 backdrop-blur-sm p-4 sm:p-5 space-y-3">
+          <div className="flex items-end gap-4 sm:gap-5 flex-wrap">
             <div className="flex items-baseline gap-2">
               <span
                 className={cn(
@@ -135,11 +135,11 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
                 {EXAMPLE.level}
               </span>
             </div>
-            <div className="ml-auto text-right space-y-1">
+            <div className="ml-auto min-w-0 text-right space-y-1">
               <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
                 Top attack
               </p>
-              <p className="text-sm font-bold break-words max-w-xs">
+              <p className="text-sm font-bold break-words max-w-[12rem]">
                 {EXAMPLE.topAttack}
               </p>
             </div>
@@ -173,7 +173,7 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
         </div>
 
         {/* Scan-status / progress card. */}
-        <section className="rounded-xl border border-border bg-card/40 backdrop-blur-sm p-5 space-y-4">
+        <section className="rounded-xl border border-border bg-card/40 backdrop-blur-sm p-4 sm:p-5 space-y-4">
           <div className="flex items-center gap-3">
             <span
               className={cn(
@@ -232,8 +232,8 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Recent scans
           </p>
-          <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[22rem] text-sm">
               <thead>
                 <tr className="border-b border-border text-left font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">Target</th>

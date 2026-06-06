@@ -52,12 +52,12 @@ export function CinematicHero({
 
         {/* Title */}
         <h1
-          className="text-5xl md:text-7xl lg:text-[5.5rem] font-bold tracking-tight leading-[0.95] max-w-5xl animate-rogue-reveal"
+          className="text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem] font-bold tracking-tight leading-[0.95] max-w-5xl animate-rogue-reveal"
           style={{ animationDelay: "0.1s" }}
         >
           <span className="block">Your LLM is being</span>
           <span className="block">
-            <span className="rogue-word-rotator-wrap inline-flex h-[1.2em] overflow-hidden align-baseline mr-3 text-rogue-red leading-[1.2]">
+            <span className="rogue-word-rotator-wrap inline-flex max-w-full h-[1.2em] overflow-hidden align-baseline mr-3 text-rogue-red leading-[1.2]">
               <span className="rogue-word-rotator">
                 <span className="block h-[1.2em] leading-[1.2]">jailbroken.</span>
                 <span className="block h-[1.2em] leading-[1.2]">prompt-injected.</span>
@@ -184,9 +184,9 @@ function HeroStat({
 }) {
   const tintClass = tint === "green" ? "text-rogue-green" : "text-rogue-red";
   return (
-    <div>
+    <div className="min-w-0">
       <p
-        className={`text-3xl md:text-4xl font-bold tabular-nums leading-none ${tintClass}`}
+        className={`text-2xl sm:text-3xl md:text-4xl font-bold tabular-nums leading-none ${tintClass}`}
       >
         {value !== null ? value.toLocaleString() : "—"}
       </p>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
@@ -21,6 +21,11 @@ export const metadata: Metadata = {
   title: "ROGUE · Open-web LLM Threat Intelligence",
   description:
     "Continuous red-team for production LLM deployments. Harvests new jailbreaks from the open web, reproduces them against your deployment configuration, ships a daily diff of which attacks now bypass your guardrails.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

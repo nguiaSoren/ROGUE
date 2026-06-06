@@ -65,7 +65,7 @@ export function Footer() {
             <FooterColumn title="Product" links={PRODUCT} />
             <FooterColumn title="Company" links={COMPANY} />
             <FooterColumn title="Developers" links={DEVELOPERS} />
-            <div className="col-span-2 sm:col-span-1">
+            <div className="col-span-2 min-w-0 sm:col-span-1">
               <NewsletterSignup variant="footer" />
             </div>
           </div>

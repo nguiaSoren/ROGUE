@@ -58,7 +58,7 @@ export default async function BriefPage() {
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         {/* Masthead */}
         <header className="rogue-card border border-border rounded-xl bg-card/40 backdrop-blur-sm p-6 md:p-8 animate-rogue-fade-up">
           <div className="flex items-start justify-between gap-6 flex-wrap">
@@ -68,7 +68,7 @@ export default async function BriefPage() {
                 daily threat brief
               </p>
               <div className="space-y-1">
-                <h1 className="text-4xl font-bold tracking-tight">Threat Brief</h1>
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Threat Brief</h1>
                 <p className="font-mono text-xs text-muted-foreground uppercase tracking-[0.18em]">
                   {longDate}
                 </p>

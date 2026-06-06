@@ -205,7 +205,7 @@ function LadderVisual() {
 
 function BreachVisual() {
   return (
-    <div className="inline-flex items-center gap-2 rounded-md border border-rogue-red/40 bg-rogue-red/5 px-2.5 py-1.5 font-mono text-[11px]">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-rogue-red/40 bg-rogue-red/5 px-2.5 py-1.5 font-mono text-[11px]">
       <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-rogue-red animate-rogue-pulse-critical" />
       <span className="text-foreground/90">Crescendo</span>
       <span className="text-muted-foreground/50">·</span>

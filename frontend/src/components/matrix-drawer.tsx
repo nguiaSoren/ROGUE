@@ -198,12 +198,12 @@ export function MatrixCellDrawer({
           animation: "rogue-slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
-        <div className="sticky top-0 bg-background/95 backdrop-blur-xl border-b border-border z-10 px-5 py-4 flex items-center justify-between">
-          <div>
+        <div className="sticky top-0 bg-background/95 backdrop-blur-xl border-b border-border z-10 px-5 py-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
               cell · {cell.family}
             </p>
-            <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate max-w-[400px]">
+            <p className="text-xs font-mono text-muted-foreground mt-0.5 truncate max-w-full sm:max-w-[400px]">
               <span className="inline-flex items-center gap-1.5">
                 <ProviderLogo model={cell.target_model} className="text-xs opacity-80" />
                 {cell.config_name} · {cell.target_model}
@@ -221,7 +221,7 @@ export function MatrixCellDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-rogue-red transition-colors text-2xl leading-none font-mono w-8 h-8 flex items-center justify-center"
+            className="shrink-0 text-muted-foreground hover:text-rogue-red transition-colors text-2xl leading-none font-mono w-8 h-8 flex items-center justify-center"
             aria-label="Close"
           >
             ×
@@ -371,7 +371,7 @@ export function MatrixCellDrawer({
                             href={s.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-rogue-green hover:underline truncate inline-block max-w-[380px] align-middle"
+                            className="text-rogue-green hover:underline truncate inline-block max-w-full sm:max-w-[380px] align-middle"
                             title={s.url}
                           >
                             {s.url} ↗

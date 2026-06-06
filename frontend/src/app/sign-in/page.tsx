@@ -51,13 +51,13 @@ export default function SignInPage() {
           value={key}
           onChange={(e) => setKey(e.target.value)}
           placeholder="rk_live_…"
-          className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:border-foreground/40"
+          className="w-full rounded border border-border bg-background px-3 py-2.5 font-mono text-base sm:text-sm outline-none focus:border-foreground/40"
         />
         {error ? <p className="text-sm text-[var(--rogue-red,#ef4444)]">{error}</p> : null}
         <button
           type="submit"
           disabled={busy || !key.trim()}
-          className="w-full rounded bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          className="w-full rounded bg-foreground px-3 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
         >
           {busy ? "Verifying…" : "Sign in"}
         </button>

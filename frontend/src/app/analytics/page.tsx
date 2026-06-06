@@ -273,13 +273,13 @@ function AtpSection({ atp }: { atp: NonNullable<Analytics["atp"]> }) {
 function Shell({ children, generatedAt }: { children: React.ReactNode; generatedAt?: string }) {
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         <header className="space-y-2 animate-rogue-fade-up">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green flex items-center gap-2">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
             /analytics {generatedAt ? `· ${generatedAt.slice(0, 16).replace("T", " ")}Z` : ""}
           </p>
-          <h1 className="text-4xl font-bold tracking-tight">Telemetry</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Telemetry</h1>
           <p className="text-sm text-muted-foreground">Capability, discovery, allocation &amp; research metrics from the live breach matrix — a published snapshot.</p>
         </header>
         {children}

@@ -359,7 +359,7 @@ export function MatrixHeatmap({
         <table className="w-full font-mono text-xs border-collapse">
           <thead>
             <tr className="border-b border-border bg-background/60">
-              <th className="text-left p-3 sticky left-0 bg-background/95 backdrop-blur-sm font-semibold tracking-[0.15em] uppercase text-[10px] z-10 border-r border-border min-w-[180px]">
+              <th className="text-left p-2 sm:p-3 sticky left-0 bg-background/95 backdrop-blur-sm font-semibold tracking-[0.15em] uppercase text-[10px] z-10 border-r border-border min-w-[120px] sm:min-w-[180px]">
                 Attack family
               </th>
               {visibleConfigs.map((c) => {
@@ -374,7 +374,7 @@ export function MatrixHeatmap({
                 return (
                   <th
                     key={c.config_id}
-                    className="text-center p-3 font-semibold tracking-[0.15em] uppercase text-[10px] whitespace-nowrap"
+                    className="text-center p-2 sm:p-3 font-semibold tracking-[0.15em] uppercase text-[10px] whitespace-nowrap"
                     title={c.config_id}
                   >
                     <div className="flex flex-col items-center gap-1">
@@ -418,7 +418,7 @@ export function MatrixHeatmap({
           <tbody>
             {visibleFamilies.map((family, rowIdx) => (
               <tr key={family} className="border-b border-border/50 last:border-b-0 group">
-                <td className="p-3 sticky left-0 bg-background/95 backdrop-blur-sm font-mono text-[11px] whitespace-nowrap border-r border-border z-10 group-hover:text-rogue-green transition-colors">
+                <td className="p-2 sm:p-3 sticky left-0 bg-background/95 backdrop-blur-sm font-mono text-[11px] whitespace-nowrap border-r border-border z-10 group-hover:text-rogue-green transition-colors">
                   <button
                     type="button"
                     onClick={() =>

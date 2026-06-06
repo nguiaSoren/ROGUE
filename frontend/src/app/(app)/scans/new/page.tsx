@@ -105,10 +105,10 @@ export default function NewScanPage() {
     setBusy(false);
   }
 
-  const field = "w-full rounded border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground/40";
+  const field = "w-full rounded border border-border bg-background px-3 py-2.5 text-base sm:text-sm outline-none focus:border-foreground/40";
 
   return (
-    <div className="mx-auto w-full max-w-lg">
+    <div className="mx-auto w-full max-w-lg px-4 sm:px-0">
       <h1 className="text-xl font-semibold">New scan</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Point ROGUE at a model and pick an attack pack. Scans run asynchronously — you&apos;ll watch
@@ -116,13 +116,13 @@ export default function NewScanPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        <div className="flex gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm">
           {(["provider", "endpoint"] as const).map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setMode(m)}
-              className={`rounded border px-3 py-1 ${mode === m ? "border-foreground bg-muted" : "border-border text-muted-foreground"}`}
+              className={`rounded border px-3 py-2 ${mode === m ? "border-foreground bg-muted" : "border-border text-muted-foreground"}`}
             >
               {m === "provider" ? "Known provider" : "Custom endpoint"}
             </button>
@@ -157,7 +157,7 @@ export default function NewScanPage() {
 
         <div>
           <span className="text-sm text-muted-foreground">Attack corpus</span>
-          <div className="mt-1 flex gap-2 text-sm">
+          <div className="mt-1 flex flex-wrap gap-2 text-sm">
             {(
               [
                 ["pack", "Curated pack"],
@@ -169,7 +169,7 @@ export default function NewScanPage() {
                 key={m}
                 type="button"
                 onClick={() => setScanMode(m)}
-                className={`rounded border px-3 py-1 ${scanMode === m ? "border-foreground bg-muted" : "border-border text-muted-foreground"}`}
+                className={`rounded border px-3 py-2 ${scanMode === m ? "border-foreground bg-muted" : "border-border text-muted-foreground"}`}
               >
                 {label}
               </button>
@@ -202,11 +202,11 @@ export default function NewScanPage() {
 
         {error ? <p className="text-sm text-[var(--rogue-red,#ef4444)]">{error}</p> : null}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={busy || (mode === "endpoint" && !endpoint.trim())}
-            className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+            className="rounded bg-foreground px-4 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Launching…" : "Launch scan"}
           </button>
@@ -214,7 +214,7 @@ export default function NewScanPage() {
             type="button"
             onClick={onTestConnection}
             disabled={validating || (mode === "endpoint" && !endpoint.trim())}
-            className="rounded border border-border px-4 py-2 text-sm font-medium hover:border-foreground/40 disabled:opacity-50"
+            className="rounded border border-border px-4 py-2.5 text-sm font-medium hover:border-foreground/40 disabled:opacity-50"
           >
             {validating ? "Testing…" : "Test connection"}
           </button>
@@ -228,10 +228,10 @@ export default function NewScanPage() {
           <div
             className={`rogue-card rounded border p-4 ${validation.ok ? "border-border" : "rogue-card-critical border-[var(--rogue-red-dim,#ff003c55)]"}`}
           >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-sm">{validation.target}</span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-mono text-sm break-all min-w-0">{validation.target}</span>
               <span
-                className={`text-xs font-medium ${validation.ok ? "text-[var(--rogue-green,#16a34a)]" : "text-[var(--rogue-red,#ef4444)]"}`}
+                className={`shrink-0 text-xs font-medium ${validation.ok ? "text-[var(--rogue-green,#16a34a)]" : "text-[var(--rogue-red,#ef4444)]"}`}
               >
                 {validation.ok ? "Ready to scan" : "Not ready"}
               </span>

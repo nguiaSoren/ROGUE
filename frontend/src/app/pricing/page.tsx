@@ -206,8 +206,9 @@ export default function PricingPage() {
           title="What's in each plan."
           lede="The same core engine across every tier — the plan sets how many configs you cover, how often you scan, and the controls your org needs."
         >
-          <div className="rogue-card border border-border rounded-xl bg-card/40 backdrop-blur-sm overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
+          {/* Desktop: full comparison table (md+). */}
+          <div className="hidden md:block rogue-card border border-border rounded-xl bg-card/40 backdrop-blur-sm overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border">
                   <th className="px-5 py-4 text-left font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -255,6 +256,52 @@ export default function PricingPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: stacked per-tier comparison cards (below md). */}
+          <div className="md:hidden space-y-4">
+            {TIERS.map((tier, tierIdx) => (
+              <div
+                key={tier.name}
+                className={
+                  "rogue-card rounded-xl bg-card/40 backdrop-blur-sm p-5 " +
+                  (tier.featured
+                    ? "border-2 border-rogue-green"
+                    : "border border-border")
+                }
+              >
+                <div className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-3">
+                  <h3
+                    className={
+                      "text-lg font-bold tracking-tight " +
+                      (tier.featured ? "text-rogue-green" : "text-foreground")
+                    }
+                  >
+                    {tier.name}
+                  </h3>
+                  {tier.featured && (
+                    <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-rogue-green">
+                      Most popular
+                    </span>
+                  )}
+                </div>
+                <dl className="mt-3 space-y-2.5 text-sm">
+                  {COMPARISON.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex items-start justify-between gap-4"
+                    >
+                      <dt className="min-w-0 font-medium text-foreground break-words">
+                        {row.label}
+                      </dt>
+                      <dd className="min-w-0 text-right text-muted-foreground break-words">
+                        <CompCell value={row.cells[tierIdx]} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
           </div>
         </Section>
 

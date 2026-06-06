@@ -64,8 +64,8 @@ export default async function ReportPage({
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
-        <header className="flex items-start justify-between gap-6 flex-wrap animate-rogue-fade-up">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+        <header className="flex items-start justify-between gap-4 sm:gap-6 flex-wrap animate-rogue-fade-up">
           <div className="space-y-2 min-w-0">
             <Link
               href={`/scans/${encodeURIComponent(scanId)}`}
@@ -73,7 +73,7 @@ export default async function ReportPage({
             >
               ← /scans/{scanId}
             </Link>
-            <h1 className="text-3xl font-bold tracking-tight break-words">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">
               {report ? report.target : "Scan report"}
             </h1>
             {report && (

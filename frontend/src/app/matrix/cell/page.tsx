@@ -33,7 +33,7 @@ export default async function CellPage({
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-4xl mx-auto px-6 py-10 space-y-4">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-4">
         {!family || !config ? (
           <div className="border border-rogue-red/40 rounded-lg p-6 font-mono text-sm text-rogue-red bg-rogue-red/5">
             {"// missing ?family= and ?config= query params"}
