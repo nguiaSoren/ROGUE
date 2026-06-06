@@ -151,7 +151,7 @@ export function NewsletterSignup({
                     setMessage(null);
                   }
                 }}
-                className="h-9 text-sm sm:flex-1"
+                className="h-9 text-sm min-w-0 sm:flex-1"
               />
               <button
                 type="submit"
@@ -235,7 +235,7 @@ export function NewsletterSignup({
                   setMessage(null);
                 }
               }}
-              className="sm:flex-1"
+              className="min-w-0 sm:flex-1"
             />
             <button
               type="submit"

@@ -70,7 +70,7 @@ export function ReportPreview({ className }: { className?: string }) {
           <span className="h-3 w-3 rounded-full bg-rogue-orange/70" />
           <span className="h-3 w-3 rounded-full bg-rogue-green/70" />
         </div>
-        <div className="flex-1 truncate text-center font-mono text-[11px] text-muted-foreground">
+        <div className="min-w-0 flex-1 truncate text-center font-mono text-[10px] sm:text-[11px] text-muted-foreground">
           <span className="text-rogue-green">app.rogue</span>
           <span className="opacity-50"> · scans / </span>
           <span className="text-foreground/80">scan_8f3a2</span>
@@ -92,7 +92,7 @@ export function ReportPreview({ className }: { className?: string }) {
 
       {/* ---- report body ----------------------------------------------- */}
       <div className="bg-rogue-bg-deep">
-        <div className="space-y-5 p-5 sm:p-7">
+        <div className="space-y-5 p-4 sm:p-7">
           {/* header */}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
@@ -112,8 +112,8 @@ export function ReportPreview({ className }: { className?: string }) {
           </div>
 
           {/* risk headline */}
-          <section className="rogue-card space-y-3 rounded-lg border border-border bg-card/40 p-5 sm:p-6">
-            <div className="flex flex-wrap items-end gap-5">
+          <section className="rogue-card space-y-3 rounded-lg border border-border bg-card/40 p-4 sm:p-6">
+            <div className="flex flex-wrap items-end gap-4 sm:gap-5">
               <div className="flex items-baseline gap-2">
                 <span
                   className={cn(
@@ -135,11 +135,11 @@ export function ReportPreview({ className }: { className?: string }) {
                   {EXAMPLE.level}
                 </span>
               </div>
-              <div className="ml-auto space-y-1 text-right">
+              <div className="ml-auto min-w-0 space-y-1 text-right">
                 <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
                   Top attack
                 </p>
-                <p className="max-w-[12rem] text-sm font-bold text-foreground">
+                <p className="max-w-[12rem] break-words text-sm font-bold text-foreground">
                   {EXAMPLE.topAttack}
                 </p>
               </div>
@@ -152,7 +152,7 @@ export function ReportPreview({ className }: { className?: string }) {
           </section>
 
           {/* executive summary */}
-          <section className="rogue-card space-y-3 rounded-lg border border-border bg-card/40 p-5 sm:p-6">
+          <section className="rogue-card space-y-3 rounded-lg border border-border bg-card/40 p-4 sm:p-6">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
               Executive summary
             </h3>
@@ -178,7 +178,7 @@ export function ReportPreview({ className }: { className?: string }) {
           </div>
 
           {/* recommendations */}
-          <section className="space-y-3 rounded-lg border border-border bg-card/30 p-5">
+          <section className="space-y-3 rounded-lg border border-border bg-card/30 p-4 sm:p-5">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Recommendations
             </h3>

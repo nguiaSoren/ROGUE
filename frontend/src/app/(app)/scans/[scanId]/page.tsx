@@ -40,7 +40,7 @@ export default async function ScanDetailPage({
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         <header className="space-y-2 animate-rogue-fade-up">
           <Link
             href="/scans"
@@ -48,7 +48,7 @@ export default async function ScanDetailPage({
           >
             ← /scans
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight font-mono break-all">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-mono break-all">
             {scanId}
           </h1>
           {record && (

@@ -123,6 +123,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Guard against page-level horizontal scroll on mobile (overflowing wide
+       elements). `clip` (not `hidden`) does not create a scroll container, so
+       it leaves the sticky header working. */
+    overflow-x: clip;
   }
   html {
     @apply font-sans;

@@ -35,13 +35,13 @@ export default async function ScansPage() {
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
-        <header className="flex items-start justify-between gap-6 flex-wrap animate-rogue-fade-up">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+        <header className="flex items-start justify-between gap-4 sm:gap-6 flex-wrap animate-rogue-fade-up">
           <div className="space-y-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
               /scans
             </p>
-            <h1 className="text-4xl font-bold tracking-tight">Scans</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Scans</h1>
             <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
               Every red-team scan your org has launched, newest first. Click a row to
               watch a running scan or open its report.

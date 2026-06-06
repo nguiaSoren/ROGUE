@@ -208,7 +208,7 @@ export function IntroOverlay() {
       <button
         type="button"
         onClick={dismiss}
-        className="absolute top-6 right-6 z-10 px-4 py-2 rounded-md border border-border bg-card/40 backdrop-blur-md font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-rogue-green hover:border-rogue-green transition-colors"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 min-h-[44px] px-4 py-2 rounded-md border border-border bg-card/40 backdrop-blur-md font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-rogue-green hover:border-rogue-green transition-colors"
       >
         skip intro →
       </button>

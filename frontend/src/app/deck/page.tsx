@@ -44,7 +44,7 @@ export default function DeckPage() {
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
               01 / 10 · ROGUE
             </p>
-            <h1 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
+            <h1 className="mt-6 text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               Continuously red-team your AI
               <br />
               <span className="text-rogue-green">before attackers do.</span>

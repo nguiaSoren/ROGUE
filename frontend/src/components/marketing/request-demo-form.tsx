@@ -263,8 +263,7 @@ export function RequestDemoForm() {
             <iframe
               src={CALENDLY_URL}
               title="Book a demo with ROGUE"
-              className="w-full"
-              style={{ height: 680, border: 0 }}
+              className="block w-full h-[640px] min-h-[560px] border-0"
               loading="lazy"
             />
           </div>
