@@ -134,12 +134,12 @@ export default function EnterprisePage() {
               >
                 Security
               </Link>
-              . For plans and packaging, see{" "}
+              . Or apply for{" "}
               <Link
-                href="/pricing"
+                href="/early-access"
                 className="text-rogue-green hover:underline underline-offset-4"
               >
-                Pricing
+                early access
               </Link>
               .
             </p>

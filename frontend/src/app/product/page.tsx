@@ -97,12 +97,12 @@ export default function ProductPage() {
               >
                 early access
               </Link>
-              , or see plans and packaging on{" "}
+              , or see deployment options on{" "}
               <Link
-                href="/pricing"
+                href="/enterprise"
                 className="text-rogue-green hover:underline underline-offset-4"
               >
-                Pricing
+                Enterprise
               </Link>
               .
             </p>

@@ -242,10 +242,10 @@ export default async function Home() {
           </div>
           <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
             <Link
-              href="/pricing"
+              href="/early-access"
               className="transition-colors hover:text-rogue-green"
             >
-              View pricing
+              Early access
             </Link>
           </div>
         </section>

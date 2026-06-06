@@ -14,7 +14,6 @@ type FooterLink = { label: string; href: string; external?: boolean };
 
 const PRODUCT: FooterLink[] = [
   { label: "Overview", href: "/" },
-  { label: "Pricing", href: "/pricing" },
   { label: "Live feed", href: "/feed" },
   { label: "Breach matrix", href: "/matrix" },
   { label: "Threat brief", href: "/brief" },
