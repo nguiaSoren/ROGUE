@@ -290,7 +290,7 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 09 — WHO IT'S FOR / PRICING ------------------------------- */}
+        {/* 09 — WHO IT'S FOR ----------------------------------------- */}
         <Slide n={9}>
           <Section
             eyebrow="09 / 10 · who it's for"
@@ -319,7 +319,8 @@ export default function DeckPage() {
             <div className="mt-8 flex items-center gap-3">
               <Boxes className="h-5 w-5 text-rogue-green shrink-0" />
               <p className="text-sm text-muted-foreground">
-                From a single endpoint to org-wide continuous coverage.{" "}
+                Onboarding a handful of early partners now — bring your stack and
+                threat model.{" "}
                 <Link
                   href="/early-access"
                   className="text-rogue-green font-mono uppercase tracking-[0.1em] text-xs hover:underline"
