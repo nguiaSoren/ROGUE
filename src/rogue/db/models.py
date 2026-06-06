@@ -959,6 +959,27 @@ class DemoRequest(Base):
     )
 
 
+class NewsletterSubscriber(Base):
+    """A newsletter subscriber captured from the marketing site (``/api/newsletter``).
+
+    Append-only subscription store — no FK into the threat-DB graph, deliberately
+    standalone. Purely additive (§13-safe). ``email`` is unique so a re-subscribe
+    is idempotent (the router returns the existing row's id). The wire body lives
+    in ``rogue.api.newsletter.NewsletterBody``; this is its storage twin.
+    """
+
+    __tablename__ = "newsletter_subscribers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    source: Mapped[Optional[str]] = mapped_column(String(60), nullable=True, default="site")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -980,4 +1001,5 @@ __all__ = [
     "RetrievalMetric",
     "PrimitiveGrammarLabel",
     "DemoRequest",
+    "NewsletterSubscriber",
 ]

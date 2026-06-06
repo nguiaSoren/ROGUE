@@ -20,6 +20,12 @@ import { SourcesMarquee } from "@/components/sources-marquee";
 import { Section } from "@/components/marketing/section";
 import { StatCard } from "@/components/marketing/stat-card";
 import { CtaRow } from "@/components/marketing/cta-row";
+import { WorkflowWalkthrough } from "@/components/marketing/workflow-walkthrough";
+import { ReportPreview } from "@/components/marketing/preview/report-preview";
+import { McpPreview } from "@/components/marketing/preview/mcp-preview";
+import { EarlyAccessSection } from "@/components/marketing/early-access-section";
+import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
+import { ThreatReportDownload } from "@/components/marketing/threat-report-download";
 import { PROOF_POINTS } from "@/lib/proof";
 
 /**
@@ -164,6 +170,14 @@ export default async function Home() {
           </div>
         </Section>
 
+        {/* 4c. WORKFLOW WALKTHROUGH — the concrete end-to-end story
+            (connect endpoint → ladder scan → jailbreak → filed ticket).
+            Self-headed; sits between the personas and the MCP pitch so the
+            "how it actually works" answer lands right after "who it's for". */}
+        <section className="animate-rogue-fade-up">
+          <WorkflowWalkthrough />
+        </section>
+
         {/* 5. CONNECT VIA MCP — query it yourself, one click ----------- */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
@@ -180,6 +194,29 @@ export default async function Home() {
           </div>
           <McpConnect />
         </section>
+
+        {/* 5b. PRODUCT PREVIEW TEASER — make it concrete: a real scored
+            report + the MCP session, side-by-side on desktop, stacked on
+            mobile. Two previews max here; the full set lives on /product. */}
+        <Section
+          eyebrow="see the product"
+          title="This is what you get back."
+          lede="A scored executive report you can hand to a CISO, and a live MCP session that runs the whole red-team from inside your editor."
+          className="!px-0 animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ReportPreview />
+            <McpPreview />
+          </div>
+          <div className="mt-6">
+            <Link
+              href="/product"
+              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-opacity hover:opacity-80"
+            >
+              Take the full product tour &rarr;
+            </Link>
+          </div>
+        </Section>
 
         {/* 6. HOW ROGUE THINKS ------------------------------------------ */}
         <HowRogueThinks
@@ -225,6 +262,12 @@ export default async function Home() {
           </div>
         </Section>
 
+        {/* 8c. EARLY ACCESS — the honest "who's using it" answer: no logos
+            yet, we're onboarding first partners. Self-contained, max-w-7xl. */}
+        <div className="animate-rogue-fade-up">
+          <EarlyAccessSection />
+        </div>
+
         {/* 9. DEEP-DIVE LINKS ------------------------------------------ */}
         <section className="space-y-4 animate-rogue-fade-up">
           <div className="space-y-1">
@@ -257,6 +300,13 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* 9b. THREAT INTEL + NEWSLETTER — concrete artifacts to take away
+            plus a low-commitment subscribe, adjacent on desktop. ---------- */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-rogue-fade-up">
+          <ThreatReportDownload />
+          <NewsletterSignup variant="section" />
+        </section>
+
         {/* 10. CLOSING CTA — conversion close ------------------------- */}
         <section className="rogue-card border border-border rounded-2xl p-8 md:p-12 bg-card/40 backdrop-blur-sm text-center animate-rogue-fade-up">
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
@@ -269,14 +319,16 @@ export default async function Home() {
             Point us at an endpoint and get a scored security report back. Book a
             walkthrough, or run a scan yourself right now.
           </p>
-          <CtaRow className="mt-8 justify-center" />
-          <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center">
             <Link
               href="/scans/new"
-              className="transition-colors hover:text-rogue-green"
+              className="inline-flex items-center justify-center rounded-lg px-6 py-3 bg-rogue-green text-black font-mono text-sm font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rogue-green/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              Run a scan
+              Run a free scan
             </Link>
+            <CtaRow />
+          </div>
+          <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
             <Link
               href="/pricing"
               className="transition-colors hover:text-rogue-green"

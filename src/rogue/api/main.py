@@ -1758,3 +1758,9 @@ def bandit_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
 from rogue.api import demo as _demo_router  # noqa: E402
 
 app.include_router(_demo_router.router)
+
+# Newsletter subscription (`POST /api/newsletter`). Imported at the bottom for
+# the same reason as the demo router — it imports `get_session` from this module.
+from rogue.api import newsletter as _newsletter_router  # noqa: E402
+
+app.include_router(_newsletter_router.router)
