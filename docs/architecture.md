@@ -116,6 +116,40 @@ This is a real agentic loop, not "for query in queries: requests.get(query)". Th
 
 Every processed URL is recorded (including zero-yield ones — the worst to re-crawl), so the ledger grows monotonically across runs. This prunes cost *before* the fetch/extract spend; the pgvector dedup gate runs *after* and only stops a duplicate from being *stored*. Net: a daily (or 9-day) re-run pays only for **genuinely new or changed** URLs — unchanged ones are skipped, new ones are fetched, changed ones are re-fetched and re-extracted.
 
+## Technique Retrieval Layer (additive — candidate-generator in the reproduce path)
+
+This subsection documents an additive layer inside Layer 4 (REPRODUCE) that sits in front of the contextual scheduler. It does not change the five-layer pipeline shape or any decision in §3 or §13.
+
+**What it does.** As the self-growing attack repertoire scales from ~22 techniques today toward hundreds, scoring every technique on every ladder call becomes the dominant per-run cost. The Technique Retrieval Layer changes this from O(all techniques) to O(K) by inserting a cheap semantic-similarity gate before the scheduler: given a target's capability profile, retrieve the K most relevant techniques first, then let the scheduler rank and order only those.
+
+**Position in the reproduce path:**
+
+```
+target (DeploymentConfig)
+    │
+    ▼  [build_target_fingerprint]
+TargetFingerprint (vendor, family, modality caps, known_successes)
+    │
+    ▼  [TechniqueRetriever — pgvector cosine top-K, MIN_K=25]
+top-K technique labels  ←── technique_embeddings table (migration 0026)
+    │
+    ▼
+contextual scheduler (ladder_priors.order_by_blend)
+    │
+    ▼
+escalation ladder (escalation_ladder.py)
+```
+
+**Key distinction — candidate generator vs ranker.** The retriever answers "which techniques at all?" (candidate generation). The contextual scheduler answers "which technique first?" (ranking). These are kept separate because the retriever is stateless over breach history, while the scheduler is the telemetry consumer. The retriever narrows the field; the scheduler decides the order.
+
+**Components.** All code lives under `src/rogue/retrieval/`. Schemas: `TechniqueProfile` (`src/rogue/schemas/technique_profile.py`) and `TargetFingerprint` (`src/rogue/schemas/target_fingerprint.py`). New DB tables (migration `0026`): `technique_embeddings`, `target_embeddings`, `retrieval_metrics`. Reuses the existing embedding stack: OpenAI text-embedding-3-small, 1536 dimensions, pgvector ivfflat cosine.
+
+**Safety measures.** The `MIN_K=25` floor prevents under-retrieval for cold-start targets. A shadow mode (`ROGUE_RETRIEVAL_SHADOW=1`) measures retrieval quality without changing ladder execution. Activation (`ROGUE_RETRIEVAL_TOPK`) is **disabled by default** this session and is gated on Recall@50 ≥ 80% measured by `evaluate_recall` (offline Recall@K replay of `ladder_attempts` telemetry).
+
+**Non-goal.** This layer does not raise ASR; it reduces per-run cost as the library scales. It introduces no new bandits, RL, LLM-generated rankings, or architectural changes to the scheduler, the escalation ladder, or any other layer.
+
+Full design: `docs/retrieval.md`. Glossary entries: Technique Retrieval System, TechniqueProfile, TargetFingerprint, TechniqueRetriever, MIN_K, Recall@K, retrieval shadow mode, technique_embeddings / target_embeddings / retrieval_metrics.
+
 ## What the reproduce layer actually does (multimodal + escalation)
 
 Layer 4 is more than "send text, judge the reply." Two build-time extensions (§10.7–§10.10) live *inside* the §3 architecture — they enrich Layer 4, they do not redesign the five layers:
@@ -123,6 +157,24 @@ Layer 4 is more than "send text, judge the reply." Two build-time extensions (§
 - **True multimodal rendering.** `instantiator.render()` turns an attack into the modality its `vector` demands — text, a real **image** (typographic / OCR / MML / VPI / EXIF), spoken **audio** (TTS + acoustic styles), or **structured-data** (JSON/CSV/YAML/XML) injection — all deterministic renderers under `reproduce/modality_renderers/` (+ `structured_data.py`, `coj.py`). `target_panel` attaches image/audio as provider-specific content blocks, gated by per-model capability (`supports_image` / `supports_audio`). This is the real multimodal path that replaced the project's earlier text-only-pretending-to-be-multimodal stub.
 - **Auto-escalation ladder.** A refused (EVADE-band) attack can be escalated through a 5-tier ladder that **stops at the first breach**: image renderers → CoJ edit-step decomposition → structured-data → audio → planner-authored multi-turn escalation (crescendo → actor_attack → acronym). Runs standalone (`synthesize_escalations.py --ladder`) or **inline in reproduce** (`reproduce_once.py --escalate`, bounded by `--escalate-max-spend`). Tiers 1–4 are planner-free, so the ladder works even when the escalation planner refuses; the planner backbone auto-falls-back to a less-aligned model.
 - **Roadmap (§10.10).** A contextual Thompson bandit will reorder the ladder to try the likely-winning strategy first — the "how to break" counterpart to the harvest "what to harvest" bandit.
+
+## Grammar Component Analysis (observational)
+
+This subsection documents a measurement layer that is purely additive to the five-layer pipeline and to the frozen §3/§13 design decisions. It does not change `AttackFamily`, `AttackVector`, or any other locked taxonomy, and does not generate new attacks or spend on API calls.
+
+**What it is.** An observational, $0, read-only predictive-power study that tests the hypothesis behind any Technique-AST or synthetic-generation roadmap: do grammar components — and their combinations — actually predict breach outcomes? The analysis labels each existing `AttackPrimitive` with structural `GrammarNode`s, joins those labels to breach outcomes from `breach_matrix`, and measures per-node lift and pairwise synergy with appropriate confound controls.
+
+**Why it is needed before building.** Building a Technique-AST compositor (a system that assembles new attacks by combining structural grammar nodes) costs months of engineering. If grammar nodes do not independently predict breach — i.e., if knowing that a primitive has `AUTHORITY_FRAME` + `TRIGGER_BACKDOOR` does not move the breach probability beyond what `AttackFamily` already captures — then the whole premise of composition is empirically unfounded and the build should not happen. A null result saves months. A positive result (at least one cross-family node with FDR-significant lift that survives family stratification) validates the premise with real data before any engineering investment.
+
+**Position in the architecture.** This is a measurement layer below Layer 2 (EXTRACT) and beside Layer 4 (REPRODUCE). It reads `attack_primitives` (from Layer 2) and `breach_results` (from Layer 4) but writes nothing back to either table. It uses a dedicated side table — `primitive_grammar_labels` (migration `0027`) — to store labels without touching the frozen schema.
+
+**The `GrammarNode` layer vs `AttackFamily`.** `AttackFamily` (15 members, locked Day 0, §13 frozen) classifies *what* an attack attempts. `GrammarNode` (23 members) classifies *how* an attack is structurally constructed — derived from `payload_slots` keys (e.g. `authority_claim`, `trigger_phrase`, `exfil_destination`, `encoding_scheme`) and from `requires_multi_turn`. This is a deliberately different abstraction layer: a cross-family node like `AUTHORITY_FRAME` fires across `role_hijack`, `refusal_suppression`, `indirect_prompt_injection`, and `direct_instruction_override` — the cross-family firing pattern is what makes the signal non-circular and what would justify using nodes as composition primitives for a generator.
+
+**Analysis unit.** The per-(primitive × target) outcome (~1540 pairs across ~298 primitives × ~6 configs) rather than the per-primitive level. The per-primitive ANY-breach base rate is ~0.79 in a 6-model panel, a ceiling that washes out all contrast. The per-(primitive × target) outcome has real spread and is the correct unit.
+
+**Confound controls.** (1) Family collinearity: family-mirroring nodes (those derived directly from `family`) are flagged as near-circular and their lift is interpreted accordingly; Mantel–Haenszel stratification tests whether cross-family structural nodes show lift after controlling for `AttackFamily`. (2) Multiple comparisons: Benjamini–Hochberg FDR correction applied across all 23 per-node Fisher exact p-values. (3) Judge-version caveat: `breach_matrix` is graded by the v1/v2 judge (over-reports vs v3); all breach signals inherit that bias and are treated as v1/v2-baseline.
+
+**File map.** `src/rogue/schemas/grammar_node.py` (enum + wire type) · `src/rogue/grammar/` (`dataset.py`, `labeler.py`, `stats.py`, `combinations.py`) · migration `0027` · `docs/grammar_efficacy.md` (full design + methodology).
 
 ## What we deliberately do NOT do
 

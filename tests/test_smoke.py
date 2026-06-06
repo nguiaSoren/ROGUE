@@ -95,7 +95,10 @@ def test_models_metadata_has_expected_tables() -> None:
     governed renderer lifecycle, migration 0015) added 2026-06-02.
     ``ladder_attempts`` (§10.9 orchestration-trace telemetry, migration 0017)
     added 2026-06-02. ``ladder_rotation_membership`` (§10.10 Phase 2.1 reachability
-    telemetry, migration 0019) added 2026-06-03. Add new entries here when migrations
+    telemetry, migration 0019) added 2026-06-03. ``technique_embeddings``,
+    ``target_embeddings`` and ``retrieval_metrics`` (Technique Retrieval System,
+    migration 0026) added 2026-06-06. ``primitive_grammar_labels`` (grammar-component
+    study, migration 0027) added 2026-06-06. Add new entries here when migrations
     add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
@@ -117,14 +120,18 @@ def test_models_metadata_has_expected_tables() -> None:
         "memberships",
         "organizations",
         "pair_refinement_steps",
+        "primitive_grammar_labels",
         "primitive_images",
         "projects",
         "renderer_capabilities",
         "reports",
+        "retrieval_metrics",
         "scan_jobs",
         "scan_runs",
         "secrets",
         "source_provenances",
+        "target_embeddings",
+        "technique_embeddings",
         "users",
     ]
 
