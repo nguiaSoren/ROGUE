@@ -213,7 +213,7 @@ export default function ResearchPage() {
                   $0 observational study over 1,540 (primitive × target) cells
                 </span>{" "}
                 tested whether grammar-structure nodes predict breach{" "}
-                <em>beyond</em> attack-family membership, with full confound
+                <em>beyond</em>{" "}attack-family membership, with full confound
                 controls: Benjamini-Hochberg FDR across hundreds of node/pair
                 tests, Mantel-Haenszel stratification by target model,
                 within-family lift, and Cramér&rsquo;s-V collinearity flagging.

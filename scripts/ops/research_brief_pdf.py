@@ -1,8 +1,9 @@
 """Generate the ROGUE research-brief PDF served at /research and attachable to
 outreach emails.
 
-A clean, academic 2-page brief (white background, not the dark site theme) of the
-four measured findings + limitations. All numbers are verbatim from the measured
+A designed, readable 2-page brief: dark header band, metric chips, boxed
+"why this is notable" callouts, clean bullets, a footer rule. White page so it
+prints/reads well for an academic. All numbers are verbatim from the measured
 work (mirror of `frontend/src/app/research/page.tsx`). Writes to
 `frontend/public/rogue-research-brief.pdf` (Next serves it at
 `/rogue-research-brief.pdf`).
@@ -14,197 +15,262 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reportlab.lib.colors import HexColor
+from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    HRFlowable,
     ListFlowable,
     ListItem,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
+    Table,
+    TableStyle,
 )
 
 _ROOT = Path(__file__).resolve().parents[2]
 _OUT = _ROOT / "frontend" / "public" / "rogue-research-brief.pdf"
 
-GREEN = HexColor("#1f9d55")
-INK = HexColor("#16181d")
-MUTED = HexColor("#52565e")
+GREEN = colors.HexColor("#1f9d55")
+INK = colors.HexColor("#14161b")
+BODY = colors.HexColor("#23262d")
+MUTED = colors.HexColor("#5b6views" if False else "#5b6068")
+LIGHT = colors.HexColor("#f3f6f4")
+CHIPBG = colors.HexColor("#eef3f0")
+LINE = colors.HexColor("#d8ddd9")
+
+MARGIN = 0.8 * inch
+CONTENT_W = LETTER[0] - 2 * MARGIN
 
 
 def _styles() -> dict[str, ParagraphStyle]:
     base = getSampleStyleSheet()
     return {
-        "title": ParagraphStyle(
-            "t", parent=base["Title"], fontName="Helvetica-Bold",
-            fontSize=20, leading=24, textColor=INK, spaceAfter=2,
-        ),
-        "sub": ParagraphStyle(
-            "s", parent=base["Normal"], fontName="Helvetica",
-            fontSize=10.5, leading=14, textColor=MUTED, spaceAfter=2,
-        ),
-        "meta": ParagraphStyle(
-            "m", parent=base["Normal"], fontName="Helvetica",
-            fontSize=8.5, leading=12, textColor=MUTED,
-        ),
-        "eyebrow": ParagraphStyle(
-            "e", parent=base["Normal"], fontName="Helvetica-Bold",
-            fontSize=8, leading=11, textColor=GREEN, spaceBefore=10, spaceAfter=2,
-        ),
-        "h": ParagraphStyle(
-            "h", parent=base["Heading2"], fontName="Helvetica-Bold",
-            fontSize=12, leading=15, textColor=INK, spaceAfter=3,
-        ),
-        "body": ParagraphStyle(
-            "b", parent=base["Normal"], fontName="Helvetica",
-            fontSize=9.5, leading=13.5, textColor=INK, alignment=TA_LEFT, spaceAfter=4,
-        ),
-        "note": ParagraphStyle(
-            "n", parent=base["Normal"], fontName="Helvetica-Oblique",
-            fontSize=9, leading=12.5, textColor=MUTED, leftIndent=10, spaceAfter=4,
-        ),
-        "li": ParagraphStyle(
-            "li", parent=base["Normal"], fontName="Helvetica",
-            fontSize=9.5, leading=13, textColor=INK,
-        ),
+        "brand": ParagraphStyle("brand", parent=base["Normal"], fontName="Helvetica-Bold",
+                                fontSize=17, leading=20, textColor=colors.white),
+        "tagline": ParagraphStyle("tag", parent=base["Normal"], fontName="Helvetica",
+                                  fontSize=9, leading=13, textColor=colors.HexColor("#aeb6b0")),
+        "meta": ParagraphStyle("meta", parent=base["Normal"], fontName="Helvetica",
+                               fontSize=8.5, leading=12, textColor=MUTED),
+        "h": ParagraphStyle("h", parent=base["Normal"], fontName="Helvetica-Bold",
+                            fontSize=12.5, leading=15.5, textColor=INK, spaceBefore=14, spaceAfter=5),
+        "body": ParagraphStyle("body", parent=base["Normal"], fontName="Helvetica",
+                               fontSize=10, leading=14.5, textColor=BODY, alignment=TA_LEFT, spaceAfter=5),
+        "chipval": ParagraphStyle("cv", parent=base["Normal"], fontName="Helvetica-Bold",
+                                  fontSize=12.5, leading=15, textColor=GREEN),
+        "chiplbl": ParagraphStyle("cl", parent=base["Normal"], fontName="Helvetica",
+                                  fontSize=7, leading=9, textColor=MUTED),
+        "notelbl": ParagraphStyle("nl", parent=base["Normal"], fontName="Helvetica-Bold",
+                                  fontSize=7.5, leading=10, textColor=GREEN),
+        "note": ParagraphStyle("note", parent=base["Normal"], fontName="Helvetica",
+                               fontSize=9, leading=13, textColor=colors.HexColor("#41454c")),
+        "li": ParagraphStyle("li", parent=base["Normal"], fontName="Helvetica",
+                             fontSize=10, leading=14, textColor=BODY),
+        "limit": ParagraphStyle("lim", parent=base["Normal"], fontName="Helvetica",
+                                fontSize=9.5, leading=13.5, textColor=colors.HexColor("#41454c")),
     }
 
 
+S = _styles()
+b = lambda x: f"<b>{x}</b>"  # noqa: E731
+
+
+def _header() -> Table:
+    cell = [
+        Paragraph('<font color="#1f9d55">ROGUE</font>  ·  Research Brief', S["brand"]),
+        Paragraph(
+            "A solo research build of a continuous open-web LLM red-team. "
+            "The methods and the measured results, including the negative ones.",
+            S["tagline"],
+        ),
+    ]
+    t = Table([[cell]], colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), INK),
+        ("LEFTPADDING", (0, 0), (-1, -1), 16),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+        ("TOPPADDING", (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LINEBELOW", (0, 0), (-1, -1), 3, GREEN),
+    ]))
+    return t
+
+
+def _chips(items: list[tuple[str, str]]) -> Table:
+    cells = [[Paragraph(v, S["chipval"]), Spacer(1, 2), Paragraph(lbl.upper(), S["chiplbl"])]
+             for v, lbl in items]
+    w = CONTENT_W / len(items)
+    t = Table([cells], colWidths=[w] * len(items))
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), CHIPBG),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEAFTER", (0, 0), (-2, -1), 1, colors.white),
+        ("LINEBELOW", (0, 0), (-1, -1), 2, GREEN),
+    ]))
+    return t
+
+
+def _note(text: str) -> Table:
+    inner = [Paragraph("WHY THIS IS NOTABLE", S["notelbl"]), Spacer(1, 2), Paragraph(text, S["note"])]
+    t = Table([[inner]], colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("LINEBEFORE", (0, 0), (0, -1), 2.5, GREEN),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return t
+
+
+def _heading(num: str, title: str) -> Paragraph:
+    return Paragraph(f'<font color="#1f9d55"><b>{num}</b></font>&nbsp;&nbsp;{b(title)}', S["h"])
+
+
+def _footer(canvas, doc) -> None:
+    canvas.saveState()
+    y = 0.55 * inch
+    canvas.setStrokeColor(LINE)
+    canvas.setLineWidth(0.6)
+    canvas.line(MARGIN, y + 12, LETTER[0] - MARGIN, y + 12)
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(MUTED)
+    canvas.drawString(MARGIN, y, "Soren Obounou Nguia  ·  rogue-eosin.vercel.app/research")
+    canvas.setFillColor(GREEN)
+    canvas.drawRightString(LETTER[0] - MARGIN, y, f"{doc.page}")
+    canvas.restoreState()
+
+
 def build() -> Path:
-    S = _styles()
     doc = SimpleDocTemplate(
         str(_OUT), pagesize=LETTER,
-        leftMargin=0.85 * inch, rightMargin=0.85 * inch,
-        topMargin=0.7 * inch, bottomMargin=0.65 * inch,
+        leftMargin=MARGIN, rightMargin=MARGIN, topMargin=0.6 * inch, bottomMargin=0.85 * inch,
         title="ROGUE — Research Brief", author="Soren Obounou Nguia",
     )
-    F: list = []
+    F: list = [
+        _header(),
+        Spacer(1, 7),
+        Paragraph(
+            "Soren Obounou Nguia &nbsp;·&nbsp; Seoul &nbsp;·&nbsp; nguiasoren@gmail.com "
+            "&nbsp;·&nbsp; live evidence at /matrix, /analytics, /about",
+            S["meta"],
+        ),
+        Spacer(1, 10),
+    ]
 
-    def eyebrow(t: str) -> None:
-        F.append(Paragraph(t.upper(), S["eyebrow"]))
-
-    def h(t: str) -> None:
-        F.append(Paragraph(t, S["h"]))
-
-    def p(t: str) -> None:
-        F.append(Paragraph(t, S["body"]))
-
-    def note(t: str) -> None:
-        F.append(Paragraph("<b>Why this is notable.</b> " + t, S["note"]))
-
-    bold = lambda x: f'<font color="#16181d"><b>{x}</b></font>'  # noqa: E731
-
-    F.append(Paragraph("ROGUE — Research Brief", S["title"]))
-    F.append(Paragraph(
-        "A solo research build of a continuous open-web LLM red-team. "
-        "The methods and the measured results — including the negative ones.",
-        S["sub"],
-    ))
-    F.append(Spacer(1, 4))
-    F.append(Paragraph(
-        "Soren Obounou Nguia · Seoul · nguiasoren@gmail.com · "
-        '<font color="#1f9d55">rogue-eosin.vercel.app/research</font> · '
-        "live evidence: /matrix · /analytics · /about",
-        S["meta"],
-    ))
-    F.append(Spacer(1, 6))
-    F.append(HRFlowable(width="100%", thickness=0.8, color=GREEN, spaceAfter=8))
-
-    eyebrow("Finding 01 — calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it")
-    p(
+    # 01
+    F += [_heading("01", "Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it.")]
+    F += [Paragraph(
         "Every breach verdict is an LLM judgment, so the judge is the load-bearing weakness. It was "
-        "validated four ways — three against independent human-annotated benchmarks: blind stratified "
+        "validated four ways, three against independent human-annotated benchmarks: blind stratified "
         "in-distribution hand-labels, WildGuardTest (Allen AI annotators), StrongREJECT, and "
         "JailbreakBench&rsquo;s <i>judge_comparison</i> (300 human-labeled rows against four field "
-        "classifiers). JBB exposed over-flagging: the v1 judge agreed with the human majority only "
-        + bold("70.3% &mdash; last of five") + " (behind HarmBench / LlamaGuard-2 / GPT-4 / Llama-3), at "
-        "recall 98% / precision 55%."
-    )
-    p(
-        "A 20-row false-positive audit diagnosed " + bold("five recurring failure modes") + "; the root "
-        "cause was a <i>rubric</i> problem &mdash; it rewarded engagement with the attack frame "
-        "(persona acceptance, acknowledgment, format mimicry) over transfer of harmful content. A "
-        + bold("content-transfer-gate rubric (v3)") + " moved the same 300 rows to "
-        + bold("89.3% agreement / 79.5% precision / 95.5% recall") + " (+19 / +24.5 / &minus;2.5 pp) &mdash; "
-        "dead-last to 3rd of five, tied with the frontier classifiers &mdash; for ~$8.4 via a tiered "
-        "evaluation. Then the honest part: re-judging the stored breach matrix under v3 "
-        + bold("dropped breach cells 2,429 to 1,371 (&minus;43.6%)") + ", correcting prior over-reporting "
-        "(all three external axes re-measured under v3: WildGuard harm 88.5%, StrongREJECT inflation &minus;26%)."
-    )
-    note(
+        "classifiers). JailbreakBench exposed over-flagging: the v1 judge agreed with the human majority "
+        "only " + b("70.3%, last of five") + " (behind HarmBench, LlamaGuard-2, GPT-4, Llama-3), at recall "
+        "98% and precision 55%.", S["body"])]
+    F += [Paragraph(
+        "A 20-row false-positive audit traced it to " + b("five recurring failure modes") + ". The root "
+        "cause was a <i>rubric</i> problem: it rewarded engagement with the attack frame (persona "
+        "acceptance, acknowledgment, format mimicry) over transfer of harmful content. A "
+        + b("content-transfer-gate rubric (v3)") + " moved the same 300 rows to "
+        + b("89.3% agreement, 79.5% precision, 95.5% recall") + " (a 19-point agreement gain, 24.5-point "
+        "precision gain, 2.5-point recall cost), lifting it from last to 3rd of five and tied with the "
+        "frontier classifiers, for about $8.4 via a tiered evaluation.", S["body"])]
+    F += [Paragraph(
+        "Then the honest part. Re-judging the stored breach matrix under v3 cut breach cells from "
+        + b("2,429 to 1,371, a 43.6% reduction") + ", correcting prior over-reporting. All three external "
+        "axes were re-measured under v3 (WildGuard harm 88.5%; StrongREJECT 26% more conservative).", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("70.3 → 89.3%", "JBB human agreement"),
+        ("55 → 79.5%", "precision"),
+        ("2,429 → 1,371", "breach cells re-judged"),
+        ("2.56%", "in-dist false-positive"),
+    ]), Spacer(1, 6)]
+    F += [_note(
         "A named false-positive taxonomy for a safety judge, plus a measured finding that two respected "
-        "benchmarks (WildGuardTest harm labels, StrongREJECT) themselves <i>over-count</i> relative to a "
-        "strict content-transfer standard."
-    )
+        "benchmarks (WildGuardTest harm labels and StrongREJECT) themselves <i>over-count</i> relative to a "
+        "strict content-transfer standard.")]
 
-    eyebrow("Finding 02 — scheduling as a capability lever, not just an optimization")
-    p(
-        "A within-tier greedy reorder was replaced with a " + bold("target-conditioned cross-tier scheduler")
-        + " &mdash; a static, explainable blend (0.5&middot;global + 0.3&middot;vendor + 0.2&middot;family "
-        "breach-rate, Laplace-smoothed, deliberately no ML / no bandit so it stays reproducible). A "
-        "single-variable controlled experiment (same ladder, attacks, corpus, judge, and target &mdash; "
-        "Claude Haiku, AdvBench + JailbreakBench; only the order changed) beat the production baseline on "
-        "every axis: " + bold("median winner-rank 22 to 11&ndash;13.5") + ", "
-        + bold("attack-success-rate 50% to 60%") + ", and " + bold("cost-per-success $1.25 to $0.74 (&minus;41%)") + "."
-    )
-    note(
-        "The mechanism: rank&darr; <i>caused</i> ASR&uarr; &mdash; the old order exhausted the per-scan "
-        "budget cap before reaching the winning technique &mdash; so reordering improved coverage, cost, "
-        "and latency at once with zero new attacks. The reproducibility invariant is "
-        "&ldquo;reorder, never exclude&rdquo;: same ladder, different order, full reachability preserved."
-    )
+    # 02
+    F += [_heading("02", "Scheduling as a capability lever, not just an optimization.")]
+    F += [Paragraph(
+        "A within-tier greedy reorder was replaced with a " + b("target-conditioned cross-tier scheduler") +
+        ": a static, explainable blend (0.5 global, 0.3 vendor, 0.2 family breach-rate; Laplace-smoothed; "
+        "deliberately no ML and no bandit, so it stays reproducible). A single-variable controlled "
+        "experiment (same ladder, attacks, corpus, judge, and target on Claude Haiku across AdvBench and "
+        "JailbreakBench, with only the order changed) beat the production baseline on every axis: "
+        + b("median winner-rank 22 → 11&ndash;13.5") + ", " + b("attack-success-rate 50% → 60%") +
+        ", and " + b("cost-per-success $1.25 → $0.74 (41% cheaper)") + ".", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("22 → 11", "median winner-rank"),
+        ("50 → 60%", "attack-success-rate"),
+        ("41% cheaper", "cost per success"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "The mechanism is the interesting part: a lower rank <i>caused</i> a higher success rate. The old "
+        "order exhausted the per-scan budget cap before reaching the winning technique, so reordering "
+        "improved coverage, cost, and latency at once with zero new attacks. The reproducibility invariant "
+        "is &ldquo;reorder, never exclude&rdquo;: same ladder, different order, full reachability preserved.")]
 
-    eyebrow("Finding 03 — a publication-grade null result: grammar-component predictive power")
-    p(
-        "Before building a grammar/AST attack-composition engine, a " + bold("$0 observational study over "
-        "1,540 (primitive &times; target) cells") + " tested whether grammar-structure nodes predict breach "
+    # 03
+    F += [_heading("03", "A publication-grade null result: grammar-component predictive power.")]
+    F += [Paragraph(
+        "Before building a grammar/AST attack-composition engine, a " + b("$0 observational study over "
+        "1,540 (primitive × target) cells") + " tested whether grammar-structure nodes predict breach "
         "<i>beyond</i> attack-family membership, with full confound controls: Benjamini&ndash;Hochberg FDR "
-        "across hundreds of node/pair tests, Mantel&ndash;Haenszel stratification by target model, "
-        "within-family lift, and Cram&eacute;r&rsquo;s-V collinearity flagging. Verdict "
-        + bold("weak/none") + " &mdash; the family label carries the predictive weight; cross-family "
-        "structural nodes show ~1.0&ndash;1.1&times; non-significant lift, and the striking pre-FDR pairwise "
-        "synergies (odds ratios up to 16.8) survived " + bold("none") + " of the four controls."
-    )
-    note(
-        "A cheap, rigorous falsification that redirected engineering away from a months-long build "
-        "&mdash; a successful negative result."
-    )
+        "across hundreds of node and pair tests, Mantel&ndash;Haenszel stratification by target model, "
+        "within-family lift, and Cram&eacute;r&rsquo;s-V collinearity flagging. The verdict was "
+        + b("weak to none") + ": the family label carries the predictive weight, cross-family structural "
+        "nodes show roughly 1.0 to 1.1× non-significant lift, and the striking pre-FDR pairwise "
+        "synergies (odds ratios up to 16.8) survived " + b("none") + " of the four controls.", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("1,540", "cells, $0 study"),
+        ("~1.0–1.1×", "cross-family lift (n.s.)"),
+        ("0 of 4", "synergies survived controls"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "A cheap, rigorous falsification that redirected engineering away from a months-long build: "
+        "a successful negative result.")]
 
-    eyebrow("Finding 04 — measure-before-build discipline")
-    p(
-        "$0 measurements from existing telemetry were used repeatedly to <i>invert</i> &ldquo;build it&rdquo; "
-        "decisions, each parked with an explicit trigger-to-revisit:"
-    )
-    F.append(ListFlowable(
-        [
-            ListItem(Paragraph(
-                bold("Per-model ladder routing") + " &mdash; the spread was a model main effect, not a "
-                "family&times;model interaction, so it was not worth the rewrite.", S["li"]), value="–"),
-            ListItem(Paragraph(
-                bold("LLM renderer-synthesis") + " &mdash; synthesis-grade backlog flat at 7 across two "
-                "widening harvests, so it was parked.", S["li"]), value="–"),
-            ListItem(Paragraph(
-                bold("HF jailbreak-dataset bulk-import") + " &mdash; measured 0 new attack families, so it "
-                "was declined.", S["li"]), value="–"),
-        ],
-        bulletType="bullet", start="–", leftIndent=14, spaceAfter=4,
-    ))
+    # 04
+    F += [_heading("04", "Measure-before-build discipline.")]
+    F += [Paragraph(
+        "$0 measurements from existing telemetry were used repeatedly to <i>invert</i> &ldquo;build "
+        "it&rdquo; decisions, each parked with an explicit trigger to revisit:", S["body"])]
+    F += [ListFlowable([
+        ListItem(Paragraph(b("Per-model ladder routing.") + " The spread was a model main effect, not a "
+                           "family×model interaction, so it was not worth the rewrite.", S["li"]),
+                 leftIndent=14, value="circle"),
+        ListItem(Paragraph(b("LLM renderer-synthesis.") + " The synthesis-grade backlog stayed flat at 7 "
+                           "across two widening harvests, so it was parked.", S["li"]),
+                 leftIndent=14, value="circle"),
+        ListItem(Paragraph(b("HF jailbreak-dataset bulk-import.") + " It measured 0 new attack families, so "
+                           "it was declined.", S["li"]), leftIndent=14, value="circle"),
+    ], bulletType="bullet", bulletColor=GREEN, bulletFontSize=6, spaceAfter=6)]
 
-    F.append(Spacer(1, 4))
-    F.append(HRFlowable(width="100%", thickness=0.6, color=MUTED, spaceAfter=6))
-    eyebrow("Limitations (stated plainly)")
-    p(
-        "Targets are black-box live-API models whose versions are not pinned; some cells are small-n "
-        "(95% bootstrap CIs are persisted precisely because of this); the judge is "
+    # limitations
+    F += [Spacer(1, 8)]
+    lim = [Paragraph("LIMITATIONS, STATED PLAINLY", S["notelbl"]), Spacer(1, 3), Paragraph(
+        "Targets are black-box live-API models whose versions are not pinned. Some cells are small-n "
+        "(95% bootstrap confidence intervals are persisted precisely because of this). The judge is "
         "single-operator-calibrated. These are descriptive measurements of a live system, not validated "
-        "generalizations."
-    )
+        "generalizations.", S["limit"])]
+    box = Table([[lim]], colWidths=[CONTENT_W])
+    box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 14), ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+        ("TOPPADDING", (0, 0), (-1, -1), 11), ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.5, GREEN),
+    ]))
+    F += [box]
 
-    doc.build(F)
+    doc.build(F, onFirstPage=_footer, onLaterPages=_footer)
     return _OUT
 
 
