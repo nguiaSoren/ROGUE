@@ -19,7 +19,7 @@ export function MiniMatrix({ matrix }: { matrix: BreachMatrixResponse | null }) 
           /matrix
         </p>
         <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-          {"// no breach data yet — run scripts/reproduce/reproduce_once.py to seed"}
+          {"// no breach data yet, run scripts/reproduce/reproduce_once.py to seed"}
         </p>
       </Link>
     );

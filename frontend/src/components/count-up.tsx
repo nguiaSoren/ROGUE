@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 /**
  * Client-side count-up animation. Tickers from 0 to `value` over `duration`.
  *
- * Uses an ease-out curve so the number snaps in fast then slows — feels
+ * Uses an ease-out curve so the number snaps in fast then slows, feels
  * "alive" instead of linear/mechanical. Pure setTimeout loop; no library.
  *
  * Use for the hero KPI numbers + any place where a static integer benefits

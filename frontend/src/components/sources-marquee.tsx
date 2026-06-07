@@ -9,9 +9,9 @@ import { plainifyYield } from "@/lib/plain-numbers";
  * open-web sources. The spotlight surfaces ROGUE's two BD-aligned
  * differentiators that the BD CEO outreach made explicit:
  *
- *   1. Cost-effectiveness — the §11.6 ε-greedy bandit measures bytes-of-
+ *   1. Cost-effectiveness, the §11.6 ε-greedy bandit measures bytes-of-
  *      novel-intel per dollar of BD spend and self-tunes its query mix.
- *   2. Reliability + breadth — ROGUE uses all 5 BD products with documented
+ *   2. Reliability + breadth, ROGUE uses all 5 BD products with documented
  *      fallback paths (Scraping Browser → SERP, MCP → Unlocker, etc.).
  *
  * The marquee below pauses on hover so demo viewers can read entries.
@@ -48,7 +48,7 @@ export function SourcesMarquee({
   // Duplicate the list so the marquee can loop seamlessly with translateX(-50%).
   const doubled = [...SOURCES, ...SOURCES];
 
-  // The bandit is the cost-optimization story — full hero treatment.
+  // The bandit is the cost-optimization story, full hero treatment.
   const hotArm = bandit?.top_arms?.[0];
   const coldArm = bandit?.bottom_arms?.[0];
   const hotYield = hotArm ? hotArm.mean_yield.toFixed(2) : null;
@@ -58,7 +58,7 @@ export function SourcesMarquee({
       : null;
   const plainBandit = hotArm
     ? plainifyYield(hotArm.mean_yield)
-    : "bandit warming up — first pulls in progress";
+    : "bandit warming up, first pulls in progress";
 
   return (
     <section className="space-y-6">
@@ -74,7 +74,7 @@ export function SourcesMarquee({
         <p className="text-base text-muted-foreground max-w-2xl leading-relaxed">
           Most red-team tools scrape one platform and hope it stays free.
           ROGUE fans out across the entire Bright Data product line and lets
-          a bandit decide where to spend the next dollar — automatically.
+          a bandit decide where to spend the next dollar, automatically.
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export function SourcesMarquee({
           {/* The hero number */}
           <div className="space-y-1 min-w-0">
             <p className="text-5xl sm:text-6xl md:text-7xl font-bold tabular-nums leading-none text-rogue-green">
-              {hotYield ?? "—"}
+              {hotYield ?? ", "}
             </p>
             <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-foreground mt-2">
               novel attacks per $1 BD spend
@@ -122,7 +122,7 @@ export function SourcesMarquee({
             </p>
           </div>
 
-          {/* How it works — the BD CEO answer */}
+          {/* How it works, the BD CEO answer */}
           <div className="space-y-3 text-sm leading-relaxed">
             <p>
               <span className="font-semibold text-foreground">
@@ -148,18 +148,18 @@ export function SourcesMarquee({
                 seeded{" "}
                 {bandit.seeded_from_corpus_at
                   ? bandit.seeded_from_corpus_at.slice(0, 10)
-                  : "—"}
+                  : ", "}
                 {" · live pulls since "}
                 {bandit.last_live_pulled_at
                   ? bandit.last_live_pulled_at.slice(0, 10)
-                  : "—"}
+                  : ", "}
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* 3 supporting metric tiles (bandit dropped — it's the hero now) -- */}
+      {/* 3 supporting metric tiles (bandit dropped, it's the hero now) -- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 animate-rogue-fade-up">
         <MetricTile
           value="5 / 5"
@@ -194,7 +194,7 @@ export function SourcesMarquee({
         />
       </div>
 
-      {/* Sources marquee — single visual representation of the source     */}
+      {/* Sources marquee, single visual representation of the source     */}
       {/* roster; the per-product card grid was removed as it duplicated  */}
       {/* the "via X" labels in the marquee chips below.                  */}
       <div className="space-y-2">

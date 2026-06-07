@@ -7,7 +7,7 @@ import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
  *
  * Extracted from the inline definition in feed/page.tsx so each arm row can
  * own its own hover-card with the full per-arm breakdown (pulls, novel,
- * cost, mean yield). Hover-card is pure CSS — no state, no client boundary.
+ * cost, mean yield). Hover-card is pure CSS, no state, no client boundary.
  */
 export function BanditWidget({
   bandit,
@@ -100,7 +100,7 @@ function BanditRow({
         </span>
       </div>
 
-      {/* Hover-card — pure CSS, opens below the row. */}
+      {/* Hover-card, pure CSS, opens below the row. */}
       <div className="hidden group-hover:block absolute left-0 right-0 z-30 mt-1 p-3 rounded-md border border-rogue-green/40 bg-black/90 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.6)] space-y-2 animate-rogue-fade-up">
         <p
           className={`text-[10px] font-mono uppercase tracking-[0.18em] ${
@@ -128,7 +128,7 @@ function BanditRow({
         <p className="text-[10px] text-muted-foreground/80 font-mono leading-snug pt-1 border-t border-border/50">
           {isWarm
             ? "// next pull biased by ε-greedy: 90% pick the hottest arm, 10% explore."
-            : "// untested arm — guaranteed at least one cold-start pull before ε-greedy kicks in."}
+            : "// untested arm, guaranteed at least one cold-start pull before ε-greedy kicks in."}
         </p>
       </div>
     </li>

@@ -9,7 +9,7 @@ import { plainifyAttackCount, plainifyTrials } from "@/lib/plain-numbers";
  * read: one massive headline, a rotating-word subhead (the threats ROGUE
  * watches), a single high-contrast CTA, and a scroll cue.
  *
- * Server component — no interactivity, all motion is CSS keyframes so
+ * Server component, no interactivity, all motion is CSS keyframes so
  * there's no JS hydration penalty before the first paint.
  */
 export function CinematicHero({
@@ -83,11 +83,11 @@ export function CinematicHero({
           </span>
           . Harvests every new jailbreak from{" "}
           <span className="text-foreground font-medium">19 open-web sources</span>,
-          reproduces each one against your stack, and ships a daily brief —
+          reproduces each one against your stack, and ships a daily brief, 
           on a budget the bandit auto-tunes for you.
         </p>
 
-        {/* Product value line — the "what you actually buy" one-liner */}
+        {/* Product value line, the "what you actually buy" one-liner */}
         <p
           className="text-base md:text-lg max-w-2xl leading-relaxed animate-rogue-reveal"
           style={{ animationDelay: "0.3s" }}
@@ -96,11 +96,11 @@ export function CinematicHero({
             Point ROGUE at your LLM endpoint.
           </span>{" "}
           <span className="text-muted-foreground">
-            Get a report of which jailbreaks break it — and how to fix them.
+            Get a report of which jailbreaks break it, and how to fix them.
           </span>
         </p>
 
-        {/* Hero stat trio — the "this is alive" proof */}
+        {/* Hero stat trio, the "this is alive" proof */}
         <div
           className="grid grid-cols-3 gap-3 md:gap-6 max-w-2xl animate-rogue-reveal"
           style={{ animationDelay: "0.35s" }}
@@ -188,7 +188,7 @@ function HeroStat({
       <p
         className={`text-2xl sm:text-3xl md:text-4xl font-bold tabular-nums leading-none ${tintClass}`}
       >
-        {value !== null ? value.toLocaleString() : "—"}
+        {value !== null ? value.toLocaleString() : ", "}
       </p>
       <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground mt-2">
         {label}

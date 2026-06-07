@@ -6,16 +6,16 @@ import { StatCard } from "@/components/marketing/stat-card";
 import { PROOF_POINTS } from "@/lib/proof";
 
 export const metadata = {
-  title: "About — ROGUE",
+  title: "About, ROGUE",
   description:
-    "ROGUE is an autonomous open-web LLM red-team agent — built solo by Soren Nguia for the Bright Data × lablab.ai hackathon, now a hosted platform live in production. Mission: make LLM deployments secure by default.",
+    "ROGUE is an autonomous open-web LLM red-team agent, built solo by Soren Nguia for the Bright Data × lablab.ai hackathon, now a hosted platform live in production. Mission: make LLM deployments secure by default.",
 };
 
 /**
- * /about — the story, mission, and verified numbers behind ROGUE. Strictly
+ * /about, the story, mission, and verified numbers behind ROGUE. Strictly
  * factual: solo-build + hackathon origin + live-in-production. The Grand Prize
  * is the founder's PRIOR award (Yonsei CS Exhibition 2024, for the GPTFuzz
- * LLM-security fuzzer) — NOT a ROGUE/hackathon award; attributed accordingly.
+ * LLM-security fuzzer), NOT a ROGUE/hackathon award; attributed accordingly.
  * Contact is email only (no social links, per founder decision). Server
  * component. All proof numbers come from src/lib/proof.ts.
  */
@@ -27,7 +27,7 @@ export default function AboutPage() {
         <Section
           eyebrow="about"
           title="Built to make LLM deployments secure by default."
-          lede="ROGUE is a continuous, autonomous red-team for large language models. It learns how real attackers break models from the open web, reproduces those attacks against your deployment, and tells you what's exploitable — before someone else finds out."
+          lede="ROGUE is a continuous, autonomous red-team for large language models. It learns how real attackers break models from the open web, reproduces those attacks against your deployment, and tells you what's exploitable, before someone else finds out."
         />
 
         {/* 2. THE STORY --------------------------------------------------- */}
@@ -41,12 +41,12 @@ export default function AboutPage() {
                 Bright Data × lablab.ai &ldquo;Web Data UNLOCKED&rdquo;
                 hackathon
               </span>{" "}
-              in May 2026 — an autonomous open-web LLM red-team agent.
+              in May 2026, an autonomous open-web LLM red-team agent.
             </p>
             <p className="text-base text-muted-foreground leading-relaxed">
               Since the hackathon it has been extended into a hosted,
-              multi-tenant platform — SDK, REST API, dashboard, and an MCP
-              server — that is permanently live in production.
+              multi-tenant platform, SDK, REST API, dashboard, and an MCP
+              server, that is permanently live in production.
             </p>
             <div className="rogue-card border border-border rounded-xl p-5 md:p-6 bg-card/40 backdrop-blur-sm flex gap-4">
               <Trophy
@@ -59,7 +59,7 @@ export default function AboutPage() {
                   Grand Prize · Yonsei University CS Exhibition, 2024
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                  Awarded to the founder for GPTFuzz optimization — an
+                  Awarded to the founder for GPTFuzz optimization, an
                   LLM-security fuzzer. ROGUE is his next LLM-security project,
                   built and run live solo from Seoul, South Korea.
                 </p>
@@ -68,7 +68,7 @@ export default function AboutPage() {
           </div>
         </Section>
 
-        {/* 2b. WHY THIS EXISTS — honest framing: solo research/engineering
+        {/* 2b. WHY THIS EXISTS, honest framing: solo research/engineering
             build, early access, no customers yet. Preempts the "overselling a
             customerless SaaS" read for a technical / hiring audience. ------- */}
         <Section
@@ -84,8 +84,8 @@ export default function AboutPage() {
             <p className="text-base text-muted-foreground leading-relaxed">
               ROGUE is a solo research-and-engineering project, not a funded
               company. It began as a six-day hackathon build and kept getting
-              extended — into a hosted platform, an MCP server, a benchmark
-              layer, a self-recalibrating judge — to see how far one engineer
+              extended, into a hosted platform, an MCP server, a benchmark
+              layer, a self-recalibrating judge, to see how far one engineer
               can take a continuous open-web red-team, end to end and in
               production. It&rsquo;s in{" "}
               <span className="text-foreground font-medium">early access</span>:
@@ -105,7 +105,7 @@ export default function AboutPage() {
               aria-hidden
             />
             <p className="mt-5 text-2xl md:text-3xl font-bold tracking-tight leading-snug">
-              To make LLM deployments secure by default — real-time, autonomous
+              To make LLM deployments secure by default, real-time, autonomous
               threat intelligence enterprises can trust.
             </p>
           </div>
@@ -116,11 +116,11 @@ export default function AboutPage() {
           <div className="max-w-3xl space-y-5">
             <p className="text-base text-muted-foreground leading-relaxed">
               ROGUE harvests, reproduces, and judges LLM jailbreaks and
-              prompt-injection from the open web —{" "}
+              prompt-injection from the open web, {" "}
               <span className="text-foreground font-medium">
                 19 sources across 5 Bright Data products
               </span>{" "}
-              — then surfaces the vulnerabilities and exactly how to fix them
+, then surfaces the vulnerabilities and exactly how to fix them
               before attackers exploit them.
             </p>
             <div className="flex items-start gap-3">
@@ -169,7 +169,7 @@ export default function AboutPage() {
               </p>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Questions, partnerships, or anything else — reach the founder
+              Questions, partnerships, or anything else, reach the founder
               directly at{" "}
               <a
                 href="mailto:nguiasoren@gmail.com"

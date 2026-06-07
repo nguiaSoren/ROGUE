@@ -4,7 +4,7 @@ import { plainifyPP, plainifyRate } from "@/lib/plain-numbers";
 /**
  * Unit tests for the plain-English number translators used across the breach
  * dashboard. These are pure functions (rate/delta in → human phrase out), so
- * they're tested at their threshold boundaries — the only place the mapping can
+ * they're tested at their threshold boundaries, the only place the mapping can
  * silently regress.
  */
 describe("plainifyRate", () => {

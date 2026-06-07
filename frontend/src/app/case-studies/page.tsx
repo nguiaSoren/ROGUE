@@ -4,13 +4,13 @@ import { ArrowRight, FlaskConical } from "lucide-react";
 import { CASE_STUDIES } from "@/content/case-studies";
 
 export const metadata: Metadata = {
-  title: "Case Studies — ROGUE",
+  title: "Case Studies, ROGUE",
   description:
-    "How a ROGUE engagement reads. Two illustrative templates — one seed-stage startup, one enterprise model-risk team — demonstrating the Problem → Deployment → Findings → Remediation → Outcome reporting framework.",
+    "How a ROGUE engagement reads. Two illustrative templates, one seed-stage startup, one enterprise model-risk team, demonstrating the Problem → Deployment → Findings → Remediation → Outcome reporting framework.",
 };
 
 /**
- * /case-studies — index of all case studies.
+ * /case-studies, index of all case studies.
  *
  * Today the store holds two illustrative TEMPLATES (no real customers exist
  * yet). The intro makes that explicit and invites the reader to become the
@@ -32,12 +32,12 @@ export default function CaseStudiesIndex() {
           <p className="text-base text-muted-foreground leading-relaxed">
             We are pre-first-customer, and we will not invent one. The two
             studies below are{" "}
-            <span className="text-foreground font-medium">templates</span> — honest,
+            <span className="text-foreground font-medium">templates</span>, honest,
             generic examples that show exactly how ROGUE reports a red-team
             engagement, section by section: Problem → Deployment → Findings →
             Remediation → Outcome. Every number in them is an illustrative
             placeholder, clearly marked. When we run our first real engagement,
-            its report will land here in this same shape — with real, measured
+            its report will land here in this same shape, with real, measured
             results.
           </p>
 
@@ -46,7 +46,7 @@ export default function CaseStudiesIndex() {
             <FlaskConical className="size-4 text-rogue-green mt-0.5 shrink-0" />
             <p className="text-sm text-muted-foreground leading-relaxed">
               <span className="text-foreground font-medium">
-                These are example templates — not real customer engagements.
+                These are example templates, not real customer engagements.
               </span>{" "}
               They demonstrate ROGUE&apos;s reporting framework using hypothetical,
               generic scenarios.
@@ -91,7 +91,7 @@ export default function CaseStudiesIndex() {
               </p>
               {cs.isTemplate && (
                 <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/80">
-                  Example template — not a real customer engagement
+                  Example template, not a real customer engagement
                 </p>
               )}
               <span className="mt-4 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-rogue-green">

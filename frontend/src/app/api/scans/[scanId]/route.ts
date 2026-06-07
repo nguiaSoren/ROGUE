@@ -1,5 +1,5 @@
 /**
- * GET /api/scans/{scanId} — the poller's endpoint (called by the client ScanProgress component).
+ * GET /api/scans/{scanId}, the poller's endpoint (called by the client ScanProgress component).
  *
  * Forwards to `GET /v1/scans/{id}` with the session key attached server-side, so the live-progress
  * poll never exposes the bearer to the browser.

@@ -5,7 +5,7 @@ import { getApiKey } from "@/lib/session";
 import { ScanProgress } from "@/components/scan-progress";
 
 /**
- * /scans/{scanId} — the scan DETAIL page.
+ * /scans/{scanId}, the scan DETAIL page.
  *
  * Server shell: it owns the route + the initial `ScanRecord` fetch, then hands the
  * live state off to the `"use client"` `ScanProgress` component, which polls
@@ -14,10 +14,10 @@ import { ScanProgress } from "@/components/scan-progress";
  * the first paint is real data, not a spinner.
  *
  * Auth: `(app)/layout.tsx` gates the session; we re-read the key here (server-only)
- * and thread the bearer into the seed fetch. The client poller never sees it — it
+ * and thread the bearer into the seed fetch. The client poller never sees it, it
  * polls the same-origin `/api/scans/{id}` route, which re-attaches the bearer.
  */
-export const dynamic = "force-dynamic"; // tenant data — never statically cached
+export const dynamic = "force-dynamic"; // tenant data, never statically cached
 
 export default async function ScanDetailPage({
   params,

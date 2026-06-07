@@ -21,7 +21,7 @@ interface Feature {
 }
 
 /**
- * The enterprise feature checklist. Honest framing only — every claim maps to a
+ * The enterprise feature checklist. Honest framing only, every claim maps to a
  * shipped capability. Compliance (SOC 2 / ISO 27001) and SOAR/SIEM are marked as
  * roadmap, never as delivered. No email alerts (Slack only). No customer claims.
  */
@@ -35,7 +35,7 @@ const FEATURES: Feature[] = [
   {
     icon: Layers,
     claim: "Multimodal defense",
-    detail: "Text, image, and audio carrier attacks — not just text.",
+    detail: "Text, image, and audio carrier attacks, not just text.",
   },
   {
     icon: Bell,
@@ -48,7 +48,7 @@ const FEATURES: Feature[] = [
     detail: (
       <>
         Risk scores, findings, a remediation trail, and a CISO executive summary
-        — compliance-supporting evidence.{" "}
+, compliance-supporting evidence.{" "}
         <span className="text-foreground/80">
           SOC 2 / ISO 27001: <RoadmapTag />.
         </span>
@@ -86,7 +86,7 @@ function ComingSoonTag() {
 }
 
 /**
- * EnterprisePitch — "ROGUE for Enterprises" pitch section.
+ * EnterprisePitch, "ROGUE for Enterprises" pitch section.
  *
  * Renders as a top-level <section> inside the shared max-w-7xl container, so it
  * can be dropped directly onto a marketing page. Server component. Dark terminal
@@ -104,7 +104,7 @@ export function EnterprisePitch({ className }: EnterprisePitchProps) {
         </h2>
         <p className="text-base text-muted-foreground leading-relaxed">
           Everything you need to find, triage, and route LLM jailbreaks before
-          they reach production — wired into the tools your team already uses.
+          they reach production, wired into the tools your team already uses.
         </p>
       </div>
 

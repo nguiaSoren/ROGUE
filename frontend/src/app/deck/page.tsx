@@ -20,13 +20,13 @@ import {
 } from "@/lib/proof";
 
 export const metadata = {
-  title: "ROGUE — Pitch",
+  title: "ROGUE, Pitch",
   description:
     "ROGUE in ten slides: a continuous open-web red-team that finds the jailbreaks before your users do. Built on Bright Data, queryable over MCP.",
 };
 
 /**
- * /deck — a scrollable, screen-shareable pitch deck. Ten full-width sections,
+ * /deck, a scrollable, screen-shareable pitch deck. Ten full-width sections,
  * each reading like one slide. Server component; pulls every number from
  * @/lib/proof so the narrative can never drift from the verified figures.
  *
@@ -37,7 +37,7 @@ export default function DeckPage() {
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
       <div className="space-y-24 md:space-y-32 py-20 md:py-28">
-        {/* 01 — TITLE -------------------------------------------------- */}
+        {/* 01, TITLE -------------------------------------------------- */}
         <Slide n={1}>
           <div className="max-w-7xl mx-auto px-6">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green flex items-center gap-2">
@@ -51,7 +51,7 @@ export default function DeckPage() {
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
               A continuous open-web red-team for LLM deployments. Point it at an
-              endpoint, get a scored security report — and a daily diff of what
+              endpoint, get a scored security report, and a daily diff of what
               changed.
             </p>
             <p className="mt-10 font-mono text-sm text-muted-foreground">
@@ -66,12 +66,12 @@ export default function DeckPage() {
           </div>
         </Slide>
 
-        {/* 02 — PROBLEM ------------------------------------------------ */}
+        {/* 02, PROBLEM ------------------------------------------------ */}
         <Slide n={2}>
           <Section
             eyebrow="02 / 10 · the problem"
-            title="You find out you were jailbroken from your users — not before."
-            lede="Every LLM you ship is a public attack surface. Prompt injection, jailbreaks, and tool-abuse land in production silently. The first signal is usually a screenshot on social media or an angry support ticket — long after the model already said the thing."
+            title="You find out you were jailbroken from your users, not before."
+            lede="Every LLM you ship is a public attack surface. Prompt injection, jailbreaks, and tool-abuse land in production silently. The first signal is usually a screenshot on social media or an angry support ticket, long after the model already said the thing."
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <PainCard
@@ -93,12 +93,12 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 03 — WHY NOW ----------------------------------------------- */}
+        {/* 03, WHY NOW ----------------------------------------------- */}
         <Slide n={3}>
           <Section
             eyebrow="03 / 10 · why now"
             title="Attack techniques evolve daily. Your red-team report is already stale."
-            lede="Jailbreaks and injection patterns are published, remixed, and refined in the open every day — on Reddit, X, GitHub, Discord, and research feeds. A one-off pentest is a photograph of a moving target. The moment it ships, it's out of date."
+            lede="Jailbreaks and injection patterns are published, remixed, and refined in the open every day, on Reddit, X, GitHub, Discord, and research feeds. A one-off pentest is a photograph of a moving target. The moment it ships, it's out of date."
           >
             <div className="rogue-card border border-border rounded-xl p-6 md:p-8 bg-card/40 backdrop-blur-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -132,18 +132,18 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 04 — SOLUTION ---------------------------------------------- */}
+        {/* 04, SOLUTION ---------------------------------------------- */}
         <Slide n={4}>
           <Section
             eyebrow="04 / 10 · the solution"
             title="Point ROGUE at an endpoint. Get a scored report with remediation."
-            lede="No agents to install, no traffic to mirror. Give ROGUE your deployment config and it does the rest — continuously."
+            lede="No agents to install, no traffic to mirror. Give ROGUE your deployment config and it does the rest, continuously."
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StepCard
                 step="1"
                 title="Connect"
-                desc="Register your deployment — model, system prompt, and tools. Hosted, private, or via the SDK."
+                desc="Register your deployment, model, system prompt, and tools. Hosted, private, or via the SDK."
               />
               <StepCard
                 step="2"
@@ -153,13 +153,13 @@ export default function DeckPage() {
               <StepCard
                 step="3"
                 title="Report"
-                desc="A scored security report with severity, the exact prompts that broke through, and concrete remediation — refreshed daily."
+                desc="A scored security report with severity, the exact prompts that broke through, and concrete remediation, refreshed daily."
               />
             </div>
           </Section>
         </Slide>
 
-        {/* 05 — HOW IT WORKS ----------------------------------------- */}
+        {/* 05, HOW IT WORKS ----------------------------------------- */}
         <Slide n={5}>
           <Section
             eyebrow="05 / 10 · how it works"
@@ -180,7 +180,7 @@ export default function DeckPage() {
               <PipelineCard
                 phase="Diff"
                 headline="Daily threat brief"
-                desc="Ship a CISO-readable diff of what's new, what regressed, and what to fix — the artifact you'd actually forward to your team."
+                desc="Ship a CISO-readable diff of what's new, what regressed, and what to fix, the artifact you'd actually forward to your team."
               />
             </div>
             <p className="mt-6 font-mono text-xs text-muted-foreground">
@@ -191,12 +191,12 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 06 — DIFFERENTIATOR --------------------------------------- */}
+        {/* 06, DIFFERENTIATOR --------------------------------------- */}
         <Slide n={6}>
           <Section
             eyebrow="06 / 10 · the differentiator"
             title="ROGUE exposes its own MCP server. Nobody else does this."
-            lede="ROGUE isn't just a dashboard — it's a live MCP server. Your assistant queries the threat DB directly, in the tool you already work in."
+            lede="ROGUE isn't just a dashboard, it's a live MCP server. Your assistant queries the threat DB directly, in the tool you already work in."
           >
             <div className="rogue-card border border-border rounded-xl p-6 md:p-8 bg-card/40 backdrop-blur-sm">
               <div className="flex items-start gap-4">
@@ -205,17 +205,17 @@ export default function DeckPage() {
                 </div>
                 <div className="space-y-3">
                   <p className="text-lg font-bold">
-                    Claude Desktop · Cursor · Windsurf — connected in one click.
+                    Claude Desktop · Cursor · Windsurf, connected in one click.
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
                     Ask &ldquo;what new attacks landed against my config this
                     week?&rdquo; from inside your IDE and get an answer from the
-                    live threat database — no context-switching, no copy-paste.
+                    live threat database, no context-switching, no copy-paste.
                     The same intelligence that powers the dashboard is available
                     as a tool to your own agents.
                   </p>
                   <p className="font-mono text-xs text-muted-foreground">
-                    Producer and consumer of MCP — a defensible moat, not a
+                    Producer and consumer of MCP, a defensible moat, not a
                     feature checkbox.
                   </p>
                 </div>
@@ -224,12 +224,12 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 07 — PROOF ------------------------------------------------- */}
+        {/* 07, PROOF ------------------------------------------------- */}
         <Slide n={7}>
           <Section
             eyebrow="07 / 10 · proof"
             title="Defensible numbers, every one traceable."
-            lede="No inflated asterisks. These are the figures we stand behind — measured, sourced, and recalibrated under the current judge."
+            lede="No inflated asterisks. These are the figures we stand behind, measured, sourced, and recalibrated under the current judge."
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {PROOF_POINTS.map((p) => (
@@ -254,12 +254,12 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 08 — DEPLOYMENT ------------------------------------------- */}
+        {/* 08, DEPLOYMENT ------------------------------------------- */}
         <Slide n={8}>
           <Section
             eyebrow="08 / 10 · deployment"
             title="Four ways to run it."
-            lede="From a hosted scan to fully air-gapped — ROGUE meets your security posture, not the other way around."
+            lede="From a hosted scan to fully air-gapped, ROGUE meets your security posture, not the other way around."
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <DeployCard
@@ -272,11 +272,11 @@ export default function DeckPage() {
               />
               <DeployCard
                 title="SDK"
-                desc="A Python client against a frozen v1 contract — wire ROGUE into your own CI or test harness."
+                desc="A Python client against a frozen v1 contract, wire ROGUE into your own CI or test harness."
               />
               <DeployCard
                 title="MCP"
-                desc="Query the live threat DB from Claude Desktop, Cursor, or Windsurf — one-click connect."
+                desc="Query the live threat DB from Claude Desktop, Cursor, or Windsurf, one-click connect."
               />
             </div>
             <div className="mt-8">
@@ -290,7 +290,7 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 09 — WHO IT'S FOR ----------------------------------------- */}
+        {/* 09, WHO IT'S FOR ----------------------------------------- */}
         <Slide n={9}>
           <Section
             eyebrow="09 / 10 · who it's for"
@@ -319,7 +319,7 @@ export default function DeckPage() {
             <div className="mt-8 flex items-center gap-3">
               <Boxes className="h-5 w-5 text-rogue-green shrink-0" />
               <p className="text-sm text-muted-foreground">
-                Onboarding a handful of early partners now — bring your stack and
+                Onboarding a handful of early partners now, bring your stack and
                 threat model.{" "}
                 <Link
                   href="/early-access"
@@ -332,7 +332,7 @@ export default function DeckPage() {
           </Section>
         </Slide>
 
-        {/* 10 — CLOSE / CTA ------------------------------------------ */}
+        {/* 10, CLOSE / CTA ------------------------------------------ */}
         <Slide n={10}>
           <div className="max-w-7xl mx-auto px-6">
             <div className="rogue-card border border-border rounded-2xl p-8 md:p-14 bg-card/40 backdrop-blur-sm text-center">
@@ -344,7 +344,7 @@ export default function DeckPage() {
               </h2>
               <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
                 Give us an endpoint. We&apos;ll show you exactly what breaks
-                through it — and what to fix.
+                through it, and what to fix.
               </p>
               <div className="mt-8 flex justify-center">
                 <CtaRow />

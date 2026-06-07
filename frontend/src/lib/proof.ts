@@ -1,5 +1,5 @@
 /**
- * proof.ts — the SINGLE SOURCE of verified, defensible marketing numbers.
+ * proof.ts, the SINGLE SOURCE of verified, defensible marketing numbers.
  *
  * Every value below is traceable to a line in README.md or ROGUE_PLAN.md
  * (cited in the inline comment). Marketing pages must import from here rather
@@ -11,43 +11,43 @@
  * see README judge-calibration). They are deliberately NOT exported here.
  */
 
-// Defensible static citations — every value traces to a line in README.md /
+// Defensible static citations, every value traces to a line in README.md /
 // ROGUE_PLAN.md and is kept in sync with the live corpus (canonical: 15 attack
 // families, 459 primitives, 8 deployment configs). These are NOT fetched at
 // runtime; they are the verified marketing figures the commercial pages cite.
 export const CORPUS = {
-  primitives: 459, // canonical live corpus — attack_primitives rows
-  harvested: 298, // README.md:25 — public HuggingFace dataset
-  families: 15, // canonical — OWASP LLM Top 10 + MITRE ATLAS aligned
-  sources: 19, // README.md:41 — open-web sources
-  bdProducts: 5, // README.md:55 — Bright Data products
+  primitives: 459, // canonical live corpus, attack_primitives rows
+  harvested: 298, // README.md:25, public HuggingFace dataset
+  families: 15, // canonical, OWASP LLM Top 10 + MITRE ATLAS aligned
+  sources: 19, // README.md:41, open-web sources
+  bdProducts: 5, // README.md:55, Bright Data products
   modelsTested: 6, // README.md:221
-  reproductionTrials: 8321, // ROGUE_PLAN.md:2560 — reproduction trials run
+  reproductionTrials: 8321, // ROGUE_PLAN.md:2560, reproduction trials run
 } as const
 
 export const JUDGE_V3 = {
-  humanAgreement: 89.3, // README.md:236 — JailbreakBench, v3 recalibrated
-  precision: 79.5, // README.md:236 — up from 55% (v1)
+  humanAgreement: 89.3, // README.md:236, JailbreakBench, v3 recalibrated
+  precision: 79.5, // README.md:236, up from 55% (v1)
   recall: 95.5, // README.md:236
   rankOf: 5, // [withheld]
   rank: 3,
 } as const
 
 export const SCHEDULER_AB = {
-  winnerRankFrom: 22, // ROGUE_PLAN.md:451 (20-goal A/B) — median winner-rank, fixed
-  winnerRankToJBB: 11, // ROGUE_PLAN.md:451 — contextual, JBB
-  winnerRankToAdv: 13.5, // ROGUE_PLAN.md:451 — contextual, AdvBench
-  costFrom: 1.25, // ROGUE_PLAN.md:451 — cost per successful breach (fixed)
-  costTo: 0.74, // ROGUE_PLAN.md:451 — cost per successful breach (contextual)
-  costReductionPct: 41, // ROGUE_PLAN.md:451 — −41%
-  asrFrom: 50, // ROGUE_PLAN.md:451 — 10/20
-  asrTo: 60, // ROGUE_PLAN.md:451 — 12/20
+  winnerRankFrom: 22, // ROGUE_PLAN.md:451 (20-goal A/B), median winner-rank, fixed
+  winnerRankToJBB: 11, // ROGUE_PLAN.md:451, contextual, JBB
+  winnerRankToAdv: 13.5, // ROGUE_PLAN.md:451, contextual, AdvBench
+  costFrom: 1.25, // ROGUE_PLAN.md:451, cost per successful breach (fixed)
+  costTo: 0.74, // ROGUE_PLAN.md:451, cost per successful breach (contextual)
+  costReductionPct: 41, // ROGUE_PLAN.md:451, −41%
+  asrFrom: 50, // ROGUE_PLAN.md:451, 10/20
+  asrTo: 60, // ROGUE_PLAN.md:451, 12/20
 } as const
 
 export const EFFICIENCY = {
   dailyHarvestUsdLow: 0.05, // README.md:90
   dailyHarvestUsdHigh: 0.3, // README.md:90
-  judgeCostPerCallUsd: 0.0032, // README.md:242 — caching + batch API
+  judgeCostPerCallUsd: 0.0032, // README.md:242, caching + batch API
 } as const
 
 /**

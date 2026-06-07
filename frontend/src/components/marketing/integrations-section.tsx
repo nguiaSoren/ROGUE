@@ -11,13 +11,13 @@ import { Section } from "@/components/marketing/section"
 import { cn } from "@/lib/utils"
 
 /**
- * IntegrationsSection — enterprise-friendly reframing of the MCP pitch.
+ * IntegrationsSection, enterprise-friendly reframing of the MCP pitch.
  *
  * Instead of leading with "we expose an MCP server" jargon, this groups
  * ROGUE's connection points by the tools a security/eng team already uses:
  * IDEs, chat, security tooling, and the raw API/SDK. The MCP differentiator
- * stays — phrased plainly ("ROGUE is its own connector, so an agent inside
- * your editor can run a whole scan") — rather than fronting the acronym.
+ * stays, phrased plainly ("ROGUE is its own connector, so an agent inside
+ * your editor can run a whole scan"), rather than fronting the acronym.
  *
  * HONESTY: SOAR/SIEM (Splunk, Palo Alto) is NOT live today and is badged
  * "Coming soon". Everything else listed is real and available now.
@@ -29,7 +29,7 @@ export function IntegrationsSection({ className }: { className?: string }) {
     <Section
       eyebrow="integrations"
       title="Connects to the tools your team already uses."
-      lede="ROGUE meets your workflow where it lives — your editor, your chat, your tracker, your own services. It runs as a connector your AI agents can call directly, so a full scan is one command away from wherever you work."
+      lede="ROGUE meets your workflow where it lives, your editor, your chat, your tracker, your own services. It runs as a connector your AI agents can call directly, so a full scan is one command away from wherever you work."
       className={className}
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -81,7 +81,7 @@ const GROUPS: Group[] = [
     title: "Your chat & tracker",
     availability: "now",
     detail:
-      "Daily threat briefs and breach alerts land in Slack. Every critical finding is auto-filed as a Jira ticket — your team triages where it already works.",
+      "Daily threat briefs and breach alerts land in Slack. Every critical finding is auto-filed as a Jira ticket, your team triages where it already works.",
     tools: ["Slack", "Jira"],
   },
   {
@@ -89,7 +89,7 @@ const GROUPS: Group[] = [
     title: "Security tooling",
     availability: "soon",
     detail:
-      "SOAR / SIEM connectors to pipe findings into your existing security stack. On the roadmap — not available today.",
+      "SOAR / SIEM connectors to pipe findings into your existing security stack. On the roadmap, not available today.",
     tools: ["Splunk", "Palo Alto"],
   },
   {
@@ -97,7 +97,7 @@ const GROUPS: Group[] = [
     title: "API & SDK",
     availability: "now",
     detail:
-      "A REST /v1 API and a Python SDK for anything bespoke — wire ROGUE into your own pipelines, dashboards, and CI.",
+      "A REST /v1 API and a Python SDK for anything bespoke, wire ROGUE into your own pipelines, dashboards, and CI.",
     tools: ["REST /v1", "Python SDK"],
   },
 ]

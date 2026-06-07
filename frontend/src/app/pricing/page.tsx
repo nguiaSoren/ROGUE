@@ -8,7 +8,7 @@ import { PROOF_POINTS } from "@/lib/proof";
 import { COMMERCIAL } from "@/lib/flags";
 
 export const metadata = {
-  title: "Pricing — ROGUE",
+  title: "Pricing, ROGUE",
   description:
     "Continuous open-web red-team, priced to the depth you need. Free, Pro, and Enterprise tiers for evaluating and hardening your LLM deployments.",
 };
@@ -102,7 +102,7 @@ const COMPARISON: ReadonlyArray<{
 const FAQ = [
   {
     q: "How does a scan connect to my model?",
-    a: "Point ROGUE at any HTTP endpoint — a hosted model, a gateway, or your own API. You provide a DeploymentConfig (model × system prompt × tools); ROGUE drives it like a black box and grades every response. No SDK or code change on your side.",
+    a: "Point ROGUE at any HTTP endpoint, a hosted model, a gateway, or your own API. You provide a DeploymentConfig (model × system prompt × tools); ROGUE drives it like a black box and grades every response. No SDK or code change on your side.",
   },
   {
     q: "What counts as a scan?",
@@ -110,15 +110,15 @@ const FAQ = [
   },
   {
     q: "Can I self-host?",
-    a: "Yes — on Enterprise. We support private and self-hosted deployments so the engine runs inside your own environment with your network controls. Free and Pro run on our hosted platform.",
+    a: "Yes, on Enterprise. We support private and self-hosted deployments so the engine runs inside your own environment with your network controls. Free and Pro run on our hosted platform.",
   },
   {
     q: "Do you store my model weights?",
-    a: "No. ROGUE never sees or stores model weights. It interacts with your deployment only over its public or private API surface — prompts in, responses out — and retains the transcripts needed to produce your report.",
+    a: "No. ROGUE never sees or stores model weights. It interacts with your deployment only over its public or private API surface, prompts in, responses out, and retains the transcripts needed to produce your report.",
   },
   {
     q: "What about SOC 2?",
-    a: "SOC 2 and ISO 27001 are on our roadmap — we are not certified today and don't claim to be. What we provide now are audit-ready reports and compliance-supporting evidence: every breach is reproduced with the exact prompt, the judge verdict, and confidence intervals, so the artifact stands up to scrutiny.",
+    a: "SOC 2 and ISO 27001 are on our roadmap, we are not certified today and don't claim to be. What we provide now are audit-ready reports and compliance-supporting evidence: every breach is reproduced with the exact prompt, the judge verdict, and confidence intervals, so the artifact stands up to scrutiny.",
   },
   {
     q: "Which providers are supported?",
@@ -126,7 +126,7 @@ const FAQ = [
   },
 ] as const;
 
-/** Renders one comparison-table cell — check, dash, or label text. */
+/** Renders one comparison-table cell, check, dash, or label text. */
 function CompCell({ value }: { value: Cell }) {
   if (value === true) {
     return (
@@ -148,7 +148,7 @@ function CompCell({ value }: { value: Cell }) {
 }
 
 /**
- * /pricing — concrete tiers (Free / Pro / Enterprise), a comparison table,
+ * /pricing, concrete tiers (Free / Pro / Enterprise), a comparison table,
  * a proof strip, and an FAQ.
  *
  * Server component. Outer wrapper mirrors the homepage. Pricing figures are
@@ -175,7 +175,7 @@ export default function PricingPage() {
             Priced to the depth you need.
           </h1>
           <p className="text-base text-muted-foreground leading-relaxed">
-            ROGUE is a continuous open-web red-team for your LLM deployments —
+            ROGUE is a continuous open-web red-team for your LLM deployments, 
             harvested live attacks, reproduced against your stack, scored, and
             shipped as a report. Start free, scale on Pro, go private on
             Enterprise.
@@ -210,7 +210,7 @@ export default function PricingPage() {
         <Section
           eyebrow="compare"
           title="What's in each plan."
-          lede="The same core engine across every tier — the plan sets how many configs you cover, how often you scan, and the controls your org needs."
+          lede="The same core engine across every tier, the plan sets how many configs you cover, how often you scan, and the controls your org needs."
         >
           {/* Desktop: full comparison table (md+). */}
           <div className="hidden md:block rogue-card border border-border rounded-xl bg-card/40 backdrop-blur-sm overflow-x-auto">
@@ -315,7 +315,7 @@ export default function PricingPage() {
         <Section
           eyebrow="a real engine, not a deck"
           title="Every tier runs the same proven core."
-          lede="The numbers below come from the live system — the corpus, the recalibrated judge, and the measured efficiency of the adaptive ladder."
+          lede="The numbers below come from the live system, the corpus, the recalibrated judge, and the measured efficiency of the adaptive ladder."
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {proof.map((p) => (

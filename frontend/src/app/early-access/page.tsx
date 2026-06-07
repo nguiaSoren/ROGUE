@@ -12,13 +12,13 @@ import { StatCard } from "@/components/marketing/stat-card";
 import { PROOF_POINTS } from "@/lib/proof";
 
 export const metadata = {
-  title: "Early Access — ROGUE",
+  title: "Early Access, ROGUE",
   description:
-    "ROGUE is onboarding its first partners. Three honest on-ramps: an Early Access program, scoped pilots on your real deployment, and research partnerships on the harvested corpus and benchmark infra. No customer claims — just an invitation to be early.",
+    "ROGUE is onboarding its first partners. Three honest on-ramps: an Early Access program, scoped pilots on your real deployment, and research partnerships on the harvested corpus and benchmark infra. No customer claims, just an invitation to be early.",
 };
 
 /**
- * /early-access — the honest social-proof replacement. ROGUE has no customers
+ * /early-access, the honest social-proof replacement. ROGUE has no customers
  * yet, so this page never implies any: it frames the three on-ramps for the
  * first partners we're onboarding now. Server component.
  */
@@ -30,7 +30,7 @@ export default function EarlyAccessPage() {
         <Section
           eyebrow="early access"
           title="We're onboarding our first partners."
-          lede="ROGUE is a working red-team engine looking for the teams it goes to production with. We're not showing customer logos, because we don't have customers yet — we have an invitation. There are three ways to take it, depending on where you are."
+          lede="ROGUE is a working red-team engine looking for the teams it goes to production with. We're not showing customer logos, because we don't have customers yet, we have an invitation. There are three ways to take it, depending on where you are."
         >
           <CtaRow />
         </Section>
@@ -91,7 +91,7 @@ export default function EarlyAccessPage() {
         <Section
           eyebrow="why partner now"
           title="Being early is the advantage."
-          lede="The window where you can shape a security product to your own stack closes fast. Right now it's wide open — and the engine underneath is already real, not a slide deck."
+          lede="The window where you can shape a security product to your own stack closes fast. Right now it's wide open, and the engine underneath is already real, not a slide deck."
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl">
             {[PROOF_POINTS[0], PROOF_POINTS[1], PROOF_POINTS[2]].map((p) => (
@@ -222,22 +222,22 @@ const REASONS: ReadonlyArray<{ title: string; body: string }> = [
   },
   {
     title: "A real, defensible engine",
-    body: "This isn't vaporware. There's a continuous open-web harvest, a recalibrated judge, and an adaptive ladder behind it — working today, against real deployments.",
+    body: "This isn't vaporware. There's a continuous open-web harvest, a recalibrated judge, and an adaptive ladder behind it, working today, against real deployments.",
   },
 ];
 
 const FAQ: ReadonlyArray<{ q: string; a: React.ReactNode }> = [
   {
     q: "Is there a cost?",
-    a: "Early-access and pilot terms are set per partner while we're onboarding our first cohort — being early is meant to be a good deal, not a premium one. Research partnerships are typically non-commercial. Tell us your situation and we'll be straight about what it costs.",
+    a: "Early-access and pilot terms are set per partner while we're onboarding our first cohort, being early is meant to be a good deal, not a premium one. Research partnerships are typically non-commercial. Tell us your situation and we'll be straight about what it costs.",
   },
   {
     q: "What do you need from us?",
-    a: "Very little: a reachable model endpoint to point ROGUE at, and a judge key for grading the results. ROGUE is the attacker side — it never needs your model weights, training data, or source code.",
+    a: "Very little: a reachable model endpoint to point ROGUE at, and a judge key for grading the results. ROGUE is the attacker side, it never needs your model weights, training data, or source code.",
   },
   {
     q: "How long is a pilot?",
-    a: "Pilots are deliberately time-boxed — usually a couple of weeks from kickoff to the executive risk report. Long enough to run the full repertoire against your real deployment, short enough to get an answer fast.",
+    a: "Pilots are deliberately time-boxed, usually a couple of weeks from kickoff to the executive risk report. Long enough to run the full repertoire against your real deployment, short enough to get an answer fast.",
   },
   {
     q: "Do you store our data?",

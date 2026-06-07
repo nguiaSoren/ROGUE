@@ -1,5 +1,5 @@
 /**
- * POST /api/scans — create a scan from a client component (the /scans/new form).
+ * POST /api/scans, create a scan from a client component (the /scans/new form).
  *
  * Reads the API key from the server session cookie and forwards to `POST /v1/scans`, so the browser
  * never holds the bearer. Returns the created `ScanRecord` (status=queued) or the error envelope.

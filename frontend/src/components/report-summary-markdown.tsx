@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 
 /**
  * Renders the scan report's `executive_summary` markdown as a clean, prose-first
- * block — the "forward-to-your-boss" overview. Unlike `BriefMarkdown` (which is
+ * block, the "forward-to-your-boss" overview. Unlike `BriefMarkdown` (which is
  * tuned to the threat-brief's CRITICAL/HIGH section vocabulary), this is tuned for
  * a short narrative: readable headings, paragraphs, lists, and inline emphasis,
  * with no severity-keyword tinting that would misfire on plain English.

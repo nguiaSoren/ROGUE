@@ -1,5 +1,5 @@
 /**
- * Case-studies content store — the "internal CMS".
+ * Case-studies content store, the "internal CMS".
  *
  * This is a typed data module, deliberately *not* a database or MDX pipeline:
  * future real case studies get appended to `CASE_STUDIES` below without any
@@ -7,17 +7,17 @@
  *
  * HONESTY CONSTRAINT (founder directive): no fake customers, no invented logos,
  * no fabricated metrics. The two seed entries are TEMPLATES (`isTemplate: true`)
- * — illustrative frameworks written in generic, hypothetical language, shown so
+ *, illustrative frameworks written in generic, hypothetical language, shown so
  * a prospective customer can see exactly what a ROGUE engagement report looks
  * like before any real engagement exists. The pages render a visible
- * "Example template — not a real customer engagement" notice for these.
+ * "Example template, not a real customer engagement" notice for these.
  *
  * When a real engagement lands: add an entry with `isTemplate: false`, real
  * (consented) details, and real measured metrics. The rendering pipeline needs
  * no changes.
  */
 
-/** Canonical findings entry — either a plain line or a severity-tagged finding. */
+/** Canonical findings entry, either a plain line or a severity-tagged finding. */
 export type Severity = "critical" | "high" | "medium" | "low";
 
 export interface Finding {
@@ -34,7 +34,7 @@ export interface Metric {
 }
 
 export interface CaseStudy {
-  /** URL slug — unique. */
+  /** URL slug, unique. */
   slug: string;
   /** Display title. */
   title: string;
@@ -77,15 +77,15 @@ export function isTaggedFindings(
 export const CASE_STUDIES: CaseStudy[] = [
   {
     slug: "template-startup",
-    title: "Template — Seed-stage AI startup",
+    title: "Template, Seed-stage AI startup",
     segment: "Startup",
     isTemplate: true,
     summary:
       "Illustrative framework: how a ROGUE engagement reads for a small team shipping a customer-support agent on a hosted model.",
     problem:
-      "A typical seed-stage team is shipping a customer-support agent built on a hosted frontier model with a thin system prompt and two tools (order lookup, refund issuance). They have no in-house red-team, no security hire, and a launch deadline. The open question they cannot answer: can a hostile user talk the agent into issuing a refund it should not, or into leaking another customer's order history? This template shows the shape of the answer ROGUE would deliver — the numbers below are hypothetical placeholders, not a real result.",
+      "A typical seed-stage team is shipping a customer-support agent built on a hosted frontier model with a thin system prompt and two tools (order lookup, refund issuance). They have no in-house red-team, no security hire, and a launch deadline. The open question they cannot answer: can a hostile user talk the agent into issuing a refund it should not, or into leaking another customer's order history? This template shows the shape of the answer ROGUE would deliver, the numbers below are hypothetical placeholders, not a real result.",
     deployment:
-      "DeploymentConfig under test: a single hosted chat model × a ~300-word support-agent system prompt × two tools (read-only order lookup, write-capable refund issuance). One tenant, one environment. ROGUE points at the live endpoint and replays its harvested attack repertoire against exactly this configuration — same model, same prompt, same tool schema the real users hit.",
+      "DeploymentConfig under test: a single hosted chat model × a ~300-word support-agent system prompt × two tools (read-only order lookup, write-capable refund issuance). One tenant, one environment. ROGUE points at the live endpoint and replays its harvested attack repertoire against exactly this configuration, same model, same prompt, same tool schema the real users hit.",
     findings: [
       {
         severity: "high",
@@ -107,7 +107,7 @@ export const CASE_STUDIES: CaseStudy[] = [
       },
     ],
     remediation: [
-      "Gate every write-capable tool (refunds) behind a deterministic policy check outside the model — never let the model be the sole authority for an irreversible action.",
+      "Gate every write-capable tool (refunds) behind a deterministic policy check outside the model, never let the model be the sole authority for an irreversible action.",
       "Scope the order-lookup tool to the authenticated user's own records server-side, so a coerced ID simply returns nothing.",
       "Treat the system prompt as public: assume it leaks and put no secrets or bypass phrases in it.",
       "Re-run the same ROGUE config on every prompt or tool change to catch regressions before they ship.",
@@ -122,13 +122,13 @@ export const CASE_STUDIES: CaseStudy[] = [
   },
   {
     slug: "template-enterprise",
-    title: "Template — Enterprise model-risk team",
+    title: "Template, Enterprise model-risk team",
     segment: "Enterprise",
     isTemplate: true,
     summary:
       "Illustrative framework: how a ROGUE engagement reads for a model-risk function governing many internal deployments against an audit obligation.",
     problem:
-      "A typical enterprise model-risk team governs a fleet of internal LLM deployments — a knowledge-base assistant, a code helper, a contract-summarizer — each on a different model and system prompt, each owned by a different product team. The model-risk function owes an auditor a defensible, repeatable answer to 'are these resistant to known prompt-injection and jailbreak techniques, and how do you know it stays true over time?' This template shows the shape of the program ROGUE would stand up; the numbers below are hypothetical placeholders, not a real result.",
+      "A typical enterprise model-risk team governs a fleet of internal LLM deployments, a knowledge-base assistant, a code helper, a contract-summarizer, each on a different model and system prompt, each owned by a different product team. The model-risk function owes an auditor a defensible, repeatable answer to 'are these resistant to known prompt-injection and jailbreak techniques, and how do you know it stays true over time?' This template shows the shape of the program ROGUE would stand up; the numbers below are hypothetical placeholders, not a real result.",
     deployment:
       "DeploymentConfigs under test: several distinct deployments, each captured as model × system_prompt × tools, registered with ROGUE as separate configs. ROGUE replays the continuously-harvested open-web attack repertoire against every config on a schedule and produces a per-config breach matrix plus a dated threat-brief diff the model-risk team can attach to its evidence file.",
     findings: [
@@ -136,7 +136,7 @@ export const CASE_STUDIES: CaseStudy[] = [
         severity: "critical",
         title: "Indirect injection through retrieved documents",
         detail:
-          "For a retrieval-augmented deployment, a hypothetical poisoned document in the knowledge base carries instructions the assistant follows. This is the canonical enterprise RAG failure: the attacker never talks to the model directly — they plant the payload upstream.",
+          "For a retrieval-augmented deployment, a hypothetical poisoned document in the knowledge base carries instructions the assistant follows. This is the canonical enterprise RAG failure: the attacker never talks to the model directly, they plant the payload upstream.",
       },
       {
         severity: "high",
@@ -148,7 +148,7 @@ export const CASE_STUDIES: CaseStudy[] = [
         severity: "medium",
         title: "Drift between brief cycles",
         detail:
-          "Newly harvested techniques crack a config that was clean last cycle. The dated diff is the audit artifact — it demonstrates the program is live and catching regressions, not a one-time snapshot.",
+          "Newly harvested techniques crack a config that was clean last cycle. The dated diff is the audit artifact, it demonstrates the program is live and catching regressions, not a one-time snapshot.",
       },
     ],
     remediation: [

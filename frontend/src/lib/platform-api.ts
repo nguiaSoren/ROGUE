@@ -3,8 +3,8 @@
  *
  * This is the SECOND, parallel client to `lib/api.ts` (the credential-less `/api/*`
  * reader the public marketing/threat-intel pages use). It carries the SAME Render
- * cold-start resilience as `apiGet` — the 502/503/504 retry with 1.5s→3s backoff
- * and the 12s per-attempt abort (mirroring `lib/api.ts:23-28`, `:37-60`) — but with
+ * cold-start resilience as `apiGet`, the 502/503/504 retry with 1.5s→3s backoff
+ * and the 12s per-attempt abort (mirroring `lib/api.ts:23-28`, `:37-60`), but with
  * three differences driven by tenancy (see docs/platform/dashboard/pages-and-routes.md §3-4):
  *
  *  1. It injects an `Authorization: Bearer <key>` header. The bearer is passed in as
@@ -12,9 +12,9 @@
  *     The key comes from the httpOnly session cookie (`lib/session.ts:getApiKey()`), read
  *     server-side by the `/api/*` proxy route handlers that wrap these calls; client
  *     components hit those same-origin proxies and never see the bearer. There is no
- *     placeholder fallback — `resolveKey()` throws `ApiV1Error(401, "no_session", …)`
+ *     placeholder fallback, `resolveKey()` throws `ApiV1Error(401, "no_session", …)`
  *     when no key is supplied.
- *  2. Tenant data is per-request, not ISR — every call is `cache: "no-store"`.
+ *  2. Tenant data is per-request, not ISR, every call is `cache: "no-store"`.
  *  3. On a non-OK response it reads the error envelope `{ error: { code, message } }`
  *     (ARCHITECTURE §5) and throws an `ApiV1Error` carrying it, so product pages can
  *     render an explicit error state instead of silently serving stale cross-tenant HTML.
@@ -26,7 +26,7 @@
 
 // Server-side base for the hosted platform API. Defaults to the live service; override with
 // API_BASE / NEXT_PUBLIC_API_BASE. This client runs server-side only (Server Components + Route
-// Handlers) so it reads the real bearer from the session — the key is never shipped to the browser.
+// Handlers) so it reads the real bearer from the session, the key is never shipped to the browser.
 const API_BASE =
   process.env.API_BASE ??
   process.env.NEXT_PUBLIC_API_BASE ??
@@ -42,10 +42,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Resolve the bearer for a call — required (the caller reads it from the server session). */
+/** Resolve the bearer for a call, required (the caller reads it from the server session). */
 function resolveKey(key?: string): string {
   if (!key) {
-    throw new ApiV1Error(401, "no_session", "no API key in session — sign in first");
+    throw new ApiV1Error(401, "no_session", "no API key in session, sign in first");
   }
   return key;
 }
@@ -96,13 +96,13 @@ async function apiV1<T>(path: string, key: string | undefined, opts: FetchOpts =
         method: opts.method ?? "GET",
         headers,
         body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-        // Tenant data is private + per-request — never the public corpus's 300s ISR.
+        // Tenant data is private + per-request, never the public corpus's 300s ISR.
         cache: "no-store",
         signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
       });
 
       if (GATEWAY_STATUSES.has(r.status) && attempt < MAX_RETRIES) {
-        await sleep(1500 * (attempt + 1)); // 1.5s, then 3s — ride out the cold boot
+        await sleep(1500 * (attempt + 1)); // 1.5s, then 3s, ride out the cold boot
         continue;
       }
 
@@ -119,7 +119,7 @@ async function apiV1<T>(path: string, key: string | undefined, opts: FetchOpts =
             details = env.error.details;
           }
         } catch {
-          /* non-JSON error body — keep the status-line message */
+          /* non-JSON error body, keep the status-line message */
         }
         throw new ApiV1Error(r.status, code, message, details);
       }
@@ -128,9 +128,9 @@ async function apiV1<T>(path: string, key: string | undefined, opts: FetchOpts =
       // this client only decodes the JSON surface.
       return (await r.json()) as T;
     } catch (e) {
-      // An ApiV1Error is a real, decoded API failure — do not retry it as a cold start.
+      // An ApiV1Error is a real, decoded API failure, do not retry it as a cold start.
       if (e instanceof ApiV1Error) throw e;
-      // Network-level throw (connection reset during cold boot) — retry too.
+      // Network-level throw (connection reset during cold boot), retry too.
       lastError = e;
       if (attempt < MAX_RETRIES) {
         await sleep(1500 * (attempt + 1));
@@ -143,7 +143,7 @@ async function apiV1<T>(path: string, key: string | undefined, opts: FetchOpts =
 }
 
 // --------------------------------------------------------------------------
-// Types — mirror src/rogue/platform/schemas.py and src/rogue/report.py.
+// Types, mirror src/rogue/platform/schemas.py and src/rogue/report.py.
 // --------------------------------------------------------------------------
 
 /** Mirrors `ScanStatus` (src/rogue/platform/schemas.py:16). */
@@ -159,7 +159,7 @@ export function isTerminal(status: ScanStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-/** Mirrors `TargetSpec.redacted()` (src/rogue/platform/schemas.py:47) — the persist-safe snapshot. */
+/** Mirrors `TargetSpec.redacted()` (src/rogue/platform/schemas.py:47), the persist-safe snapshot. */
 export type RedactedTarget = {
   endpoint?: string | null;
   provider?: string | null;
@@ -168,7 +168,7 @@ export type RedactedTarget = {
   has_api_key?: boolean;
 };
 
-/** Mirrors `TargetSpec` (src/rogue/platform/schemas.py:28) — what /scans/new posts. */
+/** Mirrors `TargetSpec` (src/rogue/platform/schemas.py:28), what /scans/new posts. */
 export type TargetSpec = {
   endpoint?: string | null;
   provider?: string | null;
@@ -178,12 +178,12 @@ export type TargetSpec = {
   system_prompt?: string;
 };
 
-/** Mirrors `ScanSpec` (src/rogue/platform/schemas.py:58) — the POST /v1/scans body. */
+/** Mirrors `ScanSpec` (src/rogue/platform/schemas.py:58), the POST /v1/scans body. */
 export type ScanSpec = {
   target: TargetSpec;
   /** "pack" = a small curated JSON pack; "repertoire" = the live harvested corpus (ROGUE's full
    *  arsenal, capped at max_tests); "ladder" = escalate each goal through ROGUE's full multi-tier
-   *  arsenal (graduated techniques + chain-of-jailbreak + structured-data + image/audio renderers) —
+   *  arsenal (graduated techniques + chain-of-jailbreak + structured-data + image/audio renderers), 
    *  the deepest and most expensive mode. Default "pack". Mirrors `ScanSpec.mode`. */
   mode?: "pack" | "repertoire" | "ladder";
   pack?: string;
@@ -193,7 +193,7 @@ export type ScanSpec = {
   budget?: number | null;
 };
 
-/** Mirrors `ScanRecord` (src/rogue/platform/schemas.py:69) — GET /v1/scans/{id}. */
+/** Mirrors `ScanRecord` (src/rogue/platform/schemas.py:69), GET /v1/scans/{id}. */
 export type ScanRecord = {
   scan_id: string;
   org_id: string;
@@ -257,7 +257,7 @@ export type ScanReportJson = {
   /** 0–100 headline added by the report route on top of the SDK dataclass. */
   score?: number | null;
   /** Banded headline level for `score` (critical/high/medium/low); from the report
-   *  route's `scoring.risk_level`. Absent on older runs — derive from `score` then. */
+   *  route's `scoring.risk_level`. Absent on older runs, derive from `score` then. */
   risk_level?: "critical" | "high" | "medium" | "low" | null;
   /** One-line plain-English description of how `score` is computed (report caption). */
   score_methodology?: string | null;
@@ -268,11 +268,11 @@ export type ScanReportJson = {
 export type ReportFormat = "json" | "html" | "pdf";
 
 // --------------------------------------------------------------------------
-// API surface — each takes the bearer `key` (server-resolved) as an argument.
+// API surface, each takes the bearer `key` (server-resolved) as an argument.
 // --------------------------------------------------------------------------
 
 export const platformApi = {
-  /** POST /v1/scans — create (queue) a scan. Returns the 202 `ScanRecord` (status=queued).
+  /** POST /v1/scans, create (queue) a scan. Returns the 202 `ScanRecord` (status=queued).
    *  Pass an `idempotencyKey` so a double-submit can't launch two paid scans. */
   createScan: (body: ScanSpec, key?: string, idempotencyKey?: string) =>
     apiV1<ScanRecord>("/v1/scans", key, {
@@ -281,15 +281,15 @@ export const platformApi = {
       headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
     }),
 
-  /** GET /v1/scans/{id} — the full `ScanRecord` (the poller's route). */
+  /** GET /v1/scans/{id}, the full `ScanRecord` (the poller's route). */
   getScan: (scanId: string, key?: string) =>
     apiV1<ScanRecord>(`/v1/scans/${encodeURIComponent(scanId)}`, key),
 
-  /** POST /v1/scans/{id}/cancel — request cancellation; returns the updated `ScanRecord`. */
+  /** POST /v1/scans/{id}/cancel, request cancellation; returns the updated `ScanRecord`. */
   cancelScan: (scanId: string, key?: string) =>
     apiV1<ScanRecord>(`/v1/scans/${encodeURIComponent(scanId)}/cancel`, key, { method: "POST" }),
 
-  /** GET /v1/scans — newest-first, cursor-paginated list. */
+  /** GET /v1/scans, newest-first, cursor-paginated list. */
   listScans: (
     key?: string,
     params?: { project_id?: string; limit?: number; cursor?: string },
@@ -302,7 +302,7 @@ export const platformApi = {
     return apiV1<ScanListResponse>(`/v1/scans${qs ? `?${qs}` : ""}`, key);
   },
 
-  /** GET /v1/scans/{id}/report?format=… — the completed report. Only `json` is
+  /** GET /v1/scans/{id}/report?format=…, the completed report. Only `json` is
    *  decoded here; `html`/`pdf` are fetched as links by the export buttons (see
    *  reportUrl). */
   getReport: (scanId: string, key?: string, format: ReportFormat = "json") =>
@@ -311,7 +311,7 @@ export const platformApi = {
       key,
     ),
 
-  /** POST /v1/validate — dry-run a target (reachability/credentials) before a paid scan. */
+  /** POST /v1/validate, dry-run a target (reachability/credentials) before a paid scan. */
   validateTarget: (body: TargetSpec, key?: string) =>
     apiV1<{
       target: string;
@@ -329,7 +329,7 @@ export const platformApi = {
     ),
 };
 
-/** The bare URL for a report export — for an <a href> / new tab, where the browser
+/** The bare URL for a report export, for an <a href> / new tab, where the browser
  *  handles the open/download (html/pdf, and json as a raw download). The bearer for
  *  these is supplied by the server-side route handler, not appended here (never put
  *  a secret in a client href). */

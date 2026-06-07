@@ -8,14 +8,14 @@ import type {
 /**
  * Top-of-feed "augmentation A/B at a glance" KPI strip.
  *
- * Surfaces the §10.7 disciplined-sweep headline numbers — 4 tiles, one per
- * augmentation — color-matched to the sidebar widgets so the visual link
+ * Surfaces the §10.7 disciplined-sweep headline numbers, 4 tiles, one per
+ * augmentation, color-matched to the sidebar widgets so the visual link
  * is immediate. Each tile shows:
  *   - the augmentation name (color-accented label)
  *   - a single primary metric (breach rate or avg-iters)
  *   - a one-line "what this means" subtitle
  *
- * Empty states are handled inline — when an augmentation has no data
+ * Empty states are handled inline, when an augmentation has no data
  * yet, the tile renders a muted "// no data" placeholder rather than a
  * fake number.
  */
@@ -147,7 +147,7 @@ function StripTile({
         {name}
       </p>
       <p className="text-2xl font-bold mt-1.5 tabular-nums">
-        {metric ?? <span className="text-muted-foreground text-base font-normal">—</span>}
+        {metric ?? <span className="text-muted-foreground text-base font-normal">, </span>}
       </p>
       <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
         {unit}

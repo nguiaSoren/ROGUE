@@ -3,7 +3,7 @@
  *
  *   [19 sources]  →  [harvest]  →  [reproduce 5-panel]  →  [judge]
  *
- * Pure SVG + CSS animations — server component, zero JS. The "moving pulses"
+ * Pure SVG + CSS animations, server component, zero JS. The "moving pulses"
  * are repeating <circle> elements animated along the connecting paths via
  * SMIL `animateMotion`. SMIL is well supported in modern browsers and
  * doesn't require JS scheduling.
@@ -172,7 +172,7 @@ export function PipelineFlow({
               fill={s.color}
               fontFamily="var(--font-mono, monospace)"
             >
-              {s.value ?? "—"}
+              {s.value ?? ", "}
             </text>
             {/* Label below */}
             <text

@@ -2,12 +2,12 @@ import { ShieldAlert, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * DashboardPreview — a marketing, screenshot-style recreation of the auth-gated
+ * DashboardPreview, a marketing, screenshot-style recreation of the auth-gated
  * scan dashboard (the `/scans/{id}` detail + report + a `/scans` list snippet).
  *
  * This is NOT the real dashboard and pulls no live data: every number is static,
  * illustrative example data (the real screens are behind sign-in, so we can't
- * screenshot them). It's a server component — pure markup, no hooks — wrapped in a
+ * screenshot them). It's a server component, pure markup, no hooks, wrapped in a
  * faux app-window frame so it reads as a product shot. Visuals mirror the live
  * components 1:1 where it matters:
  *   - risk headline + /100 + banded pill  → scans/[scanId]/report/page.tsx RiskHeadline
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  * rogue-red for breach/critical, orange for HIGH.
  */
 
-// ── Example data — illustrative only, not a real scan. ───────────────────────
+// ── Example data, illustrative only, not a real scan. ───────────────────────
 const EXAMPLE = {
   scanId: "scan_8f3a2",
   target: "claude-haiku-4-5",
@@ -54,7 +54,7 @@ const SCORE_TINT_TEXT = {
   LOW: "text-rogue-green",
 } as const;
 
-// Pill tints — the shared severity vocabulary (score-badge.tsx TINT_CLASS).
+// Pill tints, the shared severity vocabulary (score-badge.tsx TINT_CLASS).
 const PILL = {
   red: "border-rogue-red/40 bg-rogue-red/10 text-rogue-red",
   orange: "border-orange-500/40 bg-orange-500/10 text-orange-300",
@@ -77,7 +77,7 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
         className,
       )}
     >
-      {/* ── Faux window chrome — darker than the body so it reads as a frame. ── */}
+      {/* ── Faux window chrome, darker than the body so it reads as a frame. ── */}
       <div className="flex items-center gap-3 border-b border-border bg-black/60 px-4 py-2.5">
         <div className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-full bg-rogue-red/70" />
@@ -107,7 +107,7 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
           </p>
         </div>
 
-        {/* Risk headline — the score leads. */}
+        {/* Risk headline, the score leads. */}
         <section className="rounded-xl border border-border bg-card/40 backdrop-blur-sm p-4 sm:p-5 space-y-3">
           <div className="flex items-end gap-4 sm:gap-5 flex-wrap">
             <div className="flex items-baseline gap-2">
@@ -284,7 +284,7 @@ export function DashboardPreview({ className }: { className?: string } = {}) {
                           scoreTint(s.score),
                         )}
                       >
-                        {s.score ?? "—"}
+                        {s.score ?? ", "}
                       </span>
                     </td>
                   </tr>

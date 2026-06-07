@@ -7,11 +7,11 @@ import { NextResponse } from "next/server";
  * The data pages (/matrix, /brief, /feed, /) are statically prerendered + 5-min
  * ISR, so new breaches otherwise surface within ~5 min. The harvest / reproduce
  * scripts POST here after they write new rows so the pages regenerate
- * immediately — "latest data, no waiting, no polling".
+ * immediately, "latest data, no waiting, no polling".
  *
  *   curl -X POST "$FRONTEND/api/revalidate" -H "x-revalidate-token: $REVALIDATE_TOKEN"
  *
- * Auth: a shared secret in REVALIDATE_TOKEN (Vercel env). Fails closed — if the
+ * Auth: a shared secret in REVALIDATE_TOKEN (Vercel env). Fails closed, if the
  * env var is unset or the token mismatches, nothing is revalidated. POST-only so
  * it can't be triggered by a stray GET / prefetch.
  */

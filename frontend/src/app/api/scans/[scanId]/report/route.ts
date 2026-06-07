@@ -1,9 +1,9 @@
 /**
- * GET /api/scans/{scanId}/report?format=json|html|pdf — the export proxy.
+ * GET /api/scans/{scanId}/report?format=json|html|pdf, the export proxy.
  *
  * Forwards to `GET /v1/scans/{id}/report` with the session key attached, then streams the body back
  * with the upstream content-type. This lets the report page's export links/buttons be plain
- * same-origin `<a href>`s — the bearer stays server-side, never in a client URL.
+ * same-origin `<a href>`s, the bearer stays server-side, never in a client URL.
  */
 
 import { API_BASE } from "@/lib/platform-api";

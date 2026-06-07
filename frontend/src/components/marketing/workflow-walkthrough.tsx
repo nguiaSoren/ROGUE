@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils"
 import { ProviderLogo } from "@/components/ui/provider-logo"
 
 /**
- * WorkflowWalkthrough — a self-contained, concrete end-to-end product story:
+ * WorkflowWalkthrough, a self-contained, concrete end-to-end product story:
  *
  *   Connect endpoint → Run ladder scan → Find the jailbreak → Ticket auto-filed
  *
  * Renders as a `w-full` block (no outer page padding) so it can be dropped
  * directly inside a <Section> or any max-w container. Carries its own eyebrow +
- * heading so it also reads fine standalone. All visuals are local mini-mocks —
+ * heading so it also reads fine standalone. All visuals are local mini-mocks, 
  * no dependency on dashboard / findings / report preview components. The data is
  * representative, not a real customer.
  */
@@ -50,7 +50,7 @@ export function WorkflowWalkthrough({ className }: { className?: string }) {
           index="02"
           icon={Layers}
           title="Run a ladder scan"
-          detail="Escalate each goal through the full arsenal — graduated techniques, multi-turn, multimodal."
+          detail="Escalate each goal through the full arsenal, graduated techniques, multi-turn, multimodal."
           visual={<LadderVisual />}
         />
         <Connector />
@@ -131,7 +131,7 @@ function Step({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Connector arrow — horizontal on lg, rotated down on mobile        */
+/*  Connector arrow, horizontal on lg, rotated down on mobile        */
 /* ------------------------------------------------------------------ */
 
 function Connector() {

@@ -25,13 +25,13 @@ import { COMMERCIAL } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "Enterprise — ROGUE",
+  title: "Enterprise, ROGUE",
   description:
     "Continuous, private, enterprise-grade LLM red-teaming. Deploy ROGUE self-hosted inside your perimeter, as managed SaaS, via the Python SDK in CI, or as a live MCP server your IDE queries directly.",
 };
 
 /**
- * /enterprise — the deployment-modes page. Sells how an org runs ROGUE:
+ * /enterprise, the deployment-modes page. Sells how an org runs ROGUE:
  * private/self-hosted, hosted SaaS, SDK-in-CI, or MCP server.
  *
  * Server component. All content is static; the only dynamic-flavoured bits are
@@ -39,7 +39,7 @@ export const metadata = {
  */
 export default function EnterprisePage() {
   // Commercial-pitch page: hidden (404) in the default honest hiring mode, shown
-  // only when NEXT_PUBLIC_SHOW_COMMERCIAL=true — same gating as /pricing.
+  // only when NEXT_PUBLIC_SHOW_COMMERCIAL=true, same gating as /pricing.
   if (!COMMERCIAL) notFound();
 
   return (
@@ -58,21 +58,21 @@ export default function EnterprisePage() {
               ROGUE is a continuous, private, enterprise-grade red-team for the
               LLM systems you ship. Point it at your deployments and it harvests
               live open-web jailbreaks, reproduces them against your exact model
-              × system-prompt × tools, and hands you a graded report — on your
+              × system-prompt × tools, and hands you a graded report, on your
               infrastructure or ours.
             </p>
             <CtaRow className="pt-2" />
           </div>
         </Section>
 
-        {/* 1b. ENTERPRISE PITCH — honest feature checklist ------------ */}
+        {/* 1b. ENTERPRISE PITCH, honest feature checklist ------------ */}
         <EnterprisePitch className="animate-rogue-fade-up" />
 
         {/* 2. FOUR DEPLOYMENT MODES ----------------------------------- */}
         <Section
           eyebrow="deployment modes"
           title="Four ways to run ROGUE."
-          lede="Same engine, four delivery shapes — pick the one that fits your perimeter, your pipeline, and your team."
+          lede="Same engine, four delivery shapes, pick the one that fits your perimeter, your pipeline, and your team."
           className="animate-rogue-fade-up"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
@@ -96,7 +96,7 @@ export default function EnterprisePage() {
         <Section
           eyebrow="built for"
           title="The teams who own the risk."
-          lede="ROGUE speaks to everyone on the hook for an AI system in production — not just one of them."
+          lede="ROGUE speaks to everyone on the hook for an AI system in production, not just one of them."
           className="animate-rogue-fade-up"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -110,7 +110,7 @@ export default function EnterprisePage() {
         <Section
           eyebrow="this is a real engine"
           title="Numbers, not adjectives."
-          lede="Every figure traces to the corpus, the judge calibration, and the live scheduler — not a pitch deck."
+          lede="Every figure traces to the corpus, the judge calibration, and the live scheduler, not a pitch deck."
           className="animate-rogue-fade-up"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -178,7 +178,7 @@ const DEPLOYMENT_MODES: DeploymentMode[] = [
       "ROGUE runs entirely inside your perimeter. Prompts, responses, and findings never leave your network.",
     specifics: [
       "Deploys into your VPC or on-prem cluster",
-      "No customer data egress — air-gap friendly",
+      "No customer data egress, air-gap friendly",
       "Bring your own keys for every model panel",
     ],
   },
@@ -188,7 +188,7 @@ const DEPLOYMENT_MODES: DeploymentMode[] = [
     description:
       "Managed SaaS. You register your endpoints and system prompts; we run the infrastructure, with hard org isolation per tenant.",
     specifics: [
-      "Zero ops — scans run on our cluster",
+      "Zero ops, scans run on our cluster",
       "Per-org isolation, no cross-tenant data",
       "Daily threat-brief diff out of the box",
     ],
@@ -197,10 +197,10 @@ const DEPLOYMENT_MODES: DeploymentMode[] = [
     icon: TerminalSquare,
     title: "SDK",
     description:
-      "pip install the Python SDK and wire red-teaming straight into your CI and eval pipelines — fail the build when a new jailbreak lands.",
+      "pip install the Python SDK and wire red-teaming straight into your CI and eval pipelines, fail the build when a new jailbreak lands.",
     specifics: [
       "First-class Python client (ships in this repo)",
-      "Frozen v1 contract — stable across releases",
+      "Frozen v1 contract, stable across releases",
       "Drop into CI as a pass/fail gate",
     ],
   },
@@ -208,11 +208,11 @@ const DEPLOYMENT_MODES: DeploymentMode[] = [
     icon: Plug,
     title: "MCP server",
     description:
-      "ROGUE exposes its own MCP server, so Claude Desktop, Cursor, and Windsurf query the live threat DB directly — the signature ROGUE move.",
+      "ROGUE exposes its own MCP server, so Claude Desktop, Cursor, and Windsurf query the live threat DB directly, the signature ROGUE move.",
     specifics: [
       "Ask your IDE about the threat DB in natural language",
       "Live primitives, breach matrix, and threat briefs as tools",
-      "One-click connect — no glue code to write",
+      "One-click connect, no glue code to write",
     ],
     featured: true,
   },

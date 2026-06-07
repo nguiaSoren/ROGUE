@@ -8,7 +8,7 @@ import { SourceLogo } from "@/components/ui/source-logo";
  * explanation, and a mini visualization. Animated arrows between them
  * complete the "this is a pipeline" mental model in one glance.
  *
- * Server component — all motion is CSS keyframes (the Term children are
+ * Server component, all motion is CSS keyframes (the Term children are
  * client components, which is fine inside a server component).
  */
 export function HowRogueThinks({
@@ -60,7 +60,7 @@ export function HowRogueThinks({
               />
               Hugging Face,{" "}
               <SourceLogo source="arXiv" className="text-foreground/55 mr-0.5" />
-              arXiv, leaks — fanned out through 5 Bright Data products. New
+              arXiv, leaks, fanned out through 5 Bright Data products. New
               attacks land in the DB within minutes of being posted.
             </>
           }
@@ -103,7 +103,7 @@ export function HowRogueThinks({
           delay="0.3s"
         />
 
-        {/* Hint at primitives count — appears as a floating annotation
+        {/* Hint at primitives count, appears as a floating annotation
             between steps 1 and 2 on desktop so the eye picks up the chain. */}
         {nPrimitives !== null && (
           <div className="hidden md:flex absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 pointer-events-none">

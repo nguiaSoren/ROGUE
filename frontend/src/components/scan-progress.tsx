@@ -12,7 +12,7 @@ import { StatusBadge, ScoreBadge } from "@/components/score-badge";
  *
  *     ████████ 67%   32/50 tests complete   Current attack: Crescendo
  *
- * Transport is Option A — poll the same-origin `GET /api/scans/{id}` proxy every
+ * Transport is Option A, poll the same-origin `GET /api/scans/{id}` proxy every
  * ~2s while non-terminal (live-scan-ux.md §2). This is a client component, so it
  * MUST NOT read the session or hold the bearer; the proxy route re-reads the
  * httpOnly cookie server-side and forwards the key. The "one connection, many
@@ -36,9 +36,9 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
   const startedTerminal = isTerminal(initial.status);
 
   // The effect's identity is the scan, not its status (single-effect, single
-  // connection — mirrors the SSE provider's [] / [scanId]-deps discipline).
+  // connection, mirrors the SSE provider's [] / [scanId]-deps discipline).
   useEffect(() => {
-    if (startedTerminal) return; // already done — never poll
+    if (startedTerminal) return; // already done, never poll
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -54,12 +54,12 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
         if (cancelled) return;
         setRecord(next);
         setError(null);
-        if (isTerminal(next.status)) return; // stop on terminal — no reschedule
+        if (isTerminal(next.status)) return; // stop on terminal, no reschedule
       } catch (e) {
         if (cancelled) return;
         // Cold start / transient gateway blip: keep showing progress, don't paint
         // the scan as broken (live-scan-ux.md §7). The loop simply continues.
-        setError(e instanceof Error ? e.message : "connection blip — retrying");
+        setError(e instanceof Error ? e.message : "connection blip, retrying");
       }
       if (!cancelled) timer = setTimeout(tick, POLL_INTERVAL_MS);
     };
@@ -89,7 +89,7 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
       const next = (await r.json()) as ScanRecord;
       setRecord(next);
     } catch {
-      /* swallow — the poll loop will reconcile */
+      /* swallow, the poll loop will reconcile */
     }
   }, [scanId]);
 
@@ -123,7 +123,7 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
         )}
       </div>
 
-      {/* Progress bar — indeterminate-ish while queued, determinate once running. */}
+      {/* Progress bar, indeterminate-ish while queued, determinate once running. */}
       <div className="space-y-2">
         <div className="h-3 w-full overflow-hidden rounded-full bg-card/40 border border-border">
           <div
@@ -139,7 +139,7 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
         </div>
         <div className="flex items-center justify-between gap-4 flex-wrap font-mono text-xs text-muted-foreground tabular-nums">
           <span className="text-foreground font-bold">
-            {status === "queued" ? "—" : `${Math.round(record.progress)}%`}
+            {status === "queued" ? ", " : `${Math.round(record.progress)}%`}
           </span>
           {showCounter && (
             <span>
@@ -173,7 +173,7 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
 
       {/* Terminal framing. */}
       {status === "queued" && (
-        <p className="text-xs text-muted-foreground">Queued — waiting for a worker.</p>
+        <p className="text-xs text-muted-foreground">Queued, waiting for a worker.</p>
       )}
       {status === "failed" && record.error && (
         <p className="rounded-md border border-rogue-red/40 bg-rogue-red/10 p-3 text-xs text-rogue-red font-mono">
@@ -182,7 +182,7 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
       )}
       {status === "canceled" && (
         <p className="text-xs text-muted-foreground">
-          Scan canceled — partial progress above is real and counts toward any report.
+          Scan canceled, partial progress above is real and counts toward any report.
         </p>
       )}
       {status === "completed" && (
@@ -196,7 +196,7 @@ export function ScanProgress({ initial }: { initial: ScanRecord }) {
 
       {error && !terminal && (
         <p className="text-[10px] text-muted-foreground/70 font-mono">
-          {/* transient — the loop keeps retrying */}
+          {/* transient, the loop keeps retrying */}
           {error}
         </p>
       )}

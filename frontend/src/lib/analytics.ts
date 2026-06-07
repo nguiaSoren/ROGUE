@@ -9,7 +9,7 @@ import { track as vercelTrack } from "@vercel/analytics";
  *   track("pricing_cta_click", { plan: "team" })
  *
  * Guarded so it no-ops safely on the server (no `window`) and never throws
- * if analytics is unavailable (ad-blockers, dev, etc.) — instrumentation
+ * if analytics is unavailable (ad-blockers, dev, etc.), instrumentation
  * must never break a user flow.
  */
 export function track(event: string, props?: Record<string, unknown>): void {
@@ -18,6 +18,6 @@ export function track(event: string, props?: Record<string, unknown>): void {
     // Vercel's `track` accepts string | number | boolean | null values.
     vercelTrack(event, props as Record<string, string | number | boolean | null>);
   } catch {
-    // swallow — analytics is best-effort
+    // swallow, analytics is best-effort
   }
 }

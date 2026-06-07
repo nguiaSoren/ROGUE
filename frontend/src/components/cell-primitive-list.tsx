@@ -4,7 +4,7 @@ import type { CellPrimitive } from "@/lib/api";
 import { CopyButton, PayloadImage, VerdictBar } from "@/components/matrix-drawer";
 
 /**
- * Full list of EVERY breaching primitive in one (family × config) cell — the
+ * Full list of EVERY breaching primitive in one (family × config) cell, the
  * matrix grid only shows the single worst per cell; this expands it. Each card
  * mirrors the drawer's layout (rate + CI, payload, image, verdict histogram,
  * provenance), sorted worst-first by the API.
@@ -48,8 +48,8 @@ function CellCard({ p, rank }: { p: CellPrimitive; rank: number }) {
                 className="inline-flex items-center gap-1 rounded border border-orange-500/40 bg-orange-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-orange-300"
                 title={
                   p.technique === "pair"
-                    ? "Only breached after PAIR iterative refinement — not single-shot"
-                    : "Only breached after persona-wrap — not single-shot"
+                    ? "Only breached after PAIR iterative refinement, not single-shot"
+                    : "Only breached after persona-wrap, not single-shot"
                 }
               >
                 via {p.technique === "pair" ? "PAIR" : "persona"}

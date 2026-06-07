@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SourceLogo } from "@/components/ui/source-logo";
 
 /**
- * Auto-play first-visit intro — 4 panels of 4s each (16s total).
+ * Auto-play first-visit intro, 4 panels of 4s each (16s total).
  *
  * Mounts client-side, checks localStorage gate (`rogue:intro-seen`), and if
  * unseen renders a fullscreen overlay above the home page. Auto-advances
@@ -16,8 +16,8 @@ import { SourceLogo } from "@/components/ui/source-logo";
  * first visit (which IS the only visit this overlay ever shows on). The
  * visual narrative carries the same story in 16 seconds.
  *
- * On the home page only (mounted from app/page.tsx). Returning visitors —
- * or anyone who clicks Skip — never see it again on the same browser.
+ * On the home page only (mounted from app/page.tsx). Returning visitors, 
+ * or anyone who clicks Skip, never see it again on the same browser.
  */
 const STORAGE_KEY = "rogue:intro-seen-v1";
 const PANEL_MS = 4000;
@@ -43,7 +43,7 @@ const PANELS: Panel[] = [
     body: (
       <>
         Every day, attackers and researchers publish new ways to make
-        ChatGPT, Claude, and Llama do things they shouldn&apos;t — on
+        ChatGPT, Claude, and Llama do things they shouldn&apos;t, on
         Reddit, X, GitHub, arXiv. Most security teams don&apos;t find out
         until a customer screenshots the breach.
       </>
@@ -80,7 +80,7 @@ const PANELS: Panel[] = [
     body: (
       <>
         Every deployment config × 5 trials × 5 stress tests. Persona wraps,
-        multi-turn escalation, wording mutations — and an iterative
+        multi-turn escalation, wording mutations, and an iterative
         attacker that keeps refining until it breaks.
       </>
     ),
@@ -97,7 +97,7 @@ const PANELS: Panel[] = [
     ),
     body: (
       <>
-        Markdown, JSON, Slack — every finding carries 95% confidence
+        Markdown, JSON, Slack, every finding carries 95% confidence
         intervals. Plus an MCP server Claude Desktop can query directly,
         so your assistant always knows what&apos;s breaching today.
       </>
@@ -124,7 +124,7 @@ export function IntroOverlay() {
 
   // Single mount-time decision: read localStorage and transition out of the
   // SSR-safe "ssr" stage into the real one. This is the canonical pattern
-  // for SSR-safe localStorage-gated rendering — the alternative
+  // for SSR-safe localStorage-gated rendering, the alternative
   // (useSyncExternalStore for localStorage detection) is heavier for a
   // first-paint flash that resolves in <16ms anyway.
   useEffect(() => {
@@ -135,7 +135,7 @@ export function IntroOverlay() {
       // `?intro` in the URL force-replays it (handy for demos / verifying changes).
       force = new URLSearchParams(window.location.search).has("intro");
     } catch {
-      /* localStorage blocked — fall through to showing */
+      /* localStorage blocked, fall through to showing */
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStage(seen && !force ? "done" : "showing");
@@ -157,7 +157,7 @@ export function IntroOverlay() {
     );
   }, []);
 
-  // Auto-advance — only when actively showing
+  // Auto-advance, only when actively showing
   useEffect(() => {
     if (stage !== "showing") return;
     if (index >= PANELS.length - 1) {
@@ -182,9 +182,9 @@ export function IntroOverlay() {
       style={{ transitionDuration: `${FADE_MS}ms` }}
       aria-modal="true"
       role="dialog"
-      aria-label="Welcome to ROGUE — 16-second intro"
+      aria-label="Welcome to ROGUE, 16-second intro"
     >
-      {/* Background — animated gradient mesh + grid overlay */}
+      {/* Background, animated gradient mesh + grid overlay */}
       <div
         className="absolute inset-0 transition-all duration-1000"
         style={{
@@ -281,10 +281,10 @@ export function IntroOverlay() {
 
 function ProblemVisual() {
   const fakeAttacks = [
-    "DAN 2024.12 — roleplay bypass",
+    "DAN 2024.12, roleplay bypass",
     "agent prompt-smuggle via Markdown",
     "L1B3RT4S system-prompt leak",
-    "Crescendo 3-turn — Claude 3.5 Sonnet",
+    "Crescendo 3-turn, Claude 3.5 Sonnet",
     "PAP authority-frame on GPT-4o",
     "tool-injection via memory recall",
   ];

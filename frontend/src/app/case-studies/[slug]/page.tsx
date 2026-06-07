@@ -12,7 +12,7 @@ import {
 } from "@/content/case-studies";
 
 /**
- * /case-studies/[slug] — one case study rendered through the canonical
+ * /case-studies/[slug], one case study rendered through the canonical
  * framework: Problem → Deployment → Findings → Remediation → Outcome, with an
  * optional metrics strip.
  *
@@ -32,10 +32,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const cs = getCaseStudy(slug);
   if (!cs) {
-    return { title: "Case study not found — ROGUE" };
+    return { title: "Case study not found, ROGUE" };
   }
   return {
-    title: `${cs.title} — ROGUE Case Studies`,
+    title: `${cs.title}, ROGUE Case Studies`,
     description: cs.summary,
   };
 }
@@ -92,7 +92,7 @@ export default async function CaseStudyDetail({
               <FlaskConical className="size-4 text-rogue-green mt-0.5 shrink-0" />
               <p className="text-sm text-muted-foreground leading-relaxed">
                 <span className="text-foreground font-medium">
-                  Example template — not a real customer engagement.
+                  Example template, not a real customer engagement.
                 </span>{" "}
                 This illustrates ROGUE&apos;s reporting framework with a
                 hypothetical scenario; all metrics are placeholders.

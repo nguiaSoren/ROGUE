@@ -9,7 +9,7 @@ import { AttackRow } from "@/components/attack-row";
  *
  * The page server-renders the default 7-day window (instant first paint + ISR),
  * then hands the LEFT intel ribbons + CENTER attack list to this component so
- * the user can re-scope the window — today | 7 days | all time — without a
+ * the user can re-scope the window, today | 7 days | all time, without a
  * navigation round-trip. Keeping it client-side (not a `?window=` searchParam)
  * preserves the page's static render, the same reason /matrix reads its run-day
  * override from `window.location` rather than `useSearchParams`.
@@ -30,7 +30,7 @@ type WindowKey = (typeof WINDOWS)[number]["key"];
 export function FeedStream({
   initialAttacks,
 }: {
-  // The server's 7-day fetch — seeds the default window so no client re-fetch
+  // The server's 7-day fetch, seeds the default window so no client re-fetch
   // happens on load; only changing the window triggers one.
   initialAttacks: AttacksResponse;
 }) {
@@ -54,7 +54,7 @@ export function FeedStream({
 
   const list = useMemo(() => attacks.attacks ?? [], [attacks]);
 
-  // Family + Bright Data product histograms for the left ribbon — recomputed
+  // Family + Bright Data product histograms for the left ribbon, recomputed
   // from whatever window is currently loaded.
   const familyCounts = useMemo(() => topCounts(list.map((a) => a.family), 8), [list]);
   const productCounts = useMemo(
@@ -64,12 +64,12 @@ export function FeedStream({
 
   const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label.toLowerCase();
   // The API relabels to "newest rows regardless of recency" when the window is
-  // empty and it falls back — surface that so the count isn't read as in-window.
+  // empty and it falls back, surface that so the count isn't read as in-window.
   const stale = Boolean(attacks.stale) && windowKey !== "all";
 
   return (
     <>
-      {/* LEFT — intel ribbon: families + products distribution */}
+      {/* LEFT, intel ribbon: families + products distribution */}
       <aside className="space-y-4 lg:order-1">
         <IntelRibbon
           title="hot families"
@@ -85,13 +85,13 @@ export function FeedStream({
         />
       </aside>
 
-      {/* CENTER — time toggle + attack list */}
+      {/* CENTER, time toggle + attack list */}
       <section className="space-y-3 lg:order-2 min-w-0">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            newest attacks — click row to expand
+            newest attacks, click row to expand
           </h2>
-          {/* Window segmented control — styling mirrors the /matrix scope toggle. */}
+          {/* Window segmented control, styling mirrors the /matrix scope toggle. */}
           <div className="inline-flex items-center gap-2">
             <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
               window:
@@ -123,7 +123,7 @@ export function FeedStream({
               <span className="text-rogue-green animate-pulse">loading {windowLabel}…</span>
             ) : errored ? (
               <span className="text-rogue-red">
-                {"// couldn't load — the API may be waking up; pick a window to retry"}
+                {"// couldn't load, the API may be waking up; pick a window to retry"}
               </span>
             ) : stale ? (
               <span>

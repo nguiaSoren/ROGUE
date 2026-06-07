@@ -18,29 +18,29 @@ import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
 import { EarlyAccessSection } from "@/components/marketing/early-access-section";
 
-// ISR — statically prerendered + revalidated every 5 min, matching /matrix and
+// ISR, statically prerendered + revalidated every 5 min, matching /matrix and
 // REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
 // data surfaces within the window instead of paying the full round-trip.
 export const revalidate = 300;
 
 /**
- * Cinematic home — the demo entry. Designed for a 5-second pitch and a
+ * Cinematic home, the demo entry. Designed for a 5-second pitch and a
  * 5-minute deep-dive.
  *
  * Reading order:
- *   1. CINEMATIC HERO — rotating-word headline (states the offer), stat trio, CTA.
- *   2. SOURCES MARQUEE — 19 sources × 5 BD products.
- *   3. AHA MOMENT — "freshest threats" ticker + mini-matrix side-by-side.
- *   4. USE CASES — who uses ROGUE (problem/solution personas).
- *   5. WORKFLOW WALKTHROUGH — the concrete end-to-end story (endpoint → report).
- *   6. INTEGRATIONS — connects to the tools your team already uses (MCP-aware).
- *   7. PRODUCT PREVIEW — a real scored report + a live MCP session (teaser → /product).
- *   8. HOW ROGUE THINKS — 3-step narrative (harvest → reproduce → defend).
- *   9. AUGMENTATION SHOWCASE — the §10.7 results.
- *  10. TRACTION BAND — real results, not logos (award / live / dataset / numbers).
+ *   1. CINEMATIC HERO, rotating-word headline (states the offer), stat trio, CTA.
+ *   2. SOURCES MARQUEE, 19 sources × 5 BD products.
+ *   3. AHA MOMENT, "freshest threats" ticker + mini-matrix side-by-side.
+ *   4. USE CASES, who uses ROGUE (problem/solution personas).
+ *   5. WORKFLOW WALKTHROUGH, the concrete end-to-end story (endpoint → report).
+ *   6. INTEGRATIONS, connects to the tools your team already uses (MCP-aware).
+ *   7. PRODUCT PREVIEW, a real scored report + a live MCP session (teaser → /product).
+ *   8. HOW ROGUE THINKS, 3-step narrative (harvest → reproduce → defend).
+ *   9. AUGMENTATION SHOWCASE, the §10.7 results.
+ *  10. TRACTION BAND, real results, not logos (award / live / dataset / numbers).
  *  11. EARLY ACCESS, DEEP-DIVE LINKS, closing CTA.
  *
- * Server component. All data fetched in parallel via Promise.allSettled —
+ * Server component. All data fetched in parallel via Promise.allSettled, 
  * the page renders even if a backend endpoint is offline.
  */
 export default async function Home() {
@@ -80,7 +80,7 @@ export default async function Home() {
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
-      {/* First-visit auto-play intro — gated by localStorage so it shows
+      {/* First-visit auto-play intro, gated by localStorage so it shows
           once per browser. Skip button always visible top-right. */}
       <IntroOverlay />
 
@@ -95,7 +95,7 @@ export default async function Home() {
         {/* 2. BRIGHT DATA SPOTLIGHT ------------------------------------ */}
         <SourcesMarquee bandit={bandit} />
 
-        {/* 4. AHA MOMENT — fresh threats + mini-matrix ----------------- */}
+        {/* 4. AHA MOMENT, fresh threats + mini-matrix ----------------- */}
         <section
           className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 animate-rogue-fade-up"
         >
@@ -109,7 +109,7 @@ export default async function Home() {
             </h2>
             <p className="text-sm text-muted-foreground max-w-xl">
               {attacks?.stale
-                ? "The harvester runs on demand. Nothing new landed in the last 48h — these are the most recent attacks in the threat DB."
+                ? "The harvester runs on demand. Nothing new landed in the last 48h, these are the most recent attacks in the threat DB."
                 : "The harvester runs continuously. Every row below is an attack someone published on the open web in the last 2 days."}
             </p>
             <div className="pt-2">
@@ -124,12 +124,12 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 4b. USE CASES — who uses ROGUE (problem/solution personas).
+        {/* 4b. USE CASES, who uses ROGUE (problem/solution personas).
             Replaces the lighter "one engine, five teams" strip; the full
             5-persona breadth still lives on /enterprise. ---------------- */}
         <UseCasesSection className="!px-0 animate-rogue-fade-up" />
 
-        {/* 4c. WORKFLOW WALKTHROUGH — the concrete end-to-end story
+        {/* 4c. WORKFLOW WALKTHROUGH, the concrete end-to-end story
             (connect endpoint → ladder scan → jailbreak → filed ticket).
             Self-headed; sits between the personas and the MCP pitch so the
             "how it actually works" answer lands right after "who it's for". */}
@@ -137,12 +137,12 @@ export default async function Home() {
           <WorkflowWalkthrough />
         </section>
 
-        {/* 5. INTEGRATIONS — connects to the tools your team already uses
+        {/* 5. INTEGRATIONS, connects to the tools your team already uses
             (enterprise-friendly reframe of the MCP pitch; keeps the MCP
             connector differentiator without leading with jargon). ------- */}
         <IntegrationsSection className="!px-0 animate-rogue-fade-up" />
 
-        {/* 5b. PRODUCT PREVIEW TEASER — make it concrete: a real scored
+        {/* 5b. PRODUCT PREVIEW TEASER, make it concrete: a real scored
             report + the MCP session, side-by-side on desktop, stacked on
             mobile. Two previews max here; the full set lives on /product. */}
         <Section
@@ -182,12 +182,12 @@ export default async function Home() {
           stubbornness={stubbornness}
         />
 
-        {/* 8b. TRACTION BAND — real results, not logos. Richer social-proof
+        {/* 8b. TRACTION BAND, real results, not logos. Richer social-proof
             band (award + live deployment + open dataset + measured numbers)
             that supersedes the old inline PROOF_POINTS→StatCard strip. ---- */}
         <TractionBand className="!px-0 animate-rogue-fade-up" />
 
-        {/* 8c. EARLY ACCESS — the honest "who's using it" answer: no logos
+        {/* 8c. EARLY ACCESS, the honest "who's using it" answer: no logos
             yet, we're onboarding first partners. Self-contained, max-w-7xl. */}
         <div className="animate-rogue-fade-up">
           <EarlyAccessSection />
@@ -208,7 +208,7 @@ export default async function Home() {
               href="/feed"
               path="/feed"
               title="Live Feed"
-              desc="Newest attacks with the 5-stress-test sidebar. Click any row to see the full payload + breach trail — including the new ▶ play replay."
+              desc="Newest attacks with the 5-stress-test sidebar. Click any row to see the full payload + breach trail, including the new ▶ play replay."
             />
             <PageLink
               href="/matrix"
@@ -229,7 +229,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 10. CLOSING CTA — conversion close ------------------------- */}
+        {/* 10. CLOSING CTA, conversion close ------------------------- */}
         <section className="rogue-card border border-border rounded-2xl p-8 md:p-12 bg-card/40 backdrop-blur-sm text-center animate-rogue-fade-up">
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
             get started

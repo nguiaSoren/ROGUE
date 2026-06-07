@@ -1,8 +1,8 @@
 /**
  * Instant Suspense fallback for /brief. The brief page is server-rendered with
  * an ISR window; a cold-cache or cold-Render visit waits on the markdown brief
- * fetch with no feedback. This skeleton mirrors the page shell — dated masthead,
- * KPI snapshot strip, and a long-form report placeholder — so the transition
+ * fetch with no feedback. This skeleton mirrors the page shell, dated masthead,
+ * KPI snapshot strip, and a long-form report placeholder, so the transition
  * into the real brief is seamless. Mirrors matrix/loading.tsx.
  */
 export default function BriefLoading() {

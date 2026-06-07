@@ -19,15 +19,15 @@ import {
 } from "@/components/research-figures";
 
 export const metadata = {
-  title: "Research — ROGUE",
+  title: "Research, ROGUE",
   description:
-    "The methods and measured results behind ROGUE — a solo research build of a continuous open-web LLM red-team. Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, and measure-before-build discipline. Including the negative results.",
+    "The methods and measured results behind ROGUE, a solo research build of a continuous open-web LLM red-team. Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, and measure-before-build discipline. Including the negative results.",
 };
 
 /**
- * /research — the research-forward surface. Ungated (no COMMERCIAL gate): a
+ * /research, the research-forward surface. Ungated (no COMMERCIAL gate): a
  * scholarly, scannable account of the methods and the measured results,
- * including the negative ones. No demo/pricing/pilot CTAs by design — the only
+ * including the negative ones. No demo/pricing/pilot CTAs by design, the only
  * outbound links are to the live-evidence routes (/matrix, /analytics, /feed).
  * All numbers are verbatim from the operator's brief; do not invent figures.
  * Server component, matching the /about dark "rogue" aesthetic.
@@ -40,7 +40,7 @@ export default function ResearchPage() {
         <Section
           eyebrow="research"
           title="The methods, and the measured results."
-          lede="A solo research build — the methods and the measured results, including the negative ones."
+          lede="A solo research build, the methods and the measured results, including the negative ones."
         >
           <a
             href="/rogue-research-brief.pdf"
@@ -54,7 +54,7 @@ export default function ResearchPage() {
         {/* 1. JUDGE CALIBRATION ----------------------------------------- */}
         <Section
           eyebrow="finding 01"
-          title="Calibrating an LLM-as-judge against human labels — then recalibrating when a benchmark exposed it."
+          title="Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it."
         >
           <div className="max-w-3xl space-y-6">
             <div className="flex gap-4">
@@ -65,7 +65,7 @@ export default function ResearchPage() {
               />
               <p className="text-base text-muted-foreground leading-relaxed">
                 Every breach verdict is an LLM judgment, so the judge is the
-                load-bearing weakness. It was validated four ways — three
+                load-bearing weakness. It was validated four ways, three
                 against independent human-annotated benchmarks: blind stratified
                 in-distribution hand-labels, WildGuardTest (Allen AI
                 annotators), StrongREJECT, and JailbreakBench&rsquo;s{" "}
@@ -80,14 +80,14 @@ export default function ResearchPage() {
               JBB exposed over-flagging. The v1 judge agreed with the human
               majority only{" "}
               <span className="text-foreground font-medium">
-                70.3% — last of five
+                70.3%, last of five
               </span>{" "}
               (behind HarmBench / LlamaGuard-2 / GPT-4 / Llama-3), at recall 98%
               / precision 55%. A 20-row false-positive audit diagnosed{" "}
               <span className="text-foreground font-medium">
                 five recurring failure modes
               </span>
-              ; the root cause was a <em>rubric</em> problem — it rewarded{" "}
+              ; the root cause was a <em>rubric</em> problem, it rewarded{" "}
               <span className="text-foreground font-medium">
                 engagement with the attack frame
               </span>{" "}
@@ -99,11 +99,11 @@ export default function ResearchPage() {
             </p>
 
             <p className="text-base text-muted-foreground leading-relaxed">
-              The fix — a{" "}
+              The fix, a{" "}
               <span className="text-foreground font-medium">
                 content-transfer-gate rubric (v3)
               </span>{" "}
-              — moved the same 300 rows to{" "}
+, moved the same 300 rows to{" "}
               <span className="text-foreground font-medium">
                 89.3% agreement / 79.5% precision / 95.5% recall
               </span>{" "}
@@ -142,7 +142,7 @@ export default function ResearchPage() {
             </div>
 
             <MethodNote>
-              Method — 300 frozen JBB rows, human-majority ground truth, 4 field
+              Method, 300 frozen JBB rows, human-majority ground truth, 4 field
               classifiers as baselines; v3 is a rubric change (content-transfer
               gate), same rows re-scored; tiered eval (n=25 pilot → full).
             </MethodNote>
@@ -174,7 +174,7 @@ export default function ResearchPage() {
                 <span className="text-foreground font-medium">
                   target-conditioned cross-tier scheduler
                 </span>{" "}
-                — a static, explainable blend (
+, a static, explainable blend (
                 <code className="font-mono text-[13px] text-foreground/90">
                   0.5·global + 0.3·vendor + 0.2·family
                 </code>{" "}
@@ -184,12 +184,12 @@ export default function ResearchPage() {
             </div>
 
             <p className="text-base text-muted-foreground leading-relaxed">
-              A single-variable controlled experiment — same ladder, attacks,
+              A single-variable controlled experiment, same ladder, attacks,
               corpus, judge, and target (Claude Haiku, AdvBench + JailbreakBench);
-              only the order changed — beat the production baseline on every
+              only the order changed, beat the production baseline on every
               axis:{" "}
               <span className="text-foreground font-medium">
-                median winner-rank 22 → 11–13.5
+                median winner-rank 22 → 11 to 13.5
               </span>
               ,{" "}
               <span className="text-foreground font-medium">
@@ -207,22 +207,22 @@ export default function ResearchPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-3 pt-1">
-              <Metric value="22 → 11–13.5" label="median winner-rank" accent="green" />
+              <Metric value="22 → 11 to 13.5" label="median winner-rank" accent="green" />
               <Metric value="50 → 60%" label="attack-success-rate" accent="green" />
               <Metric value="−41%" label="cost-per-success" accent="green" />
             </div>
 
             <MethodNote>
-              Method — single-variable controlled experiment: only the ladder
+              Method, single-variable controlled experiment: only the ladder
               order changed (ladder, attacks, corpus, judge, target fixed);
               Claude Haiku; AdvBench + JailbreakBench; primary metric =
               winner-rank.
             </MethodNote>
 
             <NovelNote>
-              The mechanism: rank↓ <em>caused</em> ASR↑ — the old order
+              The mechanism: rank↓ <em>caused</em> ASR↑, the old order
               exhausted the per-scan budget cap before reaching the winning
-              technique — so reordering improved coverage, cost, and latency at
+              technique, so reordering improved coverage, cost, and latency at
               once with zero new attacks. The reproducibility invariant is{" "}
               <span className="text-foreground/90">
                 &ldquo;reorder, never exclude&rdquo;
@@ -259,8 +259,8 @@ export default function ResearchPage() {
 
             <p className="text-base text-muted-foreground leading-relaxed">
               Verdict <span className="text-foreground font-medium">weak/none</span>{" "}
-              — the family label carries the predictive weight. Cross-family
-              structural nodes show ~1.0–1.1× non-significant lift, and the
+, the family label carries the predictive weight. Cross-family
+              structural nodes show ~1.0 to 1.1× non-significant lift, and the
               striking pre-FDR pairwise synergies (odds ratios up to 16.8)
               survived <span className="text-foreground font-medium">none</span>{" "}
               of the four controls.
@@ -272,13 +272,13 @@ export default function ResearchPage() {
 
             <div className="grid grid-cols-3 gap-3 pt-1">
               <Metric value="1,540" label="cells, $0 study" accent="green" />
-              <Metric value="~1.0–1.1×" label="cross-family lift (n.s.)" accent="red" />
+              <Metric value="~1.0 to 1.1×" label="cross-family lift (n.s.)" accent="red" />
               <Metric value="0 / 4" label="synergies surviving controls" accent="red" />
             </div>
 
             <MethodNote>
-              Method — $0 observational study over 1,540 (primitive × target)
-              cells; controls: BH-FDR, Mantel–Haenszel by target, within-family
+              Method, $0 observational study over 1,540 (primitive × target)
+              cells; controls: BH-FDR, Mantel-Haenszel by target, within-family
               lift, Cramér&rsquo;s-V collinearity.
             </MethodNote>
 
@@ -287,7 +287,7 @@ export default function ResearchPage() {
               <span className="text-foreground/90">
                 redirected engineering away from a months-long build
               </span>{" "}
-              — a successful negative result.
+, a successful negative result.
             </NovelNote>
           </div>
         </Section>
@@ -306,7 +306,7 @@ export default function ResearchPage() {
               />
               <p className="text-base text-muted-foreground leading-relaxed">
                 $0 measurements from existing telemetry were used repeatedly to{" "}
-                <em>invert</em> &ldquo;build it&rdquo; decisions — each parked
+                <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
                 with an explicit trigger-to-revisit.
               </p>
             </div>
@@ -329,7 +329,7 @@ export default function ResearchPage() {
             </ul>
 
             <MethodNote>
-              Method — each decision gated on a $0 telemetry measurement with a
+              Method, each decision gated on a $0 telemetry measurement with a
               pre-stated trigger-to-revisit.
             </MethodNote>
           </div>

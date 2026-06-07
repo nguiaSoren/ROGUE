@@ -1,7 +1,7 @@
 /**
  * Instant Suspense fallback for /matrix/cell. The cell page server-renders a
  * (family × config) breakdown against the API, which can take a second or two
- * on a cold Render instance — without this, a click on "worst attacker today"
+ * on a cold Render instance, without this, a click on "worst attacker today"
  * (or "see all primitives") froze on the previous page with no feedback. This
  * mirrors the CellShell layout so the skeleton → content swap is seamless.
  */

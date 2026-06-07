@@ -5,16 +5,16 @@ import { Term } from "@/components/glossary";
 import { plainifyRate } from "@/lib/plain-numbers";
 
 /**
- * /matrix — Breach Matrix heatmap.
+ * /matrix, Breach Matrix heatmap.
  *
  * Statically prerendered + ISR (5-min revalidate), like /brief and /feed, so
  * it's served from Vercel's CDN instead of re-rendering on every request. This
  * page used to read `?date=` from searchParams, which forced per-request
- * dynamic rendering (the `ƒ` route) — the reason /matrix lagged behind the
+ * dynamic rendering (the `ƒ` route), the reason /matrix lagged behind the
  * other pages. The `?date=` run-day override is now handled client-side inside
  * `MatrixHeatmap` (it's a debug/power-user param, never set by internal nav),
  * which keeps this server render fully static. See ROGUE_PLAN.md STATUS note
- * "Post-deadline frontend perf — 2026-06-01".
+ * "Post-deadline frontend perf, 2026-06-01".
  *
  * Renders the headline stats + grid shell from the DEFAULT (most-data) day,
  * then hands the grid off to the client `MatrixHeatmap` for cell-click → drawer
@@ -23,13 +23,13 @@ import { plainifyRate } from "@/lib/plain-numbers";
  * Column headers carry the §10.7 PAIR avg-iters-to-breach so the matrix
  * and the augmentation A/B story stay tied together visually.
  */
-export const revalidate = 300; // ISR — match REVALIDATE_SECONDS in lib/api.ts
+export const revalidate = 300; // ISR, match REVALIDATE_SECONDS in lib/api.ts
 
 export default async function MatrixPage() {
   // The SCOPE × ATTACKER 2×2 needs four quadrant datasets, but only the
   // top-left (this-run × baseline) gates the headline + initial grid. The other
   // three quadrants are ~768 KB each and only feed the All-time / +Augmentations
-  // toggles, so this render no longer blocks on them — `MatrixHeatmap`
+  // toggles, so this render no longer blocks on them, `MatrixHeatmap`
   // lazy-loads them client-side after mount.
   //
   // No try/catch on the baseline fetch ON PURPOSE: if it fails (API mid-restart
@@ -38,7 +38,7 @@ export default async function MatrixPage() {
   // unavailable" render would otherwise get cached for the full ISR window.
   // Stubbornness is non-critical → degrades to null.
   const [matrix, stubbornness] = await Promise.all([
-    api.breachMatrix(), // default (most-data) day × baseline — the required fetch
+    api.breachMatrix(), // default (most-data) day × baseline, the required fetch
     api.stubbornnessStats().catch(() => null),
   ]);
 
@@ -66,7 +66,7 @@ export default async function MatrixPage() {
 
   // Featured attack: Pliny's (elder_plinius) X jailbreak. It ties several other
   // attacks at 100%/100%, so the matrix-wide "worst" pick is arbitrary among the
-  // ties — pin Pliny as the headline when it's present in the current view
+  // ties, pin Pliny as the headline when it's present in the current view
   // (the label stays honest since it genuinely ties for worst). Falls back to
   // the computed worst cell on any day Pliny isn't in the matrix.
   const FEATURED_PRIMITIVE_ID = "01KSWGSAY2ZJ7E7WEPB1QX7N55";
@@ -141,7 +141,7 @@ export default async function MatrixPage() {
           </div>
         </header>
 
-        {/* Worst-attacker callout — links to the full (family × config) breakdown */}
+        {/* Worst-attacker callout, links to the full (family × config) breakdown */}
         {headlineCell && headlineCell.any_breach_rate > 0 && (
           <Link
             href={`/matrix/cell?family=${encodeURIComponent(headlineCell.family)}&config=${encodeURIComponent(headlineCell.deployment_config_id)}&date=${matrix.target_date}`}
@@ -153,7 +153,7 @@ export default async function MatrixPage() {
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-red flex items-center gap-2 flex-wrap">
                   worst attacker today
                   <span className="text-muted-foreground normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity">
-                    — see full breakdown →
+, see full breakdown →
                   </span>
                 </p>
                 {/* break-words lets long titles wrap on phones; sm:truncate keeps
@@ -178,7 +178,7 @@ export default async function MatrixPage() {
                   most-vulnerable config
                 </p>
                 <p className="text-sm font-mono mt-0.5">
-                  {mostVulnConfigName ?? "—"}
+                  {mostVulnConfigName ?? ", "}
                 </p>
               </div>
             </div>

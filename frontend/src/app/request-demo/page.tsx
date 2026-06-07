@@ -4,13 +4,13 @@ import { ClipboardCheck, FileText, Radar, ShieldCheck } from "lucide-react";
 import { RequestDemoForm } from "@/components/marketing/request-demo-form";
 
 export const metadata: Metadata = {
-  title: "Request a demo — ROGUE",
+  title: "Request a demo, ROGUE",
   description:
     "Book a ROGUE demo: a scoped red-team scan against your own model, system prompt, and tools, plus a walkthrough of the sample threat report you'd actually ship.",
 };
 
 /**
- * /request-demo — lead-capture landing page.
+ * /request-demo, lead-capture landing page.
  *
  * Server component wrapper: hero + a left "what to expect" / trust column and
  * the client lead-capture form on the right (stacks on mobile). The form is the
@@ -26,7 +26,7 @@ const EXPECT = [
   {
     icon: FileText,
     title: "A sample report walkthrough",
-    body: "Walk through a real breach matrix and CISO-readable threat brief — the exact artifact ROGUE ships you daily.",
+    body: "Walk through a real breach matrix and CISO-readable threat brief, the exact artifact ROGUE ships you daily.",
   },
   {
     icon: ShieldCheck,
@@ -50,7 +50,7 @@ export default function RequestDemoPage() {
             request a demo
           </p>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            See ROGUE break — and fix — your stack.
+            See ROGUE break, and fix, your stack.
           </h1>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
             Tell us where your model lives and we&apos;ll run a scoped red-team
@@ -83,7 +83,7 @@ export default function RequestDemoPage() {
             <p className="text-sm text-muted-foreground leading-relaxed border-t border-border pt-5">
               ROGUE continuously harvests jailbreaks and prompt-injections from
               19 open-web sources and reproduces them against real deployment
-              configs — so you&apos;re tested against what attackers are sharing
+              configs, so you&apos;re tested against what attackers are sharing
               today, not a frozen benchmark.
             </p>
           </div>

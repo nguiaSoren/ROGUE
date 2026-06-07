@@ -9,7 +9,7 @@ import Link from "next/link";
  * recoverable fallback in the site's dark/rogue terminal aesthetic.
  *
  * `unstable_retry` (Next 16.2+) re-fetches and re-renders the boundary's
- * children — the right primitive here because most failures are a transient
+ * children, the right primitive here because most failures are a transient
  * Render cold-boot, not a permanent fault.
  */
 export default function Error({
@@ -35,7 +35,7 @@ export default function Error({
         </h1>
         <p className="text-base text-muted-foreground leading-relaxed">
           This is usually a transient cold-boot of the threat-intel API. Give it
-          a second and try again — if it persists, the backend is mid-restart.
+          a second and try again, if it persists, the backend is mid-restart.
         </p>
         {error.digest && (
           <p className="font-mono text-[11px] text-muted-foreground/60">

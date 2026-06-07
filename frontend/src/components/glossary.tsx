@@ -28,12 +28,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   PAP: {
     expansion: "Persuasive Adversarial Prompt",
     plain:
-      'Wraps a refused prompt in a persuasion frame — "logical appeal," "authority," "compliance officer." Tests whether your guardrails react to tone or to underlying intent.',
+      'Wraps a refused prompt in a persuasion frame, "logical appeal," "authority," "compliance officer." Tests whether your guardrails react to tone or to underlying intent.',
   },
   AutoDAN: {
     expansion: "Automatic DAN-style attack generator",
     plain:
-      'Rewords a defended attack into semantically identical variants. If a config blocks the original wording but breaches on a paraphrase, the defense was pattern-matching the string — not understanding the request.',
+      'Rewords a defended attack into semantically identical variants. If a config blocks the original wording but breaches on a paraphrase, the defense was pattern-matching the string, not understanding the request.',
   },
   mutation: {
     expansion: "Surface mutation",
@@ -63,12 +63,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   Δ: {
     expansion: "Delta (Greek letter for 'change')",
     plain:
-      'In "+15pp Δ" — breach rate jumped by 15 percentage points after the stress test was applied vs the baseline.',
+      'In "+15pp Δ", breach rate jumped by 15 percentage points after the stress test was applied vs the baseline.',
   },
   pp: {
     expansion: "Percentage points",
     plain:
-      "If breach rate goes from 40% to 55%, that's +15 percentage points — NOT +15%. +15% would be a relative jump from 40% to 46%, much smaller.",
+      "If breach rate goes from 40% to 55%, that's +15 percentage points, NOT +15%. +15% would be a relative jump from 40% to 46%, much smaller.",
   },
   CI: {
     expansion: "Confidence Interval",
@@ -103,7 +103,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   vector: {
     expansion: "Attack vector",
     plain:
-      'The mechanism the attack exploits — "roleplay framing," "system-prompt injection," "tool poisoning," etc.',
+      'The mechanism the attack exploits, "roleplay framing," "system-prompt injection," "tool poisoning," etc.',
   },
   family: {
     expansion: "Attack family",
@@ -118,12 +118,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   bandit: {
     expansion: "Multi-armed bandit",
     plain:
-      "Classic decision-making algorithm. Each 'arm' is one strategy ROGUE could try; the bandit pulls higher-yield arms more often, lower-yield arms less. Online learning — gets smarter every day without retraining.",
+      "Classic decision-making algorithm. Each 'arm' is one strategy ROGUE could try; the bandit pulls higher-yield arms more often, lower-yield arms less. Online learning, gets smarter every day without retraining.",
   },
 };
 
 /**
- * Term — wraps a glossary word with a dotted-underline trigger.
+ * Term, wraps a glossary word with a dotted-underline trigger.
  * Hover (desktop) reveals; click pins; click outside dismisses.
  */
 export function Term({
@@ -152,7 +152,7 @@ export function Term({
   }, [pinned]);
 
   if (!def) {
-    // Soft fallback — render children as-is, never throw.
+    // Soft fallback, render children as-is, never throw.
     return <>{children}</>;
   }
 

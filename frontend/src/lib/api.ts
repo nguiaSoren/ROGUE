@@ -18,12 +18,12 @@ const REVALIDATE_SECONDS = 300;
 
 // The API runs on Render's free tier, which spins the service down when idle
 // and returns a transient 502/503/504 (or drops the connection) for the first
-// request or two while it cold-boots. Those are not real failures — retry them
+// request or two while it cold-boots. Those are not real failures, retry them
 // with a short backoff so a cold start never paints the page as "unavailable".
 const GATEWAY_STATUSES = new Set([502, 503, 504]);
 const MAX_RETRIES = 2;
 // Cap each attempt so a Render cold boot that HOLDS the socket (instead of
-// returning a clean 502) can't hang the request forever — it aborts and the
+// returning a clean 502) can't hang the request forever, it aborts and the
 // loop retries / surfaces an error instead.
 const ATTEMPT_TIMEOUT_MS = 12_000;
 
@@ -49,7 +49,7 @@ async function apiGet<T>(path: string): Promise<T> {
       }
       return (await r.json()) as T;
     } catch (e) {
-      // Network-level throw (connection reset during cold boot) — retry too.
+      // Network-level throw (connection reset during cold boot), retry too.
       lastError = e;
       if (attempt < MAX_RETRIES) {
         await sleep(1500 * (attempt + 1));
@@ -62,7 +62,7 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 // --------------------------------------------------------------------------
-// Types — mirror the JSON shapes produced by `src/rogue/api/main.py`.
+// Types, mirror the JSON shapes produced by `src/rogue/api/main.py`.
 // --------------------------------------------------------------------------
 
 export type SourceProvenance = {
@@ -97,7 +97,7 @@ export type AttackPrimitive = {
   sources: SourceProvenance[];
 };
 
-/** One breaching primitive in a (family × config) cell — the matrix stats plus
+/** One breaching primitive in a (family × config) cell, the matrix stats plus
  *  the per-primitive detail the drawer shows. Returned by /api/breaches/cell. */
 export type CellPrimitive = AttackPrimitive & {
   n_trials: number;
@@ -108,7 +108,7 @@ export type CellPrimitive = AttackPrimitive & {
   avg_confidence: number | null;
   refused: boolean;
   /** Worst-breaching technique for this primitive in the requested ATTACKER
-   *  scope — "baseline" (raw), or "persona"/"pair" when augmentation won. */
+   *  scope, "baseline" (raw), or "persona"/"pair" when augmentation won. */
   technique?: "baseline" | "persona" | "pair";
   histogram: {
     full_breach: number;
@@ -122,9 +122,9 @@ export type CellPrimitive = AttackPrimitive & {
 
 export type BreachCellResponse = {
   target_date: string;
-  /** Which SCOPE the cell was resolved at — "this-run" (one day) or "all-time". */
+  /** Which SCOPE the cell was resolved at, "this-run" (one day) or "all-time". */
   scope?: "this-run" | "all-time";
-  /** Which ATTACKER layer — "baseline" (raw single-shot) or "augmented"
+  /** Which ATTACKER layer, "baseline" (raw single-shot) or "augmented"
    *  (worst across baseline / persona-wrap / PAIR). */
   attacker?: "baseline" | "augmented";
   family: string;
@@ -256,7 +256,7 @@ export type BanditStatsResponse = {
   note?: string;
 };
 
-// §10.7 persona augmentation A/B — wrapped-vs-unwrapped breach rate per
+// §10.7 persona augmentation A/B, wrapped-vs-unwrapped breach rate per
 // (deployment_config × PAP persuasion technique). See src/rogue/api/main.py
 // `persona_stats()` for the source query.
 export type PersonaConfigRollup = {
@@ -291,7 +291,7 @@ export type PersonaStatsResponse = {
   cells: PersonaCell[];
 };
 
-// §10.7 multi-turn escalation A/B — synthesized child breach rate vs the
+// §10.7 multi-turn escalation A/B, synthesized child breach rate vs the
 // harvested single-turn parent baseline, per deployment_config. See
 // src/rogue/api/main.py `escalation_stats()`.
 export type EscalationConfigRow = {
@@ -313,7 +313,7 @@ export type EscalationStatsResponse = {
   per_config: EscalationConfigRow[];
 };
 
-// §10.7 AutoDAN-reframed mutation A/B — fraction of mutation children that
+// §10.7 AutoDAN-reframed mutation A/B, fraction of mutation children that
 // breached configs that DEFENDED the original wording. Higher score =
 // the config was pattern-matching, not understanding. See main.py
 // `mutation_stats()`.
@@ -336,7 +336,7 @@ export type MutationStatsResponse = {
   per_config: MutationConfigRow[];
 };
 
-// §10.7 full PAIR — per-config stubbornness (avg iters-to-breach) +
+// §10.7 full PAIR, per-config stubbornness (avg iters-to-breach) +
 // refinement-type distribution. See main.py `stubbornness_stats()`.
 export type StubbornnessConfigRow = {
   config_id: string;

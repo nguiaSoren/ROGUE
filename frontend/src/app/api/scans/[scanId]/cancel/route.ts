@@ -1,5 +1,5 @@
 /**
- * POST /api/scans/{scanId}/cancel — cancel a running scan (called by the client cancel button).
+ * POST /api/scans/{scanId}/cancel, cancel a running scan (called by the client cancel button).
  * Forwards to `POST /v1/scans/{id}/cancel` with the session key attached server-side.
  */
 

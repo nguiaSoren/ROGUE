@@ -41,7 +41,7 @@ export function Section({ eyebrow, title, lede, children, className, id }: Secti
   )
 }
 
-/** Form field label — mono uppercase, matches the eyebrow treatment but dimmer. */
+/** Form field label, mono uppercase, matches the eyebrow treatment but dimmer. */
 export function FieldLabel({ className, children, ...props }: React.ComponentProps<"label">) {
   return (
     <label

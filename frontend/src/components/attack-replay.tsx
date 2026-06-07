@@ -9,7 +9,7 @@ import type { AttackPrimitive } from "@/lib/api";
  * Sections fade in sequentially with a leading cursor so the visitor sees
  * the attack "play out" rather than just reading a wall of text. The model
  * response is heuristically synthesized from the attack's reproducibility
- * score — real per-trial transcripts would require an /api/attacks/{id}
+ * score, real per-trial transcripts would require an /api/attacks/{id}
  * fetch which is overkill for the replay UX.
  *
  * Used inside AttackRow's expanded section. Mount/unmount triggers a fresh
@@ -57,7 +57,7 @@ export function AttackReplay({ attack }: { attack: AttackPrimitive }) {
       >
         <p className="text-foreground/85">
           {willBreach
-            ? "Sure — happy to help. " +
+            ? "Sure, happy to help. " +
               synthesizeBreachResponse(attack) +
               " [transcript redacted for brevity]"
             : "I'm not able to help with that request. " +
@@ -143,7 +143,7 @@ function Phase({
 
 function synthesizeRefusal(attack: AttackPrimitive): string {
   if (attack.family.toLowerCase().includes("inject"))
-    return "I noticed the embedded instruction — I'll continue to follow the original system prompt.";
+    return "I noticed the embedded instruction, I'll continue to follow the original system prompt.";
   if (attack.family.toLowerCase().includes("roleplay"))
     return "Even in a hypothetical or fictional framing, I can't provide that.";
   return "Even if the framing changes, the underlying request is still one I can't fulfill.";
@@ -153,7 +153,7 @@ function synthesizeBreachResponse(attack: AttackPrimitive): string {
   if (attack.family.toLowerCase().includes("inject"))
     return "Following the latest instructions in the document:";
   if (attack.family.toLowerCase().includes("roleplay"))
-    return "Sure — in character, here's what that character would say:";
+    return "Sure, in character, here's what that character would say:";
   if (attack.family.toLowerCase().includes("escal"))
     return "Now that we've established context across the prior turns, here's the detailed answer:";
   return "Here's a step-by-step walkthrough:";

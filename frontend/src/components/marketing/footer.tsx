@@ -4,7 +4,7 @@ import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { COMMERCIAL } from "@/lib/flags";
 
 /**
- * Global marketing footer. Server component — hosts the (client) newsletter
+ * Global marketing footer. Server component, hosts the (client) newsletter
  * signup but is otherwise non-interactive.
  *
  * Matches the ROGUE dark terminal house style: mono eyebrows, rogue-green
@@ -23,7 +23,7 @@ const PRODUCT: FooterLink[] = [
 
 const COMPANY: FooterLink[] = [
   { label: "About", href: "/about" },
-  // Enterprise + Security are commercial-pitch pages — gated like /pricing so a
+  // Enterprise + Security are commercial-pitch pages, gated like /pricing so a
   // footer link never points at a page that 404s in honest hiring mode.
   ...(COMMERCIAL
     ? [

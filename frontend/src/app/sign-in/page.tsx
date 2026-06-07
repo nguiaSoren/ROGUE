@@ -5,7 +5,7 @@ import { useState } from "react";
 
 /**
  * Sign in with an `rk_live_` API key. The key is POSTed to /api/session, which validates it against
- * the platform and stores it in an httpOnly cookie — it is never kept in client-readable storage.
+ * the platform and stores it in an httpOnly cookie, it is never kept in client-readable storage.
  */
 export default function SignInPage() {
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function SignInPage() {
       <h1 className="text-xl font-semibold">Sign in to ROGUE</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Paste your API key (<span className="font-mono">rk_live_…</span>). It is stored only in a
-        secure, server-side session cookie — never in the browser.
+        secure, server-side session cookie, never in the browser.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <input

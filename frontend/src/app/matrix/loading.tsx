@@ -2,7 +2,7 @@
  * Instant Suspense fallback for /matrix. The matrix page is server-rendered on
  * demand (it reads ?date= from searchParams), so a cold-cache or cold-Render
  * visit waited on the baseline-matrix fetch with no feedback. This skeleton
- * mirrors the page shell — header, stat capsules, and a grid placeholder — so
+ * mirrors the page shell, header, stat capsules, and a grid placeholder, so
  * the transition into the real heatmap is seamless.
  */
 export default function MatrixLoading() {

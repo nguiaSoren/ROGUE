@@ -12,7 +12,7 @@ import { AttackReplay } from "@/components/attack-replay";
  * tool / system-prompt requirement chips, copy-payload button.
  *
  * The expand interaction is the "wow, the actual prompt that broke this"
- * moment — turns the feed from a list of headlines into a forensics tool.
+ * moment, turns the feed from a list of headlines into a forensics tool.
  */
 export function AttackRow({
   attack,

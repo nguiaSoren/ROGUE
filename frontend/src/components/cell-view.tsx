@@ -12,10 +12,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
  * Client-side, resilient renderer for one (family × config) cell breakdown.
  *
  * Why client-side: /matrix/cell is a dynamic route (it reads ?family/config/date),
- * so server-rendering it would fetch the API on every request — and a transient
+ * so server-rendering it would fetch the API on every request, and a transient
  * Render cold-cycle would surface a hard "502 / cell unavailable" with no
  * recovery. Fetching here lets us retry gateway blips + cap each attempt with a
- * timeout, and show a "waking up — retry" state instead of a dead error. The
+ * timeout, and show a "waking up, retry" state instead of a dead error. The
  * page shell + loading.tsx render instantly regardless of API state.
  */
 type Scope = "this-run" | "all-time";
