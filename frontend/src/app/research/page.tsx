@@ -6,6 +6,7 @@ import {
   Ruler,
   ArrowRight,
   TriangleAlert,
+  Download,
 } from "lucide-react";
 import { Section } from "@/components/marketing/section";
 
@@ -32,7 +33,15 @@ export default function ResearchPage() {
           eyebrow="research"
           title="The methods, and the measured results."
           lede="A solo research build — the methods and the measured results, including the negative ones."
-        />
+        >
+          <a
+            href="/rogue-research-brief.pdf"
+            className="inline-flex items-center gap-2 rounded-lg border border-rogue-green/50 px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-colors hover:bg-rogue-green/10"
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            Download the 2-page brief (PDF)
+          </a>
+        </Section>
 
         {/* 1. JUDGE CALIBRATION ----------------------------------------- */}
         <Section
