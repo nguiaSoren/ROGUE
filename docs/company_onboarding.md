@@ -228,7 +228,7 @@ report.to_json("scan.json")      # full machine-readable report (returns the JSO
 report.to_html("scan.html")      # a standalone ~2 KB HTML page — KPI header + findings table
 ```
 
-For programmatic use the report exposes `report.findings`, `report.breached_findings()`, `report.top_findings(n)`, and the headline properties `report.breach_rate` / `report.breach_pct` / `report.top_attack`. For the full field-by-field shape of the report and findings, and the CLI's `rogue report scan.json --output report.html` re-render path, see [`../README_SDK.md`](../README_SDK.md).
+For programmatic use the report exposes `report.findings`, `report.breached_findings()`, `report.top_findings(n)`, and the headline properties `report.breach_rate` / `report.breach_pct` / `report.top_attack`. For the full field-by-field shape of the report and findings, and the CLI's `rogue report scan.json --output report.html` re-render path, see [`SDK.md`](SDK.md).
 
 ---
 

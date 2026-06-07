@@ -19,7 +19,7 @@ ROGUE/
 ├── docker/             # docker-compose init + test-DB bootstrap
 ├── examples/           # usage examples
 ├── data/               # runtime state (gitignored except data/discovery_bandit.json)
-├── assets/             # demo media (cover.png; large video/audio gitignored)
+├── assets/             # demo media (cover.png; submission/ = deck+cover+script; large video/audio gitignored)
 ├── .github/workflows/  # CI (ci.yml: pytest+ruff+pyright on a Postgres service; frontend lint+tsc)
 ├── pyproject.toml · uv.lock · docker-compose.yml · alembic.ini · .env.example
 └── (local-only, gitignored: ROGUE_PLAN.md · CLAUDE.md · glossary.md · docs/RESEARCH_TODO.md
@@ -72,6 +72,7 @@ frontend/src/
 
 - **Pipeline + subsystems:** `architecture.md`, `judge.md`, `scheduling.md`, `escalation_ladder.md`, `db_schema.md`, `retrieval.md`, `sources.md`, `taxonomy.md`, `schemas.md`, `budget.md`, `bandit_for_humans.md`
 - **Product:** `platform/` (api · benchmark · dashboard · integrations · orchestration · reports · tenancy), `mcp/` (ARCHITECTURE + CONTRACT), `deployment.md`, `company_onboarding.md`
+- **Onboarding / marketing:** `PROJECT_STRUCTURE.md` (this file), `ONEPAGER.md`, `BRIGHT_DATA_CASE_STUDY.md`, `SDK.md`, `marketing/` (site / video / brand-kit planning notes)
 - **Decisions:** `adr/` (0001–0008 + README index)
 - **Calibration / research:** `judge_fp_taxonomy.md`, `grammar_efficacy.md`, `outbound_package.md`
 - **Local-only (gitignored):** `RESEARCH_TODO.md`, `paper_figures.md`, `adaptive_orchestration_*.md`, `scheduler_allocation_study.md`, `3b_v2_renderer_design.md`
