@@ -1,9 +1,9 @@
 /**
- * Session route — sign in / out with an `rk_live_` API key.
+ * Session route, sign in / out with an `rk_live_` API key.
  *
  * POST validates the key against the live platform (an authed `GET /v1/scans?limit=1`) and, on
  * success, stores it in an httpOnly cookie. DELETE clears it. The raw key only ever travels in the
- * POST body over HTTPS and into a server-only cookie — it never lands in client-readable storage.
+ * POST body over HTTPS and into a server-only cookie, it never lands in client-readable storage.
  */
 
 import { NextResponse } from "next/server";

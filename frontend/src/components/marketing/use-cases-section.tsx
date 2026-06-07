@@ -5,12 +5,12 @@ import { cn } from "@/lib/utils"
 import { Section } from "@/components/marketing/section"
 
 /**
- * UseCasesSection — "Who uses ROGUE?" persona grid.
+ * UseCasesSection, "Who uses ROGUE?" persona grid.
  *
  * Three honest persona cards (LLM Engineers, Security Teams, CTOs & CISOs),
  * each with a Problem line and a Solution line, plus a closing link to the
  * product page. Server component; carries its own eyebrow + heading via the
- * shared <Section>. Drop directly into any page — it owns its container
+ * shared <Section>. Drop directly into any page, it owns its container
  * padding through <Section>.
  *
  * Honesty constraints baked into copy (do not loosen):
@@ -62,7 +62,7 @@ const personas: Persona[] = [
     problem:
       "Your model keeps getting jailbroken and you don't know how to patch it.",
     solution:
-      "ROGUE automatically tests your deployment against the latest attacks and tells you exactly which break it — with remediation for each.",
+      "ROGUE automatically tests your deployment against the latest attacks and tells you exactly which break it, with remediation for each.",
   },
   {
     icon: ShieldCheck,

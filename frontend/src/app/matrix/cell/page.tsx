@@ -1,7 +1,7 @@
 import { CellView } from "@/components/cell-view";
 
 /**
- * /matrix/cell?family=&config=&date= — every breaching primitive in one
+ * /matrix/cell?family=&config=&date=, every breaching primitive in one
  * (family × config) cell.
  *
  * The matrix grid collapses a cell to its single worst-offending primitive;
@@ -11,9 +11,9 @@ import { CellView } from "@/components/cell-view";
  * "worst attacker today" callout.
  *
  * This is a dynamic route (reads ?family/config/date), so it deliberately does
- * NO server-side API fetch — a transient Render cold-cycle would otherwise
+ * NO server-side API fetch, a transient Render cold-cycle would otherwise
  * render a hard "502 / cell unavailable" with no recovery. The data is fetched
- * client-side by `CellView` (retry + timeout + a "waking up — retry" state), so
+ * client-side by `CellView` (retry + timeout + a "waking up, retry" state), so
  * the page shell renders instantly and an API blip retries instead of erroring.
  */
 export default async function CellPage({

@@ -15,7 +15,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
  * Single shared EventSource for /api/sse/feed.
  *
  * Before: nav, LiveAttackTicker, and LiveAttackCountPill each opened their
- * own SSE connection — three concurrent streams to the same endpoint per
+ * own SSE connection, three concurrent streams to the same endpoint per
  * page load, three retry loops when the backend is down. Now a single
  * connection at the widest window (since_days=2) populates this context
  * and every consumer reads from it.
@@ -23,7 +23,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
  * The backend (src/rogue/api/main.py: /api/sse/feed) sends one snapshot
  * per connection followed by heartbeats. New snapshots only arrive on
  * reconnect (browser auto-retries on disconnect), so primitives state
- * here changes at most once per connection lifecycle — there is no
+ * here changes at most once per connection lifecycle, there is no
  * per-render storm even if consumers depend on `primitives` directly.
  */
 

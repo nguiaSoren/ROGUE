@@ -4,7 +4,7 @@
  * The platform authenticates with API keys (not user logins), so the dashboard "session" IS the key.
  * It lives in an httpOnly + secure cookie set by the `/api/session` route handler, so the browser's JS
  * never holds the raw secret. Server Components read it via `getApiKey()`; client components never see
- * it — they call same-origin route handlers that re-read this cookie and forward the bearer.
+ * it, they call same-origin route handlers that re-read this cookie and forward the bearer.
  *
  * Import ONLY from Server Components, Route Handlers, or Server Actions (it uses `next/headers`).
  */

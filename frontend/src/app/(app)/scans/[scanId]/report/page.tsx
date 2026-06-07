@@ -8,29 +8,29 @@ import {
 import { getApiKey } from "@/lib/session";
 import { ReportSummaryMarkdown } from "@/components/report-summary-markdown";
 
-/** Same-origin export proxy — the bearer is attached server-side by the route
+/** Same-origin export proxy, the bearer is attached server-side by the route
  *  handler, never placed in a client href (see app/api/scans/[scanId]/report). */
 function exportHref(scanId: string, format: "json" | "html" | "pdf"): string {
   return `/api/scans/${encodeURIComponent(scanId)}/report?format=${format}`;
 }
 
 /**
- * /scans/{scanId}/report — a completed scan's report (server component).
+ * /scans/{scanId}/report, a completed scan's report (server component).
  *
  * "The brief page for one scan" (docs/platform/dashboard/report-views.md §1):
  * headline KPIs (score, breach rate, top attack, cost), a worst-first findings
  * table, per-finding attack/response detail, and JSON/HTML/PDF export links.
- * Reads `GET /v1/scans/{id}/report?format=json` — the persisted `ScanReport.to_dict()`
+ * Reads `GET /v1/scans/{id}/report?format=json`, the persisted `ScanReport.to_dict()`
  * (src/rogue/report.py:130) PLUS the platform `score` and `recommendations[]`
- * (report-views.md §2). The page never recomputes a rate — they arrive pre-derived.
+ * (report-views.md §2). The page never recomputes a rate, they arrive pre-derived.
  *
  * Auth: `(app)/layout.tsx` gates the session; we re-read the key here (server-only)
  * for the report fetch. The json/html/pdf export links point at the same-origin
- * `/api/scans/{id}/report` proxy, which attaches the bearer server-side — never a
+ * `/api/scans/{id}/report` proxy, which attaches the bearer server-side, never a
  * secret in a client href. A `report_not_ready`/404 means the scan isn't completed
  * yet; we surface that as "not ready" rather than a hard error.
  */
-export const dynamic = "force-dynamic"; // tenant data — never statically cached
+export const dynamic = "force-dynamic"; // tenant data, never statically cached
 
 const SEVERITY_CLASS: Record<Finding["severity"], string> = {
   critical: "border-rogue-red/40 bg-rogue-red/10 text-rogue-red",
@@ -56,7 +56,7 @@ export default async function ReportPage({
     report = await platformApi.getReport(scanId, key, "json");
   } catch (e) {
     // The report route 404s with `report_not_ready` while the scan is still
-    // queued/running — treat that as "not yet", not a failure (report-views.md §6).
+    // queued/running, treat that as "not yet", not a failure (report-views.md §6).
     const msg = e instanceof Error ? e.message : "Failed to load report.";
     if (/not[_ ]?ready|404/i.test(msg)) notReady = true;
     else loadError = msg;
@@ -116,7 +116,7 @@ export default async function ReportPage({
           </div>
         ) : notReady ? (
           <div className="rounded-lg border border-border p-6 font-mono text-sm text-muted-foreground">
-            <p>Report not ready — this scan hasn&apos;t completed yet.</p>
+            <p>Report not ready, this scan hasn&apos;t completed yet.</p>
             <Link
               href={`/scans/${encodeURIComponent(scanId)}`}
               className="mt-3 inline-flex text-xs uppercase tracking-[0.15em] text-rogue-green hover:underline"
@@ -143,10 +143,10 @@ function ReportBody({ report }: { report: ScanReportJson }) {
 
   return (
     <>
-      {/* Headline — the risk score leads the report (report-views.md §1). */}
+      {/* Headline, the risk score leads the report (report-views.md §1). */}
       <RiskHeadline report={report} />
 
-      {/* Executive summary — the "forward-to-your-boss" overview, right under the
+      {/* Executive summary, the "forward-to-your-boss" overview, right under the
           headline so it's the first thing read after the score. */}
       <ExecutiveSummary report={report} />
 
@@ -217,7 +217,7 @@ function RiskHeadline({ report }: { report: ScanReportJson }) {
       <div className="flex items-end gap-5 flex-wrap">
         <div className="flex items-baseline gap-2">
           <span className={`text-5xl font-bold tabular-nums leading-none ${tint}`}>
-            {score === null ? "—" : Math.round(score)}
+            {score === null ? ", " : Math.round(score)}
           </span>
           <span className="text-lg font-mono text-muted-foreground">/100</span>
         </div>
@@ -251,7 +251,7 @@ function RiskHeadline({ report }: { report: ScanReportJson }) {
   );
 }
 
-/** Executive summary — the markdown overview a customer forwards to leadership.
+/** Executive summary, the markdown overview a customer forwards to leadership.
  *  Rendered prominently below the headline; degrades to nothing on older runs
  *  (or when the report route didn't supply one). */
 function ExecutiveSummary({ report }: { report: ScanReportJson }) {
@@ -267,7 +267,7 @@ function ExecutiveSummary({ report }: { report: ScanReportJson }) {
   );
 }
 
-/** Severity pill — reuses the page's `SEVERITY_CLASS` color vocabulary. */
+/** Severity pill, reuses the page's `SEVERITY_CLASS` color vocabulary. */
 function SeverityBadge({
   severity,
   className = "",
@@ -328,7 +328,7 @@ function FindingCard({ f, rank }: { f: Finding; rank: number }) {
         {f.family} · {f.technique}
       </p>
 
-      {/* What this is — plain-language framing so a non-expert grasps the risk,
+      {/* What this is, plain-language framing so a non-expert grasps the risk,
           shown above the fix and the evidence. */}
       {f.explanation && (
         <div className="rounded-md border border-border/60 bg-card/20 p-3">
@@ -341,7 +341,7 @@ function FindingCard({ f, rank }: { f: Finding; rank: number }) {
         </div>
       )}
 
-      {/* How to fix — actionable remediation, visually distinct from the
+      {/* How to fix, actionable remediation, visually distinct from the
           explanation (green accent = the "do this" block). */}
       {f.remediation && (
         <div className="rounded-md border border-rogue-green/40 bg-rogue-green/5 p-3">
@@ -354,14 +354,14 @@ function FindingCard({ f, rank }: { f: Finding; rank: number }) {
         </div>
       )}
 
-      {/* Evidence — proof of the breach: the attack sent and the model's
+      {/* Evidence, proof of the breach: the attack sent and the model's
           response, framed as a transcript with the breach state flagged. */}
       <FindingEvidence f={f} />
     </article>
   );
 }
 
-/** Evidence block — "Attack sent → Model response" as proof. Collapsible; the
+/** Evidence block, "Attack sent → Model response" as proof. Collapsible; the
  *  summary flags that this finding was breached so the evidence reads as a
  *  confirmed compromise, not a benign sample. */
 function FindingEvidence({ f }: { f: Finding }) {
@@ -372,7 +372,7 @@ function FindingEvidence({ f }: { f: Finding }) {
       <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
         <span className="flex items-center gap-2">
           <span className="transition-transform group-open:rotate-90">›</span>
-          Evidence — attack &amp; model response
+          Evidence, attack &amp; model response
         </span>
         {breached && (
           <span className="inline-flex items-center rounded-sm border border-rogue-red/40 bg-rogue-red/10 px-1.5 py-0.5 font-bold text-rogue-red">
@@ -426,8 +426,8 @@ function RecommendationsPanel({
   const recs = report.recommendations ?? [];
   const fallback =
     breachedCount > 0
-      ? `${breachedCount} finding${breachedCount === 1 ? "" : "s"} reproduced — prioritize the top attack (${report.top_attack ?? "n/a"}).`
-      : "No vulnerabilities reproduced — keep monitoring as the threat corpus grows.";
+      ? `${breachedCount} finding${breachedCount === 1 ? "" : "s"} reproduced, prioritize the top attack (${report.top_attack ?? "n/a"}).`
+      : "No vulnerabilities reproduced, keep monitoring as the threat corpus grows.";
   return (
     <section className="rounded-lg border border-border bg-card/30 p-5 space-y-2">
       <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">

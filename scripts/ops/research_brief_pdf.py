@@ -199,7 +199,7 @@ def build() -> Path:
     doc = SimpleDocTemplate(
         str(_OUT), pagesize=LETTER,
         leftMargin=MARGIN, rightMargin=MARGIN, topMargin=0.6 * inch, bottomMargin=0.85 * inch,
-        title="ROGUE — Research Brief", author="Soren Obounou Nguia",
+        title="ROGUE Research Brief", author="Soren Obounou Nguia",
     )
     F: list = [
         _header(),
@@ -254,7 +254,7 @@ def build() -> Path:
         "deliberately no ML and no bandit, so it stays reproducible). A single-variable controlled "
         "experiment (same ladder, attacks, corpus, judge, and target on Claude Haiku across AdvBench and "
         "JailbreakBench, with only the order changed) beat the production baseline on every axis: "
-        + b("median winner-rank 22 → 11&ndash;13.5") + ", " + b("attack-success-rate 50% → 60%") +
+        + b("median winner-rank 22 → 11 to 13.5") + ", " + b("attack-success-rate 50% → 60%") +
         ", and " + b("cost-per-success $1.25 → $0.74 (41% cheaper)") + ".", S["body"])]
     F += [Spacer(1, 4), _chips([
         ("22 → 11", "median winner-rank"),
@@ -272,15 +272,15 @@ def build() -> Path:
     F += [Paragraph(
         "Before building a grammar/AST attack-composition engine, a " + b("$0 observational study over "
         "1,540 (primitive × target) cells") + " tested whether grammar-structure nodes predict breach "
-        "<i>beyond</i> attack-family membership, with full confound controls: Benjamini&ndash;Hochberg FDR "
-        "across hundreds of node and pair tests, Mantel&ndash;Haenszel stratification by target model, "
+        "<i>beyond</i> attack-family membership, with full confound controls: Benjamini-Hochberg FDR "
+        "across hundreds of node and pair tests, Mantel-Haenszel stratification by target model, "
         "within-family lift, and Cram&eacute;r&rsquo;s-V collinearity flagging. The verdict was "
         + b("weak to none") + ": the family label carries the predictive weight, cross-family structural "
         "nodes show roughly 1.0 to 1.1× non-significant lift, and the striking pre-FDR pairwise "
         "synergies (odds ratios up to 16.8) survived " + b("none") + " of the four controls.", S["body"])]
     F += [Spacer(1, 4), _chips([
         ("1,540", "cells, $0 study"),
-        ("~1.0–1.1×", "cross-family lift (n.s.)"),
+        ("~1.0 to 1.1×", "cross-family lift (n.s.)"),
         ("0 of 4", "synergies survived controls"),
     ]), Spacer(1, 6)]
     F += [_note(

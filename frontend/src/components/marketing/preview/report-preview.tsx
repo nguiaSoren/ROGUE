@@ -7,13 +7,13 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * ReportPreview — a pixel-faithful, NON-functional native preview of a completed
+ * ReportPreview, a pixel-faithful, NON-functional native preview of a completed
  * scan's executive report, framed in a faux app-window for the marketing site.
  *
  * It mirrors the real report body in `app/(app)/scans/[scanId]/report/page.tsx`
  * (risk headline → executive summary → KPI row → recommendations) using the same
- * house vocabulary — `.rogue-card`, the rogue-green/red/orange banding, Geist /
- * Geist Mono — so it reads as a genuine product screenshot, not a mockup. All
+ * house vocabulary, `.rogue-card`, the rogue-green/red/orange banding, Geist /
+ * Geist Mono, so it reads as a genuine product screenshot, not a mockup. All
  * data is illustrative and hard-coded; the export affordances are decorative.
  *
  * Server component (no client interactivity). Drop into any marketing section;
@@ -48,11 +48,11 @@ const RECOMMENDATIONS: { icon: typeof Wrench; text: string }[] = [
   },
   {
     icon: ShieldAlert,
-    text: "Constrain tool exposure for untrusted turns — the two CRITICAL findings chained a jailbreak into a tool call. Gate high-impact tools behind a confirmation step until the conversation is re-verified.",
+    text: "Constrain tool exposure for untrusted turns, the two CRITICAL findings chained a jailbreak into a tool call. Gate high-impact tools behind a confirmation step until the conversation is re-verified.",
   },
 ];
 
-/** Banded text tint for the big score — mirrors the report's SCORE_TINT_TEXT. */
+/** Banded text tint for the big score, mirrors the report's SCORE_TINT_TEXT. */
 const SCORE_TINT = "text-orange-300"; // HIGH band
 
 export function ReportPreview({ className }: { className?: string }) {
@@ -76,7 +76,7 @@ export function ReportPreview({ className }: { className?: string }) {
           <span className="text-foreground/80">scan_8f3a2</span>
           <span className="opacity-50"> / report</span>
         </div>
-        {/* export affordances — shown, non-functional */}
+        {/* export affordances, shown, non-functional */}
         <div
           aria-hidden
           className="hidden items-center gap-1.5 font-mono text-[10px] sm:flex"

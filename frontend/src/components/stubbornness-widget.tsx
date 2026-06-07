@@ -4,20 +4,20 @@ import { ExplainerHeader } from "@/components/explainer";
 import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
 
 /**
- * §10.7 full PAIR build — per-config "stubbornness" tile on /feed.
+ * §10.7 full PAIR build, per-config "stubbornness" tile on /feed.
  *
  * Stubbornness = average iters-to-breach over PAIR cells that breached.
  * Lower = the config gave up quickly under iterative refinement;
  * higher = the config held out across multiple iterations.
  *
- * Also shows the refinement-type distribution — which attacker strategies
+ * Also shows the refinement-type distribution, which attacker strategies
  * the LLM picked most often across all PAIR steps. Useful for the deck
  * claim "X% of breaches came from roleplaying-style refinements."
  *
  * Three states:
- *   1. No PAIR rows yet — instructional stub with seed command.
- *   2. PAIR rows but none breached — header counts only.
- *   3. Breaches recorded — per-config avg-iters + refinement-type chart.
+ *   1. No PAIR rows yet, instructional stub with seed command.
+ *   2. PAIR rows but none breached, header counts only.
+ *   3. Breaches recorded, per-config avg-iters + refinement-type chart.
  */
 export function StubbornnessWidget({
   stubbornness,
@@ -61,7 +61,7 @@ export function StubbornnessWidget({
             </p>
           </div>
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-            {"// configs robust against single-iter refinement — try --pair-max-iters 5+"}
+            {"// configs robust against single-iter refinement, try --pair-max-iters 5+"}
           </p>
         </>
       )}
@@ -133,7 +133,7 @@ function StubbornnessConfigRow({
         </span>
         <span className={`tabular-nums whitespace-nowrap ${tint}`}>
           {avgIters === null
-            ? "—"
+            ? ", "
             : `${avgIters.toFixed(1)} iters`}
         </span>
       </div>

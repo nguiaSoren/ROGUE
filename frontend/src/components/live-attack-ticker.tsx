@@ -11,7 +11,7 @@ import { useSseFeed } from "@/components/sse-feed-provider";
  * On each new snapshot, diffs incoming primitives against a seenIds ref and
  * slides any new ones in from the top with a fade-up + brief green-glow flash.
  *
- * Renders 5 rows max — anything older just falls off the bottom. Each row is
+ * Renders 5 rows max, anything older just falls off the bottom. Each row is
  * a tinted-severity card with title, family, source product, and a clickable
  * link to the source.
  */
@@ -145,7 +145,7 @@ export function LiveCount({ value }: { value: number }) {
 }
 
 /**
- * Compact pill rendered above the ticker — "X attacks in the last 24h".
+ * Compact pill rendered above the ticker, "X attacks in the last 24h".
  * Reads from the shared SseFeedProvider; falls back to initialCount until
  * the first snapshot arrives.
  */

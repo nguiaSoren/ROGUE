@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { COMMERCIAL } from "@/lib/flags";
 
 /**
- * EarlyAccessSection — the honest social-proof replacement.
+ * EarlyAccessSection, the honest social-proof replacement.
  *
  * ROGUE has no customers yet, so this section never claims any. Instead it
  * frames the three on-ramps for the first partners we're onboarding now:
@@ -31,7 +31,7 @@ export function EarlyAccessSection() {
         </h2>
         <p className="text-base text-muted-foreground leading-relaxed">
           ROGUE is new and we&apos;re choosing the teams we build it with. No
-          customer logos to show yet — just three honest ways to get on the
+          customer logos to show yet, just three honest ways to get on the
           engine early and shape where it goes.
         </p>
       </div>
@@ -82,7 +82,7 @@ export function EarlyAccessSection() {
         >
           {COMMERCIAL ? "just reach out" : "read the research"}
         </Link>{" "}
-        — we read every one.
+, we read every one.
       </p>
     </section>
   );
@@ -129,14 +129,14 @@ const TRACKS: ReadonlyArray<{
 ];
 
 // Non-commercial (default) variant: same honest "what's being built" content,
-// but the pilot+partner *sales* asks are dropped — every card routes to the
+// but the pilot+partner *sales* asks are dropped, every card routes to the
 // research surface or the early-access tracks instead of /request-demo.
 const RESEARCH_TRACKS: typeof TRACKS = [
   {
     icon: FlaskConical,
     name: "The research",
     forWhom: "The methods and measured results behind the engine.",
-    gist: "Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, and measure-before-build discipline — including the negative results.",
+    gist: "Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, and measure-before-build discipline, including the negative results.",
     cta: "Read the research",
     href: "/research",
   },
@@ -144,7 +144,7 @@ const RESEARCH_TRACKS: typeof TRACKS = [
     icon: Rocket,
     name: "What's being built",
     forWhom: "A real, running continuous open-web red-team.",
-    gist: "The full repertoire and adaptive-ladder scans, a self-recalibrating judge, a benchmark layer, and an MCP server — all live in production, built solo.",
+    gist: "The full repertoire and adaptive-ladder scans, a self-recalibrating judge, a benchmark layer, and an MCP server, all live in production, built solo.",
     cta: "See the early-access tracks",
     href: "/early-access",
   },
@@ -152,7 +152,7 @@ const RESEARCH_TRACKS: typeof TRACKS = [
     icon: ClipboardCheck,
     name: "The live evidence",
     forWhom: "Don't take the writeup's word for it.",
-    gist: "The breach matrix with 95% bootstrap CIs, live telemetry, and the harvest feed — the running system's own surfaces.",
+    gist: "The breach matrix with 95% bootstrap CIs, live telemetry, and the harvest feed, the running system's own surfaces.",
     cta: "Open the matrix",
     href: "/matrix",
   },

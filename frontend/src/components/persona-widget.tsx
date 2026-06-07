@@ -5,18 +5,18 @@ import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
 import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
- * §10.7 Persona augmentation A/B tile — sidebar widget on /feed.
+ * §10.7 Persona augmentation A/B tile, sidebar widget on /feed.
  *
  * Shows per-config "persona-susceptibility score" = max breach-rate delta
  * across PAP persuasion techniques tried against that config. Positive
  * delta means the persona wrap raised breach rate vs the unwrapped
- * baseline (the deck claim — "vulnerable to social-engineering layers").
+ * baseline (the deck claim, "vulnerable to social-engineering layers").
  *
  * Renders three states:
- *   1. No persona data yet (fresh DB or pre-§10.7 sweep) — instructional
+ *   1. No persona data yet (fresh DB or pre-§10.7 sweep), instructional
  *      stub with the command to seed it.
- *   2. Baselines exist but no wrapped runs — same stub, different copy.
- *   3. Wrapped runs exist — per-config table + top-3 (technique × config)
+ *   2. Baselines exist but no wrapped runs, same stub, different copy.
+ *   3. Wrapped runs exist, per-config table + top-3 (technique × config)
  *      cells by delta.
  */
 export function PersonaWidget({

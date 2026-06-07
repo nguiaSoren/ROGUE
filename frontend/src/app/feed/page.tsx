@@ -8,16 +8,16 @@ import { MutationWidget } from "@/components/mutation-widget";
 import { PersonaWidget } from "@/components/persona-widget";
 import { StubbornnessWidget } from "@/components/stubbornness-widget";
 
-// ISR — statically prerendered + revalidated every 5 min, matching /matrix and
+// ISR, statically prerendered + revalidated every 5 min, matching /matrix and
 // REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
 // data surfaces within the window instead of paying the full round-trip.
 export const revalidate = 300;
 
 /**
- * /feed — Live Feed.
+ * /feed, Live Feed.
  *
  * Layout: 4-tile KPI strip, the §10.7 augmentation A/B summary strip, then
- * a 3-column "war room" — sources/intel ribbon, attack list (expandable
+ * a 3-column "war room", sources/intel ribbon, attack list (expandable
  * rows with payload viewer + copy), augmentation sidebar (each widget now
  * carries a sparkline / bar chart).
  *
@@ -28,7 +28,7 @@ export default async function FeedPage() {
   // allSettled so a failure throws and propagates: Next + Vercel then keep
   // serving the last-good static feed instead of caching an empty one (an
   // allSettled-degraded empty render would otherwise be cached for the full ISR
-  // window — the "feed is all empty" symptom). The 7 secondary widgets stay in
+  // window, the "feed is all empty" symptom). The 7 secondary widgets stay in
   // allSettled and degrade to null individually.
   const [attacks, secondary] = await Promise.all([
     api.attacks({ since_days: 7, limit: 50 }),
@@ -127,11 +127,11 @@ export default async function FeedPage() {
 
         {/* 3-column war room */}
         <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_300px] gap-6">
-          {/* LEFT intel ribbons + CENTER attack list — client-side so the time
+          {/* LEFT intel ribbons + CENTER attack list, client-side so the time
               window (today / 7 days / all time) re-scopes without reloading. */}
           <FeedStream initialAttacks={attacks} />
 
-          {/* RIGHT — augmentation sidebar */}
+          {/* RIGHT, augmentation sidebar */}
           <aside className="space-y-4 lg:order-3">
             <BanditWidget bandit={bandit} />
             <PersonaWidget persona={persona} />
@@ -171,7 +171,7 @@ function KpiTile({
         {label}
       </p>
       <p className={`text-3xl font-bold mt-2 tabular-nums ${tintClass}`}>
-        {value !== null ? <CountUp value={value} /> : "—"}
+        {value !== null ? <CountUp value={value} /> : ", "}
       </p>
       <p className="text-xs text-muted-foreground mt-1">{sub}</p>
     </div>
@@ -206,11 +206,11 @@ function SystemStatusWidget({
         </li>
         <li className="flex justify-between">
           <span className="text-muted-foreground">primitives</span>
-          <span className="tabular-nums">{health?.n_primitives ?? "—"}</span>
+          <span className="tabular-nums">{health?.n_primitives ?? ", "}</span>
         </li>
         <li className="flex justify-between">
           <span className="text-muted-foreground">breaches</span>
-          <span className="tabular-nums">{health?.n_breached ?? "—"}</span>
+          <span className="tabular-nums">{health?.n_breached ?? ", "}</span>
         </li>
       </ul>
     </div>

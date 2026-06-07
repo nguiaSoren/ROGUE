@@ -10,13 +10,13 @@ import {
 import { cn } from "@/lib/utils"
 
 /**
- * McpPreview — a pixel-faithful, static "screenshot" of ROGUE's MCP server
+ * McpPreview, a pixel-faithful, static "screenshot" of ROGUE's MCP server
  * driving a full red-team consult from INSIDE an AI IDE (Cursor / Claude
  * Desktop). This is the signature differentiator: ROGUE is an MCP *producer*,
  * so a security engineer runs validate → scan → poll → findings → file-tickets
  * without ever leaving the editor.
  *
- * Server component. No state, no effects, no client JS — it's an illustrative
+ * Server component. No state, no effects, no client JS, it's an illustrative
  * frozen session. Every tool name shown is a REAL v1 MCP tool
  * (`src/rogue/mcp_server/scan_tools.py` + `docs/mcp.md`).
  */
@@ -35,7 +35,7 @@ interface ToolCall {
   icon?: "wrench" | "ticket"
 }
 
-/** A single MCP tool-invocation card — mono name, args echo, result line, state pip. */
+/** A single MCP tool-invocation card, mono name, args echo, result line, state pip. */
 function ToolCallCard({ call }: { call: ToolCall }) {
   const Glyph = call.icon === "ticket" ? Ticket : Wrench
   const running = call.state === "running"
@@ -84,7 +84,7 @@ function ToolCallCard({ call }: { call: ToolCall }) {
   )
 }
 
-/** The scripted, illustrative tool-call sequence — mirrors docs/mcp.md flow (b). */
+/** The scripted, illustrative tool-call sequence, mirrors docs/mcp.md flow (b). */
 const TOOL_CALLS: ToolCall[] = [
   {
     name: "validate_target",
@@ -144,7 +144,7 @@ export function McpPreview({ className }: McpPreviewProps) {
         </div>
         <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
           <Terminal className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate font-mono text-[11px] sm:text-xs">Cursor — rogue-mcp</span>
+          <span className="truncate font-mono text-[11px] sm:text-xs">Cursor, rogue-mcp</span>
         </div>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-rogue-green/30 bg-rogue-green/5 px-2 py-0.5">
           <span className="size-1.5 animate-rogue-pulse-green rounded-full bg-rogue-green" />
@@ -156,7 +156,7 @@ export function McpPreview({ className }: McpPreviewProps) {
 
       {/* ── Conversation body ─────────────────────────────────────── */}
       <div className="space-y-5 px-4 py-5 sm:px-6">
-        {/* 1 — User prompt */}
+        {/* 1, User prompt */}
         <div className="flex gap-3">
           <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-card/60 text-muted-foreground">
             <User className="size-3.5" aria-hidden="true" />
@@ -167,7 +167,7 @@ export function McpPreview({ className }: McpPreviewProps) {
           </p>
         </div>
 
-        {/* 2 — Assistant: narration + tool-call cards */}
+        {/* 2, Assistant: narration + tool-call cards */}
         <div className="flex gap-3">
           <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-rogue-green/40 bg-rogue-green/10 text-rogue-green">
             <Sparkles className="size-3.5" aria-hidden="true" />
@@ -187,7 +187,7 @@ export function McpPreview({ className }: McpPreviewProps) {
           </div>
         </div>
 
-        {/* 3 — Assistant final summary */}
+        {/* 3, Assistant final summary */}
         <div className="flex gap-3">
           <span
             className="mt-0.5 flex size-6 shrink-0 items-center justify-center"
@@ -198,7 +198,7 @@ export function McpPreview({ className }: McpPreviewProps) {
               <span className="font-medium text-rogue-green">
                 Scan complete
               </span>{" "}
-              — 142 trials, 11 breaches{" "}
+, 142 trials, 11 breaches{" "}
               <span className="font-mono text-rogue-green">(7.7%)</span>. Top
               risk:{" "}
               <span className="font-medium">Crescendo</span>{" "}
@@ -219,7 +219,7 @@ export function McpPreview({ className }: McpPreviewProps) {
       <figcaption className="flex items-center gap-2 border-t border-border bg-[#07070b] px-4 py-2 sm:px-6">
         <span className="size-1.5 rounded-full bg-rogue-green/50" aria-hidden="true" />
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Illustrative MCP session — ROGUE is the MCP server
+          Illustrative MCP session, ROGUE is the MCP server
         </span>
       </figcaption>
     </figure>

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
  * Map an open-web source label ("Reddit · r/ChatGPTJailbreak",
  * "GitHub · L1B3RT4S", "X · @elder_plinius", "HF · …", "leak mirrors")
  * to one of the bundled platform logo slugs in /public/logos/. Mirrors
- * ui/provider-logo.tsx — same monochrome CSS-mask render so every place a
+ * ui/provider-logo.tsx, same monochrome CSS-mask render so every place a
  * source is named can show its platform icon the way LLM rows show provider
  * icons.
  *
@@ -29,7 +29,7 @@ const NAME_HINTS: [RegExp, string][] = [
   [/hugging\s?face|\bhf\b/i, "huggingface"],
   [/arxiv/i, "arxiv"],
   [/discord|promptfoo/i, "discord"],
-  // X last — single-letter token is easy to over-match, so keep it specific.
+  // X last, single-letter token is easy to over-match, so keep it specific.
   [/\bx\b|twitter|@/i, "x"],
 ];
 
@@ -53,7 +53,7 @@ export function sourceSlug(label: string | null | undefined): string | null {
 
 /**
  * Tiny monochrome platform logo for an open-web source. Rendered via CSS mask
- * so it inherits the current text color (`currentColor`) — works on any theme
+ * so it inherits the current text color (`currentColor`), works on any theme
  * regardless of each SVG's baked-in fill. Sized to 1em by default so it scales
  * with the text. Returns null for sources with no recognizable platform
  * (e.g. "jailbreakchat", "LeakHub mirrors") so callers can keep their existing

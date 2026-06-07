@@ -134,7 +134,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  ROGUE — signature aesthetic                                       */
+/*  ROGUE, signature aesthetic                                       */
 /*                                                                     */
 /*  The dashboard's visual identity. Two accent colors:                */
 /*    --rogue-green: signature / "alive" / OK / harvested              */
@@ -164,7 +164,7 @@
 /* ------------------------------------------------------------------ */
 /*  Pause-offscreen utility                                            */
 /*  Toggled by <PausedOffscreen> via IntersectionObserver. Stops all  */
-/*  running CSS animations on the wrapped subtree when not in view —   */
+/*  running CSS animations on the wrapped subtree when not in view, */
 /*  big GPU savings for marquees, drifting gradients, etc.             */
 /* ------------------------------------------------------------------ */
 [data-rg-pause="true"],
@@ -174,10 +174,10 @@
 
 /* ------------------------------------------------------------------ */
 /*  Animated background grid                                           */
-/*  Subtle drifting grid overlay — never dominates content.            */
+/*  Subtle drifting grid overlay, never dominates content.            */
 /* ------------------------------------------------------------------ */
 /* Static grid. It used to drift (animated transform), but a MOVING backdrop
-   forces Chrome to re-blur every `backdrop-blur` card on the page each frame —
+   forces Chrome to re-blur every `backdrop-blur` card on the page each frame, 
    the cross-browser jank. The drift was imperceptible; a static grid reads
    identically and lets Chrome composite the frosted cards once. */
 .bg-rogue-grid {
@@ -188,7 +188,7 @@
   background-size: 60px 60px;
 }
 
-/* Radial spotlight that follows the top — gives the page depth */
+/* Radial spotlight that follows the top, gives the page depth */
 .bg-rogue-spotlight {
   position: relative;
 }
@@ -207,7 +207,7 @@
 .bg-rogue-spotlight > * { position: relative; z-index: 1; }
 
 /* ------------------------------------------------------------------ */
-/*  Entrance — staggered fade-up                                       */
+/*  Entrance, staggered fade-up                                       */
 /*  Apply to lists; the data-stagger attribute sets the delay.         */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-fade-up {
@@ -225,10 +225,10 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Pulse — for CRITICAL/breached elements                             */
-/*  Slow heartbeat-style pulse. Use sparingly — only on actual crit.   */
+/*  Pulse, for CRITICAL/breached elements                             */
+/*  Slow heartbeat-style pulse. Use sparingly, only on actual crit.   */
 /* ------------------------------------------------------------------ */
-/* Opacity (not box-shadow) so it's compositor-only — box-shadow pulses repaint
+/* Opacity (not box-shadow) so it's compositor-only, box-shadow pulses repaint
    every frame, which is a Chrome scroll-jank source with several on screen. */
 @keyframes rogue-pulse-critical {
   0%, 100% { opacity: 1; }
@@ -247,7 +247,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Scan line — sweeps horizontally across an element                  */
+/*  Scan line, sweeps horizontally across an element                  */
 /*  Use on hero text and high-attention cards.                         */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-scan {
@@ -276,7 +276,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Glitch — quick chromatic offset for hero text                      */
+/*  Glitch, quick chromatic offset for hero text                      */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-glitch {
   0%, 100% { text-shadow: none; }
@@ -289,7 +289,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Count-up — uses CSS counter for ticking numbers                    */
+/*  Count-up, uses CSS counter for ticking numbers                    */
 /*  Apply via the <CountUp /> component.                               */
 /* ------------------------------------------------------------------ */
 @property --rogue-count {
@@ -310,7 +310,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Glow underline — for nav links on hover/active                     */
+/*  Glow underline, for nav links on hover/active                     */
 /* ------------------------------------------------------------------ */
 .rogue-nav-link {
   position: relative;
@@ -335,7 +335,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Magnetic card — slight tilt + lift on hover                        */
+/*  Magnetic card, slight tilt + lift on hover                        */
 /* ------------------------------------------------------------------ */
 .rogue-card {
   transition:
@@ -352,7 +352,7 @@
     0 16px 32px -8px rgba(0, 0, 0, 0.6);
 }
 
-/* Critical variant — pulsing red border instead of green */
+/* Critical variant, pulsing red border instead of green */
 .rogue-card-critical {
   border-color: var(--rogue-red-dim);
 }
@@ -364,7 +364,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Caret — terminal-style blinking cursor for hero                    */
+/*  Caret, terminal-style blinking cursor for hero                    */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-caret-blink {
   0%, 50%   { opacity: 1; }
@@ -377,14 +377,14 @@
   color: var(--rogue-green);
   animation: rogue-caret-blink 1s steps(1) infinite;
 }
-/* Standalone "blink this element" utility — for use on inline boxes in
+/* Standalone "blink this element" utility, for use on inline boxes in
    the AttackReplay terminal where we don't want the ::after pseudo. */
 .rogue-caret-blink {
   animation: rogue-caret-blink 1s steps(1) infinite;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Slide-in drawer — for the matrix cell-detail panel                 */
+/*  Slide-in drawer, for the matrix cell-detail panel                 */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-slide-in-right {
   from {
@@ -398,7 +398,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Heatmap cell entrance — wave cascade                               */
+/*  Heatmap cell entrance, wave cascade                               */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-cell-pop {
   from {
@@ -426,7 +426,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Scrollbar — terminal aesthetic                                     */
+/*  Scrollbar, terminal aesthetic                                     */
 /* ------------------------------------------------------------------ */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -449,7 +449,7 @@
 .border-rogue-red   { border-color: var(--rogue-red); }
 
 /* ------------------------------------------------------------------ */
-/*  Cinematic hero — animated mesh-gradient background                 */
+/*  Cinematic hero, animated mesh-gradient background                 */
 /*  Used on the home page only. Multiple radial gradients drift on     */
 /*  long timelines so the eye reads it as "alive" without distraction. */
 /* ------------------------------------------------------------------ */
@@ -468,7 +468,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Word swap — vertically rotating word for hero subhead              */
+/*  Word swap, vertically rotating word for hero subhead              */
 /*  Apply on a fixed-height wrapper containing a vertical list. The    */
 /*  list translates upward through each word every N seconds.          */
 /* ------------------------------------------------------------------ */
@@ -486,7 +486,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Scroll reveal — bigger entrance for hero/section moments           */
+/*  Scroll reveal, bigger entrance for hero/section moments           */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-reveal {
   from { opacity: 0; transform: translateY(28px); filter: blur(6px); }
@@ -497,7 +497,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Marquee — horizontal sources strip                                 */
+/*  Marquee, horizontal sources strip                                 */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-marquee {
   from { transform: translateX(0); }
@@ -509,7 +509,7 @@
 .rogue-marquee-pause:hover .rogue-marquee { animation-play-state: paused; }
 
 /* ------------------------------------------------------------------ */
-/*  Lab "augmentation toggle" — energetic state transitions            */
+/*  Lab "augmentation toggle", energetic state transitions            */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-bar-fill {
   from { width: var(--rogue-from, 0%); }
@@ -529,7 +529,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Scroll cue — gentle bounce at the bottom of the hero               */
+/*  Scroll cue, gentle bounce at the bottom of the hero               */
 /* ------------------------------------------------------------------ */
 @keyframes rogue-scroll-cue {
   0%, 100% { transform: translateY(0);  opacity: 0.4; }
@@ -564,7 +564,7 @@
 .rogue-accent-stubbornness-text { color: #fca5a5; }
 
 /* ------------------------------------------------------------------ */
-/*  Reduced motion — honor the OS "reduce motion" setting by stopping  */
+/*  Reduced motion, honor the OS "reduce motion" setting by stopping  */
 /*  the infinite loops (grid drift, mesh, glow/pulse, marquee, etc.).  */
 /*  Static frames read identically; one-shot entrances are left alone. */
 /* ------------------------------------------------------------------ */
@@ -582,7 +582,7 @@
 }
 
 /* Drop backdrop-filter (frosted glass). Chrome re-blurs every such element as
-   content scrolls behind it — the dominant scroll jank with ~36 frosted cards
+   content scrolls behind it, the dominant scroll jank with ~36 frosted cards
    (Safari optimizes it, which is why it stayed smooth there). Over the near-black
    background the frost is barely visible; cards keep their translucent background. */
 [class*="backdrop-blur"] {

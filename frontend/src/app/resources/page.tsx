@@ -14,13 +14,13 @@ import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
 import { ThreatReportDownload } from "@/components/marketing/threat-report-download";
 
 export const metadata = {
-  title: "Resources — ROGUE",
+  title: "Resources, ROGUE",
   description:
     "Threat intel and research from ROGUE: the latest LLM threat brief, a sample security report, and our judge v3 recalibration write-up. Subscribe to get future threat briefs.",
 };
 
 /**
- * /resources — lead-gen hub. Deliberately honest: only links artifacts that
+ * /resources, lead-gen hub. Deliberately honest: only links artifacts that
  * actually exist (the daily threat brief, a static sample report, and the
  * judge-v3 recalibration result whose numbers are real/defensible). Unwritten
  * content (blog, webinar) is shown under a visibly-labeled "Coming soon" group,
@@ -35,14 +35,14 @@ export default function ResourcesPage() {
         <Section
           eyebrow="resources"
           title="Threat intel & research from ROGUE."
-          lede="ROGUE runs a continuous open-web red-team — harvesting jailbreaks and prompt-injection, reproducing them against real LLM deployments, and writing down what we learn. Here's what's published, and what's on the way."
+          lede="ROGUE runs a continuous open-web red-team, harvesting jailbreaks and prompt-injection, reproducing them against real LLM deployments, and writing down what we learn. Here's what's published, and what's on the way."
         />
 
-        {/* 2. LIVE NOW — real artifacts ----------------------------------- */}
+        {/* 2. LIVE NOW, real artifacts ----------------------------------- */}
         <Section
           eyebrow="live now"
           title="Available today."
-          lede="These are real, published outputs — not placeholders."
+          lede="These are real, published outputs, not placeholders."
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Latest threat brief */}
@@ -88,7 +88,7 @@ export default function ResourcesPage() {
                 Sample security report
               </h3>
               <p className="mt-2 flex-1 text-sm text-muted-foreground leading-relaxed">
-                A full example of the scored scan report ROGUE produces — which
+                A full example of the scored scan report ROGUE produces, which
                 attacks landed, how severe they are, and the evidence behind
                 each verdict.
               </p>
@@ -101,7 +101,7 @@ export default function ResourcesPage() {
               </span>
             </a>
 
-            {/* Judge v3 recalibration write-up — on-page summary card */}
+            {/* Judge v3 recalibration write-up, on-page summary card */}
             <div className="rogue-card border border-rogue-green/40 rounded-xl p-6 bg-card/40 backdrop-blur-sm flex flex-col">
               <ScaleIcon
                 className="h-6 w-6 text-rogue-green"
@@ -135,17 +135,17 @@ export default function ResourcesPage() {
               </dl>
               <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
                 The full methodology write-up is going out to threat-brief
-                subscribers — sign up below to get it.
+                subscribers, sign up below to get it.
               </p>
             </div>
           </div>
         </Section>
 
-        {/* 3. GATED — newsletter + threat-brief CTA ----------------------- */}
+        {/* 3. GATED, newsletter + threat-brief CTA ----------------------- */}
         <Section
           eyebrow="get the threat brief"
           title="Subscribe for future briefs and write-ups."
-          lede="The threat brief — and deeper write-ups like the judge v3 recalibration — go out to subscribers. No spam, unsubscribe anytime."
+          lede="The threat brief, and deeper write-ups like the judge v3 recalibration, go out to subscribers. No spam, unsubscribe anytime."
         >
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <NewsletterSignup variant="section" />
@@ -153,7 +153,7 @@ export default function ResourcesPage() {
           </div>
         </Section>
 
-        {/* 4. COMING SOON — not yet written ------------------------------- */}
+        {/* 4. COMING SOON, not yet written ------------------------------- */}
         <Section
           eyebrow="coming soon"
           title="On the way."

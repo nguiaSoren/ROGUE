@@ -1,5 +1,5 @@
 /**
- * POST /api/scans/validate — the "test connection" pre-flight proxy.
+ * POST /api/scans/validate, the "test connection" pre-flight proxy.
  *
  * Reads the API key from the server session cookie and forwards the posted target to the upstream
  * `POST /v1/validate` (the cheap synchronous reachability/credentials check that brackets a paid
@@ -8,7 +8,7 @@
  * or the `{ error: { code, message } }` envelope.
  *
  * Note: the live endpoint is `/v1/validate` (mounted by `rogue.api.v1.validate_benchmark`), not a
- * `/v1/scans/validate` sub-route — this proxy lives under `/api/scans/validate` only to sit next to
+ * `/v1/scans/validate` sub-route, this proxy lives under `/api/scans/validate` only to sit next to
  * the other scan-flow proxy routes.
  */
 

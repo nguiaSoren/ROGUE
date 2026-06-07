@@ -8,13 +8,13 @@ import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
 
 export const metadata = {
-  title: "Product — ROGUE",
+  title: "Product, ROGUE",
   description:
     "See exactly what ROGUE does to your stack: a live walkthrough of the scan dashboard, ranked findings, the CISO-ready report, and the MCP server your IDE queries directly.",
 };
 
 /**
- * /product — the "see the product" tour. Composes the native marketing
+ * /product, the "see the product" tour. Composes the native marketing
  * previews into a single narrative walkthrough: a section per faux app-window
  * preview (dashboard, findings, report, MCP). Server component; every preview is
  * self-contained with example data, so there is no client state here.
@@ -36,8 +36,8 @@ export default function ProductPage() {
               Point ROGUE at a deployment and it harvests live open-web
               jailbreaks, reproduces them against your exact model ×
               system-prompt × tools, and ranks what breaks. Here is the whole
-              loop — the dashboard, the findings, the report, and the MCP server
-              your IDE talks to — shown with real example data.
+              loop, the dashboard, the findings, the report, and the MCP server
+              your IDE talks to, shown with real example data.
             </p>
             <CtaRow className="pt-2" />
           </div>
@@ -47,7 +47,7 @@ export default function ProductPage() {
         <Section
           eyebrow="live scans"
           title="Run a scan, watch it live."
-          lede="Kick off a scan and watch breaches surface in real time — every attack on the ladder, every panel response, scored as it lands."
+          lede="Kick off a scan and watch breaches surface in real time, every attack on the ladder, every panel response, scored as it lands."
           className="animate-rogue-fade-up"
         >
           <DashboardPreview className="mx-auto max-w-4xl" />
@@ -57,7 +57,7 @@ export default function ProductPage() {
         <Section
           eyebrow="findings"
           title="Every breach, ranked worst-first."
-          lede="The findings feed sorts by severity, so the CRITICAL and HIGH breaches sit at the top — you triage the things that actually matter, not a wall of noise."
+          lede="The findings feed sorts by severity, so the CRITICAL and HIGH breaches sit at the top, you triage the things that actually matter, not a wall of noise."
           className="animate-rogue-fade-up"
         >
           <FindingsPreview className="mx-auto max-w-4xl" />
@@ -67,7 +67,7 @@ export default function ProductPage() {
         <Section
           eyebrow="reporting"
           title="A report your CISO can read."
-          lede="Each scan ships a dated, exportable threat-brief diff — judge-graded breach rates, reproductions, and what changed since last time, in plain language."
+          lede="Each scan ships a dated, exportable threat-brief diff, judge-graded breach rates, reproductions, and what changed since last time, in plain language."
           className="animate-rogue-fade-up"
         >
           <ReportPreview className="mx-auto max-w-4xl" />

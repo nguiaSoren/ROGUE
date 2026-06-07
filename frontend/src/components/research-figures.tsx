@@ -1,7 +1,7 @@
 /**
- * research-figures.tsx — paper-grade, dark-native data visualizations for the
+ * research-figures.tsx, paper-grade, dark-native data visualizations for the
  * /research page. Pure presentational server components: no charting library,
- * no canvas — just styled divs. The only motion is the page's existing
+ * no canvas, just styled divs. The only motion is the page's existing
  * `animate-rogue-fade-up`, applied by the page where each figure is dropped in.
  *
  * Conventions matching the "rogue" aesthetic:
@@ -46,7 +46,7 @@ function Figure({
   );
 }
 
-/** A mono-eyebrow "Method —" rigor note, restrained and muted. */
+/** A mono-eyebrow "Method, " rigor note, restrained and muted. */
 export function MethodNote({ children }: { children: React.ReactNode }) {
   return (
     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80 leading-relaxed">
@@ -56,7 +56,7 @@ export function MethodNote({ children }: { children: React.ReactNode }) {
 }
 
 // --------------------------------------------------------------------------
-// Fig 1 — Judge agreement vs the field (% agreement with the human majority)
+// Fig 1, Judge agreement vs the field (% agreement with the human majority)
 // --------------------------------------------------------------------------
 
 type RankedBar = {
@@ -66,7 +66,7 @@ type RankedBar = {
   emphasis?: boolean;
 };
 
-/** Horizontal % bars, scale 0–100, drawn in the order given (sorted ascending). */
+/** Horizontal % bars, scale 0 to 100, drawn in the order given (sorted ascending). */
 export function JudgeAgreementFig() {
   const rows: RankedBar[] = [
     { label: "ROGUE v1", value: 70.3, tone: "red" },
@@ -80,7 +80,7 @@ export function JudgeAgreementFig() {
   return (
     <Figure caption="Recalibration moved ROGUE from last of five to 3rd, tied with the frontier classifiers.">
       <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
-        Judge agreement with human majority — JBB judge_comparison
+        Judge agreement with human majority, JBB judge_comparison
       </figcaption>
       <div className="space-y-2.5">
         {rows.map((r) => (
@@ -118,14 +118,14 @@ export function JudgeAgreementFig() {
         ))}
       </div>
       <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/70">
-        scale 0–100% · sorted ascending
+        scale 0 to 100% · sorted ascending
       </p>
     </Figure>
   );
 }
 
 // --------------------------------------------------------------------------
-// Fig 2 — Scheduling, before → after (single-variable controlled experiment)
+// Fig 2, Scheduling, before → after (single-variable controlled experiment)
 // --------------------------------------------------------------------------
 
 type BeforeAfter = {
@@ -138,7 +138,7 @@ type BeforeAfter = {
   delta?: string;
 };
 
-/** Three before/after pairs; each pair shares a normalized 0–1 scale. */
+/** Three before/after pairs; each pair shares a normalized 0 to 1 scale. */
 export function SchedulingFig() {
   // Each metric is normalized within its own pair so the longer bar is the
   // larger raw magnitude; the "better" arrow tells the reader the direction.
@@ -165,7 +165,7 @@ export function SchedulingFig() {
   ];
 
   return (
-    <Figure caption="Single-variable controlled experiment — only the ladder order changed.">
+    <Figure caption="Single-variable controlled experiment, only the ladder order changed.">
       <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
         Scheduling, before → after
       </figcaption>
@@ -233,7 +233,7 @@ export function SchedulingFig() {
 }
 
 // --------------------------------------------------------------------------
-// Fig 3 — The 5 false-positive modes (20-row audit, 9 FPs), by count
+// Fig 3, The 5 false-positive modes (20-row audit, 9 FPs), by count
 // --------------------------------------------------------------------------
 
 export function FalsePositiveModesFig() {
@@ -249,7 +249,7 @@ export function FalsePositiveModesFig() {
   return (
     <Figure caption="All 9 false positives = engaged with the frame, transferred no harmful content.">
       <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
-        False-positive modes — 20-row audit, 9 FPs
+        False-positive modes, 20-row audit, 9 FPs
       </figcaption>
       <div className="space-y-2.5">
         {modes.map((m) => (
@@ -283,7 +283,7 @@ export function FalsePositiveModesFig() {
 }
 
 // --------------------------------------------------------------------------
-// Fig 4 — Breach matrix, before vs after the v3 re-judge
+// Fig 4, Breach matrix, before vs after the v3 re-judge
 // --------------------------------------------------------------------------
 
 export function BreachRejudgeFig() {
@@ -294,7 +294,7 @@ export function BreachRejudgeFig() {
   return (
     <Figure caption="Re-judging corrected the over-reporting.">
       <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
-        Breach matrix — before vs after the v3 re-judge
+        Breach matrix, before vs after the v3 re-judge
       </figcaption>
       <div className="space-y-3">
         <div
@@ -342,7 +342,7 @@ export function BreachRejudgeFig() {
 }
 
 // --------------------------------------------------------------------------
-// Fig 5 — The null result (mini forest plot), OR axis ~0.5–2, line at OR=1
+// Fig 5, The null result (mini forest plot), OR axis ~0.5 to 2, line at OR=1
 // --------------------------------------------------------------------------
 
 export function NullResultForestFig() {
@@ -352,7 +352,7 @@ export function NullResultForestFig() {
     { label: "encoding_obfuscation", or: 1.1 },
     { label: "structured_output", or: 1.0 },
   ];
-  // Axis: OR 0.5 → 2.0, mapped linearly to 0–100%.
+  // Axis: OR 0.5 → 2.0, mapped linearly to 0 to 100%.
   const AXIS_MIN = 0.5;
   const AXIS_MAX = 2.0;
   const pos = (or: number) =>
@@ -360,9 +360,9 @@ export function NullResultForestFig() {
   const onePos = pos(1);
 
   return (
-    <Figure caption="Family-mirror nodes showed OR 3–4.5× but were flagged circular and excluded; striking pre-FDR synergies (OR up to 16.8) survived 0 of 4 controls.">
+    <Figure caption="Family-mirror nodes showed OR 3 to 4.5× but were flagged circular and excluded; striking pre-FDR synergies (OR up to 16.8) survived 0 of 4 controls.">
       <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
-        Grammar-component predictive power — odds ratios
+        Grammar-component predictive power, odds ratios
       </figcaption>
       <div className="space-y-3">
         {rows.map((r) => (

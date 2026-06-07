@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
  * global CSS rule in `globals.css` toggles `animation-play-state: paused`.
  *
  * `rootMargin: "200px"` so the resume happens slightly before the
- * element is fully back in view — no perceptible "snap" on scroll-up.
+ * element is fully back in view, no perceptible "snap" on scroll-up.
  */
 export function usePausedOnOffscreen<T extends HTMLElement>(
   rootMargin: string = "200px",

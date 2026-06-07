@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import type { ScanSpec, TargetSpec } from "@/lib/platform-api";
 
-/** Mirrors the upstream `ValidationResult` (src/rogue/report.py:653) — the `/v1/validate` body. */
+/** Mirrors the upstream `ValidationResult` (src/rogue/report.py:653), the `/v1/validate` body. */
 type ValidationResult = {
   target: string;
   reachable: boolean;
@@ -38,7 +38,7 @@ export default function NewScanPage() {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [validateError, setValidateError] = useState<string | null>(null);
 
-  /** The target as the form currently holds it — shared by launch + test-connection. */
+  /** The target as the form currently holds it, shared by launch + test-connection. */
   function buildTarget(): TargetSpec {
     return {
       ...(mode === "provider" ? { provider } : { endpoint: endpoint.trim() }),
@@ -111,7 +111,7 @@ export default function NewScanPage() {
     <div className="mx-auto w-full max-w-lg px-4 sm:px-0">
       <h1 className="text-xl font-semibold">New scan</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Point ROGUE at a model and pick an attack pack. Scans run asynchronously — you&apos;ll watch
+        Point ROGUE at a model and pick an attack pack. Scans run asynchronously, you&apos;ll watch
         progress live on the next screen.
       </p>
 
@@ -146,12 +146,12 @@ export default function NewScanPage() {
         )}
 
         <label className="block text-sm">
-          <span className="text-muted-foreground">Model {mode === "provider" ? "(optional — provider default)" : ""}</span>
+          <span className="text-muted-foreground">Model {mode === "provider" ? "(optional, provider default)" : ""}</span>
           <input value={model} onChange={(e) => setModel(e.target.value)} placeholder={mode === "provider" ? "gpt-5.4-nano" : "model name"} className={`${field} mt-1`} />
         </label>
 
         <label className="block text-sm">
-          <span className="text-muted-foreground">Target API key (optional — server key used if blank)</span>
+          <span className="text-muted-foreground">Target API key (optional, server key used if blank)</span>
           <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" className={`${field} mt-1 font-mono`} />
         </label>
 
@@ -176,7 +176,7 @@ export default function NewScanPage() {
             ))}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Curated pack fires a quick sample of ROGUE&apos;s threat library; full repertoire runs the entire harvested corpus; full ladder escalates each goal through ROGUE&apos;s full multi-tier arsenal — the deepest and most expensive mode.
+            Curated pack fires a quick sample of ROGUE&apos;s threat library; full repertoire runs the entire harvested corpus; full ladder escalates each goal through ROGUE&apos;s full multi-tier arsenal, the deepest and most expensive mode.
           </p>
         </div>
 

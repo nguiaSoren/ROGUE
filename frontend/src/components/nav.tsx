@@ -70,7 +70,7 @@ export function Nav() {
           </span>
         </Link>
         <nav className="flex items-center gap-3 md:gap-5 text-xs uppercase tracking-widest">
-          {/* Threat-intel links — hidden on small screens */}
+          {/* Threat-intel links, hidden on small screens */}
           <span className="hidden lg:flex items-center gap-5">
             <NavLink href="/feed" active={pathname === "/feed"}>/feed</NavLink>
             <NavLink href="/matrix" active={pathname === "/matrix"}>/matrix</NavLink>
@@ -100,7 +100,7 @@ export function Nav() {
           >
             {COMMERCIAL ? "request demo" : "early access"}
           </Link>
-          {/* Hamburger — only below md, where the inline link groups are hidden */}
+          {/* Hamburger, only below md, where the inline link groups are hidden */}
           <button
             type="button"
             onClick={() => setMenuOpen((o) => !o)}
@@ -118,7 +118,7 @@ export function Nav() {
         </nav>
       </div>
 
-      {/* Mobile panel — full nav destinations, only rendered below md */}
+      {/* Mobile panel, full nav destinations, only rendered below md */}
       {menuOpen && (
         <nav
           id="mobile-nav"

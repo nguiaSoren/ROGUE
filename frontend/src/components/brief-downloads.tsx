@@ -2,7 +2,7 @@
 
 /**
  * Download buttons for the threat brief. The page already fetched both the
- * markdown and the JSON, so we just turn them into a Blob and download —
+ * markdown and the JSON, so we just turn them into a Blob and download, 
  * no API URL, no cross-origin `download`-attribute caveats, works in prod.
  */
 function downloadBlob(filename: string, content: string, type: string) {

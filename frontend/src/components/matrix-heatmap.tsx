@@ -15,7 +15,7 @@ import { ProviderLogo } from "@/components/ui/provider-logo";
  * cell clickable → opens the drawer with the worst primitive for that cell.
  *
  * The aggregation logic (max any_breach_rate per (family × config)) is the
- * same as the server version was — only the rendering is moved client-side
+ * same as the server version was, only the rendering is moved client-side
  * so cell clicks can pop the drawer without a navigation round-trip.
  */
 export function MatrixHeatmap({
@@ -43,11 +43,11 @@ export function MatrixHeatmap({
 
   // ?date=YYYY-MM-DD pins a non-default run day. The page is statically rendered
   // for the default (most-data) day, so this override is read client-side from
-  // the URL (via window.location, NOT useSearchParams — that would deopt the
+  // the URL (via window.location, NOT useSearchParams, that would deopt the
   // static page to client-side rendering). It's a debug/power-user param that
   // internal navigation never sets; when present it swaps the this-run baseline
-  // grid. The headline stats above the grid reflect the default day — see
-  // ROGUE_PLAN.md STATUS "Post-deadline frontend perf — 2026-06-01".
+  // grid. The headline stats above the grid reflect the default day, see
+  // ROGUE_PLAN.md STATUS "Post-deadline frontend perf, 2026-06-01".
   const [dateMatrix, setDateMatrix] = useState<BreachMatrixResponse | null>(null);
   useEffect(() => {
     const date = new URLSearchParams(window.location.search).get("date");
@@ -100,12 +100,12 @@ export function MatrixHeatmap({
   >("all");
   const [configFilter, setConfigFilter] = useState<string | null>(null);
   // Two fully-independent axes (the 2×2):
-  //   SCOPE    — this run (one day) vs all-time (every run day merged)
-  //   ATTACKER — baseline (raw single-shot) vs + augmentations (persona + PAIR)
-  // Default SCOPE to All-time when THIS run is empty / almost-empty — a sparse run
+  //   SCOPE, this run (one day) vs all-time (every run day merged)
+  //   ATTACKER, baseline (raw single-shot) vs + augmentations (persona + PAIR)
+  // Default SCOPE to All-time when THIS run is empty / almost-empty, a sparse run
   // day (few or no breaching cells) would otherwise render a near-blank grid.
   // All-time merges every run, so it shows the accumulated matrix; the user can
-  // still flip back to This run. Lazy initializer — computed once from the
+  // still flip back to This run. Lazy initializer, computed once from the
   // server-passed this-run baseline (`matrix`, before any ?date= override).
   const THIS_RUN_MIN_BREACHING_CELLS = 3;
   const [scope, setScope] = useState<"this-run" | "all-time">(() =>
@@ -159,14 +159,14 @@ export function MatrixHeatmap({
   }, [active.cells]);
 
   // Family filter selects a single family (click a row label). The severity
-  // filter no longer hides families — it DIMS cells below the threshold (see
+  // filter no longer hides families, it DIMS cells below the threshold (see
   // dimThreshold), so ≥50% vs ≥70% look different even when most families breach.
   const visibleFamilies = useMemo(
     () => (familyFilter ? [familyFilter] : active.families),
     [familyFilter, active.families],
   );
 
-  // Config (column) filter — click a column header to show only that deployment.
+  // Config (column) filter, click a column header to show only that deployment.
   const visibleConfigs = useMemo(
     () =>
       configFilter
@@ -210,7 +210,7 @@ export function MatrixHeatmap({
 
   return (
     <>
-      {/* SCOPE × ATTACKER — two fully independent toggles (the 2×2). SCOPE
+      {/* SCOPE × ATTACKER, two fully independent toggles (the 2×2). SCOPE
           swaps the date window (this run's day vs every run merged); ATTACKER
           swaps the technique set (raw single-shot vs persona-wrap + PAIR). */}
       {(hasAllTime || hasAugment) && (
@@ -280,8 +280,8 @@ export function MatrixHeatmap({
           <span className="text-[10px] font-mono text-muted-foreground max-w-md leading-snug">
             {scope === "all-time" ? "every run day merged · " : "this run's day · "}
             {showAugmented
-              ? "worst-case across persona-wrap + PAIR refinement — how hot each cell gets once the attacker adapts"
-              : "raw harvested prompt, N=5 trials per cell — no adaptation"}
+              ? "worst-case across persona-wrap + PAIR refinement, how hot each cell gets once the attacker adapts"
+              : "raw harvested prompt, N=5 trials per cell, no adaptation"}
             {augPending && (
               <span className="text-rogue-green animate-pulse"> · loading…</span>
             )}
@@ -404,7 +404,7 @@ export function MatrixHeatmap({
                       {stubIters !== undefined && stubIters !== null && (
                         <span
                           className="text-[9px] tabular-nums rogue-accent-stubbornness-text"
-                          title="§10.7 PAIR avg iterations to breach — lower = more vulnerable to iterative refinement"
+                          title="§10.7 PAIR avg iterations to breach, lower = more vulnerable to iterative refinement"
                         >
                           PAIR {stubIters.toFixed(2)} iters
                         </span>
@@ -485,7 +485,7 @@ function HeatmapCell({
         }`}
         style={{ animationDelay: `${delay}s` }}
       >
-        —
+, 
       </div>
     );
   }
@@ -506,7 +506,7 @@ function HeatmapCell({
         dimmed ? "opacity-20 saturate-50" : ""
       }`}
       style={{ animationDelay: `${delay}s` }}
-      title={`${cell.title} on ${cell.config_name} — ${intensity}% any-breach (n=${cell.n_trials}) · click to inspect`}
+      title={`${cell.title} on ${cell.config_name}, ${intensity}% any-breach (n=${cell.n_trials}) · click to inspect`}
     >
       {intensity}%
     </button>

@@ -5,19 +5,19 @@ import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
 import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
- * §10.7 Multi-turn escalation A/B tile — sidebar widget on /feed.
+ * §10.7 Multi-turn escalation A/B tile, sidebar widget on /feed.
  *
  * Per-config "escalation-vulnerability score" = breach-rate delta between
  * the synthesized 3-turn Crescendo-style escalation and the harvested
  * single-turn parent. Positive delta = the escalation worked (the deck
- * claim — "watch this single-turn primitive fail at turn 1, escalated
+ * claim, "watch this single-turn primitive fail at turn 1, escalated
  * 3-turn version breach at turn 3").
  *
  * Renders three states:
- *   1. No synthesized primitives yet — instructional stub with seed cmd.
- *   2. Synthesized rows exist but no reproduce sweep has run them yet —
+ *   1. No synthesized primitives yet, instructional stub with seed cmd.
+ *   2. Synthesized rows exist but no reproduce sweep has run them yet, 
  *      header counts only, no per-config rollup.
- *   3. Pairs (parent breach data + child breach data) exist — per-config
+ *   3. Pairs (parent breach data + child breach data) exist, per-config
  *      Δ table.
  */
 export function EscalationWidget({
@@ -63,7 +63,7 @@ export function EscalationWidget({
             </p>
           </div>
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-            {"// run: uv run python scripts/reproduce/reproduce_once.py — to fire the synthesized variants against the panel"}
+            {"// run: uv run python scripts/reproduce/reproduce_once.py, to fire the synthesized variants against the panel"}
           </p>
         </>
       )}

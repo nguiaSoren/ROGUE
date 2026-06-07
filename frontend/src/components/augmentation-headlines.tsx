@@ -6,14 +6,14 @@ import type {
 } from "@/lib/api";
 
 /**
- * Home-hero "§10.7 augmentation Δ" headline strip — 4 big numbers that tell
+ * Home-hero "§10.7 augmentation Δ" headline strip, 4 big numbers that tell
  * the deck claim story before the user scrolls.
  *
  * Each tile picks the *worst* config (highest Δ / lowest stubbornness) so the
  * numbers always tell a "wow, that's bad" story rather than averaging
  * everything into a milquetoast middle.
  *
- * Empty states render a muted "// no data" instead of fake zeros — same
+ * Empty states render a muted "// no data" instead of fake zeros, same
  * convention as the sidebar widgets.
  */
 export function AugmentationHeadlines({
@@ -177,7 +177,7 @@ function HeadlineTile({
         {name}
       </p>
       <p className={`text-3xl font-bold mt-2 tabular-nums leading-none ${bigClass}`}>
-        {big ?? "—"}
+        {big ?? ", "}
       </p>
       <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
         {unit}

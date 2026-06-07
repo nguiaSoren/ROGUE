@@ -3,11 +3,11 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
- * Threat-intel CTA block. Server component — no interactivity.
+ * Threat-intel CTA block. Server component, no interactivity.
  *
  * Points at the two real artifacts ROGUE produces: the daily threat-brief page
  * (`/brief`) and a static sample scan report (`/sample-report.html`). Deliberately
- * not a gated PDF — these are the genuine outputs, so the CTA is honest.
+ * not a gated PDF, these are the genuine outputs, so the CTA is honest.
  */
 export function ThreatReportDownload({ className }: { className?: string }) {
   return (
@@ -24,7 +24,7 @@ export function ThreatReportDownload({ className }: { className?: string }) {
         Download the latest threat brief
       </h2>
       <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-        See what ROGUE found this cycle — new jailbreaks reproduced against real
+        See what ROGUE found this cycle, new jailbreaks reproduced against real
         deployments, plus a full sample scan report.
       </p>
 

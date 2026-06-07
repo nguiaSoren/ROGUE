@@ -7,7 +7,7 @@ import Link from "next/link";
  * terminal aesthetic, inside the normal Nav/Footer chrome.
  */
 export const metadata = {
-  title: "404 — ROGUE",
+  title: "404, ROGUE",
   description: "The page you are looking for does not exist.",
 };
 

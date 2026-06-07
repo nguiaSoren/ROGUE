@@ -44,14 +44,14 @@ export function plainifyRate(rate: number): string {
 }
 
 /**
- * "0.84 iters" → "easy crack — usually breaks on the 1st attempt"
+ * "0.84 iters" → "easy crack, usually breaks on the 1st attempt"
  * The lower the number, the easier the model gives up.
  */
 export function plainifyIters(iters: number): string {
-  if (iters < 1.2) return "easy crack — breaks on the 1st attempt";
+  if (iters < 1.2) return "easy crack, breaks on the 1st attempt";
   if (iters < 2.2) return "breaks on the 2nd attempt on average";
   if (iters < 3.2) return "holds ~3 attempts before breaking";
-  if (iters < 4.5) return "robust — multiple retries before any breach";
+  if (iters < 4.5) return "robust, multiple retries before any breach";
   return "very resilient against iterative attackers";
 }
 
@@ -70,7 +70,7 @@ export function plainifyPattern(score: number): string {
  * "2.4 / $" → "2-3 novel attacks for every dollar of Bright Data spend"
  */
 export function plainifyYield(novelPerDollar: number): string {
-  if (novelPerDollar >= 10) return "extremely cost-efficient — 10+ novel attacks per $";
+  if (novelPerDollar >= 10) return "extremely cost-efficient, 10+ novel attacks per $";
   if (novelPerDollar >= 3)
     return `~${Math.round(novelPerDollar)} novel attacks for every $1 of BD spend`;
   if (novelPerDollar >= 1)
@@ -100,5 +100,5 @@ export function plainifyAttackCount(n: number): string {
   if (n >= 500) return "more than most security teams see in a quarter";
   if (n >= 100) return "growing daily as the harvester runs";
   if (n > 0) return "the harvest is just starting";
-  return "no attacks yet — run the harvester to seed";
+  return "no attacks yet, run the harvester to seed";
 }

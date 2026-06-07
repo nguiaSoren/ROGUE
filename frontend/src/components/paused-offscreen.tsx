@@ -6,7 +6,7 @@ import { usePausedOnOffscreen } from "@/lib/use-paused-on-offscreen";
 /**
  * Thin client wrapper that renders any element with `data-rg-pause` toggled
  * by an IntersectionObserver. Use when the animated element is inside an
- * otherwise-server component — wrap just the animated element so the parent
+ * otherwise-server component, wrap just the animated element so the parent
  * stays server-rendered.
  *
  * The matching CSS rule in `globals.css`:

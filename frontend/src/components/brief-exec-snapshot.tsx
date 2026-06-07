@@ -6,12 +6,12 @@ import type { BriefJson, BreachedPrimitiveBrief } from "@/lib/api";
  *
  * The "show me the punchline in 3 seconds" view at the top of /brief. Pulls
  * data from the JSON form of the brief (same disk artifact as the markdown
- * — guaranteed to be consistent).
+ *, guaranteed to be consistent).
  *
  * Renders:
- *   1. Net-delta vs yesterday — large signed number with tint.
+ *   1. Net-delta vs yesterday, large signed number with tint.
  *   2. The top-3 worst new attackers (max_any_breach_rate) in a row of cards.
- *   3. A "what to do today" line — recommended action based on whether the
+ *   3. A "what to do today" line, recommended action based on whether the
  *      brief has CRITICALs (patch now), newly_defended (note the wins), or
  *      neither (steady state).
  */
@@ -79,7 +79,7 @@ export function BriefExecSnapshot({ json }: { json: BriefJson | null }) {
           </p>
           {top3.length === 0 ? (
             <div className="border border-border rounded-lg p-4 bg-card/40 text-xs font-mono text-muted-foreground">
-              {"// no new attackers today — steady state"}
+              {"// no new attackers today, steady state"}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -124,7 +124,7 @@ function TopAttackerCard({
       low: "border-blue-500/40 bg-blue-500/5",
     }[primitive.severity_tier.toLowerCase()] ?? "border-border";
 
-  // The config behind max_any_breach_rate — the worst-hit (family × config)
+  // The config behind max_any_breach_rate, the worst-hit (family × config)
   // cell. Clicking the card drills into that cell on /matrix/cell, the same
   // breakdown the matrix grid opens.
   const worstConfig = [...primitive.breached_configs].sort(
@@ -186,7 +186,7 @@ function pickRecommendation(summary: BriefJson["summary"]): {
 } {
   if (summary.new_critical > 0) {
     return {
-      text: `Patch system prompts now — ${summary.new_critical} new CRITICAL attack${summary.new_critical === 1 ? "" : "s"} bypass guardrails today.`,
+      text: `Patch system prompts now, ${summary.new_critical} new CRITICAL attack${summary.new_critical === 1 ? "" : "s"} bypass guardrails today.`,
       tint: "border-rogue-red/40 bg-rogue-red/10 text-rogue-red",
     };
   }
@@ -198,12 +198,12 @@ function pickRecommendation(summary: BriefJson["summary"]): {
   }
   if (summary.newly_defended > 0) {
     return {
-      text: `${summary.newly_defended} attacks now defended — consider re-running the panel to confirm regression.`,
+      text: `${summary.newly_defended} attacks now defended, consider re-running the panel to confirm regression.`,
       tint: "border-rogue-green/40 bg-rogue-green/10 text-rogue-green",
     };
   }
   return {
-    text: "Steady state — no critical movers today. Continue daily polling cadence.",
+    text: "Steady state, no critical movers today. Continue daily polling cadence.",
     tint: "border-border bg-card/40 text-muted-foreground",
   };
 }

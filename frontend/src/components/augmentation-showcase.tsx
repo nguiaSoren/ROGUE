@@ -50,14 +50,14 @@ export function AugmentationShowcase({
       value: Math.round(a.mean_yield * 100) / 100,
     })) ?? [];
 
-  // PERSONA — worst-case delta + the config that produced it (for plain text)
+  // PERSONA, worst-case delta + the config that produced it (for plain text)
   const personaWorstRow =
     persona?.per_config
       .filter((c) => c.max_delta !== null)
       .sort((a, b) => (b.max_delta ?? 0) - (a.max_delta ?? 0))[0] ?? null;
   const personaWorst = personaWorstRow?.max_delta ?? null;
   // Logical Appeal (the only persona actually run) lifted breach rate on no
-  // config — show the no-lift result honestly, not a confusing negative "Δ".
+  // config, show the no-lift result honestly, not a confusing negative "Δ".
   const personaLifted = personaWorst !== null && personaWorst > 0.005;
   const personaHeroValue =
     personaWorst === null
@@ -73,7 +73,7 @@ export function AugmentationShowcase({
       ? null
       : personaLifted
         ? plainifyPP(personaWorst, personaWorstRow?.baseline_breach_rate)
-        : "Wrapping the attack in a persuasion persona didn't raise breach rate on any config — this model line reacts to intent, not tone.";
+        : "Wrapping the attack in a persuasion persona didn't raise breach rate on any config, this model line reacts to intent, not tone.";
   const personaChart =
     persona?.per_config.slice(0, 5).map((c) => ({
       label: shortName(c.config_name),
@@ -255,7 +255,7 @@ function ShowcaseCard({
               heroValue ? accentClasses.text : "text-muted-foreground"
             }`}
           >
-            {heroValue ?? "—"}
+            {heroValue ?? ", "}
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">
             {heroUnit}

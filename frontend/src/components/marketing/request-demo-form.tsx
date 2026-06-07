@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils";
  * confirmation card on success. On any failure (network or non-2xx) it shows an
  * inline error and keeps the entered values so the visitor can retry.
  *
- * The API base is resolved the same way `src/lib/api.ts` does — from
- * `NEXT_PUBLIC_API_BASE` (defaulting to localhost:8000) — rather than
+ * The API base is resolved the same way `src/lib/api.ts` does, from
+ * `NEXT_PUBLIC_API_BASE` (defaulting to localhost:8000), rather than
  * hardcoded, so it tracks whatever the dashboard pages already talk to.
  */
 
@@ -33,7 +33,7 @@ const API_BASE =
 // directly" iframe below it; when unset it's form-only (today's behavior).
 const CALENDLY_URL = process.env.NEXT_PUBLIC_CALENDLY_URL;
 
-// Render's free tier cold-boots on the first request after idle — the POST can
+// Render's free tier cold-boots on the first request after idle, the POST can
 // take several seconds. Cap it generously so a real cold start succeeds, but
 // still bail rather than hang the UI forever.
 const SUBMIT_TIMEOUT_MS = 30_000;
@@ -49,7 +49,7 @@ const DEPLOYMENT_TYPES = [
   "Not sure yet",
 ] as const;
 
-// Pragmatic email shape check — presence + a basic local@domain.tld pattern.
+// Pragmatic email shape check, presence + a basic local@domain.tld pattern.
 // The server is authoritative (422 on bad email); this is just fast UX.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -86,7 +86,7 @@ export function RequestDemoForm() {
     const deployment_type = String(data.get("deployment_type") ?? "").trim();
     const message = String(data.get("message") ?? "").trim();
 
-    // Client-side email validation — presence + shape.
+    // Client-side email validation, presence + shape.
     if (!email || !EMAIL_RE.test(email)) {
       setEmailError("Enter a valid work email so we can reach you.");
       setStatus("error");
@@ -109,7 +109,7 @@ export function RequestDemoForm() {
 
       if (!r.ok) {
         if (r.status === 422) {
-          setEmailError("That email looks invalid — double-check and retry.");
+          setEmailError("That email looks invalid, double-check and retry.");
           setStatus("error");
           return;
         }
@@ -121,7 +121,7 @@ export function RequestDemoForm() {
       setStatus("success");
     } catch {
       setErrorMsg(
-        "Something went wrong sending your request. Please try again — your details are still here.",
+        "Something went wrong sending your request. Please try again, your details are still here.",
       );
       setStatus("error");
     } finally {
@@ -140,7 +140,7 @@ export function RequestDemoForm() {
               request received
             </p>
             <h2 className="text-xl font-bold tracking-tight">
-              Thanks — we&apos;ll be in touch.
+              Thanks, we&apos;ll be in touch.
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               We&apos;ll reach out shortly to scope a scan against your{" "}
@@ -248,7 +248,7 @@ export function RequestDemoForm() {
         </button>
         {submitting && showSlowHint && (
           <p className="text-xs text-muted-foreground text-center" aria-live="polite">
-            Waking the service — this can take a few seconds.
+            Waking the service, this can take a few seconds.
           </p>
         )}
       </div>

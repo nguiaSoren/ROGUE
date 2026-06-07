@@ -3,13 +3,13 @@ import { BriefMarkdown } from "@/components/brief-markdown";
 import { BriefExecSnapshot } from "@/components/brief-exec-snapshot";
 import { BriefDownloads } from "@/components/brief-downloads";
 
-// ISR — statically prerendered + revalidated every 5 min, matching /matrix and
+// ISR, statically prerendered + revalidated every 5 min, matching /matrix and
 // REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
 // data surfaces within the window instead of paying the full round-trip.
 export const revalidate = 300;
 
 /**
- * /brief — Threat Brief.
+ * /brief, Threat Brief.
  *
  * Reads like a daily CISO threat brief: a dated masthead with export actions,
  * an at-a-glance KPI snapshot strip (new breaches by severity + net movement),
@@ -21,7 +21,7 @@ export const revalidate = 300;
  * come from the same disk artifact so values cannot disagree.
  */
 export default async function BriefPage() {
-  // The markdown brief is the critical fetch — do NOT swallow its failure. If it
+  // The markdown brief is the critical fetch, do NOT swallow its failure. If it
   // throws (API mid-restart / cold Neon), let it propagate so Next + Vercel keep
   // serving the last-good static brief instead of caching a "brief unavailable"
   // page for the full ISR window. The JSON form (exec snapshot) is non-critical.
@@ -32,7 +32,7 @@ export default async function BriefPage() {
   const briefJson = (briefJsonRes?.json ?? null) as BriefJson | null;
 
   // Successful fetch but no markdown payload is an anomaly (the brief is always
-  // generable from the matrix) — throw so we keep the last-good brief rather
+  // generable from the matrix), throw so we keep the last-good brief rather
   // than caching an empty one.
   if (!briefMarkdown?.markdown) {
     throw new Error("brief markdown payload empty");
@@ -50,7 +50,7 @@ export default async function BriefPage() {
   const newBreaching = newCritical + newHigh + newMedium + newLow;
   const netDelta = summary?.net_delta ?? newBreaching - newlyDefended;
 
-  // One-line masthead summary — the "read it in 3 seconds" headline.
+  // One-line masthead summary, the "read it in 3 seconds" headline.
   const headline = buildHeadline({
     newCritical,
     newHigh,
@@ -142,7 +142,7 @@ export default async function BriefPage() {
           </div>
         </section>
 
-        {/* Executive snapshot — JSON-driven (net Δ, top-3 attackers, action) */}
+        {/* Executive snapshot, JSON-driven (net Δ, top-3 attackers, action) */}
         <BriefExecSnapshot json={briefJson} />
 
         {/* Full long-form report */}
@@ -242,18 +242,18 @@ function buildHeadline({
   newlyDefended: number;
 }): string {
   if (newCritical > 0) {
-    return `${newCritical} new CRITICAL attack${newCritical === 1 ? "" : "s"} bypassed guardrails since yesterday — patch system prompts now.`;
+    return `${newCritical} new CRITICAL attack${newCritical === 1 ? "" : "s"} bypassed guardrails since yesterday, patch system prompts now.`;
   }
   if (newHigh > 0) {
-    return `${newHigh} new HIGH-tier attack${newHigh === 1 ? "" : "s"} surfaced — review and prioritize for the next patch window.`;
+    return `${newHigh} new HIGH-tier attack${newHigh === 1 ? "" : "s"} surfaced, review and prioritize for the next patch window.`;
   }
   if (newBreaching > 0) {
     return `${newBreaching} newly-breaching attack${newBreaching === 1 ? "" : "s"} since yesterday, none critical.`;
   }
   if (newlyDefended > 0) {
-    return `No new breaches today — ${newlyDefended} previously-breaching attack${newlyDefended === 1 ? "" : "s"} now defended.`;
+    return `No new breaches today, ${newlyDefended} previously-breaching attack${newlyDefended === 1 ? "" : "s"} now defended.`;
   }
-  return "Steady state — no critical movers since yesterday. Continue daily polling cadence.";
+  return "Steady state, no critical movers since yesterday. Continue daily polling cadence.";
 }
 
 /** "2026-06-05" → "Friday, June 5, 2026"; passes through anything unparseable. */

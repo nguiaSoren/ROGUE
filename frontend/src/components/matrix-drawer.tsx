@@ -42,7 +42,7 @@ type AttackDetailResponse = {
 // --------------------------------------------------------------------------
 // Shared attack-detail cache, keyed by primitive_id. Shared between the heatmap
 // (hover prefetch) and the drawer (on open), so:
-//   • hovering a cell warms the fetch — by the time it's clicked the detail is
+//   • hovering a cell warms the fetch, by the time it's clicked the detail is
 //     usually already in hand and the drawer opens straight to content;
 //   • re-opening any previously-viewed cell is instant;
 //   • a transient 502/503/504 from a Render cold boot is retried (1.6s/2.4s)
@@ -111,13 +111,13 @@ export function MatrixCellDrawer({
 }: {
   open: boolean;
   cell: BreachCell | null;
-  /** Matrix run-date — threads into the "see all primitives" cell-page link. */
+  /** Matrix run-date, threads into the "see all primitives" cell-page link. */
   date?: string;
-  /** Matrix SCOPE toggle — threaded through so the cell page opens in the same
+  /** Matrix SCOPE toggle, threaded through so the cell page opens in the same
    *  scope you clicked from (an all-time cell that breached on another day would
    *  otherwise open to an empty day-scoped page). */
   scope?: "this-run" | "all-time";
-  /** Matrix ATTACKER toggle — same idea on the other axis, so an augmented-only
+  /** Matrix ATTACKER toggle, same idea on the other axis, so an augmented-only
    *  breach doesn't open to an empty baseline page. */
   attacker?: "baseline" | "augmented";
   onClose: () => void;
@@ -212,7 +212,7 @@ export function MatrixCellDrawer({
             {cell.refused && (
               <span
                 className="mt-1 inline-flex items-center gap-1 rounded border border-rogue-red/30 bg-rogue-red/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rogue-red"
-                title="The primary judge (Claude Sonnet) refused to grade a trial in this cell, so it was graded by the secondary judge — flagged as lower-trust provenance."
+                title="The primary judge (Claude Sonnet) refused to grade a trial in this cell, so it was graded by the secondary judge, flagged as lower-trust provenance."
               >
                 judge refused → fallback
               </span>
@@ -277,7 +277,7 @@ export function MatrixCellDrawer({
           )}
           {errored && (
             <p className="text-xs font-mono text-rogue-red">
-              {"// couldn't load this primitive (the API may be waking up) — close and reopen to retry"}
+              {"// couldn't load this primitive (the API may be waking up), close and reopen to retry"}
             </p>
           )}
           {shownDetail && (
@@ -317,7 +317,7 @@ export function MatrixCellDrawer({
                 <section>
                   <div className="flex items-center justify-between mb-1.5">
                     <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
-                      payload_template — the prompt that breached this
+                      payload_template, the prompt that breached this
                     </p>
                     <CopyButton text={shownDetail.primitive.payload_template} />
                   </div>
@@ -391,8 +391,8 @@ export function MatrixCellDrawer({
 }
 
 /**
- * Renders the primitive's real image — the §11.8 fetched carrier OR the
- * Feature-A verbatim-ingested payload image — from /api/attacks/{id}/image.
+ * Renders the primitive's real image, the §11.8 fetched carrier OR the
+ * Feature-A verbatim-ingested payload image, from /api/attacks/{id}/image.
  * Hides itself entirely if the route 404s (the deployed API only has the bytes
  * when the harvest that cached them ran on its filesystem).
  */
@@ -402,7 +402,7 @@ export function PayloadImage({ primitiveId }: { primitiveId: string }) {
   return (
     <section className="space-y-1.5">
       <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
-        payload image — sent verbatim to the vision panel
+        payload image, sent verbatim to the vision panel
       </p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

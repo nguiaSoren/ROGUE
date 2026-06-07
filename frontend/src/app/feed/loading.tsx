@@ -1,8 +1,8 @@
 /**
  * Instant Suspense fallback for /feed. The feed page is server-rendered with an
  * ISR window but a cold-cache or cold-Render visit still waits on the attacks
- * fetch with no feedback. This skeleton mirrors the page shell — KPI strip,
- * augmentation strip, and the 3-column war-room grid — so the transition into
+ * fetch with no feedback. This skeleton mirrors the page shell, KPI strip,
+ * augmentation strip, and the 3-column war-room grid, so the transition into
  * the real feed is seamless. Mirrors matrix/loading.tsx.
  */
 export default function FeedLoading() {

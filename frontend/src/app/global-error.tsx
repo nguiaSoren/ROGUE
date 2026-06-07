@@ -4,7 +4,7 @@
  * Root-layout error boundary. Catches errors thrown in the root layout itself
  * (which the per-segment `error.tsx` cannot wrap). It REPLACES the root layout
  * when active, so it must render its own <html>/<body> and cannot rely on the
- * Nav/Footer/fonts/theme provider — hence the inline dark styling that keeps it
+ * Nav/Footer/fonts/theme provider, hence the inline dark styling that keeps it
  * on-brand without the global stylesheet guaranteed to be present.
  */
 export default function GlobalError({
@@ -52,7 +52,7 @@ export default function GlobalError({
             ROGUE hit an unrecoverable error.
           </h1>
           <p style={{ color: "#9a9a9a", lineHeight: 1.6, margin: "0 0 24px" }}>
-            The page failed to render. Try reloading — if it keeps happening, the
+            The page failed to render. Try reloading, if it keeps happening, the
             service is likely mid-deploy.
           </p>
           {error.digest && (

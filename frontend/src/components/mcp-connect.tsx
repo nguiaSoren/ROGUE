@@ -3,16 +3,16 @@
 import { useState } from "react";
 
 /**
- * "Connect via MCP" — one-click install buttons for the hosted ROGUE MCP server.
+ * "Connect via MCP", one-click install buttons for the hosted ROGUE MCP server.
  *
  * The server is mounted into the API at `<api-base>/mcp` (streamable-http), so
  * there's nothing to download or clone: clients connect to a URL.
  *  - "Add to Cursor" / "Add to VS Code" fire the IDE's MCP-install deeplink.
- *  - "Copy URL" is the universal fallback — paste into Claude Desktop's custom
+ *  - "Copy URL" is the universal fallback, paste into Claude Desktop's custom
  *    connector or any MCP client.
  */
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-// Trailing slash: the server is mounted at /mcp, so the endpoint is /mcp/ —
+// Trailing slash: the server is mounted at /mcp, so the endpoint is /mcp/, 
 // using it directly avoids a 307 redirect that some MCP clients won't follow.
 const MCP_URL = `${API_BASE}/mcp/`;
 
@@ -36,7 +36,7 @@ export function McpConnect() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      /* clipboard blocked — user can still read the URL below */
+      /* clipboard blocked, user can still read the URL below */
     }
   };
 
@@ -72,9 +72,9 @@ export function McpConnect() {
         <span className="text-foreground">Claude Desktop:</span> Settings →
         Connectors → Add custom connector → paste the URL above.{" "}
         <span className="text-foreground">Cursor / VS Code:</span> click the
-        button — your editor opens and offers to add the{" "}
+        button, your editor opens and offers to add the{" "}
         <code className="text-rogue-green">rogue</code> server. No clone, no
-        Python, no JSON editing — it&apos;s a hosted, read-only MCP server with
+        Python, no JSON editing, it&apos;s a hosted, read-only MCP server with
         5 query tools.
       </p>
     </div>

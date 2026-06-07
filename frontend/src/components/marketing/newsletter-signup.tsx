@@ -8,7 +8,7 @@ import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 /**
- * Newsletter subscribe form — drop into the footer (compact inline) or a page
+ * Newsletter subscribe form, drop into the footer (compact inline) or a page
  * section (carded block). Client component.
  *
  * Validates the email client-side, then POSTs JSON to the Wave-1 backend
@@ -19,18 +19,18 @@ import { cn } from "@/lib/utils";
  * the visitor can retry.
  *
  * The API base is resolved the same way `request-demo-form.tsx` / `src/lib/api.ts`
- * do — from `NEXT_PUBLIC_API_BASE` (defaulting to localhost:8000) — so it tracks
+ * do, from `NEXT_PUBLIC_API_BASE` (defaulting to localhost:8000), so it tracks
  * whatever the dashboard pages already talk to.
  */
 
 // Mirror `src/lib/api.ts`: same env var, same localhost fallback.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
-// Render's free tier cold-boots on the first request after idle — cap the POST
+// Render's free tier cold-boots on the first request after idle, cap the POST
 // generously so a real cold start succeeds, but still bail rather than hang.
 const SUBMIT_TIMEOUT_MS = 30_000;
 
-// Pragmatic email shape check — presence + a basic local@domain.tld pattern.
+// Pragmatic email shape check, presence + a basic local@domain.tld pattern.
 // The server is authoritative (422 on bad email); this is just fast UX.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -79,7 +79,7 @@ export function NewsletterSignup({
       if (!r.ok) {
         if (r.status === 422) {
           setStatus("error");
-          setMessage("That email looks invalid — double-check and retry.");
+          setMessage("That email looks invalid, double-check and retry.");
           return;
         }
         throw new Error(`newsletter → ${r.status}`);
@@ -99,7 +99,7 @@ export function NewsletterSignup({
       setMessage(
         already
           ? "You're already on the list."
-          : "Subscribed — threat briefs incoming.",
+          : "Subscribed, threat briefs incoming.",
       );
     } catch {
       setStatus("error");
@@ -115,7 +115,7 @@ export function NewsletterSignup({
           Stay updated
         </h3>
         <p className="mt-4 max-w-xs text-sm text-muted-foreground leading-relaxed">
-          The weekly threat brief — new jailbreaks reproduced against real
+          The weekly threat brief, new jailbreaks reproduced against real
           deployments.
         </p>
         {succeeded ? (

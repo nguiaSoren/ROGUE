@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import { Term } from "@/components/glossary";
 
 /**
- * Plain-data metadata for the 5 augmentations — canonical copy + accent colors.
+ * Plain-data metadata for the 5 augmentations, canonical copy + accent colors.
  *
  * Deliberately NOT a "use client" module: both server components (the widgets
  * and the showcase) and client components (the lab) import these. If they lived
  * in a "use client" file, a server component importing them would receive a
- * client-reference placeholder instead of the real object — `.bandit` etc.
+ * client-reference placeholder instead of the real object, `.bandit` etc.
  * would read `undefined` at render.
  */
 export type AugmentationKey =
@@ -41,7 +41,7 @@ export const AUGMENTATION_COPY: Record<
     whatItIs:
       "An online learner that rates each jailbreak-hunting query by how many novel attacks per dollar it surfaces.",
     whyItMatters:
-      "Stops you from wasting Bright Data budget on queries that no longer find anything new — the hot arm gets the next 90% of pulls automatically.",
+      "Stops you from wasting Bright Data budget on queries that no longer find anything new, the hot arm gets the next 90% of pulls automatically.",
   },
   persona: {
     eyebrow: "Persona susceptibility",
@@ -71,7 +71,7 @@ export const AUGMENTATION_COPY: Record<
     whatItIs:
       "Single-turn attacks the model refused are re-synthesized as a 3-turn arc that warms up before delivering the payload.",
     whyItMatters:
-      "If turn 3 breaches a config that refused turn 1, the model is making isolated decisions — context isn't carrying its guardrails. Real users do this naturally.",
+      "If turn 3 breaches a config that refused turn 1, the model is making isolated decisions, context isn't carrying its guardrails. Real users do this naturally.",
   },
   mutation: {
     eyebrow: "Pattern-match audit",
@@ -109,7 +109,7 @@ export const AUGMENTATION_COPY: Record<
       <>
         Tells you how long your weakest config holds against a real
         adaptive attacker. Most production safety evals measure single-shot
-        refusal — this measures resilience.
+        refusal, this measures resilience.
       </>
     ),
   },

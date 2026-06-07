@@ -10,10 +10,10 @@ const HF_DATASET_URL = "https://huggingface.co/datasets/soren19/rogue-attacks-20
 const DEMO_VIDEO_URL = "https://youtu.be/-luwKpfaf2M"
 
 /**
- * Honest traction / proof band. Credibility through verifiable facts only —
+ * Honest traction / proof band. Credibility through verifiable facts only, 
  * NO customer logos, NO testimonials, NO "trusted by". Every claim is true and
  * sourced from the founder's record + src/lib/proof.ts (the single source for
- * corpus/judge numbers — never hard-code different values here). Server component.
+ * corpus/judge numbers, never hard-code different values here). Server component.
  */
 export function TractionBand({ className }: { className?: string }) {
   // Numbers come from proof.ts so a corpus/judge re-measure updates the band.
@@ -48,7 +48,7 @@ export function TractionBand({ className }: { className?: string }) {
     {
       icon: Plug,
       title: "Its own MCP server",
-      body: "Query live attacks from Claude, Cursor, or Windsurf — ROGUE is a Model Context Protocol server, not just a dashboard.",
+      body: "Query live attacks from Claude, Cursor, or Windsurf, ROGUE is a Model Context Protocol server, not just a dashboard.",
     },
     {
       icon: Zap,
@@ -61,11 +61,11 @@ export function TractionBand({ className }: { className?: string }) {
     <Section
       eyebrow="traction"
       title="Real results, not logos."
-      lede="No customer testimonials, no borrowed credibility. Here's the verifiable evidence the engine is real — a live deployment, its own MCP server, a published dataset, and measured numbers you can check."
+      lede="No customer testimonials, no borrowed credibility. Here's the verifiable evidence the engine is real, a live deployment, its own MCP server, a published dataset, and measured numbers you can check."
       className={className}
     >
       <div className="space-y-8">
-        {/* Headline milestones — MCP differentiator + live deployment */}
+        {/* Headline milestones, MCP differentiator + live deployment */}
         <div className="grid gap-4 md:grid-cols-2">
           {milestones.map(({ icon: Icon, title, body }) => (
             <div
@@ -86,7 +86,7 @@ export function TractionBand({ className }: { className?: string }) {
           ))}
         </div>
 
-        {/* Measured proof numbers — all from proof.ts */}
+        {/* Measured proof numbers, all from proof.ts */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
             <StatCard
@@ -98,7 +98,7 @@ export function TractionBand({ className }: { className?: string }) {
           ))}
         </div>
 
-        {/* Verifiable links — open dataset + demo */}
+        {/* Verifiable links, open dataset + demo */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <Link
             href={HF_DATASET_URL}
@@ -121,7 +121,7 @@ export function TractionBand({ className }: { className?: string }) {
                 <ArrowUpRight className="size-4 text-rogue-green opacity-70 transition-opacity group-hover:opacity-100" />
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                {CORPUS.harvested} harvested primitives, published and downloadable — inspect the corpus yourself.
+                {CORPUS.harvested} harvested primitives, published and downloadable, inspect the corpus yourself.
               </p>
             </div>
           </Link>

@@ -43,7 +43,7 @@ export function providerSlug(modelOrName: string | null | undefined): string | n
 
 /**
  * Tiny monochrome provider logo. Rendered via CSS mask so it inherits the
- * current text color (`currentColor`) — works on any theme regardless of each
+ * current text color (`currentColor`), works on any theme regardless of each
  * SVG's baked-in fill. Sized to 1em by default so it scales with the text.
  */
 export function ProviderLogo({

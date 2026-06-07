@@ -6,7 +6,7 @@ import { getApiKey } from "@/lib/session";
 import { StatusBadge, ScoreBadge } from "@/components/score-badge";
 
 /**
- * /scans — the scan LIST page (server component).
+ * /scans, the scan LIST page (server component).
  *
  * Mirrors the `matrix/page.tsx` async-server-component shape, with the tenancy
  * differences from docs/platform/dashboard/pages-and-routes.md §4: tenant data is
@@ -18,7 +18,7 @@ import { StatusBadge, ScoreBadge } from "@/components/score-badge";
  * key here (server-only) and pass the bearer to `listScans(key)`. The redirect is a
  * defensive belt-and-suspenders so TypeScript sees `key` as non-null below.
  */
-export const dynamic = "force-dynamic"; // tenant data — never statically cached
+export const dynamic = "force-dynamic"; // tenant data, never statically cached
 
 export default async function ScansPage() {
   const key = await getApiKey();
@@ -138,5 +138,5 @@ function EmptyState() {
 /** A human label for the redacted target snapshot (model > provider > endpoint). */
 function targetLabel(s: ScanRecord): string {
   const t = s.target ?? {};
-  return t.model || t.provider || t.endpoint || "—";
+  return t.model || t.provider || t.endpoint || ", ";
 }

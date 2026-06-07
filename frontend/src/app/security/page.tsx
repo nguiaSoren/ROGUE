@@ -16,19 +16,19 @@ import { CtaRow } from "@/components/marketing/cta-row";
 import { COMMERCIAL } from "@/lib/flags";
 
 export const metadata = {
-  title: "Security — ROGUE",
+  title: "Security, ROGUE",
   description:
-    "How ROGUE keeps your data safe: encrypted secrets, organization isolation, no stored model weights, audit logging, and least-privilege access. ROGUE is the attacker side — it tests your endpoint over the API.",
+    "How ROGUE keeps your data safe: encrypted secrets, organization isolation, no stored model weights, audit logging, and least-privilege access. ROGUE is the attacker side, it tests your endpoint over the API.",
 };
 
 /**
- * /security — answers "can I safely point this at production AI?" before a
+ * /security, answers "can I safely point this at production AI?" before a
  * buyer has to ask. Describes genuine, defensible posture only; compliance
  * (SOC2 etc.) is framed as roadmap, never claimed. Server component.
  */
 export default function SecurityPage() {
   // Commercial-pitch page: hidden (404) in the default honest hiring mode, shown
-  // only when NEXT_PUBLIC_SHOW_COMMERCIAL=true — same gating as /pricing.
+  // only when NEXT_PUBLIC_SHOW_COMMERCIAL=true, same gating as /pricing.
   if (!COMMERCIAL) notFound();
 
   return (
@@ -38,7 +38,7 @@ export default function SecurityPage() {
         <Section
           eyebrow="security & trust"
           title="Built to be safe to point at production AI."
-          lede="ROGUE attacks your model so you can patch it before someone else does — which means it has to be trustworthy with the credentials and responses it touches. Here's exactly how your data is handled, and why ROGUE never needs your model weights or training data."
+          lede="ROGUE attacks your model so you can patch it before someone else does, which means it has to be trustworthy with the credentials and responses it touches. Here's exactly how your data is handled, and why ROGUE never needs your model weights or training data."
         />
 
         {/* 2. SECURITY POSTURE GRID --------------------------------------- */}
@@ -69,7 +69,7 @@ export default function SecurityPage() {
         <Section
           eyebrow="data flow"
           title="How a scan handles your data."
-          lede="ROGUE is the attacker side of the test. It needs inference access to the endpoint you point it at — nothing more. No training data, no model weights, no source code."
+          lede="ROGUE is the attacker side of the test. It needs inference access to the endpoint you point it at, nothing more. No training data, no model weights, no source code."
         >
           <ol className="space-y-3">
             {FLOW.map((step, i) => (
@@ -149,8 +149,8 @@ export default function SecurityPage() {
             />
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
               The hosted platform fits most teams, but if your model can&apos;t be
-              reached from the public internet — or your compliance posture
-              requires data never leave your perimeter — ROGUE can run inside
+              reached from the public internet, or your compliance posture
+              requires data never leave your perimeter, ROGUE can run inside
               your own environment, pointed at internal endpoints. Self-hosted
               and private deployments keep every prompt, response, and report
               within your boundary.
@@ -168,7 +168,7 @@ export default function SecurityPage() {
         {/* 6. CLOSING CTA ------------------------------------------------- */}
         <Section
           eyebrow="ready when you are"
-          title="Point ROGUE at your endpoint — safely."
+          title="Point ROGUE at your endpoint, safely."
           lede="See exactly what a scan touches, and what it returns, on a real report."
         >
           <CtaRow />
@@ -202,7 +202,7 @@ const POSTURE: ReadonlyArray<{
   {
     icon: ServerOff,
     title: "No model weights stored",
-    body: "ROGUE tests your model over its API. It never downloads, hosts, or stores your weights — and it doesn't need your training data or source to run a scan.",
+    body: "ROGUE tests your model over its API. It never downloads, hosts, or stores your weights, and it doesn't need your training data or source to run a scan.",
   },
   {
     icon: FileText,
@@ -212,7 +212,7 @@ const POSTURE: ReadonlyArray<{
   {
     icon: Trash2,
     title: "Data retention policy",
-    body: "Reports are retained for your account so you can track posture over time. Raw attack transcripts can be retained or deleted on request — we hold only what's useful to you.",
+    body: "Reports are retained for your account so you can track posture over time. Raw attack transcripts can be retained or deleted on request, we hold only what's useful to you.",
   },
   {
     icon: EyeOff,
@@ -228,7 +228,7 @@ const FLOW: ReadonlyArray<{ title: string; body: string }> = [
   },
   {
     title: "ROGUE sends attack prompts",
-    body: "From the attacker side, ROGUE replays harvested jailbreaks and prompt-injection against your endpoint over the API — exactly as a real adversary would reach it.",
+    body: "From the attacker side, ROGUE replays harvested jailbreaks and prompt-injection against your endpoint over the API, exactly as a real adversary would reach it.",
   },
   {
     title: "It captures the responses",

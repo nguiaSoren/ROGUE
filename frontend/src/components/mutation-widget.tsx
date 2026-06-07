@@ -5,7 +5,7 @@ import { AUGMENTATION_COPY } from "@/components/augmentation-meta";
 import { ProviderLogo } from "@/components/ui/provider-logo";
 
 /**
- * §10.7 AutoDAN-reframed mutation tile — sidebar widget on /feed.
+ * §10.7 AutoDAN-reframed mutation tile, sidebar widget on /feed.
  *
  * "Pattern-matching score" per config = fraction of (parent → mutated child)
  * pairs where the config DEFENDED the original wording but FAILED on the
@@ -13,10 +13,10 @@ import { ProviderLogo } from "@/components/ui/provider-logo";
  * specific surface form rather than understanding the underlying technique.
  *
  * Three states:
- *   1. No mutation rows yet — instructional seed command.
- *   2. Mutations exist but no reproduce sweep covers them — header counts
+ *   1. No mutation rows yet, instructional seed command.
+ *   2. Mutations exist but no reproduce sweep covers them, header counts
  *      only.
- *   3. Pairs (parent + child × shared config) exist — per-config score
+ *   3. Pairs (parent + child × shared config) exist, per-config score
  *      table.
  */
 export function MutationWidget({
@@ -62,7 +62,7 @@ export function MutationWidget({
             </p>
           </div>
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-            {"// run: uv run python scripts/reproduce/reproduce_once.py — to fire the mutated variants"}
+            {"// run: uv run python scripts/reproduce/reproduce_once.py, to fire the mutated variants"}
           </p>
         </>
       )}
@@ -139,7 +139,7 @@ function MutationConfigRow({
           </span>
         </span>
         <span className={`tabular-nums whitespace-nowrap ${tint}`}>
-          {score === null ? "—" : `${(score * 100).toFixed(0)}%`}
+          {score === null ? ", " : `${(score * 100).toFixed(0)}%`}
         </span>
       </div>
       <div

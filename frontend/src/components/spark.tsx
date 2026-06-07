@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Pure-SVG mini bar chart — used in stubbornness widget for the
+ * Pure-SVG mini bar chart, used in stubbornness widget for the
  * refinement-type histogram. No recharts dependency (faster, simpler).
  *
  * Renders horizontal bars labelled left, value-aligned right. Each bar grows

@@ -1,12 +1,12 @@
 import type { ScanStatus } from "@/lib/platform-api";
 
 /**
- * Severity-tinted badges for the product (`/scans`) pages — the same color
+ * Severity-tinted badges for the product (`/scans`) pages, the same color
  * vocabulary the matrix/brief pages use (frontend/src/app/globals.css:141),
  * no new tokens.
  *
  * - `ScoreBadge` bands the 0–100 headline `score`: ≥70 red, ≥40 orange, <40 green
- *   (docs/platform/dashboard/report-views.md §4). Null score → a muted "—".
+ *   (docs/platform/dashboard/report-views.md §4). Null score → a muted ", ".
  * - `StatusBadge` tints a `ScanStatus`: running/queued = green/neutral, completed
  *   = green, failed = red, canceled = muted.
  *
@@ -43,7 +43,7 @@ export function ScoreBadge({
         className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-xs tabular-nums ${TINT_CLASS.muted} ${className}`}
         title="No score yet (scan not completed)"
       >
-        —
+, 
       </span>
     );
   }
