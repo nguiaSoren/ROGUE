@@ -44,6 +44,8 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
 5. **Diff.** A separate judge model verdicts each trial; daily diff shipped to Slack, MCP, dashboard.
 
+> **New to the codebase?** [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) maps every directory to its pipeline layer + the architecture doc that explains it.
+
 ## Hosted platform — submit an endpoint, get a report
 
 Beyond the daily threat brief, ROGUE runs as a **hosted platform**: a company points it at their own LLM endpoint and gets back a scored security report — no install, no infrastructure. `POST /v1/scans` with a target → ROGUE queues it, runs the scan on the same engine behind the SDK, the dashboard, and MCP, and returns a report you can pull as **JSON, HTML, or a CISO-ready PDF** (or read in the dashboard, or drive end-to-end from an IDE over MCP).
