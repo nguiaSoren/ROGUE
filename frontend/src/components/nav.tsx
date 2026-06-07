@@ -76,6 +76,7 @@ export function Nav() {
             <NavLink href="/matrix" active={pathname === "/matrix"}>/matrix</NavLink>
             <NavLink href="/analytics" active={pathname === "/analytics"}>/analytics</NavLink>
             <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
+            <NavLink href="/research" active={pathname === "/research"}>research</NavLink>
           </span>
           {/* Commercial links */}
           <span className="hidden md:flex items-center gap-5">
@@ -94,10 +95,10 @@ export function Nav() {
             dashboard
           </Link>
           <Link
-            href="/request-demo"
+            href={COMMERCIAL ? "/request-demo" : "/early-access"}
             className="rounded bg-rogue-green px-3 py-1 font-semibold text-[#050508] transition-opacity hover:opacity-90"
           >
-            request demo
+            {COMMERCIAL ? "request demo" : "early access"}
           </Link>
           {/* Hamburger — only below md, where the inline link groups are hidden */}
           <button
@@ -128,6 +129,7 @@ export function Nav() {
             <MobileLink href="/matrix" active={pathname === "/matrix"} onClick={closeMenu}>/matrix</MobileLink>
             <MobileLink href="/analytics" active={pathname === "/analytics"} onClick={closeMenu}>/analytics</MobileLink>
             <MobileLink href="/brief" active={pathname === "/brief"} onClick={closeMenu}>/brief</MobileLink>
+            <MobileLink href="/research" active={pathname === "/research"} onClick={closeMenu}>research</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/product" active={pathname === "/product"} onClick={closeMenu}>product</MobileLink>
             {COMMERCIAL && <MobileLink href="/pricing" active={pathname === "/pricing"} onClick={closeMenu}>pricing</MobileLink>}
@@ -138,11 +140,11 @@ export function Nav() {
             <div className="my-1 border-t border-border" />
             <MobileLink href="/scans" active={pathname === "/scans"} onClick={closeMenu}>dashboard</MobileLink>
             <Link
-              href="/request-demo"
+              href={COMMERCIAL ? "/request-demo" : "/early-access"}
               onClick={closeMenu}
               className="mt-2 mb-1 rounded bg-rogue-green px-3 py-3 text-center font-semibold text-[#050508] transition-opacity hover:opacity-90"
             >
-              request demo
+              {COMMERCIAL ? "request demo" : "early access"}
             </Link>
           </div>
         </nav>
