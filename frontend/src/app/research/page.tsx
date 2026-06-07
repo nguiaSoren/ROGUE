@@ -9,6 +9,14 @@ import {
   Download,
 } from "lucide-react";
 import { Section } from "@/components/marketing/section";
+import {
+  JudgeAgreementFig,
+  SchedulingFig,
+  FalsePositiveModesFig,
+  BreachRejudgeFig,
+  NullResultForestFig,
+  MethodNote,
+} from "@/components/research-figures";
 
 export const metadata = {
   title: "Research — ROGUE",
@@ -104,6 +112,14 @@ export default function ResearchPage() {
               (~$8.4).
             </p>
 
+            <div className="animate-rogue-fade-up">
+              <JudgeAgreementFig />
+            </div>
+
+            <div className="animate-rogue-fade-up">
+              <FalsePositiveModesFig />
+            </div>
+
             <p className="text-base text-muted-foreground leading-relaxed">
               Then the honest part: re-judging the stored breach matrix under v3{" "}
               <span className="text-foreground font-medium">
@@ -114,12 +130,22 @@ export default function ResearchPage() {
               −26%).
             </p>
 
+            <div className="animate-rogue-fade-up">
+              <BreachRejudgeFig />
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               <Metric value="70.3 → 89.3%" label="JBB agreement" accent="green" />
               <Metric value="55 → 79.5%" label="precision" accent="green" />
               <Metric value="−43.6%" label="breach cells re-judged" accent="red" />
               <Metric value="2.56%" label="in-dist false-positive" accent="green" />
             </div>
+
+            <MethodNote>
+              Method — 300 frozen JBB rows, human-majority ground truth, 4 field
+              classifiers as baselines; v3 is a rubric change (content-transfer
+              gate), same rows re-scored; tiered eval (n=25 pilot → full).
+            </MethodNote>
 
             <NovelNote>
               A named FP taxonomy for a safety judge, plus a{" "}
@@ -176,11 +202,22 @@ export default function ResearchPage() {
               .
             </p>
 
+            <div className="animate-rogue-fade-up">
+              <SchedulingFig />
+            </div>
+
             <div className="grid grid-cols-3 gap-3 pt-1">
               <Metric value="22 → 11–13.5" label="median winner-rank" accent="green" />
               <Metric value="50 → 60%" label="attack-success-rate" accent="green" />
               <Metric value="−41%" label="cost-per-success" accent="green" />
             </div>
+
+            <MethodNote>
+              Method — single-variable controlled experiment: only the ladder
+              order changed (ladder, attacks, corpus, judge, target fixed);
+              Claude Haiku; AdvBench + JailbreakBench; primary metric =
+              winner-rank.
+            </MethodNote>
 
             <NovelNote>
               The mechanism: rank↓ <em>caused</em> ASR↑ — the old order
@@ -229,11 +266,21 @@ export default function ResearchPage() {
               of the four controls.
             </p>
 
+            <div className="animate-rogue-fade-up">
+              <NullResultForestFig />
+            </div>
+
             <div className="grid grid-cols-3 gap-3 pt-1">
               <Metric value="1,540" label="cells, $0 study" accent="green" />
               <Metric value="~1.0–1.1×" label="cross-family lift (n.s.)" accent="red" />
               <Metric value="0 / 4" label="synergies surviving controls" accent="red" />
             </div>
+
+            <MethodNote>
+              Method — $0 observational study over 1,540 (primitive × target)
+              cells; controls: BH-FDR, Mantel–Haenszel by target, within-family
+              lift, Cramér&rsquo;s-V collinearity.
+            </MethodNote>
 
             <NovelNote>
               A cheap, rigorous falsification that{" "}
@@ -280,6 +327,11 @@ export default function ResearchPage() {
                 → declined.
               </InvertedDecision>
             </ul>
+
+            <MethodNote>
+              Method — each decision gated on a $0 telemetry measurement with a
+              pre-stated trigger-to-revisit.
+            </MethodNote>
           </div>
         </Section>
 
