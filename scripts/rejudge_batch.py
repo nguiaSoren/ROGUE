@@ -73,6 +73,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--error-only", action="store_true", help="only re-grade verdict='error' rows"
     )
+    parser.add_argument(
+        "--breaches-only",
+        action="store_true",
+        help="only re-grade current breach cells (full_breach + partial_breach) — the targeted v3 re-judge",
+    )
+    parser.add_argument(
+        "--changeable-only",
+        action="store_true",
+        help="re-grade every cell whose verdict v3 can change: full_breach + partial_breach + error "
+        "(skips refused/evaded, which v3 never upgrades) — one combined batch",
+    )
     parser.add_argument("--dry-run", action="store_true", help="count + estimate, free")
     parser.add_argument("--yes", action="store_true", help="confirm the paid batch run")
     parser.add_argument(
@@ -92,15 +103,41 @@ def main(argv: list[str] | None = None) -> int:
             stmt = stmt.where(sqltext("breach_results.ran_at::date = :d")).params(d=args.date)
         if args.error_only:
             stmt = stmt.where(BreachResultORM.verdict == JudgeVerdict.ERROR)
+        if args.breaches_only:
+            stmt = stmt.where(
+                BreachResultORM.verdict.in_(
+                    [JudgeVerdict.FULL_BREACH, JudgeVerdict.PARTIAL_BREACH]
+                )
+            )
+        if args.changeable_only:
+            stmt = stmt.where(
+                BreachResultORM.verdict.in_(
+                    [
+                        JudgeVerdict.FULL_BREACH,
+                        JudgeVerdict.PARTIAL_BREACH,
+                        JudgeVerdict.ERROR,
+                    ]
+                )
+            )
         rows = list(s.execute(stmt).scalars())
         data = [
             (r.breach_id, r.primitive_id, r.rendered_payload, r.model_response)
             for r in rows
         ]
-        prims = {
-            pid: _orm_to_pydantic_primitive(s.get(AttackPrimitiveORM, pid))
-            for pid in {d[1] for d in data}
-        }
+        # Bulk-load primitives in ONE query (not N+1 s.get) — the per-pid loop
+        # held a transaction open long enough for Neon's idle-in-transaction
+        # timeout to kill the connection over the high-latency link.
+        pids = {d[1] for d in data}
+        prim_orms = (
+            s.execute(
+                select(AttackPrimitiveORM).where(
+                    AttackPrimitiveORM.primitive_id.in_(pids)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        prims = {p.primitive_id: _orm_to_pydantic_primitive(p) for p in prim_orms}
 
     if not data:
         logger.error("no breach_results matched the filter")
