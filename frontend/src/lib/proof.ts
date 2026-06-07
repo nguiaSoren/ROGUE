@@ -11,10 +11,14 @@
  * see README judge-calibration). They are deliberately NOT exported here.
  */
 
+// Defensible static citations — every value traces to a line in README.md /
+// ROGUE_PLAN.md and is kept in sync with the live corpus (canonical: 15 attack
+// families, 459 primitives, 8 deployment configs). These are NOT fetched at
+// runtime; they are the verified marketing figures the commercial pages cite.
 export const CORPUS = {
-  primitives: 358, // README.md:25 — 298 harvested + 35 synthesized + 25 quarantined
+  primitives: 459, // canonical live corpus — attack_primitives rows
   harvested: 298, // README.md:25 — public HuggingFace dataset
-  families: 15, // README.md:25 — OWASP LLM Top 10 + MITRE ATLAS aligned
+  families: 15, // canonical — OWASP LLM Top 10 + MITRE ATLAS aligned
   sources: 19, // README.md:41 — open-web sources
   bdProducts: 5, // README.md:55 — Bright Data products
   modelsTested: 6, // README.md:221
@@ -56,7 +60,7 @@ export const PROOF_POINTS: ReadonlyArray<{
   sublabel: string
 }> = [
   {
-    value: "358",
+    value: "459",
     label: "attack primitives",
     sublabel: "15 families · 19 sources",
   },

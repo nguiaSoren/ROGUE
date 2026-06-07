@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
  */
 
 const EXAMPLE = {
-  target: "acme-support-assistant · claude-sonnet-4",
+  target: "acme-support-assistant · claude-sonnet-4-6",
   scanId: "scan_8f3a2",
   score: 68,
   level: "high" as const,

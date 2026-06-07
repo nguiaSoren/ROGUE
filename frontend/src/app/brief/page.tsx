@@ -3,6 +3,11 @@ import { BriefMarkdown } from "@/components/brief-markdown";
 import { BriefExecSnapshot } from "@/components/brief-exec-snapshot";
 import { BriefDownloads } from "@/components/brief-downloads";
 
+// ISR — statically prerendered + revalidated every 5 min, matching /matrix and
+// REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
+// data surfaces within the window instead of paying the full round-trip.
+export const revalidate = 300;
+
 /**
  * /brief — Threat Brief.
  *

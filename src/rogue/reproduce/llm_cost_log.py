@@ -65,14 +65,14 @@ __all__ = [
 _log = logging.getLogger(__name__)
 
 
-# USD per 1,000,000 tokens. Mirrors the Anthropic price columns in
-# `target_panel._PRICE_PER_MILLION`. Keep in sync — bump both files together
-# when Anthropic re-prices.
+# USD per 1,000,000 tokens. Pricing for the panel models also lives in
+# `rogue.adapters.model_specs` (the canonical source since the Week-2 provider
+# migration) — keep these in sync when Anthropic re-prices.
 ANTHROPIC_PRICE_PER_MILLION: dict[str, tuple[float, float]] = {
     "claude-haiku-4-5": (1.00, 5.00),
     "claude-sonnet-4-6": (3.00, 15.00),
     # Stretch / debug models (rare but used by demo overrides):
-    "claude-opus-4-7": (15.00, 75.00),
+    "claude-opus-4-8": (15.00, 75.00),
 }
 
 # At repo root, .gitignored per `.gitignore` line 51 (matches CLAUDE.md's

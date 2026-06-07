@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
+from rogue.api.observability import RATE_LIMIT_SCANS, get_limiter
 from rogue.api.v1.deps import get_report_service, get_scan_service, require_principal
 from rogue.platform.schemas import ScanRecord, ScanSpec, ScanStatus, TargetSpec
 
@@ -22,6 +23,18 @@ if TYPE_CHECKING:
     from rogue.platform.tenancy import Principal
 
 router = APIRouter(prefix="/v1", tags=["scans"])
+
+
+# Tighter rate limit on the money-spending scan-creation POST. Resolves to a
+# real SlowAPI decorator when slowapi is installed, else a no-op pass-through so
+# the route is unchanged when the dep is absent (local/tests/CI).
+_limiter = get_limiter()
+if _limiter is not None:  # pragma: no cover - exercised only with slowapi installed
+    _scan_rate_limit = _limiter.limit(RATE_LIMIT_SCANS)
+else:
+
+    def _scan_rate_limit(func):  # type: ignore[no-redef]
+        return func
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -74,7 +87,9 @@ def _envelope(code: str, message: str, **details: object) -> dict:
 # 1. POST /v1/scans — enqueue a scan, return immediately (202 + acknowledgement subset).
 # ---------------------------------------------------------------------------------------------------
 @router.post("/scans", status_code=202)
+@_scan_rate_limit
 async def create_scan(
+    request: Request,
     body: CreateScanRequest,
     principal: Principal = Depends(require_principal),
     scan_service: ScanService = Depends(get_scan_service),

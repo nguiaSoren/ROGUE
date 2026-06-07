@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 // ── Example data — illustrative only, not a real scan. ───────────────────────
 const EXAMPLE = {
   scanId: "scan_8f3a2",
-  target: "claude-haiku-4.5",
+  target: "claude-haiku-4-5",
   pack: "owasp-llm-top10",
   score: 68,
   level: "HIGH" as const,
@@ -41,8 +41,8 @@ const RECENT_SCANS: ReadonlyArray<{
   breaches: number;
   score: number | null;
 }> = [
-  { scanId: "scan_8f3a2", target: "claude-haiku-4.5", status: "completed", breaches: 11, score: 68 },
-  { scanId: "scan_7c1d9", target: "gpt-4o-mini", status: "completed", breaches: 4, score: 41 },
+  { scanId: "scan_8f3a2", target: "claude-haiku-4-5", status: "completed", breaches: 11, score: 68 },
+  { scanId: "scan_7c1d9", target: "gpt-5.4-nano", status: "completed", breaches: 4, score: 41 },
   { scanId: "scan_6b0a4", target: "llama-3.3-70b", status: "running", breaches: 2, score: null },
 ];
 

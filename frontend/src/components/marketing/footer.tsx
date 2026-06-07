@@ -23,15 +23,24 @@ const PRODUCT: FooterLink[] = [
 
 const COMPANY: FooterLink[] = [
   { label: "About", href: "/about" },
-  { label: "Enterprise", href: "/enterprise" },
-  { label: "Security", href: "/security" },
+  // Enterprise + Security are commercial-pitch pages — gated like /pricing so a
+  // footer link never points at a page that 404s in honest hiring mode.
+  ...(COMMERCIAL
+    ? [
+        { label: "Enterprise", href: "/enterprise" },
+        { label: "Security", href: "/security" },
+      ]
+    : []),
   { label: "Case studies", href: "/case-studies" },
 ];
 
 const DEVELOPERS: FooterLink[] = [
   { label: "Resources", href: "/resources" },
   { label: "Sample report", href: "/sample-report.html", external: true },
-  { label: "MCP server · IDE", href: "/enterprise" },
+  // Points at /enterprise → only show when that page is reachable.
+  ...(COMMERCIAL
+    ? [{ label: "MCP server · IDE", href: "/enterprise" }]
+    : []),
 ];
 
 export function Footer() {

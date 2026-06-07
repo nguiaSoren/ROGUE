@@ -91,6 +91,9 @@ mani.py
 
 # AI session files (local-only)
 frontend/AGENTS.md
+
+# local test creds + demo flow (plaintext throwaway key — kept out of git history)
+TESTING.md
 frontend/CLAUDE.md
 tasks/
 
@@ -111,6 +114,17 @@ scripts/_*
 
 # Internal marketing/positioning notes — not part of the public repo
 /marketing_claims.md
+/monetization_venues.md
+
+# Personal / non-product files (must never reach the auto-deploying repo)
+*_CV.md
+skills-lock.json
+.agents/
+startup/
+video/
+# Content-marketing / demo-video tooling — not part of the red-team product
+scripts/youtube_research.py
+scripts/assemble_video.sh
 
 # Local-only research/working docs (WIP; not for the public repo)
 docs/adaptive_orchestration_systems.md
@@ -123,3 +137,17 @@ scripts/export_paper_data.py
 docs/RESEARCH_TODO.md
 # contingent roadmap (build-if-trigger), not implemented system
 docs/3b_v2_renderer_design.md
+.vercel
+.env*
+# ...but .env.example files ARE tracked (documentation, no secrets).
+!.env.example
+!frontend/.env.example
+
+# Demo/video working media — large; excluded from deploy via .vercelignore, kept local.
+assets/*.mp4
+assets/*.mp3
+assets/*.pdf
+assets/captures/
+assets/music/
+assets/rogue-*.png
+assets/0531.mp4

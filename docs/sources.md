@@ -1,4 +1,4 @@
-# Sources (15, locked)
+# Sources (15 primary; expanded post-hackathon — no longer frozen)
 
 Extracted from ROGUE_PLAN.md §5. The list is built so that 5+ can break completely and the harvest pipeline still works.
 
@@ -26,7 +26,7 @@ Extracted from ROGUE_PLAN.md §5. The list is built so that 5+ can break complet
 
 ## Per-source SERP discovery queries
 
-Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total query pool 52 (39 original + 6 multimodal arms 2026-06-03 §1b + 7 source-expansion arms 2026-06-04); DiscoveryAgent picks ~10 per daily run based on recent yield.
+Every source has at least one targeted query. `{date}` is `today - 14 days` for backfill, `today - 1 day` for daily delta. Total designed query pool 52 (39 original + 6 multimodal arms 2026-06-03 §1b + 7 source-expansion arms 2026-06-04); the live bandit state (`data/discovery_bandit.json`) currently holds 45 arms. DiscoveryAgent picks ~10 per daily run based on recent yield.
 
 **Source expansion (2026-06-04, startup-track / post-deadline)** — new sources complementing arXiv at different pipeline stages; Web Unlocker fetches all as HTML, the yield-per-dollar bandit cold-starts them. (Discord/BASI deferred — needs Scraping-Browser + auth.)
 - `site:openreview.net "jailbreak" OR "prompt injection" after:{date}` *(OpenReview — ICLR/NeurIPS/ACL submissions + review threads, often months pre-arXiv; reviewer threads carry attack constructions the camera-ready strips)*

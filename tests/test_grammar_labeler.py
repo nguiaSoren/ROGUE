@@ -475,15 +475,14 @@ def db_session_for_labeler():
     except OperationalError as exc:
         pytest.skip(f"DB connection failed: {exc}")
 
+    # `primitive_grammar_labels` is created by migration 0027. If the table is
+    # absent the DB simply isn't migrated to head — `uv run alembic upgrade head`.
     insp = inspect(engine)
     if "primitive_grammar_labels" not in insp.get_table_names():
-        pytest.skip("primitive_grammar_labels table not yet created (Engineer 2 pending)")
-
-    # Verify PrimitiveGrammarLabel is importable (Engineer 2's model)
-    try:
-        from rogue.db.models import PrimitiveGrammarLabel  # type: ignore[attr-defined]  # noqa: F401
-    except (ImportError, AttributeError):
-        pytest.skip("PrimitiveGrammarLabel model not yet available (Engineer 2 pending)")
+        pytest.skip(
+            "primitive_grammar_labels table absent — DB not migrated to head "
+            "(run `uv run alembic upgrade head`)"
+        )
 
     with Session(engine) as session:
         yield session
@@ -492,7 +491,17 @@ def db_session_for_labeler():
 
 
 def test_persist_labels_writes_rows(db_session_for_labeler):
-    """Upsert heuristic labels for a fake ID and verify the rows land + are idempotent."""
+    """Upsert heuristic labels for a seeded primitive and verify rows land + are idempotent.
+
+    Migration 0027 added a FK from ``primitive_grammar_labels.primitive_id`` to
+    ``attack_primitives``, so the label's parent primitive must exist first — we
+    seed a minimal one, then clean both up.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import text
+
+    from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
     from rogue.grammar.labeler import persist_labels
 
     fake_id = "TESTLABELROW0000001"
@@ -500,24 +509,53 @@ def test_persist_labels_writes_rows(db_session_for_labeler):
         fake_id: {GrammarNode.AUTHORITY_FRAME, GrammarNode.ENCODING_OBFUSCATION},
     }
 
-    # First upsert
-    rows_written = persist_labels(db_session_for_labeler, labels, source="heuristic")
-    db_session_for_labeler.commit()
-    assert rows_written == 2
-
-    # Second upsert must be idempotent (ON CONFLICT DO UPDATE)
-    rows_written_2 = persist_labels(db_session_for_labeler, labels, source="heuristic")
-    db_session_for_labeler.commit()
-    assert rows_written_2 == 2
-
-    # Cleanup — only rows we inserted
-    from sqlalchemy import text
-
-    db_session_for_labeler.execute(
-        text(
-            "DELETE FROM primitive_grammar_labels "
-            "WHERE primitive_id = :pid AND source = 'heuristic'"
-        ),
-        {"pid": fake_id},
+    # Parent primitive (FK target). Minimal valid row.
+    db_session_for_labeler.add(
+        AttackPrimitiveORM(
+            primitive_id=fake_id,
+            cluster_id=fake_id,
+            canonical=True,
+            family="direct_instruction_override",
+            secondary_families=[],
+            vector="user_turn",
+            title="grammar-labeler FK parent",
+            short_description="seeded so the label FK resolves",
+            payload_template="ignore previous instructions",
+            payload_slots={},
+            target_models_claimed=[],
+            reproducibility_score=5,
+            requires_multi_turn=False,
+            requires_system_prompt_access=False,
+            requires_tools=[],
+            requires_multimodal=False,
+            discovered_at=datetime.now(timezone.utc),
+            base_severity="medium",
+            severity_rationale="r",
+        )
     )
     db_session_for_labeler.commit()
+
+    try:
+        # First upsert
+        rows_written = persist_labels(db_session_for_labeler, labels, source="heuristic")
+        db_session_for_labeler.commit()
+        assert rows_written == 2
+
+        # Second upsert must be idempotent (ON CONFLICT DO UPDATE)
+        rows_written_2 = persist_labels(db_session_for_labeler, labels, source="heuristic")
+        db_session_for_labeler.commit()
+        assert rows_written_2 == 2
+    finally:
+        # Cleanup — only rows we inserted (labels first: FK child).
+        db_session_for_labeler.execute(
+            text(
+                "DELETE FROM primitive_grammar_labels "
+                "WHERE primitive_id = :pid AND source = 'heuristic'"
+            ),
+            {"pid": fake_id},
+        )
+        db_session_for_labeler.execute(
+            text("DELETE FROM attack_primitives WHERE primitive_id = :pid"),
+            {"pid": fake_id},
+        )
+        db_session_for_labeler.commit()

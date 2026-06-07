@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   ArrowRight,
   Server,
@@ -20,6 +21,7 @@ import { StatCard } from "@/components/marketing/stat-card";
 import { CtaRow } from "@/components/marketing/cta-row";
 import { EnterprisePitch } from "@/components/marketing/enterprise-pitch";
 import { PROOF_POINTS } from "@/lib/proof";
+import { COMMERCIAL } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -36,6 +38,10 @@ export const metadata = {
  * the proof numbers, imported from the single source of truth in @/lib/proof.
  */
 export default function EnterprisePage() {
+  // Commercial-pitch page: hidden (404) in the default honest hiring mode, shown
+  // only when NEXT_PUBLIC_SHOW_COMMERCIAL=true — same gating as /pricing.
+  if (!COMMERCIAL) notFound();
+
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
       <div className="space-y-20 md:space-y-28 py-20 md:py-28">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   Shield,
   Lock,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { Section } from "@/components/marketing/section";
 import { CtaRow } from "@/components/marketing/cta-row";
+import { COMMERCIAL } from "@/lib/flags";
 
 export const metadata = {
   title: "Security — ROGUE",
@@ -25,6 +27,10 @@ export const metadata = {
  * (SOC2 etc.) is framed as roadmap, never claimed. Server component.
  */
 export default function SecurityPage() {
+  // Commercial-pitch page: hidden (404) in the default honest hiring mode, shown
+  // only when NEXT_PUBLIC_SHOW_COMMERCIAL=true — same gating as /pricing.
+  if (!COMMERCIAL) notFound();
+
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
       <div className="space-y-20 md:space-y-28 py-16 md:py-24">
@@ -125,7 +131,7 @@ export default function SecurityPage() {
               >
                 reach us through our contact form
               </Link>{" "}
-              and we'll route it to the right person.
+              and we&apos;ll route it to the right person.
             </p>
           </div>
         </Section>
@@ -142,7 +148,7 @@ export default function SecurityPage() {
               aria-hidden
             />
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-              The hosted platform fits most teams, but if your model can't be
+              The hosted platform fits most teams, but if your model can&apos;t be
               reached from the public internet — or your compliance posture
               requires data never leave your perimeter — ROGUE can run inside
               your own environment, pointed at internal endpoints. Self-hosted

@@ -1,0 +1,28 @@
+# Vercel uploads this repo from the git ROOT (the "rogue" project's Root Directory
+# is frontend/, so the CLI sends the whole repo and builds the subdir). The upload
+# therefore includes everything here — exclude build artifacts and the large demo
+# media that blow Vercel's 100 MB per-file limit, plus the non-frontend backend.
+
+# build/dep artifacts (unanchored → also catches frontend/node_modules, frontend/.next)
+node_modules
+.next
+.git
+*.tsbuildinfo
+__pycache__/
+*.pyc
+
+# large media — the 100 MB+ blockers (anchored to root; frontend has none of these)
+/assets/
+/video/
+*.mp4
+*.mov
+*.mp3
+*.wav
+
+# python backend + tooling + local data — not part of the frontend build
+/.venv/
+/data/
+/website/
+/papers/
+/docs/figs/
+.env*.local
