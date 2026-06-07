@@ -12,9 +12,11 @@ from datetime import datetime
 
 from sqlalchemy import (
     JSON,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -23,7 +25,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
+from rogue.attestation.chain import ENTRY_TYPES
 from rogue.db.models import Base
+
+# The CHECK-constraint vocabulary for `attestation_entries.entry_type` is derived
+# from the one source of truth in `attestation.chain` (no duplication, per the
+# CLAUDE.md schema convention) — both the ORM CHECK and migration 0031 read it.
+_ENTRY_TYPE_CHECK = "entry_type IN (" + ", ".join(f"'{t}'" for t in ENTRY_TYPES) + ")"
 
 
 class Organization(Base):
@@ -156,7 +164,47 @@ class Integration(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class AttestationEntry(Base):
+    """One line in an org's append-only, hash-chained attestation record (v2 §2.5 / ADR-0012).
+
+    The tamper-evident, reproducible, queryable record every surface emits. ONE chain per
+    `org_id` (per-tenant system-of-record, ADR-0006): `seq` is a per-org monotonic integer
+    (genesis is seq 0), and `entry_hash = sha256(prev_hash || canonical_json(payload))` links
+    each entry to the prior one's `entry_hash` (genesis links to `GENESIS_PREV` = 64 zeros).
+
+    Append-only is *enforced*, not just intended: migration 0031 installs a Postgres
+    BEFORE UPDATE OR DELETE trigger that RAISEs. A correction is a NEW entry, never an edit.
+    Captures are pointers (`reproducibility_ref` → scan_id/breach_id/report_id), not blobs.
+    `corpus_as_of` is NOT NULL — the "as of date D" framing is structural, not cosmetic.
+    `ground_truth_ref` (ADR-0011) is the independent label this verdict is scored against; it
+    is nullable because harm Phase-0 entries have no per-rule independent label yet.
+    """
+
+    __tablename__ = "attestation_entries"
+    __table_args__ = (
+        UniqueConstraint("org_id", "seq", name="uq_attestation_org_seq"),
+        UniqueConstraint("org_id", "entry_hash", name="uq_attestation_org_entry_hash"),
+        CheckConstraint(_ENTRY_TYPE_CHECK, name="ck_attestation_entry_type"),
+        Index("ix_attestation_org_seq", "org_id", "seq"),
+        Index("ix_attestation_org_entry_type", "org_id", "entry_type"),
+        Index("ix_attestation_org_reproducibility_ref", "org_id", "reproducibility_ref"),
+    )
+
+    entry_id: Mapped[str] = mapped_column(String(48), primary_key=True)  # att_…
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.org_id"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)  # per-org monotonic; genesis is 0
+    entry_type: Mapped[str] = mapped_column(String(20))  # genesis|scan|decision|mitigation|promotion
+    prev_hash: Mapped[str] = mapped_column(String(64))  # prior entry_hash (GENESIS_PREV at genesis)
+    entry_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)  # structured decision-rationale (redacted)
+    reproducibility_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ground_truth_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)  # ADR-0011
+    corpus_as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # NOT NULL — the "as of date D"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 __all__ = [
     "Organization", "User", "Membership", "Project", "ApiKey",
     "ScanRun", "ScanJob", "Report", "Secret", "Integration",
+    "AttestationEntry",
 ]

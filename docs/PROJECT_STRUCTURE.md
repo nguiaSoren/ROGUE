@@ -35,7 +35,7 @@ the cross-cutting substrate (schemas/db/core/adapters) and the product surfaces
 | Package | Role | Layer / role | Arch doc |
 |---|---|---|---|
 | `schemas/` | **Pydantic wire format** — the single source for every enum (`AttackFamily`, `AttackVector`, `Severity`, `JudgeVerdict`, `SourceType`, `BrightDataProduct`) + request/response models | substrate (wire) | `docs/schemas.md` |
-| `db/` | **SQLAlchemy storage** — `models.py` + `migrations/versions/` (Alembic, 0001→0030) + session | substrate (storage) | `docs/db_schema.md`, `docs/schemas.md` |
+| `db/` | **SQLAlchemy storage** — `models.py` + `migrations/versions/` (Alembic, 0001→0031) + session | substrate (storage) | `docs/db_schema.md`, `docs/schemas.md` |
 | `core/` | **Provider-abstraction substrate** — `CanonicalMessage`, `InvocationResult`, `TargetAdapter`, `AdapterRegistry`, content blocks, errors | substrate | `src/rogue/core/ARCHITECTURE.md`, ADR-0004 |
 | `adapters/` | **Concrete provider adapters** (OpenAI / Anthropic / Gemini / Groq / OpenRouter / CustomHTTP) + `model_specs` + conformance suite. Nothing above this boundary imports a provider SDK type | substrate | ADR-0004 |
 | `harvest/` | **Layer 1 — Harvest.** Bright Data client, `sources/` plugins (11), discovery agent, ε-greedy yield bandit | L1 | `docs/sources.md`, `docs/bandit_for_humans.md` |
@@ -47,7 +47,9 @@ the cross-cutting substrate (schemas/db/core/adapters) and the product surfaces
 | `retrieval/` | Technique-retrieval system (deployed-inactive; waiting on winner telemetry) | research | `docs/retrieval.md` |
 | `mcp_server/` | **Producer-side MCP server** (19-tool full-lifecycle surface) | product surface | `docs/mcp/ARCHITECTURE.md`, `docs/mcp/CONTRACT.md` |
 | `api/` | **FastAPI app** — `main.py` (public read API), `v1/` (authed write/scan API), `observability.py` (logging/Sentry/rate-limit) | product surface | `docs/platform/api/` |
-| `platform/` | **Hosted multi-tenant SaaS engine** — `ScanService`, Postgres job queue + worker, tenancy, Fernet `secrets`, `report_service` + `scoring`, integration store | product surface | `docs/platform/ARCHITECTURE.md`, ADR-0006 |
+| `platform/` | **Hosted multi-tenant SaaS engine** — `ScanService`, Postgres job queue + worker, tenancy, Fernet `secrets`, `report_service` + `scoring`, integration store, `models.AttestationEntry` (v2 attestation ORM) | product surface | `docs/platform/ARCHITECTURE.md`, ADR-0006 |
+| `instrument/` | **ROGUE v2 instrument spine** — shared `Target`/`Probe`/`Capture`/`Verdict`/`GroundTruthRef` types + `project_scan` seam (harm report → spine) | v2 substrate | `docs/v2/build/01_foundation.md`, ADR-0011 |
+| `attestation/` | **ROGUE v2 signed-attestation layer** — per-org append-only hash chain (`chain` primitives, `AttestationService`, `emit.payload_for_scan`, `replay`, `/v1` schemas); migration 0031 (`attestation_entries` + append-only trigger) | v2 product surface | `docs/v2/build/03_attestation.md`, ADR-0012 |
 | `packs/` | Curated attack packs (aggressive / compliance) | data | — |
 
 **Key convention:** wire (Pydantic, `schemas/`) and storage (SQLAlchemy, `db/models.py`)

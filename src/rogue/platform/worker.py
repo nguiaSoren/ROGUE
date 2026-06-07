@@ -47,6 +47,7 @@ class ScanWorker:
         *,
         worker_id: str = "worker-1",
         secret_store=None,
+        attestation_service=None,
     ) -> None:
         self.store = store
         self.queue = queue
@@ -55,6 +56,10 @@ class ScanWorker:
         # Resolves an `api_key_ref` handle back to the raw target key just-in-time (held only in memory
         # for the scan). When None, a spec's raw `api_key` is used as-is.
         self.secret_store = secret_store
+        # Appends one signed `scan` attestation entry per COMPLETED scan (v2 §2.5). Injected (not
+        # import-coupled) and OPTIONAL: when None, scans run exactly as before with no attestation.
+        # FAILED/CANCELED scans are NOT attested — there is no verdict to attest (honest completeness).
+        self.attestation_service = attestation_service
 
     async def run_once(self) -> bool:
         """Lease and process a single job. Returns False only when the queue was empty (nothing leased);
@@ -132,11 +137,44 @@ class ScanWorker:
             report_id=report_id,
             completed_at=_now(),
         )
+        # Signed attestation: append exactly ONE `scan` entry to the org's hash chain (v2 §2.5).
+        # Additive and best-effort — a chain hiccup must NEVER lose a paid scan result, so this is
+        # wrapped to log-and-continue (mirrors the "never crash a run" rule in the cost logs). The
+        # append is idempotent on `reproducibility_ref=scan_id`, so a redelivered/retried job can't
+        # double-append. corpus_as_of = scan-completion time (the moment we tested against the current
+        # open-web corpus); a true harvest cutoff replaces this when the harvest layer threads it through.
+        self._attest_completed_scan(job, report)
+
         # Ack regardless of `finalized.status`: whether the scan finalized COMPLETED or was canceled
         # mid-run (in which case the guarded write above was a no-op and it stays CANCELED), the job is
         # done and must not be redelivered.
         await self.queue.ack(job.job_id)
         return True
+
+    def _attest_completed_scan(self, job, report) -> None:
+        """Append one `scan` attestation entry for a COMPLETED scan. Never raises.
+
+        Best-effort by contract: any failure here is logged and swallowed so a chain problem can
+        never fail (or lose) the paid scan that just completed. No-op when no attestation service is
+        wired. Synchronous (the service uses short-lived blocking DB sessions like the store/queue)."""
+        if self.attestation_service is None:
+            return
+        try:
+            from rogue.attestation import emit  # local import: keep module import light
+
+            corpus_as_of = _now()
+            payload = emit.payload_for_scan(
+                report.to_dict(), {"scan_id": job.scan_id}, corpus_as_of=corpus_as_of
+            )
+            self.attestation_service.append(
+                org_id=job.org_id,
+                entry_type="scan",
+                payload=payload,
+                reproducibility_ref=job.scan_id,
+                corpus_as_of=corpus_as_of,
+            )
+        except Exception as e:  # noqa: BLE001 — attestation is additive; never fail a completed scan.
+            _log.warning("attestation append failed for scan %s (scan result preserved): %s", job.scan_id, e)
 
     async def run_forever(
         self,
@@ -182,18 +220,23 @@ def main() -> None:
     (e.g. in offline tests) never requires a database or those classes to exist yet."""
     try:
         from .engine import DefaultScanEngine
-        from .queue import PostgresJobQueue  # type: ignore[attr-defined]
-        from .store import PostgresScanStore
+        from .queue import build_postgres_job_queue
+        from .store import build_postgres_scan_store
     except ImportError as e:  # pragma: no cover — exercised only in a real deployment.
         raise RuntimeError(
             "rogue.platform.worker.main() requires the Postgres store/queue and DefaultScanEngine; "
             f"a production dependency is missing: {e}"
         ) from e
 
-    store = PostgresScanStore()
-    queue = PostgresJobQueue()
+    store = build_postgres_scan_store()
+    queue = build_postgres_job_queue()
     engine = DefaultScanEngine()
-    worker = ScanWorker(store, queue, engine)
+    # Attestation: share the store's hardened engine/sessionmaker so each completed scan appends one
+    # signed entry to its org's hash chain (v2 §2.5). Best-effort — see ScanWorker._attest_completed_scan.
+    from rogue.attestation.service import AttestationService
+
+    attestation_service = AttestationService(store._session_factory)
+    worker = ScanWorker(store, queue, engine, attestation_service=attestation_service)
     asyncio.run(worker.run_forever())
 
 
