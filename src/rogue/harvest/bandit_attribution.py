@@ -8,9 +8,9 @@ back to the arm(s) whose query template could have surfaced it via the
 
 Two callers use these helpers:
 
-  * ``scripts/seed_bandit_from_corpus.py`` — one-shot offline attribution
+  * ``scripts/harvest/seed_bandit_from_corpus.py`` — one-shot offline attribution
     over the full corpus to bootstrap a warm-prior bandit state.
-  * ``scripts/harvest_once.py`` — per-harvest attribution of THIS RUN's
+  * ``scripts/harvest/harvest_once.py`` — per-harvest attribution of THIS RUN's
     newly-canonical primitives to the arms picked by ``bandit.select(k=10)``.
 
 Both share the same matching logic so seed and live-pull state are mutually

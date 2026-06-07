@@ -92,7 +92,7 @@ Benchmarking runs a known dataset against the target and reports attack-success-
 There are two ways to benchmark a target in this codebase, and **the API self-serve endpoint exposes only the first**:
 
 - **Single-turn SDK benchmark** (`run_benchmark`, `src/rogue/benchmark.py:90`) — each dataset goal is turned into one primitive (`goal_primitive`) and run through `run_scan` with `n_trials=1`. Fast, cheap, deterministic, and the same path the SDK's `Client.benchmark` uses. **This is what `/v1/benchmark` runs.**
-- **Repertoire-ladder benchmark** (`scripts/benchmark_run.py`) — replays ROGUE's full graduated escalation ladder (`build_escalation_context` + `run_escalation_ladder_one`, `scripts/benchmark_run.py:81`) per goal. Far more expensive, research-grade, and operator-run; it is **not** wired to the public API. Its `winner_rank` (`scripts/benchmark_run.py:143`) is the field that the single-turn report leaves `null`.
+- **Repertoire-ladder benchmark** (`scripts/benchmark/benchmark_run.py`) — replays ROGUE's full graduated escalation ladder (`build_escalation_context` + `run_escalation_ladder_one`, `scripts/benchmark/benchmark_run.py:81`) per goal. Far more expensive, research-grade, and operator-run; it is **not** wired to the public API. Its `winner_rank` (`scripts/benchmark/benchmark_run.py:143`) is the field that the single-turn report leaves `null`.
 
 Dataset contents, goal loading, and how ASR maps to the leaderboard are owned by Team E — defer to [../benchmark/api-and-datasets.md](../benchmark/api-and-datasets.md) and `../benchmark/scoring-and-trends.md`. This doc only specifies the HTTP envelope.
 

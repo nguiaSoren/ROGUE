@@ -70,7 +70,7 @@ def upgrade() -> None:
         # values match `rogue.schemas.JudgeVerdict`.
         sa.Column("verdict", sa.String(length=40), nullable=False),
         # 1-10 score (PAIR's training-data convention). See VERDICT_SCORE_MAP
-        # in scripts/pair_attacker_ab.py for the canonical mapping.
+        # in scripts/reproduce/pair_attacker_ab.py for the canonical mapping.
         sa.Column("score", sa.Integer(), nullable=False),
         sa.Column("attacker_cost_usd", sa.Float(), nullable=False),
         sa.Column(

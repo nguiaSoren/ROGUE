@@ -232,7 +232,7 @@ def default_bandit_arms() -> list:
     # probe surfaced 21 unique multimodal-attack arXiv papers, 0 of them harvested.
     # These arms close that vocabulary gap; they feed the existing classify→
     # render-gate path unchanged. Vocabulary chosen from the probe's productive
-    # queries (see scripts/confirm_multimodal_gap.py).
+    # queries (see scripts/harvest/confirm_multimodal_gap.py).
     pool.append(QueryArm("arxiv_vlm_jailbreak",
         'site:arxiv.org "vision-language" jailbreak after:{date}'))
     pool.append(QueryArm("arxiv_multimodal_jailbreak",
@@ -445,7 +445,7 @@ class DiscoveryAgent:
         # Per-arm BD spend from the §11.6 (c-serp) bandit-driven SERP phase.
         # {arm_id: serp_cost + per-fetched-URL unlocker cost}. Empty when no
         # bandit is wired OR no arms were picked OR the phase was skipped.
-        # Consumed by ``scripts/harvest_once.py`` to pass real per-arm cost
+        # Consumed by ``scripts/harvest/harvest_once.py`` to pass real per-arm cost
         # to ``bandit.record(...)``.
         self.last_serp_phase_cost: dict[str, float] = {}
         self.last_serp_phase_errors: dict[str, list[str]] = {}

@@ -39,14 +39,14 @@ export function PersonaWidget({
 
       {!hasBaselines && (
         <p className="text-xs font-mono text-muted-foreground">
-          {"// no breach rows yet. Run: uv run python scripts/reproduce_once.py"}
+          {"// no breach rows yet. Run: uv run python scripts/reproduce/reproduce_once.py"}
         </p>
       )}
 
       {hasBaselines && !hasWrapped && (
         <p className="text-xs font-mono text-muted-foreground leading-relaxed">
           {
-            "// baseline ready · no wrapped runs yet · seed: uv run python scripts/reproduce_once.py --persona 'Logical Appeal' --primitive-limit 50"
+            "// baseline ready · no wrapped runs yet · seed: uv run python scripts/reproduce/reproduce_once.py --persona 'Logical Appeal' --primitive-limit 50"
           }
         </p>
       )}

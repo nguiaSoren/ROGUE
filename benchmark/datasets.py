@@ -10,7 +10,7 @@ benchmark, because the denominator can drift under you.
 
 These are harmful *goals* (and, for judge_comparison, human-labeled responses) — NOT
 attack techniques. They live here on the evaluation side and are never ingested as
-primitives (see `scripts/analyze_hf_datasets.py`: 0 new families).
+primitives (see `scripts/harvest/analyze_hf_datasets.py`: 0 new families).
 
 Freeze (one-time, needs HF_TOKEN with gated-repo read for AdvBench)::
 

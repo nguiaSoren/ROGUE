@@ -9,7 +9,7 @@ Re-grading the stored breach matrix under a new judge version (ADR-0005) means t
 
 ## Decision
 
-Cost-controlled re-grades go through the provider **Batch API** (roughly half-price, async) and are **resumable by batch id**: the pipeline submits batches, records their ids, and a resume step (`scripts/resume_rejudge.py`) reconciles completed batches back into the matrix so an interrupted run continues instead of restarting. The 2026-06-07 v3 matrix re-judge used `scripts/rejudge_batch.py --changeable-only` (skip cells whose verdict can't change) + `resume_rejudge.py`; sampling/second-grader passes use `scripts/rejudge_sample_v3.py` → `scripts/second_grader_pass.py`. `--changeable-only` plus the universal skip-cache philosophy means re-grades pay only for cells that can actually move.
+Cost-controlled re-grades go through the provider **Batch API** (roughly half-price, async) and are **resumable by batch id**: the pipeline submits batches, records their ids, and a resume step (`scripts/calibration/resume_rejudge.py`) reconciles completed batches back into the matrix so an interrupted run continues instead of restarting. The 2026-06-07 v3 matrix re-judge used `scripts/calibration/rejudge_batch.py --changeable-only` (skip cells whose verdict can't change) + `resume_rejudge.py`; sampling/second-grader passes use `scripts/calibration/rejudge_sample_v3.py` → `scripts/calibration/second_grader_pass.py`. `--changeable-only` plus the universal skip-cache philosophy means re-grades pay only for cells that can actually move.
 
 ## Consequences
 

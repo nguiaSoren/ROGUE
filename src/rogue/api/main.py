@@ -1754,7 +1754,7 @@ def bandit_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
                 "n_arms": 0,
                 "top_arms": [],
                 "bottom_arms": [],
-                "note": "bandit state not found — run scripts/harvest_once.py to seed it",
+                "note": "bandit state not found — run scripts/harvest/harvest_once.py to seed it",
             }
         try:
             state = json.loads(BANDIT_STATE_PATH.read_text(encoding="utf-8"))

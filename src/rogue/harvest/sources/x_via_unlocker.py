@@ -11,7 +11,7 @@ outbound links through Feature-C following, like any source.
 
 **Caveat (documented honestly):** discovery is bounded by Google's index of X,
 which X heavily restricts — so very-fresh posts (last hours/days) may not be
-SERP-discoverable yet. For a known-fresh post, ``scripts/harvest_url.py --url``
+SERP-discoverable yet. For a known-fresh post, ``scripts/harvest/harvest_url.py --url``
 (direct Web-Unlock) is the reliable path.
 """
 

@@ -13,7 +13,7 @@ Position in pipeline (ROGUE_PLAN.md §10.7, augmentation #2):
                                   derived_from_primitive_id=<parent>
                                                        │
                                                        ▼
-                                  picked up by `scripts/reproduce_once.py`
+                                  picked up by `scripts/reproduce/reproduce_once.py`
                                   like any other multi-turn primitive
 
 §10.7's "Multi-turn escalation planner" item: a planner LLM generates 3-turn
@@ -148,7 +148,7 @@ class EscalationPlan(BaseModel):
     """A planner-generated multi-turn escalation sequence.
 
     Round-trips through ``EscalationPlanner.plan()`` and the disk cache.
-    Consumed by ``scripts/synthesize_escalations.py`` to construct new
+    Consumed by ``scripts/reproduce/synthesize_escalations.py`` to construct new
     ``AttackPrimitive`` rows with ``synthesized=True`` and
     ``multi_turn_sequence=plan.turns``.
 

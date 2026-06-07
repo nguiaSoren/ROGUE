@@ -40,7 +40,7 @@ export function MutationWidget({
       {nMutations === 0 && (
         <p className="text-xs font-mono text-muted-foreground leading-relaxed">
           {
-            "// no mutations yet · seed: uv run python scripts/synthesize_mutations.py --limit 15"
+            "// no mutations yet · seed: uv run python scripts/reproduce/synthesize_mutations.py --limit 15"
           }
         </p>
       )}
@@ -62,7 +62,7 @@ export function MutationWidget({
             </p>
           </div>
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-            {"// run: uv run python scripts/reproduce_once.py — to fire the mutated variants"}
+            {"// run: uv run python scripts/reproduce/reproduce_once.py — to fire the mutated variants"}
           </p>
         </>
       )}

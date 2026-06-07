@@ -10,7 +10,7 @@ Pipeline position (ROGUE_PLAN.md §A.23 / §10.1):
                                          v
                                 list[ModelResponse]   ->   judge.py
 
-Consumed by `scripts/reproduce_once.py` and the FastAPI `/api/reproduce` endpoint. For each
+Consumed by `scripts/reproduce/reproduce_once.py` and the FastAPI `/api/reproduce` endpoint. For each
 (RenderedAttack, DeploymentConfig) pair we issue `n_trials` independent calls in parallel
 (asyncio.gather) so a single breach run produces a bootstrap-able sample of model behaviour (§10.3).
 
@@ -143,7 +143,7 @@ class TargetPanel:
     async def aclose(self) -> None:
         """Release every cached adapter (and its provider client). Idempotent.
 
-        Callers (e.g. ``scripts/reproduce_once.py``) should invoke this in a ``finally:`` so asyncio
+        Callers (e.g. ``scripts/reproduce/reproduce_once.py``) should invoke this in a ``finally:`` so asyncio
         doesn't log unclosed-transport warnings on process exit.
         """
         for adapter in self._adapters.values():
@@ -205,7 +205,7 @@ class TargetPanel:
             for i, t in enumerate(temperatures)
         ]
         # Per-call concurrency stays bounded by n_trials; the OUTER fan-out over
-        # (primitives × configs) in scripts/reproduce_once.py owns the Semaphore (§11.3).
+        # (primitives × configs) in scripts/reproduce/reproduce_once.py owns the Semaphore (§11.3).
         responses = await asyncio.gather(*coros)
         return sorted(responses, key=lambda r: r.trial_index)
 

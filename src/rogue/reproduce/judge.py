@@ -4,7 +4,7 @@ Pipeline position (ROGUE_PLAN.md §10.1 / §10.2):
 
     instantiator.render -> target_panel.run_attack -> JudgeAgent.judge -> BreachResult
 
-The agent is consumed by `scripts/reproduce_once.py` and by the BreachResult-
+The agent is consumed by `scripts/reproduce/reproduce_once.py` and by the BreachResult-
 construction layer in `reproduce/target_panel.py`. Each call takes the rendered
 attack, the target model's reply, and the source `AttackPrimitive` (the judge
 needs the attack's title / family / goal in-context to score correctly), and

@@ -87,7 +87,7 @@ Render background workers are a **paid** service (no free tier). For a $0 launch
 Mint an organization and its first API key with the seeding tool. The raw `rk_live_…` key is printed **exactly once** and is never stored (only its sha256 hash + a display prefix land in `api_keys` — see `generate_api_key` in `src/rogue/platform/tenancy.py`):
 
 ```bash
-python scripts/seed_org.py --name "Acme"
+python scripts/ops/seed_org.py --name "Acme"
 ```
 
 Copy the printed `rk_live_…` key and give it to the customer. If you lose it, mint a new one — it cannot be recovered from the database.

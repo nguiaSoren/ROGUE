@@ -26,7 +26,7 @@ The 4-way → binary collapse goes through :mod:`rogue.reproduce.verdict_project
 
 This module is pure — no ``datasets``, no LLM, no network. The dataset load,
 the judge calls, and the subset draw's I/O live in
-``scripts/eval_wildguard.py``, which constructs :class:`WildGuardItem` objects
+``scripts/calibration/eval_wildguard.py``, which constructs :class:`WildGuardItem` objects
 and injects a ``verdict_fn``. ``evaluate()`` is therefore unit-testable with a
 deterministic stub judge.
 

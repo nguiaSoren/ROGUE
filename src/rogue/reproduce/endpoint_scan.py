@@ -9,7 +9,7 @@ engine cannot tell a customer gateway from OpenAI.
     Company API ──► CustomHTTPAdapter ──► ROGUE   (no custom engineering)
 
 COSTLY: a real run spends money on both the endpoint calls AND the judge LLM calls. Run it
-deliberately (``scripts/scan_endpoint.py``), never on a loop/timer.
+deliberately (``scripts/reproduce/scan_endpoint.py``), never on a loop/timer.
 """
 
 from __future__ import annotations

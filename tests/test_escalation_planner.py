@@ -573,7 +573,7 @@ async def test_run_synthesis_persists_synthesized_child(
     from sqlalchemy.orm import sessionmaker
 
     from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
-    from scripts.synthesize_escalations import run_synthesis
+    from scripts.reproduce.synthesize_escalations import run_synthesis
 
     # Pin Claude so plan() routes to the stubbed _call_anthropic (default is now Mistral).
     planner = EscalationPlanner(model="claude-haiku-4-5", cache_dir=tmp_path / "esc_cache")
@@ -641,7 +641,7 @@ async def test_run_synthesis_skips_already_escalated_parent(
 ) -> None:
     """Re-running synthesize_escalations is idempotent: a parent with an
     existing synthesized child is skipped."""
-    from scripts.synthesize_escalations import run_synthesis
+    from scripts.reproduce.synthesize_escalations import run_synthesis
 
     planner = EscalationPlanner(cache_dir=tmp_path / "esc_cache")
 

@@ -41,7 +41,7 @@ export function StubbornnessWidget({
       {nPair === 0 && (
         <p className="text-xs font-mono text-muted-foreground leading-relaxed">
           {
-            "// no PAIR runs yet · seed: uv run python scripts/reproduce_once.py --pair-max-iters 3"
+            "// no PAIR runs yet · seed: uv run python scripts/reproduce/reproduce_once.py --pair-max-iters 3"
           }
         </p>
       )}

@@ -1,4 +1,4 @@
-"""Smoke tests for ``scripts/reproduce_once.py``.
+"""Smoke tests for ``scripts/reproduce/reproduce_once.py``.
 
 Pure-Python helpers (always run) cover the ORM↔Pydantic projections, the
 BreachResult builder, and the stats summary. The end-to-end mocked test
@@ -29,7 +29,7 @@ from rogue.schemas import (
     JudgeVerdict,
     demo_deployment_configs,
 )
-from scripts.reproduce_once import (
+from scripts.reproduce.reproduce_once import (
     ReproductionRunStats,
     _build_breach_result_orm,
     _needs_media_carrier,

@@ -13,7 +13,7 @@ rate across configs < threshold) and persists each plan as a NEW
     family = MULTI_TURN_GRADIENT  (Crescendo's home family; per §4.2 row 6)
     vector = USER_MULTI_TURN
 
-After this script runs, ``scripts/reproduce_once.py`` picks up the
+After this script runs, ``scripts/reproduce/reproduce_once.py`` picks up the
 synthesized primitives like any other canonical primitive — no additional
 flag needed (synthesized=True rows are canonical by default since
 the planner emits one plan per parent, no clustering to do).
@@ -21,10 +21,10 @@ the planner emits one plan per parent, no clustering to do).
 Run from the repo root::
 
     # Disciplined sweep — top-45 EVADE-band primitives at ~$0.30 LLM cost:
-    uv run python scripts/synthesize_escalations.py --limit 45
+    uv run python scripts/reproduce/synthesize_escalations.py --limit 45
 
     # Demo seed — just synthesize escalations for a specific primitive:
-    uv run python scripts/synthesize_escalations.py --primitive-id 01ABCD...
+    uv run python scripts/reproduce/synthesize_escalations.py --primitive-id 01ABCD...
 
 Env vars: ``DATABASE_URL`` (dev DB), ``ANTHROPIC_API_KEY`` (planner LLM).
 
@@ -72,7 +72,7 @@ from rogue.schemas import (  # noqa: E402
     demo_deployment_configs,
 )
 
-logger = logging.getLogger("rogue.scripts.synthesize_escalations")
+logger = logging.getLogger("rogue.scripts.reproduce.synthesize_escalations")
 
 DEFAULT_DATABASE_URL = (
     "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue"
@@ -145,7 +145,7 @@ def _assert_schema_present(database_url: str) -> None:
 def _orm_to_pydantic_primitive(orm: AttackPrimitiveORM) -> AttackPrimitive:
     """Trimmed ORM→Pydantic projection — only fields the planner reads.
 
-    Mirrors `scripts/reproduce_once.py::_orm_to_pydantic_primitive` but
+    Mirrors `scripts/reproduce/reproduce_once.py::_orm_to_pydantic_primitive` but
     accepts the new §10.7 fields (synthesized, derived_from_primitive_id,
     slot_requirements) read off the ORM row.
     """
@@ -235,7 +235,7 @@ def _load_evade_band_primitives(
     if not rows:
         logger.warning(
             "no EVADE-band primitives found (threshold=%.2f, limit=%d) — "
-            "run scripts/reproduce_once.py first to populate breach_results",
+            "run scripts/reproduce/reproduce_once.py first to populate breach_results",
             threshold, limit,
         )
         return []

@@ -41,7 +41,7 @@ export function EscalationWidget({
       {nSynthesized === 0 && (
         <p className="text-xs font-mono text-muted-foreground leading-relaxed">
           {
-            "// no escalations yet · seed: uv run python scripts/synthesize_escalations.py --limit 45"
+            "// no escalations yet · seed: uv run python scripts/reproduce/synthesize_escalations.py --limit 45"
           }
         </p>
       )}
@@ -63,7 +63,7 @@ export function EscalationWidget({
             </p>
           </div>
           <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-            {"// run: uv run python scripts/reproduce_once.py — to fire the synthesized variants against the panel"}
+            {"// run: uv run python scripts/reproduce/reproduce_once.py — to fire the synthesized variants against the panel"}
           </p>
         </>
       )}

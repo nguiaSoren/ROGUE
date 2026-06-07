@@ -30,7 +30,7 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
     ports: ["8000:8000", "8001:8001"]
     command: >
-      sh -c "alembic upgrade head && python scripts/seed_demo_data.py &&
+      sh -c "alembic upgrade head && python scripts/ops/seed_demo_data.py &&
              uvicorn rogue.api.main:app --host 0.0.0.0 --port 8000"
 
   frontend:

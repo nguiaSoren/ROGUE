@@ -426,7 +426,7 @@ async def test_run_mutation_synthesis_persists_mutated_children(
     from sqlalchemy.orm import sessionmaker
 
     from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
-    from scripts.synthesize_mutations import run_mutation_synthesis
+    from scripts.reproduce.synthesize_mutations import run_mutation_synthesis
 
     mutator = SyntacticMutator(cache_dir=tmp_path / "mut_cache")
 
@@ -499,7 +499,7 @@ async def test_run_mutation_synthesis_skips_already_mutated_parent(
 ) -> None:
     """Idempotent: re-running with a fresh cache still skips parents with
     existing mutation children."""
-    from scripts.synthesize_mutations import run_mutation_synthesis
+    from scripts.reproduce.synthesize_mutations import run_mutation_synthesis
 
     def stub_embed(_text: str) -> list[float]:
         # Always orthogonal ⇒ nothing dedups.

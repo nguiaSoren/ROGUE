@@ -40,34 +40,34 @@ Local `.env` `DATABASE_URL` now points at **Neon** (the live DB) by default, so 
 pipeline writes straight to production. There is effectively **one database** — no
 copy/sync step. **To push new data live, just run normally:**
 ```
-uv run python scripts/harvest_once.py --since 1d    # new attacks    → Neon (live)
-uv run python scripts/reproduce_once.py             # run them → breaches → Neon (live)
+uv run python scripts/harvest/harvest_once.py --since 1d    # new attacks    → Neon (live)
+uv run python scripts/reproduce/reproduce_once.py             # run them → breaches → Neon (live)
 ```
 New data shows on the site within the cache window (below), or immediately after the next deploy.
 
 - **The breach matrix is a live SQL view** (`breach_matrix`), computed on every request —
   so new breaches appear **automatically**. No code change, no manual "refresh." (The
   `breach_matrix_daily_snapshot` materialized view is only used by
-  `scripts/snapshot_breach_matrix.py`, not the dashboard, so you never refresh it for the site.)
+  `scripts/ops/snapshot_breach_matrix.py`, not the dashboard, so you never refresh it for the site.)
 - **The bandit widget is live too** — its state lives in Neon (`bandit_state` table, upserted
   by the harvest), so `/api/bandit/stats` reflects the latest harvest automatically (no redeploy).
 - **Fast local sandbox** (does NOT touch live): the local Docker DB (`LOCAL_DATABASE_URL`
   in `.env`, also Postgres 17) is for quick experiments. Start it (`docker compose up -d`)
   and override for one run:
   ```
-  DATABASE_URL="$(grep ^LOCAL_DATABASE_URL= .env | cut -d= -f2-)" uv run python scripts/reproduce_once.py ...
+  DATABASE_URL="$(grep ^LOCAL_DATABASE_URL= .env | cut -d= -f2-)" uv run python scripts/reproduce/reproduce_once.py ...
   ```
 
 ## Keeping local ↔ Neon in sync
 The two databases are separate copies (both Postgres 17). There is **no real-time
 auto-sync** — a laptop DB and a cloud DB can't cleanly stream to each other, and it's not
-worth the fragility. Instead, `scripts/sync_db.sh` does a one-command full copy (runs the
+worth the fragility. Instead, `scripts/ops/sync_db.sh` does a one-command full copy (runs the
 pg17 tools inside the local container, so nothing to install):
 ```
-./scripts/sync_db.sh pull     # Neon → local : mirror the live DB into local (run after a harvest)
-./scripts/sync_db.sh push     # local → Neon : publish local to live (overwrites live — confirms first)
+./scripts/ops/sync_db.sh pull     # Neon → local : mirror the live DB into local (run after a harvest)
+./scripts/ops/sync_db.sh push     # local → Neon : publish local to live (overwrites live — confirms first)
 ```
-Typical loop: `harvest`/`reproduce` → Neon (live), then `./scripts/sync_db.sh pull` so your
+Typical loop: `harvest`/`reproduce` → Neon (live), then `./scripts/ops/sync_db.sh pull` so your
 local copy matches for fast experiments.
 
 ## Caching

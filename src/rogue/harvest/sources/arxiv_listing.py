@@ -46,7 +46,7 @@ DEFAULT_LISTINGS = [
     # vision-language / VLM / cross-modal / typographic / audio jailbreak papers
     # concentrate in cs.CV + cs.MM and were NOT being pulled — a 5-query SERP probe
     # found 21 such arXiv papers, 0 harvested. Same downstream commentary-filter
-    # drops non-attack abstracts. (Confirmed gap; see scripts/confirm_multimodal_gap.py.)
+    # drops non-attack abstracts. (Confirmed gap; see scripts/harvest/confirm_multimodal_gap.py.)
     "https://arxiv.org/list/cs.CV/new",  # Computer Vision (vision-language attacks)
     "https://arxiv.org/list/cs.MM/new",  # Multimedia (audio / cross-modal attacks)
 ]

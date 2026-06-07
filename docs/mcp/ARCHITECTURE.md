@@ -124,7 +124,7 @@ A coding agent drives the loop itself: `start_scan` → poll `get_scan_status` u
 **Stored integrations — the secref indirection.** A target's API key is redacted on persist by `ScanService`'s `SecretStore` (`secrets.py` — Fernet ciphertext in the `secrets` table, the queue carries only an `api_key_ref` handle). The *destination* credentials for Slack and Jira are handled the same way but registered ahead of time, not passed by the agent:
 
 ```
-admin runs  scripts/add_integration.py --org <id> --kind slack --name slack-sec --webhook <url>
+admin runs  scripts/ops/add_integration.py --org <id> --kind slack --name slack-sec --webhook <url>
    │
    ▼
 IntegrationStore.put(org_id, kind, name, config, secret)        integration_store.py:70
@@ -190,7 +190,7 @@ The `mcpServers` client-config shapes (remote URL vs. local `command`/`args`) ar
 - **Per-tenant MCP auth** — `rk_live_…` / `rk_test_…` bearer keys on the `/mcp` mount, resolved through the same authentication + tenancy chain as the `/v1` API, with read tools gated by `read` scope and action tools by `scan`. This turns the currently-open public endpoint into a multi-tenant one where each client runs and reads only its own org's scans. The org binding moves from `ROGUE_MCP_ORG_ID` to the resolved key's `AuthContext` — the never-a-tool-arg invariant is unchanged.
 - **`list_projects` / `create_project`** — project-scoped organization of scans, blocked on a project service in the platform layer.
 - **`download_report`** — binary PDF/HTML report artifacts. v1 surfaces only text renderings (`get_report` summary/json, `create_executive_summary` markdown) because MCP is a text protocol; binary delivery needs a separate mechanism (e.g. a signed URL the user opens in the dashboard).
-- **Stored-integration UI** — a dashboard surface for registering Slack/Jira integrations, replacing today's admin-only `scripts/add_integration.py` CLI path.
+- **Stored-integration UI** — a dashboard surface for registering Slack/Jira integrations, replacing today's admin-only `scripts/ops/add_integration.py` CLI path.
 
 ## Out of scope for this layer (owned elsewhere)
 
