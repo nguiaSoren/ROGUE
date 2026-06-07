@@ -129,3 +129,9 @@ Re-scoring the 50-row StrongREJECT calibration sample under v3 gives an inflatio
 ### 7.4 Net
 
 All three external axes are now v3-coherent: **JBB 89.3% agreement (precision 55% → 79.5%), WildGuard harm 88.5% (↑), StrongREJECT non-inflationary (−26%).** The v3 content-transfer gate improved strict-harm agreement and conservatism across the board, and the only apparent "costs" — the refusal-axis drop and the 19 harm-axis false-negatives — are dominated by benchmark-label construct differences rather than real harm-detection regressions. Net of the audit, there is no case for loosening the judge.
+
+## 8. Corpus re-judge landed (2026-06-07)
+
+The full v3 re-judge of the **stored breach matrix** — the action this taxonomy was written to motivate (§4 framed these rubric edits as "the input to a re-judge of the breach corpus") — is **done as of 2026-06-07**. It was no longer deferred for cost: a batched re-grade of the 2,429 breach cells + 419 ERROR cells under `judge_v3.md` cost **~$9.11** (well under the old inline estimates of ~$55 targeted / ~$242 full), so the live dashboard / stored matrix is now **v3-graded**, not v1/v2-graded.
+
+**Result:** breach cells dropped **2,429 → 1,371 (−43.6%)** and all **419 ERROR cells resolved**. The −43.6% drop closely matches the **~45% FP rate** measured in the §2 production audit — independent corroboration that the v1/v2 over-reporting characterized here was real, and that the v3 content-transfer gate removes it at corpus scale, not just on the 20-row audit and the JBB calibration set. The dashboard no longer over-reports breaches relative to v3.
