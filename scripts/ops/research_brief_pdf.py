@@ -20,6 +20,7 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.graphics.shapes import Drawing, Rect
 from reportlab.platypus import (
     ListFlowable,
     ListItem,
@@ -70,6 +71,12 @@ def _styles() -> dict[str, ParagraphStyle]:
                              fontSize=10, leading=14, textColor=BODY),
         "limit": ParagraphStyle("lim", parent=base["Normal"], fontName="Helvetica",
                                 fontSize=9.5, leading=13.5, textColor=colors.HexColor("#41454c")),
+        "barlbl": ParagraphStyle("barlbl", parent=base["Normal"], fontName="Helvetica",
+                                 fontSize=8, leading=10, textColor=INK),
+        "barval": ParagraphStyle("barval", parent=base["Normal"], fontName="Helvetica",
+                                 fontSize=8, leading=10, textColor=INK),
+        "cap": ParagraphStyle("cap", parent=base["Normal"], fontName="Helvetica-Oblique",
+                              fontSize=7.5, leading=10.5, textColor=MUTED),
     }
 
 
@@ -133,6 +140,47 @@ def _heading(num: str, title: str) -> Paragraph:
     return Paragraph(f'<font color="#1f9d55"><b>{num}</b></font>&nbsp;&nbsp;{b(title)}', S["h"])
 
 
+def _judgefig() -> Table:
+    """Horizontal bars: judge agreement vs the field (the last → tied-with-frontier story)."""
+    rows = [
+        ("ROGUE v1", 70.3, colors.HexColor("#c0392b")),
+        ("HarmBench", 78.3, colors.HexColor("#b9c2bb")),
+        ("LlamaGuard-2", 87.7, colors.HexColor("#b9c2bb")),
+        ("ROGUE v3", 89.3, GREEN),
+        ("GPT-4", 90.3, colors.HexColor("#b9c2bb")),
+        ("Llama-3", 90.7, colors.HexColor("#b9c2bb")),
+    ]
+    barmax = 2.7 * inch
+    data = []
+    for label, val, color in rows:
+        d = Drawing(barmax, 11)
+        d.add(Rect(0, 1.5, barmax, 8, fillColor=CHIPBG, strokeColor=None))
+        d.add(Rect(0, 1.5, barmax * val / 100.0, 8, fillColor=color, strokeColor=None))
+        emph = "Helvetica-Bold" if label.startswith("ROGUE") else "Helvetica"
+        data.append([
+            Paragraph(f'<font name="{emph}">{label}</font>', S["barlbl"]),
+            d,
+            Paragraph(f'<font name="{emph}">{val:.1f}</font>', S["barval"]),
+        ])
+    t = Table(data, colWidths=[1.25 * inch, barmax, 0.55 * inch])
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("LEFTPADDING", (0, 0), (0, -1), 0), ("RIGHTPADDING", (1, 0), (1, -1), 6),
+        ("LEFTPADDING", (2, 0), (2, -1), 4),
+    ]))
+    cap = Paragraph(
+        "Judge agreement vs the field (JailbreakBench, % vs the human majority). "
+        "Recalibration moved ROGUE from last of five to 3rd, tied with the frontier classifiers.",
+        S["cap"])
+    wrap = Table([[t], [cap]], colWidths=[CONTENT_W])
+    wrap.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 1), (0, 1), 5), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
+    ]))
+    return wrap
+
+
 def _footer(canvas, doc) -> None:
     canvas.saveState()
     y = 0.55 * inch
@@ -191,7 +239,8 @@ def build() -> Path:
         ("55 → 79.5%", "precision"),
         ("2,429 → 1,371", "breach cells re-judged"),
         ("2.56%", "in-dist false-positive"),
-    ]), Spacer(1, 6)]
+    ]), Spacer(1, 8)]
+    F += [_judgefig(), Spacer(1, 8)]
     F += [_note(
         "A named false-positive taxonomy for a safety judge, plus a measured finding that two respected "
         "benchmarks (WildGuardTest harm labels and StrongREJECT) themselves <i>over-count</i> relative to a "
