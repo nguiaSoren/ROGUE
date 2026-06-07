@@ -103,6 +103,8 @@ glossary.md
 answers.md
 new_methods.md
 assets/deck_slide_lines.md
+# rogue v2 spec — internal planning, local-only
+docs/v2/
 
 # Dev-scratch scripts — not part of the runnable project
 scripts/_*
