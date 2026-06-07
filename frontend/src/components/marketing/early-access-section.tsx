@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Rocket, ClipboardCheck, FlaskConical, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COMMERCIAL } from "@/lib/flags";
 
 /**
  * EarlyAccessSection — the honest social-proof replacement.
@@ -10,8 +11,15 @@ import { cn } from "@/lib/utils";
  * Early Access, Pilot, and Research Partners. Self-contained and
  * max-w-7xl-aware so it can be dropped in as a top-level homepage section.
  * Server component.
+ *
+ * The honest "what's being built" content is shown in both modes. The sales
+ * CTAs branch on COMMERCIAL: in commercial mode the cards route to
+ * /request-demo ("Start a pilot", "Partner with us"); in the default
+ * hiring/research mode the pilot+partner sales asks are dropped and every
+ * card routes to /early-access or /research instead.
  */
 export function EarlyAccessSection() {
+  const tracks = COMMERCIAL ? TRACKS : RESEARCH_TRACKS;
   return (
     <section className="max-w-7xl mx-auto px-6">
       <div className="max-w-3xl space-y-4">
@@ -29,7 +37,7 @@ export function EarlyAccessSection() {
       </div>
 
       <div className="mt-10 md:mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-        {TRACKS.map((track) => (
+        {tracks.map((track) => (
           <div
             key={track.name}
             className="rogue-card border border-border rounded-xl p-5 md:p-6 bg-card/40 backdrop-blur-sm flex flex-col"
@@ -69,10 +77,10 @@ export function EarlyAccessSection() {
         </Link>{" "}
         or{" "}
         <Link
-          href="/request-demo"
+          href={COMMERCIAL ? "/request-demo" : "/research"}
           className="text-rogue-green underline-offset-4 hover:underline"
         >
-          just reach out
+          {COMMERCIAL ? "just reach out" : "read the research"}
         </Link>{" "}
         — we read every one.
       </p>
@@ -117,5 +125,35 @@ const TRACKS: ReadonlyArray<{
     gist: "Access to the harvested corpus and benchmark infra, co-authorship on findings, and the MCP server for live threat-DB queries.",
     cta: "Partner with us",
     href: "/request-demo",
+  },
+];
+
+// Non-commercial (default) variant: same honest "what's being built" content,
+// but the pilot+partner *sales* asks are dropped — every card routes to the
+// research surface or the early-access tracks instead of /request-demo.
+const RESEARCH_TRACKS: typeof TRACKS = [
+  {
+    icon: FlaskConical,
+    name: "The research",
+    forWhom: "The methods and measured results behind the engine.",
+    gist: "Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, and measure-before-build discipline — including the negative results.",
+    cta: "Read the research",
+    href: "/research",
+  },
+  {
+    icon: Rocket,
+    name: "What's being built",
+    forWhom: "A real, running continuous open-web red-team.",
+    gist: "The full repertoire and adaptive-ladder scans, a self-recalibrating judge, a benchmark layer, and an MCP server — all live in production, built solo.",
+    cta: "See the early-access tracks",
+    href: "/early-access",
+  },
+  {
+    icon: ClipboardCheck,
+    name: "The live evidence",
+    forWhom: "Don't take the writeup's word for it.",
+    gist: "The breach matrix with 95% bootstrap CIs, live telemetry, and the harvest feed — the running system's own surfaces.",
+    cta: "Open the matrix",
+    href: "/matrix",
   },
 ];

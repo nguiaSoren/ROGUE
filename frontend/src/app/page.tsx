@@ -238,8 +238,9 @@ export default async function Home() {
             See ROGUE break your stack.
           </h2>
           <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Point us at an endpoint and get a scored security report back. Book a
-            walkthrough, or run a scan yourself right now.
+            {COMMERCIAL
+              ? "Point us at an endpoint and get a scored security report back. Book a walkthrough, or run a scan yourself right now."
+              : "Point it at an endpoint and get a scored security report back. Read the research, or run a scan yourself right now."}
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center">
             <Link
@@ -252,10 +253,10 @@ export default async function Home() {
           </div>
           <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
             <Link
-              href={COMMERCIAL ? "/pricing" : "/early-access"}
+              href={COMMERCIAL ? "/pricing" : "/research"}
               className="transition-colors hover:text-rogue-green"
             >
-              {COMMERCIAL ? "View pricing" : "Early access"}
+              {COMMERCIAL ? "View pricing" : "Read the research"}
             </Link>
           </div>
         </section>
