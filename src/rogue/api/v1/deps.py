@@ -63,6 +63,17 @@ def get_benchmark_service() -> Any:
     return _require("benchmark_service")
 
 
+def get_attestation_service() -> Any:
+    """The per-org append-only attestation chain service (v2 §2.5)."""
+    return _require("attestation_service")
+
+
+def get_scan_store() -> Any:
+    """The durable ScanStore — used by the attestation replay route to resolve a
+    `reproducibility_ref` (scan_id) back to the persisted report it reconstructs from."""
+    return _require("store")
+
+
 def wire(**services: Any) -> None:
     """Called by assembly to install the production service graph."""
     _SERVICES.update(services)
@@ -74,5 +85,7 @@ __all__ = [
     "get_report_service",
     "get_scan_engine",
     "get_benchmark_service",
+    "get_attestation_service",
+    "get_scan_store",
     "wire",
 ]

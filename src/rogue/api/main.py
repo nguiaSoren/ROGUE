@@ -180,6 +180,7 @@ async def _lifespan(_app: "FastAPI"):
         _worker = ScanWorker(
             _PLATFORM["store"], _PLATFORM["queue"], _PLATFORM["engine"], worker_id="inprocess-1",
             secret_store=_PLATFORM.get("secret_store"),
+            attestation_service=_PLATFORM.get("attestation_service"),
         )
         worker_task = asyncio.create_task(_worker.run_forever(poll_interval=2.0, stop_event=stop_event))
         logger.info("in-process scan worker started")
@@ -248,12 +249,14 @@ if _limiter is not None:  # pragma: no cover - exercised only with slowapi insta
 # either a separate `python -m rogue.platform.worker` process, or the in-process worker started in
 # `_lifespan` when ROGUE_INPROCESS_WORKER=1 (the $0 single-service path).
 try:  # pragma: no cover - exercised at process start
+    from rogue.api.v1 import attestation as _v1_attestation
     from rogue.api.v1 import deps as _v1_deps
     from rogue.api.v1 import scans as _v1_scans
     from rogue.api.v1 import validate_benchmark as _v1_vb
 
     app.include_router(_v1_scans.router)
     app.include_router(_v1_vb.router)
+    app.include_router(_v1_attestation.router)
 
     def _wire_platform() -> None:
         from rogue.platform.benchmark_service import DefaultBenchmarkService
@@ -268,10 +271,17 @@ try:  # pragma: no cover - exercised at process start
         queue = build_postgres_job_queue()
         engine = DefaultScanEngine()
         secret_store = build_postgres_secret_store()  # None unless SECRET_ENCRYPTION_KEY is set
+        # Signed-attestation service (v2 §2.5): shares the store's hardened sessionmaker so a completed
+        # scan appends one entry to its org's append-only hash chain. Consumed by the /v1 attestation
+        # API and injected into the in-process worker (_lifespan).
+        from rogue.attestation.service import AttestationService
+
+        attestation_service = AttestationService(store._session_factory)
         _PLATFORM["store"] = store
         _PLATFORM["queue"] = queue
         _PLATFORM["engine"] = engine
         _PLATFORM["secret_store"] = secret_store
+        _PLATFORM["attestation_service"] = attestation_service
         if secret_store is None:
             logger.warning(
                 "SECRET_ENCRYPTION_KEY unset — hosted scans that carry a raw target api_key will be "
@@ -296,6 +306,8 @@ try:  # pragma: no cover - exercised at process start
             report_service=report_service,
             scan_engine=engine,
             benchmark_service=benchmark_service,
+            attestation_service=attestation_service,
+            store=store,
         )
 
         # Register the MCP action tools on the live server so agents can run the full scan lifecycle
