@@ -24,9 +24,11 @@ export function Nav() {
   const [dbUp, setDbUp] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Close the mobile menu on route change.
+  // Close the mobile menu on route change. Deferred via rAF so this isn't a
+  // synchronous setState in the effect body (avoids the cascading-render lint).
   useEffect(() => {
-    setMenuOpen(false);
+    const id = requestAnimationFrame(() => setMenuOpen(false));
+    return () => cancelAnimationFrame(id);
   }, [pathname]);
 
   const closeMenu = () => setMenuOpen(false);
@@ -79,8 +81,8 @@ export function Nav() {
           <span className="hidden md:flex items-center gap-5">
             <NavLink href="/product" active={pathname === "/product"}>product</NavLink>
             {COMMERCIAL && <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>}
-            <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>
-            <NavLink href="/security" active={pathname === "/security"}>security</NavLink>
+            {COMMERCIAL && <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>}
+            {COMMERCIAL && <NavLink href="/security" active={pathname === "/security"}>security</NavLink>}
             <NavLink href="/resources" active={pathname === "/resources"}>resources</NavLink>
             <NavLink href="/about" active={pathname === "/about"}>about</NavLink>
           </span>
@@ -129,8 +131,8 @@ export function Nav() {
             <div className="my-1 border-t border-border" />
             <MobileLink href="/product" active={pathname === "/product"} onClick={closeMenu}>product</MobileLink>
             {COMMERCIAL && <MobileLink href="/pricing" active={pathname === "/pricing"} onClick={closeMenu}>pricing</MobileLink>}
-            <MobileLink href="/enterprise" active={pathname === "/enterprise"} onClick={closeMenu}>enterprise</MobileLink>
-            <MobileLink href="/security" active={pathname === "/security"} onClick={closeMenu}>security</MobileLink>
+            {COMMERCIAL && <MobileLink href="/enterprise" active={pathname === "/enterprise"} onClick={closeMenu}>enterprise</MobileLink>}
+            {COMMERCIAL && <MobileLink href="/security" active={pathname === "/security"} onClick={closeMenu}>security</MobileLink>}
             <MobileLink href="/resources" active={pathname === "/resources"} onClick={closeMenu}>resources</MobileLink>
             <MobileLink href="/about" active={pathname === "/about"} onClick={closeMenu}>about</MobileLink>
             <div className="my-1 border-t border-border" />

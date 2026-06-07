@@ -134,8 +134,12 @@ DEFAULT_PER_RUN_BUDGET_USD = 0.50
 # absolute — aborts the whole run if exceeded. Both can be overridden via
 # env vars (ROGUE_PAIR_PER_PRIMITIVE_BUDGET_USD,
 # ROGUE_PAIR_PER_DAY_BUDGET_USD) or constructor kwargs.
-DEFAULT_PER_PRIMITIVE_BUDGET_USD = 1.50
-DEFAULT_PER_DAY_BUDGET_USD = 20.00
+DEFAULT_PER_PRIMITIVE_BUDGET_USD = float(
+    os.environ.get("ROGUE_PAIR_PER_PRIMITIVE_BUDGET_USD", "1.50")
+)
+DEFAULT_PER_DAY_BUDGET_USD = float(
+    os.environ.get("ROGUE_PAIR_PER_DAY_BUDGET_USD", "20.00")
+)
 
 _REFINE_MAX_TOKENS = 1024
 

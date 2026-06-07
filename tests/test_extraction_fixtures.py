@@ -14,12 +14,14 @@ assert the returned :class:`AttackPrimitive` matches the family / vector /
 slot shape documented in the matching golden JSON fixture under
 ``tests/fixtures/0[123]_*.json``.
 
-Gated on ``ANTHROPIC_API_KEY`` because each test issues one real Anthropic
-extraction call (~$0.005). When the key is absent the tests skip cleanly so
-CI without secrets still passes; locally the ``.env`` autoloads it via
-``dotenv``. Run with::
+Every test here issues one real Anthropic extraction call (~$0.005), so they
+are doubly gated: marked ``@pytest.mark.live`` and skipped unless BOTH
+``ROGUE_LIVE_TESTS == "1"`` AND ``ANTHROPIC_API_KEY`` is present. This keeps
+paid network calls off the default ``uv run pytest`` path (a stray key in
+``.env`` no longer triggers spend); locally the ``.env`` autoloads the key via
+``dotenv``. Run the live path explicitly with::
 
-    uv run pytest tests/test_extraction_fixtures.py -v
+    ROGUE_LIVE_TESTS=1 uv run pytest tests/test_extraction_fixtures.py -v -m live
 """
 
 from __future__ import annotations
@@ -40,11 +42,20 @@ from rogue.schemas import AttackPrimitive
 load_dotenv()
 
 
+# Every test in this module makes a real, paid Anthropic call.
+pytestmark = pytest.mark.live
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-SKIP_REASON = "real LLM call — needs ANTHROPIC_API_KEY"
+SKIP_REASON = (
+    "live LLM call — set ROGUE_LIVE_TESTS=1 and provide ANTHROPIC_API_KEY"
+)
 
 
 def _skip_unless_anthropic_key() -> None:
+    # Doubly gated: opt-in flag AND a real key. The flag prevents a stray key
+    # in `.env` from silently turning a routine `pytest` run into a paid one.
+    if os.environ.get("ROGUE_LIVE_TESTS") != "1":
+        pytest.skip(SKIP_REASON)
     if not os.environ.get("ANTHROPIC_API_KEY"):
         pytest.skip(SKIP_REASON)
 

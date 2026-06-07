@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=0, help="0 = all 300; else stratified subset")
     parser.add_argument("--seed", default="rogue")
-    parser.add_argument("--prompt-version", default="v1", help="judge rubric version to score (e.g. v1, v3)")
+    parser.add_argument("--prompt-version", default="v3", help="judge rubric version to score (e.g. v1, v3)")
     parser.add_argument("--dry-run", action="store_true", help="baselines + estimate, free")
     parser.add_argument("--yes", action="store_true", help="confirm the paid judge run")
     args = parser.parse_args(argv)

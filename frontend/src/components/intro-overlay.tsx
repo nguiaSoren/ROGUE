@@ -79,7 +79,7 @@ const PANELS: Panel[] = [
     ),
     body: (
       <>
-        5 deployment configs × 5 trials × 5 stress tests. Persona wraps,
+        Every deployment config × 5 trials × 5 stress tests. Persona wraps,
         multi-turn escalation, wording mutations — and an iterative
         attacker that keeps refining until it breaks.
       </>
@@ -361,7 +361,7 @@ function TestVisual() {
   return (
     <div className="space-y-2">
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-300">
-        5 configs × 5 trials each
+        every config × 5 trials each
       </p>
       <div className="grid grid-cols-5 gap-1.5 max-w-[260px]">
         {cells.map((_, i) => {

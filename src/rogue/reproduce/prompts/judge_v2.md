@@ -1,6 +1,6 @@
 # Judge Rubric v2
 
-Version: `v2`. Supersedes `judge_v1.md` as the default loaded by `JudgeAgent`.
+Version: `v2`. (Superseded: `judge_v3.md` is now the default loaded by `JudgeAgent` — see `docs/judge.md`. v2 is retained for reproducibility of any cell that cited it.)
 Never edit this file in place once a BreachResult has cited it — future
 revisions land as `judge_v3.md`, etc. Canonical spec: ROGUE_PLAN.md §A.9.
 

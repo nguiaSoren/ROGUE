@@ -1,6 +1,6 @@
 [project]
 name = "rogue"
-version = "0.1.0"
+version = "1.0.0"
 description = "Open-web LLM threat intelligence agent (Bright Data hackathon submission)"
 requires-python = ">=3.11,<3.12"
 authors = [{name = "Soren Obounou Nguia"}]
@@ -25,10 +25,13 @@ dependencies = [
     "pillow>=10.4",
     "datasets>=4.8.5",
     "reportlab>=4.5.1",
+    # Production-readiness (both degrade to no-ops when their env vars are unset):
+    "sentry-sdk[fastapi]>=2.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0", "ruff>=0.5", "mypy>=1.10"]
 
 [project.scripts]
 rogue = "rogue.cli:main"
@@ -41,9 +44,17 @@ build-backend = "hatchling.build"
 line-length = 100
 target-version = "py311"
 
+# Ruff lint uses its default set (E4/E7/E9 + F) — verified clean across src/.
+# Tightening to the fuller E/I/UP/B set surfaces ~1,200 mostly-mechanical findings
+# (Optional[X]→X|None, import sorting, bugbear); that's a dedicated cleanup pass
+# tracked for v2, deliberately NOT bundled here so the new CI gate stays green.
+
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+markers = [
+    "live: hits live paid APIs (Bright Data / LLMs); skipped unless ROGUE_LIVE_TESTS=1",
+]
 
 [dependency-groups]
 dev = [

@@ -59,6 +59,17 @@ from rogue.db.image_cache import (  # noqa: E402
 )
 from mcp.server.transport_security import TransportSecuritySettings  # noqa: E402
 from rogue.mcp_server.server import mcp as rogue_mcp  # noqa: E402
+from rogue.api.observability import (  # noqa: E402
+    RATE_LIMIT_DEFAULT,
+    configure_logging,
+    get_limiter,
+    init_sentry,
+)
+
+# Production-readiness wiring. Both calls degrade to a no-op when the optional
+# deps / env vars are absent (LOG_JSON, SENTRY_DSN); safe to call at import.
+configure_logging()
+init_sentry()
 
 logger = logging.getLogger("rogue.api")
 
@@ -209,6 +220,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount("/mcp", _mcp_app)
+
+
+# Rate limiting (SlowAPI). When slowapi is installed, attach the limiter to
+# app.state (so route decorators can find it), register its 429 handler, and add
+# its middleware. When the dep is absent, get_limiter() returns None and the
+# whole block is skipped — the API behaves identically, just unthrottled.
+_limiter = get_limiter()
+if _limiter is not None:  # pragma: no cover - exercised only with slowapi installed
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+
+    app.state.limiter = _limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
+    logger.info("rate limiting enabled (default %s)", RATE_LIMIT_DEFAULT)
 
 
 # --------------------------------------------------------------------------- #

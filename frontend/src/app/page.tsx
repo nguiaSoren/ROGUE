@@ -18,6 +18,11 @@ import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
 import { EarlyAccessSection } from "@/components/marketing/early-access-section";
 
+// ISR — statically prerendered + revalidated every 5 min, matching /matrix and
+// REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
+// data surfaces within the window instead of paying the full round-trip.
+export const revalidate = 300;
+
 /**
  * Cinematic home — the demo entry. Designed for a 5-second pitch and a
  * 5-minute deep-dive.
@@ -209,7 +214,11 @@ export default async function Home() {
               href="/matrix"
               path="/matrix"
               title="Breach Matrix"
-              desc="14 attack families × 5 configs. Click any red cell to see the exact prompt that cracked it, with 95% CIs."
+              desc={`${
+                matrix?.families.length ?? 15
+              } attack families × ${
+                health?.n_configs ?? matrix?.configs.length ?? 8
+              } configs. Click any red cell to see the exact prompt that cracked it, with 95% CIs.`}
             />
             <PageLink
               href="/brief"

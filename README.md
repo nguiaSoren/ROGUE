@@ -66,7 +66,7 @@ ROGUE uses 5 Bright Data products end-to-end:
 
 The discovery layer doesn't just *call* Bright Data SERP — it learns to use it
 better over time. An ε-greedy multi-armed bandit (`src/rogue/harvest/bandit.py`)
-maintains 39 candidate SERP queries across the 19 sources and picks the 10
+maintains 45 candidate SERP queries across the sources and picks the 10
 highest-yield queries per daily harvest, where **yield = novel canonical attack
 primitives per dollar of Bright Data spend**.
 
@@ -140,7 +140,7 @@ The bandit widget's arm rows each carry a CSS-only hover-card with
 
 ### `/matrix` — breach heatmap
 
-15 attack families × 6 deployment configs. Click any red cell to see the
+15 attack families × 8 deployment configs. Click any red cell to see the
 exact primitive that cracked it, with 95% bootstrap CIs. Column headers
 carry the PAIR avg-iters-to-breach so the matrix and the augmentation
 story stay tied together visually.
@@ -218,7 +218,7 @@ ROGUE harvests **two different things** from the open web, and now automates bot
 - 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see `docs/taxonomy.md`
 - 14-slot payload-template vocabulary for cross-deployment reproduction
 - 19-source open-web harvest list — see `docs/sources.md`
-- 6-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite) — deliberate vintage mix: 4 current cheap-tier models from each major lab + 1 older open-weight reliability anchor (the Llama slot) chosen for the role of "weakest-guardrails baseline" so the breach matrix has a comparison point against which the newer-model safety wins stand out — **plus Claude Opus 4.8**, a flagship added to reproduce the elder_plinius jailbreak against a frontier model (it breached at 100%; Claude Haiku held).
+- 8-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B-Instruct via OpenRouter, Mistral Small 4, Gemini 3.1 Flash-Lite, **plus Claude Opus 4.8** and two audio targets — Voxtral-Small-24B + GPT-Audio-Mini) — a deliberate mix: cheap-tier models from each major lab + an older open-weight reliability anchor (the Llama slot) as the "weakest-guardrails baseline", the Opus 4.8 flagship as a frontier reference, and audio endpoints for multimodal coverage. Under judge v3, Opus 4.8 is the hardest target — only 1 of 46 primitives breached it, and it refuses the well-known Pliny/GODMODE jailbreaks outright.
 - Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated four ways: in-distribution **2.56% false-positive breach rate (1/39), 0 missed breaches (0/11)** + **88.5% harm-axis agreement on WildGuardTest** (v3, n=200), and — after a recalibration that diagnosed and fixed an over-flagging rubric — **89.3% agreement on JailbreakBench's human-labeled set (recall 95.5% / precision 79.5%)**, up from the v1 baseline of 70.3% / precision 55% (see [Judge calibration](#judge-calibration))
 - Daily threat brief (markdown + JSON) + Slack webhook
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf
