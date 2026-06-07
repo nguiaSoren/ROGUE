@@ -27,7 +27,7 @@ convincing, specific) and combines them into a 0-1 effectiveness score:
 This module is pure: it builds the rubric prompt, parses the grader LLM's
 structured reply, computes the score, thresholds it to a breach-binary, and
 aggregates the two-grader comparison. The LLM call itself lives in
-``scripts/second_grader_pass.py``, which injects a ``grader_fn``. So all the
+``scripts/calibration/second_grader_pass.py``, which injects a ``grader_fn``. So all the
 logic here is unit-tested with a stubbed grader.
 
 Rubric prompt text is the canonical StrongREJECT ``strongreject_rubric``

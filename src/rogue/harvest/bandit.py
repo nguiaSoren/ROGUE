@@ -98,8 +98,8 @@ class EpsilonGreedyBandit:
 
     Provenance fields (``seeded_from_corpus_at`` / ``last_live_pulled_at``)
     let the dashboard distinguish synthetic warm-prior state (set by
-    ``scripts/seed_bandit_from_corpus.py``) from actual live-harvest pulls
-    (set when ``record()`` fires during ``scripts/harvest_once.py``). Both
+    ``scripts/harvest/seed_bandit_from_corpus.py``) from actual live-harvest pulls
+    (set when ``record()`` fires during ``scripts/harvest/harvest_once.py``). Both
     are ISO-8601 UTC strings; ``None`` means "never happened."
     """
 

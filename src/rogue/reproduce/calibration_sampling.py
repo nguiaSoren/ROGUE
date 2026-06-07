@@ -19,7 +19,7 @@ sample it's measured on. Two failure modes this module exists to prevent:
   sample is defensible as unbiased rather than hand-curated.
 
 This module is pure (no DB, no I/O) so it is unit-tested offline. The live-DB
-query + worksheet emission live in ``scripts/sample_calibration_set.py``, which
+query + worksheet emission live in ``scripts/calibration/sample_calibration_set.py``, which
 builds :class:`CandidateRow` objects from a ``breach_results ⋈ deployment_configs
 ⋈ attack_primitives`` join and feeds them here.
 

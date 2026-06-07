@@ -1,7 +1,7 @@
 """Tests for `rogue.harvest.bandit_attribution`.
 
 The (c-full) per-arm attribution shipped 2026-05-27 replaces the prior
-even-split heuristic in `scripts/harvest_once.py`. These tests lock the
+even-split heuristic in `scripts/harvest/harvest_once.py`. These tests lock the
 behavior so it can't silently regress:
 
   * Most-specific-wins: a Pliny URL routes to `github_pliny_umbrella` (specific)

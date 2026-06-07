@@ -3,7 +3,7 @@
 A `pack` scan fires a small curated JSON pack (8–17 primitives). A `repertoire` scan fires the
 platform's actual harvested arsenal — the corpus ROGUE continuously grows from the open web (hundreds
 of primitives) — so customers benefit from the harvesting, not a frozen sample. This module is the
-in-package, deployable corpus loader (the equivalent converter in `scripts/reproduce_once.py` can't be
+in-package, deployable corpus loader (the equivalent converter in `scripts/reproduce/reproduce_once.py` can't be
 imported by the worker — `scripts/` isn't on the package path).
 
 Primitives are fully projected into Pydantic before the session closes, so callers can (and must) use a
@@ -29,7 +29,7 @@ _DEFAULT_DATABASE_URL = "postgresql+psycopg://rogue:rogue_dev_password@localhost
 def _orm_to_primitive(orm: AttackPrimitiveORM) -> AttackPrimitive:
     """Project an ORM corpus row into the Pydantic wire type the renderer + judge consume.
 
-    Mirrors ``scripts/reproduce_once._orm_to_pydantic_primitive`` — enum coercion + JSON-column
+    Mirrors ``scripts/reproduce/reproduce_once._orm_to_pydantic_primitive`` — enum coercion + JSON-column
     defaults + a placeholder ``sources`` entry (the reproduction layer never reads provenance)."""
     return AttackPrimitive.model_validate(
         {

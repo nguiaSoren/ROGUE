@@ -177,7 +177,7 @@ For the pairwise interaction analysis, BH FDR is applied separately across all n
 | `src/rogue/grammar/stats.py` | Pure-Python statistics: `wilson_ci`, `fisher_exact_2x2`, `odds_ratio_ci`, `node_lift_table` — per-node lift / OR / CI / Fisher p; p-values uncorrected (BH FDR applied downstream) |
 | `src/rogue/grammar/combinations.py` | Pairwise interaction analysis: four-cell table per node pair, logistic no-interaction baseline, `interaction_delta`, Fisher p, pre-FDR `synergy` flag |
 | `src/rogue/db/migrations/versions/0027_primitive_grammar_labels.py` | Creates `primitive_grammar_labels` table and `grammar_node` Postgres enum |
-| `scripts/grammar_labels.py` | CLI driver: label the corpus (`assign` subcommand) and inspect assigned labels (`show` subcommand) |
+| `scripts/benchmark/grammar_labels.py` | CLI driver: label the corpus (`assign` subcommand) and inspect assigned labels (`show` subcommand) |
 
 ---
 
@@ -196,7 +196,7 @@ The study is the precondition for a future roadmap item (Technique-AST / composi
 
 ## Results & recommendation (RAN 2026-06-06) — VERDICT: weak/none
 
-The study was executed via `scripts/grammar_study.py` over 351 primitives (301 with breach data) and 1,540 per-(primitive × target) units. Full output: `data/grammar_analysis/REPORT.md`.
+The study was executed via `scripts/benchmark/grammar_study.py` over 351 primitives (301 with breach data) and 1,540 per-(primitive × target) units. Full output: `data/grammar_analysis/REPORT.md`.
 
 **Verdict: weak/none — grammar barely predicts breach after controls.** The marginal lift that exists is family-driven, not grammar-driven: the only strong movers — `multimodal` (OR 4.56) and `training_data_extraction` (OR 3.35) — are family-mirroring nodes flagged *circular* by the Cramér's-V collinearity check (the node is essentially the family label, so its lift is family lift). The genuinely cross-family structural nodes (`authority_frame`, `language_shift`, `encoding_obfuscation`, `structured_output`) show negligible lift (~1.0–1.1×, non-significant). The pairwise synergies that looked striking pre-FDR — e.g. `system_prompt_leak + training_data_extraction` (Δ +0.46, OR 16.8, p=0.0006) — survive none of the four control bars (FDR-significant ∧ non-circular ∧ within-family stratification ∧ target Mantel–Haenszel pooling). The originating memo's specific premise, `RoleHijack + AuthorityFrame = 2.5× breach odds`, is unsupported: the `role_hijack` node has OR = 0.95 (no lift) and the composition did not survive controls. **Bottom line: the family label carries the predictive weight; sub-family grammar structure adds little once family is controlled — Family >> Grammar.**
 

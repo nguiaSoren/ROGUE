@@ -2,7 +2,7 @@
 
 Position in the pipeline (ROGUE_PLAN.md §10.7 #4 full build):
 
-    scripts/reproduce_once.py --pair-max-iters N
+    scripts/reproduce/reproduce_once.py --pair-max-iters N
                   │
                   ▼
     PairOrchestrator.run_pair_cell(primitive, config, panel, judge)
@@ -99,7 +99,7 @@ BREACH_VERDICT_SET: set[JudgeVerdict] = {
     JudgeVerdict.FULL_BREACH,
 }
 
-# Mirror of scripts/pair_attacker_ab.VERDICT_SCORE_MAP — kept local here to
+# Mirror of scripts/reproduce/pair_attacker_ab.VERDICT_SCORE_MAP — kept local here to
 # avoid a script→library import inversion. Monotonic 1-10 per PAIR's
 # training-data convention.
 _VERDICT_SCORE_MAP: dict[JudgeVerdict, int] = {
@@ -135,7 +135,7 @@ class PairStepRecord:
 class PairCellResult:
     """Aggregate return value of ``run_pair_cell``.
 
-    The orchestrator's caller (typically ``scripts/reproduce_once.py``'s
+    The orchestrator's caller (typically ``scripts/reproduce/reproduce_once.py``'s
     extension) uses this to compose the final BreachResult row. The
     ``steps`` list is the full chain — same data the orchestrator persists
     to ``pair_refinement_steps``.
@@ -348,7 +348,7 @@ class PairOrchestrator:
     ) -> tuple[JudgeVerdict, str, str]:
         """Fire one trial + judge. Returns (verdict, rendered_payload, response).
 
-        Same shape as the helper in `scripts/pair_attacker_ab.py`; kept
+        Same shape as the helper in `scripts/reproduce/pair_attacker_ab.py`; kept
         local here to avoid the orchestrator depending on a script.
         """
         responses: list[ModelResponse] = await self.panel.run_attack(

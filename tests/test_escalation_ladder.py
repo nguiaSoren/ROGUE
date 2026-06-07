@@ -17,7 +17,7 @@ import pytest
 from rogue.reproduce.escalation_planner import EscalationPlan
 from rogue.reproduce.target_panel import supports_audio
 from rogue.schemas import AttackPrimitive, JudgeVerdict, demo_deployment_configs
-from scripts.synthesize_escalations import (
+from scripts.reproduce.synthesize_escalations import (
     ESCALATION_LADDER,
     run_escalation_ladder_one,
 )

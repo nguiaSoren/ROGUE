@@ -14,7 +14,7 @@ collapses through the single audited mapping in
 :mod:`rogue.reproduce.verdict_projection` (``to_breach_binary``), never inline.
 
 This module is pure — no ``datasets``, no LLM, no network. The frozen-data load,
-the live judge calls, and the subset draw live in ``scripts/eval_jbb_judge.py``,
+the live judge calls, and the subset draw live in ``scripts/calibration/eval_jbb_judge.py``,
 which injects a ``verdict_fn``. ``evaluate()`` is unit-testable with a stub judge.
 
 The baseline classifiers' agreement is computed here too (their labels are stored

@@ -83,7 +83,7 @@ HAIKU_MODEL = "claude-haiku-4-5"
 SONNET_MODEL = "claude-sonnet-4-6"
 
 # Production default is ``"mixed"`` (locked 2026-05-27 by the n=20 A/B in
-# scripts/pair_attacker_ab.py — see ROGUE_PLAN.md §10.7 PAIR-specific
+# scripts/reproduce/pair_attacker_ab.py — see ROGUE_PLAN.md §10.7 PAIR-specific
 # section for the empirical numbers: mixed has the best $/breach ratio
 # $0.0059 vs $0.0091 (haiku-only) vs $0.0215 (sonnet-only), and the three
 # breach-rate Wilson 95% CIs overlap so the rate differences are NOT

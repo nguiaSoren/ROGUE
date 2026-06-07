@@ -21,7 +21,7 @@ Three persistence mechanisms for the per-cell breach matrix now coexist:
      (c) reproducible analysis that needs a frozen reference point.
 
   3. CSV snapshot at ``data/breach_matrix_snapshots/YYYY-MM-DD.csv`` —
-     written by ``scripts/snapshot_breach_matrix.py``. Plain-text artifact
+     written by ``scripts/ops/snapshot_breach_matrix.py``. Plain-text artifact
      for offline analysis / git-diffable archive / sharing in the
      submission packet.
 
@@ -32,7 +32,7 @@ unchanged. The difference is purely freshness/cost.
 
 **Refresh strategy**: ROGUE doesn't auto-refresh on INSERT (Postgres
 materialized views aren't transactional). The script that fires sweeps
-(``scripts/reproduce_once.py``, etc.) doesn't refresh either — that would
+(``scripts/reproduce/reproduce_once.py``, etc.) doesn't refresh either — that would
 slow each sweep by ~100ms for marginal value. Instead, the daily snapshot
 script + a cron-style invocation refresh on a deliberate cadence.
 ``REFRESH MATERIALIZED VIEW CONCURRENTLY breach_matrix_daily_snapshot;``

@@ -103,13 +103,13 @@ def db_primitive_loader(session: "Session") -> PrimitiveLoader:
     table.
 
     Reuses the canonical ORM→Pydantic projection already maintained for the
-    reproduction layer (``scripts.reproduce_once._orm_to_pydantic_primitive``)
+    reproduction layer (``scripts.reproduce.reproduce_once._orm_to_pydantic_primitive``)
     so enum coercion and JSON-column defaults stay in one place. The import is
     lazy: the offline-testable :func:`make_judge_fn` core never triggers it,
     and only the paid live-DB runs pay the import cost.
     """
     from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
-    from scripts.reproduce_once import _orm_to_pydantic_primitive
+    from scripts.reproduce.reproduce_once import _orm_to_pydantic_primitive
 
     def load(primitive_id: str) -> AttackPrimitive:
         orm = session.get(AttackPrimitiveORM, primitive_id)

@@ -1,4 +1,4 @@
-"""Tests for §10.7 PAIR attacker-quality A/B (scripts/pair_attacker_ab.py).
+"""Tests for §10.7 PAIR attacker-quality A/B (scripts/reproduce/pair_attacker_ab.py).
 
 Three groups:
 
@@ -38,7 +38,7 @@ from rogue.schemas import (
     AttackVector,
     JudgeVerdict,
 )
-from scripts.pair_attacker_ab import (
+from scripts.reproduce.pair_attacker_ab import (
     DECISION_HAIKU_WITHIN_PP,
     DECISION_MIXED_WITHIN_PP,
     DECISION_SONNET_DOMINANT_PP,

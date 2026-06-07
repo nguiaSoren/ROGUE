@@ -3,7 +3,7 @@
 The experiments proved `allocation → growth`: a growth-mode sweep (K=quota,
 starvation ordering) converts starved candidates into graduated capabilities at
 ~$7/graduation, but it costs ~10× a canonical sweep, so it must run *deliberately*,
-not on every reproduce. `scripts/growth_sweep.sh` made growth mode explicit; this
+not on every reproduce. `scripts/reproduce/growth_sweep.sh` made growth mode explicit; this
 makes the *decision to run it* explicit too — turning growth from a human call into
 system behaviour.
 

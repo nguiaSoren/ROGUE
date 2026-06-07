@@ -18,7 +18,7 @@ from rogue.db.neon_sync import (
 # Import at module top so the CLI's import-time load_dotenv() runs ONCE at
 # collection; per-test monkeypatch of NEON_DATABASE_URL then controls
 # os.environ at main() call time (argparse reads it lazily).
-from scripts.sync_to_neon import main as sync_cli_main
+from scripts.ops.sync_to_neon import main as sync_cli_main
 
 _URL = "postgresql+psycopg://rogue:pw@localhost:5432/rogue"
 _NEON = "postgresql+psycopg://u:p@neon.example/neondb"

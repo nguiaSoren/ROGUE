@@ -13,7 +13,7 @@ ROGUE/
 ├── frontend/           # Next.js 16 dashboard + marketing site   → frontend/ARCHITECTURE.md
 ├── sdk/                # customer-facing Python SDK (separate uv project; frozen v1 contract)
 ├── tests/              # pytest suite (~132 files, ~1,931 tests); DB tests skip when Docker is down
-├── scripts/            # operational + research scripts (~70) — harvest/reproduce/re-judge/benchmark
+├── scripts/            # ~60 scripts, bucketed: harvest/ · reproduce/ · calibration/ · benchmark/ · ops/
 ├── benchmark/          # frozen field-standard goal sets (AdvBench / JailbreakBench / judge_comparison)
 ├── docs/               # architecture docs, ADRs, specs, research artifacts (some gitignored)
 ├── docker/             # docker-compose init + test-DB bootstrap

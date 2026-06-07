@@ -8,7 +8,7 @@ one breaches. Authoritative code:
   (`run_escalation_ladder_one`, `run_escalation_ladder`, `build_escalation_context`,
   `run_synthesis`).
 - `src/rogue/reproduce/escalation_planner.py` — `EscalationPlanner` (Tier 5's plan author).
-- `scripts/synthesize_escalations.py` — back-compat shim (see end).
+- `scripts/reproduce/synthesize_escalations.py` — back-compat shim (see end).
 
 Intended design: `ROGUE_PLAN.md §10.7` (synthesis) + `§10.8` (ARMS ladder) + `§10.10`
 (adaptive ordering). Spec for the ordering that feeds the ladder: `docs/scheduling.md`.
@@ -139,8 +139,8 @@ Use it to bulk-seed multi-turn primitives; the standard reproduction layer fires
 The `--ladder` CLI flag selects `run_escalation_ladder` (COSTLY: reproduces + judges live)
 instead.
 
-## `scripts/synthesize_escalations.py` — back-compat shim
-The ladder + synthesis core used to live in `scripts/synthesize_escalations.py`. It moved
+## `scripts/reproduce/synthesize_escalations.py` — back-compat shim
+The ladder + synthesis core used to live in `scripts/reproduce/synthesize_escalations.py`. It moved
 into the package at `rogue.reproduce.escalation_ladder` so the deployed platform worker can
 import it (`scripts/` isn't on the worker's `PYTHONPATH`, and `src/rogue` importing
 `scripts` was a backwards layering dependency). The script is now a thin shim that
@@ -149,4 +149,4 @@ re-exports the moved public + used-private API (`run_escalation_ladder`,
 `LadderResult`, `LadderStats`, `SynthesisStats`, `main`, the `DEFAULT_*`/`ESCALATION_LADDER`
 constants, `_orm_to_pydantic_primitive`). Existing callers
 (`from scripts.synthesize_escalations import …` in benchmark_run / reproduce_once / tests)
-and `python scripts/synthesize_escalations.py` keep working unchanged.
+and `python scripts/reproduce/synthesize_escalations.py` keep working unchanged.

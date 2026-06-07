@@ -51,7 +51,7 @@ export function LiveAttackTicker({
   if (!attacks || attacks.length === 0) {
     return (
       <div className="border border-border rounded-lg p-6 bg-card/40 backdrop-blur-sm font-mono text-xs text-muted-foreground">
-        {"// waiting for live feed... (run scripts/harvest_once.py to seed)"}
+        {"// waiting for live feed... (run scripts/harvest/harvest_once.py to seed)"}
       </div>
     );
   }

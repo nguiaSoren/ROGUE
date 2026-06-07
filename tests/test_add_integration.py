@@ -14,7 +14,7 @@ from pathlib import Path
 from rogue.platform.integration_store import InMemoryIntegrationStore
 
 # Load the script by path (scripts/ is not an importable package).
-_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "add_integration.py"
+_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "ops" / "add_integration.py"
 _spec = importlib.util.spec_from_file_location("add_integration", _SCRIPT)
 add_integration_mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(add_integration_mod)

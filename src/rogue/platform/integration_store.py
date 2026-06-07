@@ -5,7 +5,7 @@ The enterprise model the tool-args approach was a placeholder for:
 
     Organization → stored Integration (config + secret_ref → SecretStore) → MCP tool references by name
 
-An ops/admin path (`scripts/add_integration.py`) registers an org's integration once (the secret is
+An ops/admin path (`scripts/ops/add_integration.py`) registers an org's integration once (the secret is
 encrypted into the `secrets` table via the `SecretStore`); thereafter `send_slack_alert(scan_id,
 integration="slack-sec")` / `create_jira_ticket(scan_id, integration="jira-prod")` resolve the config +
 decrypt the secret server-side. The LLM only ever sees the integration's NAME.

@@ -60,7 +60,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 # Load .env BEFORE importing anything that reads provider keys at module-init
-# time (Anthropic/OpenAI SDKs). Mirrors `scripts/harvest_once.py`.
+# time (Anthropic/OpenAI SDKs). Mirrors `scripts/harvest/harvest_once.py`.
 load_dotenv()
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402

@@ -56,7 +56,7 @@ class DeploymentConfig(BaseModel):
             "optional OpenAI-compatible endpoint URL. When set, the reproduction panel routes this "
             "config to the CustomHTTPAdapter against this URL (and `target_model` is the bare model "
             "name the endpoint serves) instead of a known provider. Used by ad-hoc endpoint scans "
-            "(scripts/scan_endpoint.py); ephemeral — not persisted to the deployment_configs table."
+            "(scripts/reproduce/scan_endpoint.py); ephemeral — not persisted to the deployment_configs table."
         ),
     )
 
@@ -83,7 +83,7 @@ ACME_FORBIDDEN_TOPICS = [
 def demo_deployment_configs() -> list[DeploymentConfig]:
     """Return the 5 demo DeploymentConfigs for the hackathon — one per panel model.
 
-    Used by `scripts/seed_demo_data.py` to populate the matrix on Day 0. All five
+    Used by `scripts/ops/seed_demo_data.py` to populate the matrix on Day 0. All five
     share the same system prompt and forbidden topics, differing only in target_model
     so the breach matrix's 5 columns can be compared apples-to-apples.
     """

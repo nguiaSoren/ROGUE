@@ -355,7 +355,7 @@ async def test_run_reproduction_persists_persona_used_on_breach_results(
     from sqlalchemy.orm import sessionmaker
 
     from rogue.db.models import BreachResult as BreachResultORM
-    from scripts.reproduce_once import run_reproduction
+    from scripts.reproduce.reproduce_once import run_reproduction
 
     class _StubPanel:
         async def run_attack(self, rendered, config, temperature, n_trials):
@@ -426,7 +426,7 @@ async def test_run_reproduction_persists_persona_used_on_breach_results(
 def test_persist_breach_result_includes_persona_used_field() -> None:
     """Pure-Python check that _build_breach_result_orm wires persona_used
     through from RenderedAttack to the ORM row — no DB needed."""
-    from scripts.reproduce_once import _build_breach_result_orm
+    from scripts.reproduce.reproduce_once import _build_breach_result_orm
 
     rendered = RenderedAttack(
         messages=[{"role": "user", "content": "wrapped payload here"}],
@@ -462,7 +462,7 @@ def test_persist_breach_result_includes_persona_used_field() -> None:
 def test_persist_breach_result_persona_used_is_none_when_unwrapped() -> None:
     """Baseline rows (no --persona flag) must persist NULL so the A/B
     grouping query (persona_used IS NULL ⇒ baseline) works."""
-    from scripts.reproduce_once import _build_breach_result_orm
+    from scripts.reproduce.reproduce_once import _build_breach_result_orm
 
     rendered = RenderedAttack(
         messages=[{"role": "user", "content": "unwrapped payload"}],

@@ -35,7 +35,7 @@ _PLATFORM_TABLES = [
 ]
 
 # Load the script by path (scripts/ is not an importable package).
-_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "seed_org.py"
+_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "ops" / "seed_org.py"
 _spec = importlib.util.spec_from_file_location("seed_org", _SCRIPT)
 seed_org_mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(seed_org_mod)

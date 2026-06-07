@@ -16,7 +16,7 @@ Four groups:
      (one of each kind) writes 3 files with correct row counts + a
      README that interpolates the counts.
 
-Spec: scripts/export_huggingface_dataset.py docstring + ROGUE_PLAN.md
+Spec: scripts/harvest/export_huggingface_dataset.py docstring + ROGUE_PLAN.md
 §11.3.5 + §10.7 dataset-split.
 """
 
@@ -37,7 +37,7 @@ from rogue.schemas import (
     AttackVector,
     Severity,
 )
-from scripts.export_huggingface_dataset import (
+from scripts.harvest.export_huggingface_dataset import (
     ExportStats,
     FileStats,
     _bucket_for,

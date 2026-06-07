@@ -7,7 +7,7 @@ and the attached images are ``pbs.twimg.com/media/...`` URLs in the body. This
 turns that raw HTML into ``(tweet_text, image_urls)`` so the standard pipeline
 (media ingestion + multimodal extraction) can take over.
 
-Shared by ``scripts/harvest_url.py`` (one URL on demand) and
+Shared by ``scripts/harvest/harvest_url.py`` (one URL on demand) and
 ``sources/x_via_unlocker.py`` (SERP-discover → Web-Unlock each).
 """
 

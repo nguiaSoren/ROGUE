@@ -10,7 +10,7 @@ default_embed_fn(model=None) -> EmbedFn
     *inside* the returned closure (lazy), so importing this module requires no
     OPENAI_API_KEY and makes no network calls. Reads the model from the ``model``
     argument or the ``EMBEDDING_MODEL`` env var (default: "text-embedding-3-small").
-    Mirrors the pattern in scripts/harvest_url.py:57.
+    Mirrors the pattern in scripts/harvest/harvest_url.py:57.
 
 deterministic_embed_fn(dim=1536) -> EmbedFn
     Returns an offline, reproducible embedding callable. Same text always yields

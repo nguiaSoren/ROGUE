@@ -417,7 +417,7 @@ def _make_stub_attacker(
 
 
 def test_verdict_to_pair_score_is_monotonic() -> None:
-    """Same monotonic 1-10 mapping as scripts/pair_attacker_ab.py."""
+    """Same monotonic 1-10 mapping as scripts/reproduce/pair_attacker_ab.py."""
     assert verdict_to_pair_score(JudgeVerdict.REFUSED) == 1
     assert verdict_to_pair_score(JudgeVerdict.EVADED) == 3
     assert verdict_to_pair_score(JudgeVerdict.PARTIAL_BREACH) == 7
@@ -596,7 +596,7 @@ def test_build_pair_breach_result_orm_sets_pair_columns() -> None:
     pair_attacker_total_cost_usd; persona_used stays NULL so PAIR rows don't
     pollute the persona A/B (the 2026-05-28 contamination fix — PAIR rows are
     identified canonically by pair_attacker_total_cost_usd)."""
-    from scripts.reproduce_once import _build_pair_breach_result_orm
+    from scripts.reproduce.reproduce_once import _build_pair_breach_result_orm
 
     cell = PairCellResult(
         primitive_id="P1",
@@ -649,7 +649,7 @@ def test_build_pair_breach_result_orm_sets_pair_columns() -> None:
 def test_build_pair_breach_result_orm_marks_no_breach() -> None:
     """When PAIR runs all iters without breach, the row still carries no
     persona_used (NULL) — PAIR is identified by pair_attacker_total_cost_usd."""
-    from scripts.reproduce_once import _build_pair_breach_result_orm
+    from scripts.reproduce.reproduce_once import _build_pair_breach_result_orm
 
     cell = PairCellResult(
         primitive_id="P1",
@@ -767,7 +767,7 @@ async def test_run_reproduction_with_pair_max_iters_persists_chain(
         BreachResult as BreachResultORM,
         PairRefinementStep as PairRefinementStepORM,
     )
-    from scripts.reproduce_once import run_reproduction
+    from scripts.reproduce.reproduce_once import run_reproduction
 
     panel = _StubPanel(
         baseline_response="I cannot help.",
@@ -839,7 +839,7 @@ async def test_run_reproduction_no_iterative_flag_skips_pair(
         BreachResult as BreachResultORM,
         PairRefinementStep as PairRefinementStepORM,
     )
-    from scripts.reproduce_once import run_reproduction
+    from scripts.reproduce.reproduce_once import run_reproduction
 
     panel = _StubPanel(
         baseline_response="I cannot help.",

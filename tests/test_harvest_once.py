@@ -1,4 +1,4 @@
-"""Smoke tests for ``scripts/harvest_once.py``.
+"""Smoke tests for ``scripts/harvest/harvest_once.py``.
 
 Two flavours:
 
@@ -31,7 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from rogue.schemas import AttackPrimitive, RawDocument
-from scripts.harvest_once import (
+from scripts.harvest.harvest_once import (
     HarvestRunStats,
     _ensure_primitive_has_provenance,
     _synthesize_source,
@@ -231,8 +231,8 @@ async def test_run_harvest_end_to_end_with_mocks(live_db, tmp_path) -> None:
     # migration created estimated_cost_usd/latency_ms — see ORM model
     # docstring). Spend semantics aren't load-bearing for this wiring test.
     from decimal import Decimal as _Decimal
-    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
-         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+    with patch("scripts.harvest.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
         agent_instance = MagicMock()
         agent_instance.run = AsyncMock(return_value=[raw_a, raw_b])
         agent_instance.last_run_reports = []
@@ -309,8 +309,8 @@ async def test_run_harvest_isolates_extract_errors(live_db, tmp_path) -> None:
         return [0.0] * 1536
 
     from decimal import Decimal as _Decimal
-    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
-         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+    with patch("scripts.harvest.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
         agent_instance = MagicMock()
         agent_instance.run = AsyncMock(return_value=[raw_good, raw_bad])
         agent_instance.last_run_reports = []
@@ -342,8 +342,8 @@ async def test_run_harvest_x_handles_adds_x_plugin(live_db, tmp_path) -> None:
     mock_bd_client.aclose = AsyncMock()
 
     from decimal import Decimal as _Decimal
-    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
-         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+    with patch("scripts.harvest.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
         agent_instance = MagicMock()
         agent_instance.run = AsyncMock(return_value=[])
         agent_instance.last_run_reports = []
@@ -374,8 +374,8 @@ async def test_run_harvest_no_x_handles_keeps_default_plugins(live_db, tmp_path)
     mock_bd_client.aclose = AsyncMock()
 
     from decimal import Decimal as _Decimal
-    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
-         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+    with patch("scripts.harvest.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
         agent_instance = MagicMock()
         agent_instance.run = AsyncMock(return_value=[])
         agent_instance.last_run_reports = []
@@ -403,8 +403,8 @@ async def test_run_harvest_x_only_runs_just_x_and_skips_serp(live_db, tmp_path) 
     mock_bd_client.aclose = AsyncMock()
 
     from decimal import Decimal as _Decimal
-    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
-         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+    with patch("scripts.harvest.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
         agent_instance = MagicMock()
         agent_instance.run = AsyncMock(return_value=[])
         agent_instance.last_run_reports = []
@@ -474,8 +474,8 @@ async def test_run_harvest_ingests_images_and_passes_to_extractor(
         return [0.0] * 1536
 
     from decimal import Decimal as _Decimal
-    with patch("scripts.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
-         patch("scripts.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
+    with patch("scripts.harvest.harvest_once.DiscoveryAgent") as mock_discovery_cls, \
+         patch("scripts.harvest.harvest_once.daily_bd_spend_usd", return_value=_Decimal("0.00")):
         agent_instance = MagicMock()
         agent_instance.run = AsyncMock(return_value=[raw])
         agent_instance.last_run_reports = []

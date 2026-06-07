@@ -8,7 +8,7 @@ ships that table to Neon, and the image route serves the bytes anywhere.
 
 Free + idempotent (no LLM/BD). Auto-runs at the end of ``reproduce_once`` /
 ``harvest_once`` (just before the Neon sync) so freshly-fetched carriers get a
-DB row; also a standalone backfill via ``scripts/cache_images_to_db.py``.
+DB row; also a standalone backfill via ``scripts/harvest/cache_images_to_db.py``.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Tests for the non-paid logic of the Workstream-A scripts:
-``scripts/sample_calibration_set.py`` (worksheet blinding) and
-``scripts/run_calibration.py`` (label validation, fixture merge, report
+``scripts/calibration/sample_calibration_set.py`` (worksheet blinding) and
+``scripts/calibration/run_calibration.py`` (label validation, fixture merge, report
 serialization). No DB, no judge calls.
 
 Spec: ROGUE_PLAN.md §10.2 + judge-calibration plan (Workstream A).
@@ -16,12 +16,12 @@ import pytest
 from rogue.reproduce.calibration_sampling import CandidateRow
 from rogue.reproduce.judge_calibration import CalibrationReport
 from rogue.schemas import JudgeVerdict
-from scripts.run_calibration import (
+from scripts.calibration.run_calibration import (
     _load_labeled_cases,
     _merge_into_fixture,
     _serialize_report,
 )
-from scripts.sample_calibration_set import _full_entry, _worksheet_entry
+from scripts.calibration.sample_calibration_set import _full_entry, _worksheet_entry
 
 V = JudgeVerdict
 
