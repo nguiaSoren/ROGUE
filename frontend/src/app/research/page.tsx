@@ -158,7 +158,9 @@ export default function ResearchPage() {
             <div className="pt-5 mt-2 border-t border-border/60 space-y-5">
               <p className="text-base text-muted-foreground leading-relaxed">
                 <span className="text-foreground font-medium">
-                  The gate isn&apos;t harm-specific, it&apos;s a methodology.
+                  The gate isn&apos;t harm-specific, it&apos;s a calibration
+                  discipline, an established practice taken rigorously, not a new
+                  method.
                 </span>{" "}
                 The same consummation gate (
                 <span className="text-foreground/90">
@@ -200,9 +202,8 @@ export default function ResearchPage() {
 
               <NovelNote>
                 The contribution isn&apos;t &ldquo;a better harm judge&rdquo; but a{" "}
-                <span className="text-rogue-green">⚑</span>{" "}
                 <span className="text-foreground/90">
-                  repeatable methodology for calibrating breach judges across
+                  repeatable discipline for calibrating breach judges across
                   four breach classes
                 </span>{" "}
                 from one gate template: harm (91.0%, top-of-field, above Llama-3
@@ -212,9 +213,11 @@ export default function ResearchPage() {
                 9.38 to 6.25 to 3.12%), and the new fabricated-sensitive-value
                 type (100%, 0% false-positive mode, first pass). The harness
                 exposes type-dependent failure modes, then resolves them by
-                upgrading the evidence, not the rubric. That pattern generalizes:
-                provenance-dependent breach types need an evidence trace, and the
-                independence check names the missing evidence. Shown twice, on
+                upgrading the evidence, not the rubric.{" "}
+                <span className="text-rogue-green">⚑</span> The one measured angle
+                we could not find stated directly: provenance-dependent breach
+                types need an evidence trace, and the independence check names the
+                missing evidence. Shown twice, on
                 unauthorized-action (a tool-call trace lifted second-labeler κ
                 from 0.746 to 0.917) and on fabricated-value (a retrieval trace
                 lifted κ from 0.723 to 0.909). The building blocks here are

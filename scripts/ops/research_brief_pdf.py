@@ -246,7 +246,8 @@ def build() -> Path:
         "benchmarks (WildGuardTest harm labels and StrongREJECT) themselves <i>over-count</i> relative to a "
         "strict content-transfer standard.")]
     F += [Spacer(1, 6), Paragraph(
-        b("The gate is not harm-specific, it is a methodology.") + " One consummation-gate template, "
+        b("The gate is not harm-specific, it is a calibration discipline.") + " An established practice taken "
+        "rigorously, not a new method. One consummation-gate template, "
         "re-instantiated per breach type, now calibrates " + b("four structurally different breach classes") +
         ": a <i>harm</i> breach (capability transfer, re-confirmed at " + b("91.0% agreement, 273 of 300") +
         ", top-of-field); a <i>content</i> breach (information-disclosure, did the protected datum appear), "
@@ -264,7 +265,7 @@ def build() -> Path:
         "evidence trace, not a better rubric, and the independence check names the missing evidence, shown "
         "twice, a tool-call trace that lifted second-labeler kappa from 0.746 to 0.917 for unauthorized-action "
         "and a retrieval trace that lifted kappa from 0.723 to 0.909 for fabricated-value. The contribution is "
-        + b("a repeatable methodology for calibrating breach judges across breach classes") + ", "
+        + b("a repeatable discipline for calibrating breach judges across breach classes") + ", "
         "not a single judge.", S["body"])]
     F += [Spacer(1, 4), _chips([
         ("91.0%", "harm (capability transfer)"),
