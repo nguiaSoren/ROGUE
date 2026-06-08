@@ -28,6 +28,7 @@ from rogue.attestation.chain import (
     verify_chain,
 )
 from rogue.attestation.emit import payload_for_scan
+from rogue.attestation.remediation import append_mitigation, mitigation_record
 from rogue.attestation.replay import ReplayResult
 from rogue.attestation.replay import replay as replay  # noqa: PLC0414 — re-export the function
 from rogue.attestation.schemas import (
@@ -53,6 +54,9 @@ __all__ = [
     "AttestationService",
     # emit seam
     "payload_for_scan",
+    # mitigation seam (Surface 1b §8)
+    "mitigation_record",
+    "append_mitigation",
     # replay
     "replay",
     "ReplayResult",

@@ -51,6 +51,7 @@ from rogue.schemas import (
     SourceType,
     StrategyStatus,
 )
+from rogue.schemas.remediation import MitigationType
 
 
 class Base(DeclarativeBase):
@@ -980,6 +981,65 @@ class NewsletterSubscriber(Base):
     )
 
 
+class Mitigation(Base):
+    """Storage twin of ``rogue.schemas.remediation.RemediationResult`` — one
+    persisted measured-remediation outcome (Surface 1b, build-05 §8).
+
+    The Pydantic side splits a remediation into a :class:`~rogue.schemas.remediation.MitigationCandidate`
+    (the generated artifact) + its re-test evidence (:class:`~rogue.schemas.remediation.RemediationResult`
+    fields + an :class:`~rogue.schemas.remediation.OverBlockCheck`). This single row
+    flattens the candidate's identity/artifact + the result's rates into one record.
+    Per the CLAUDE.md alias convention, a caller that needs BOTH the ORM and the
+    Pydantic class imports this as ``from rogue.db.models import Mitigation as MitigationORM``
+    (the Pydantic side stays ``RemediationResult`` / ``MitigationCandidate``).
+
+    ``breach_ref`` is a SOFT reference to the area-04 ``RuleVerdict`` / ``BreachResult``
+    being remediated (no hard FK — a remediation may outlive the breach row, and the
+    ref can point at a rule_id rather than a breach_id). ``rejected_candidates`` stores
+    small dicts/refs (candidate_id + type + reason), NOT full artifact blobs.
+    ``verified_by`` mirrors the Pydantic ``Literal['rescan', 'by_construction_out_of_band']``
+    — kept as a CHECK-free ``String(40)`` so adding a verification mode is a one-line edit.
+    The rate columns are nullable because ``by_construction_out_of_band`` results have no
+    measured breach-rate delta (the fix lives outside the prompt/scope, §6.note).
+    """
+
+    __tablename__ = "mitigations"
+
+    # ----- Identity -----
+    mitigation_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    breach_ref: Mapped[str] = mapped_column(String(40), index=True)
+
+    # ----- The candidate (artifact + provenance) -----
+    mitigation_type: Mapped[MitigationType] = mapped_column(
+        SAEnum(MitigationType, name="mitigation_type", values_callable=_enum_values),
+        index=True,
+    )
+    artifact: Mapped[str] = mapped_column(Text)
+    generated_by: Mapped[str] = mapped_column(String(120))
+
+    # ----- Re-test evidence -----
+    accepted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    # 'rescan' | 'by_construction_out_of_band' (Pydantic Literal mirror).
+    verified_by: Mapped[str] = mapped_column(String(40), default="rescan")
+    # Rates are NULL for by_construction_out_of_band (no measured delta).
+    pre_breach_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    post_breach_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    over_block_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    ci_low: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    ci_high: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Small dicts/refs for the candidates that were tried and rejected — NOT
+    # full artifact blobs. Store {candidate_id, mitigation_type, reason} shapes.
+    rejected_candidates: Mapped[list] = mapped_column(JSON, default=list)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        server_default=func.now(),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -1002,4 +1062,5 @@ __all__ = [
     "PrimitiveGrammarLabel",
     "DemoRequest",
     "NewsletterSubscriber",
+    "Mitigation",
 ]

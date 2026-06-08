@@ -12,6 +12,10 @@ import json as _json
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # avoid a heavy import cycle (pydantic schema) on the hot SDK report path
+    from rogue.schemas.remediation import RemediationResult
 
 # Display label per internal attack-family slug (so customers see "Crescendo", not "multi_turn_gradient").
 _TECHNIQUE_DISPLAY: dict[str, str] = {
@@ -271,8 +275,44 @@ def explain_family(family: str) -> str:
 
 
 def remediation_for(family: str) -> str:
-    """Concrete, vendor-neutral mitigation for an attack-family slug (generic fallback otherwise)."""
+    """The DEPRECATED-but-kept *generic* per-family mitigation FALLBACK for an attack-family slug.
+
+    Returns the static, vendor-neutral advice for a family (generic fallback for an unknown slug).
+    Prefer :func:`remediation_section`, which routes through a PROVEN `RemediationResult` when one
+    exists and falls back to this. Kept because it IS that fallback and still has direct callers.
+    """
     return _REMEDIATION_BY_FAMILY.get(family, _GENERIC_REMEDIATION)
+
+
+def remediation_section(family: str, result: "RemediationResult | None" = None) -> str:
+    """The per-finding mitigation text: a PROVEN, re-tested remediation when one exists, else the
+    generic per-family fallback (:func:`remediation_for`, unchanged).
+
+    With no ``result`` the output is byte-identical to ``remediation_for(family)`` — so a report
+    built without supplied mitigations renders exactly as before. With a verified
+    :class:`~rogue.schemas.remediation.RemediationResult`, returns a plain, HTML-safe one-liner
+    carrying the re-test evidence and the ADR-0010 "client deploys; ROGUE re-verifies" framing.
+    For the markdown surface, callers should instead reuse
+    :func:`rogue.remediation.render_remediation_markdown` directly.
+    """
+    if result is None:
+        return remediation_for(family)
+    if result.verified_by == "rescan":
+        pre = f"{round(result.pre_breach_rate * 100)}"
+        post = f"{round(result.post_breach_rate * 100)}"
+        ob = (
+            f" over-block {round(result.over_block.over_block_rate * 100)}%"
+            if result.over_block is not None
+            else ""
+        )
+        return (
+            f"Verified: re-tested vs the attack family — breach {post}% (was {pre}%);{ob}. "
+            "Client deploys; ROGUE re-verifies."
+        )
+    return (
+        "Verified by construction / out-of-band — the fix lives outside the prompt/scope; no "
+        "re-scan breach-rate delta is claimed. Client deploys; ROGUE re-verifies."
+    )
 
 
 def _fmt_usd(x: float) -> str:
@@ -465,7 +505,16 @@ class ScanReport:
         ]
         return "\n".join(lines)
 
-    def to_dict(self) -> dict:
+    def to_dict(
+        self, *, mitigations: "dict[str, RemediationResult] | None" = None
+    ) -> dict:
+        """The customer-facing report dict.
+
+        ``mitigations`` (keyed by attack-family slug) optionally routes a finding's ``remediation``
+        through a PROVEN :class:`~rogue.schemas.remediation.RemediationResult`; with the default
+        ``None`` the output is byte-identical to today (the generic per-family fallback).
+        """
+        muts = mitigations or {}
         findings = []
         for f in self.findings:
             d = asdict(f)
@@ -475,9 +524,10 @@ class ScanReport:
             d["vector"] = vector_label(f.vector)
             # Render-time only: explanation + remediation live on the family slug, not the shared
             # `Finding` dataclass (which is also the SDK wire type). `explanation` says what the
-            # attack is and why it matters; `remediation` says what to do about it.
+            # attack is and why it matters; `remediation` says what to do about it — routed through a
+            # PROVEN RemediationResult when one was supplied for the family, else the generic fallback.
             d["explanation"] = explain_family(f.family)
-            d["remediation"] = remediation_for(f.family)
+            d["remediation"] = remediation_section(f.family, muts.get(f.family))
             # Keep the raw `success_rate` float (above, via asdict) for back-compat, but ADD a clear
             # human label so a JSON consumer doesn't have to guess what "success" means.
             d["breach_label"] = f.breach_label
@@ -492,8 +542,14 @@ class ScanReport:
             "findings": findings,
         }
 
-    def to_json(self, path: str | Path | None = None, *, indent: int = 2) -> str:
-        text = _json.dumps(self.to_dict(), indent=indent, default=str)
+    def to_json(
+        self,
+        path: str | Path | None = None,
+        *,
+        indent: int = 2,
+        mitigations: "dict[str, RemediationResult] | None" = None,
+    ) -> str:
+        text = _json.dumps(self.to_dict(mitigations=mitigations), indent=indent, default=str)
         if path is not None:
             Path(path).write_text(text, encoding="utf-8")
         return text
@@ -504,14 +560,18 @@ class ScanReport:
         *,
         score: float | None = None,
         risk_level: str | None = None,
+        mitigations: "dict[str, RemediationResult] | None" = None,
     ) -> str:
         """A standalone HTML report — the artifact for a sales demo / email attachment.
 
         ``score`` / ``risk_level`` are the platform's 0–100 risk number and its band ("HIGH"),
         passed in by the platform report layer (this module never imports `rogue.platform.scoring`).
         The SDK path has no platform score and omits both, so the headline score KPI is suppressed
-        gracefully. Self-contained: inline CSS, no external assets, valid standalone HTML.
+        gracefully. ``mitigations`` (keyed by attack-family slug) optionally routes each finding's
+        Remediation line through a PROVEN `RemediationResult`; with the default ``None`` the page is
+        byte-identical to today. Self-contained: inline CSS, no external assets, valid standalone HTML.
         """
+        muts = mitigations or {}
         # Severity-grouped finding rows: critical→high→medium→low, breached-first within each group,
         # each group introduced by a labelled header row carrying its count.
         rows: list[str] = []
@@ -554,7 +614,7 @@ class ScanReport:
                 rows.append(
                     '<tr class="remediation"><td></td>'
                     f'<td colspan="4"><b>Remediation:</b> '
-                    f"{_html.escape(remediation_for(f.family))}</td></tr>"
+                    f"{_html.escape(remediation_section(f.family, muts.get(f.family)))}</td></tr>"
                 )
         rate_color = "#d33" if self.breach_rate > 0 else "#2a2"
 
@@ -746,6 +806,7 @@ __all__ = [
     "humanize_technique",
     "vector_label",
     "remediation_for",
+    "remediation_section",
     "explain_family",
     "SCORE_METHODOLOGY",
 ]
