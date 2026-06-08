@@ -95,7 +95,7 @@ Concrete per-harvest economics:
 The `/feed` dashboard widget surfaces the live top-3 / bottom-3 arms by
 `mean_yield` (novel primitives per dollar) with provenance fields
 (`seeded_from_corpus_at` / `last_live_pulled_at`) so the warm-prior baseline is
-honestly distinguished from live observation. See `docs/bandit_for_humans.md`
+honestly distinguished from live observation. See `docs/research/bandit_for_humans.md`
 for a plain-English explainer of how the bandit works.
 
 ## Dashboard

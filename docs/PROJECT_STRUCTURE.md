@@ -22,7 +22,7 @@ ROGUE/
 ├── assets/             # demo media (cover.png; submission/ = deck+cover+script; large video/audio gitignored)
 ├── .github/workflows/  # CI (ci.yml: pytest+ruff+pyright on a Postgres service; frontend lint+tsc)
 ├── pyproject.toml · uv.lock · docker-compose.yml · alembic.ini · .env.example
-└── (local-only, gitignored: ROGUE_PLAN.md · CLAUDE.md · glossary.md · docs/RESEARCH_TODO.md
+└── (local-only, gitignored: ROGUE_PLAN.md · CLAUDE.md · glossary.md · docs/research/RESEARCH_TODO.md
      · the paper artifacts · website/ · papers/)
 ```
 
@@ -38,12 +38,12 @@ the cross-cutting substrate (schemas/db/core/adapters) and the product surfaces
 | `db/` | **SQLAlchemy storage** — `models.py` + `migrations/versions/` (Alembic, 0001→0031) + session | substrate (storage) | `docs/db_schema.md`, `docs/schemas.md` |
 | `core/` | **Provider-abstraction substrate** — `CanonicalMessage`, `InvocationResult`, `TargetAdapter`, `AdapterRegistry`, content blocks, errors | substrate | `src/rogue/core/ARCHITECTURE.md`, ADR-0004 |
 | `adapters/` | **Concrete provider adapters** (OpenAI / Anthropic / Gemini / Groq / OpenRouter / CustomHTTP) + `model_specs` + conformance suite. Nothing above this boundary imports a provider SDK type | substrate | ADR-0004 |
-| `harvest/` | **Layer 1 — Harvest.** Bright Data client, `sources/` plugins (11), discovery agent, ε-greedy yield bandit | L1 | `docs/sources.md`, `docs/bandit_for_humans.md` |
+| `harvest/` | **Layer 1 — Harvest.** Bright Data client, `sources/` plugins (11), discovery agent, ε-greedy yield bandit | L1 | `docs/sources.md`, `docs/research/bandit_for_humans.md` |
 | `extract/` | **Layer 2 — Extract.** LLM agent → typed `AttackPrimitive` | L2 | `docs/architecture.md` §L2 |
 | `dedupe/` | **Layer 3 — Dedupe.** pgvector cosine clustering to canonical primitives | L3 | `docs/architecture.md` §L3 |
 | `reproduce/` | **Layer 4 — Reproduce (the core win).** `target_panel`, `instantiator`, the judge (`judge` + `judge_batch` + `verdict_projection`), the escalation ladder (`escalation_ladder` + `escalation_planner`), the scheduler (`ladder_priors` + `growth_scheduler`), `iterative_attacker` (PAIR), `modality_renderers/` + `renderer_registry`, `llm_cost_log` | L4 | `docs/judge.md`, `docs/scheduling.md`, `docs/escalation_ladder.md` |
 | `diff/` | **Layer 5 — Diff.** Today-vs-yesterday threat brief, severity scoring, Slack alert | L5 | `docs/architecture.md` §L5 |
-| `grammar/` | Grammar-component labeling + predictive-power study (the #TRS-C null result) | research | `docs/grammar_efficacy.md` |
+| `grammar/` | Grammar-component labeling + predictive-power study (the #TRS-C null result) | research | `docs/research/grammar_efficacy.md` |
 | `retrieval/` | Technique-retrieval system (deployed-inactive; waiting on winner telemetry) | research | `docs/retrieval.md` |
 | `mcp_server/` | **Producer-side MCP server** (19-tool full-lifecycle surface) | product surface | `docs/mcp/ARCHITECTURE.md`, `docs/mcp/CONTRACT.md` |
 | `api/` | **FastAPI app** — `main.py` (public read API), `v1/` (authed write/scan API), `observability.py` (logging/Sentry/rate-limit) | product surface | `docs/platform/api/` |
