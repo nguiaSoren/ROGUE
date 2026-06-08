@@ -51,8 +51,41 @@ export default function ResearchPage() {
           </a>
         </Section>
 
+        {/* AT A GLANCE -------------------------------------------------- */}
+        <Section eyebrow="at a glance" title="Four findings, in about a minute.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <GlanceCard
+              href="#finding-01"
+              eyebrow="01 · judge"
+              headline="70.3 → 89.3%"
+              desc="Calibrated an LLM-judge to human labels, then generalized it across four breach types."
+            />
+            <GlanceCard
+              href="#finding-02"
+              eyebrow="02 · scheduling"
+              headline="ASR 50 → 60%"
+              desc="Cross-tier scheduling as a capability lever: rank down caused ASR up, at −41% cost."
+            />
+            <GlanceCard
+              href="#finding-03"
+              eyebrow="03 · null result"
+              headline="0 of 4 survive"
+              desc="Grammar structure does not predict breach beyond attack family. A clean negative result."
+              accent="red"
+            />
+            <GlanceCard
+              href="#finding-04"
+              eyebrow="04 · discipline"
+              headline="measure first"
+              desc="$0 telemetry measurements inverted three build decisions before any code was written."
+            />
+          </div>
+        </Section>
+
         {/* 1. JUDGE CALIBRATION ----------------------------------------- */}
         <Section
+          id="finding-01"
+          className="scroll-mt-24"
           eyebrow="finding 01"
           title="Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it."
         >
@@ -63,7 +96,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-foreground/80 leading-relaxed">
                 Every breach verdict is an LLM judgment, so the judge is the
                 load-bearing weakness. It was validated four ways, three
                 against independent human-annotated benchmarks: blind stratified
@@ -76,7 +109,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-base text-foreground/80 leading-relaxed">
               JBB exposed over-flagging. The v1 judge agreed with the human
               majority only{" "}
               <span className="text-foreground font-medium">
@@ -98,7 +131,7 @@ export default function ResearchPage() {
               .
             </p>
 
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-base text-foreground/80 leading-relaxed">
               The fix, a{" "}
               <span className="text-foreground font-medium">
                 content-transfer-gate rubric (v3)
@@ -120,7 +153,7 @@ export default function ResearchPage() {
               <FalsePositiveModesFig />
             </div>
 
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-base text-foreground/80 leading-relaxed">
               Then the honest part: re-judging the stored breach matrix under v3{" "}
               <span className="text-foreground font-medium">
                 dropped breach cells 2,429 → 1,371 (−43.6%)
@@ -156,7 +189,7 @@ export default function ResearchPage() {
             </NovelNote>
 
             <div className="pt-5 mt-2 border-t border-border/60 space-y-5">
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-foreground/80 leading-relaxed">
                 <span className="text-foreground font-medium">
                   The gate isn&apos;t harm-specific, it&apos;s a calibration
                   discipline, an established practice taken rigorously, not a new
@@ -245,19 +278,21 @@ export default function ResearchPage() {
           </div>
         </Section>
 
-        {/* 2. SCHEDULING AS A CAPABILITY LEVER -------------------------- */}
-        <Section
-          eyebrow="finding 02"
-          title="Scheduling as a capability lever, not just an optimization."
-        >
-          <div className="max-w-3xl space-y-6">
+        {/* 2 + 3 SIDE BY SIDE ---------------------------------------- */}
+        <Section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <FindingCard
+              id="finding-02"
+              eyebrow="finding 02"
+              title="Scheduling as a capability lever, not just an optimization."
+            >
             <div className="flex gap-4">
               <ListOrdered
                 className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-foreground/80 leading-relaxed">
                 A within-tier greedy reorder was replaced with a{" "}
                 <span className="text-foreground font-medium">
                   target-conditioned cross-tier scheduler
@@ -271,7 +306,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-base text-foreground/80 leading-relaxed">
               A single-variable controlled experiment, same ladder, attacks,
               corpus, judge, and target (Claude Haiku, AdvBench + JailbreakBench);
               only the order changed, beat the production baseline on every
@@ -317,22 +352,19 @@ export default function ResearchPage() {
               </span>
               : same ladder, different order, full reachability preserved.
             </NovelNote>
-          </div>
-        </Section>
-
-        {/* 3. NULL RESULT ----------------------------------------------- */}
-        <Section
-          eyebrow="finding 03"
-          title="A publication-grade null result: grammar-component predictive power."
-        >
-          <div className="max-w-3xl space-y-6">
+            </FindingCard>
+            <FindingCard
+              id="finding-03"
+              eyebrow="finding 03"
+              title="A publication-grade null result: grammar-component predictive power."
+            >
             <div className="flex gap-4">
               <Microscope
                 className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-foreground/80 leading-relaxed">
                 Before building a grammar/AST attack-composition engine, a{" "}
                 <span className="text-foreground font-medium">
                   $0 observational study over 1,540 (primitive × target) cells
@@ -345,7 +377,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-base text-foreground/80 leading-relaxed">
               Verdict <span className="text-foreground font-medium">weak/none</span>{" "}
 , the family label carries the predictive weight. Cross-family
               structural nodes show ~1.0 to 1.1× non-significant lift, and the
@@ -377,11 +409,14 @@ export default function ResearchPage() {
               </span>{" "}
 , a successful negative result.
             </NovelNote>
+            </FindingCard>
           </div>
         </Section>
 
         {/* 4. MEASURE-BEFORE-BUILD -------------------------------------- */}
         <Section
+          id="finding-04"
+          className="scroll-mt-24"
           eyebrow="finding 04"
           title="Measure-before-build discipline."
         >
@@ -392,7 +427,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-foreground/80 leading-relaxed">
                 $0 measurements from existing telemetry were used repeatedly to{" "}
                 <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
                 with an explicit trigger-to-revisit.
@@ -459,7 +494,7 @@ export default function ResearchPage() {
               aria-hidden
             />
             <div className="space-y-3">
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-foreground/80 leading-relaxed">
                 These are honest constraints, not caveats buried in a footnote.
                 Targets are black-box live-API models whose versions are not
                 pinned; some cells are small-n (95% bootstrap CIs are persisted
@@ -512,7 +547,7 @@ function NovelNote({ children }: { children: React.ReactNode }) {
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
         why this is notable
       </p>
-      <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+      <p className="mt-1.5 text-sm text-foreground/75 leading-relaxed">
         {children}
       </p>
     </div>
@@ -529,7 +564,7 @@ function InvertedDecision({
   return (
     <li className="rogue-card border border-border rounded-xl p-4 md:p-5 bg-card/40 backdrop-blur-sm">
       <p className="text-base font-semibold text-foreground">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+      <p className="mt-1 text-sm text-foreground/75 leading-relaxed">
         {children}
       </p>
     </li>
@@ -566,5 +601,65 @@ function EvidenceLink({
         {desc}
       </p>
     </Link>
+  );
+}
+
+/** A compact at-a-glance card that links to a full finding below. */
+function GlanceCard({
+  href,
+  eyebrow,
+  headline,
+  desc,
+  accent = "green",
+}: {
+  href: string;
+  eyebrow: string;
+  headline: string;
+  desc: string;
+  accent?: "green" | "red";
+}) {
+  return (
+    <a
+      href={href}
+      className="rogue-card border border-border rounded-xl p-4 md:p-5 bg-card/40 backdrop-blur-sm block group hover:border-rogue-green/50 transition-colors"
+    >
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-rogue-green">
+        {eyebrow}
+      </p>
+      <p
+        className={`mt-2 text-lg md:text-xl font-bold tracking-tight tabular-nums ${
+          accent === "red" ? "text-rogue-red" : "text-foreground"
+        }`}
+      >
+        {headline}
+      </p>
+      <p className="mt-1 text-[13px] text-foreground/70 leading-snug">{desc}</p>
+    </a>
+  );
+}
+
+/** A finding rendered as a bordered card (for the side-by-side grid). */
+function FindingCard({
+  id,
+  eyebrow,
+  title,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      id={id}
+      className="rogue-card border border-border rounded-2xl p-6 md:p-7 bg-card/30 backdrop-blur-sm scroll-mt-24"
+    >
+      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
+        {eyebrow}
+      </p>
+      <h2 className="mt-3 text-2xl font-bold tracking-tight">{title}</h2>
+      <div className="mt-6 space-y-5">{children}</div>
+    </div>
   );
 }
