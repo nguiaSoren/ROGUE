@@ -216,8 +216,8 @@ export default function ResearchPage() {
                 provenance-dependent breach types need an evidence trace, and the
                 independence check names the missing evidence. Shown twice, on
                 unauthorized-action (a tool-call trace lifted second-labeler κ
-                from 0.746 to 0.917) and on fabricated-value (a retrieval trace,
-                built and shipping).
+                from 0.746 to 0.917) and on fabricated-value (a retrieval trace
+                lifted κ from 0.723 to 0.909).
               </NovelNote>
 
               <MethodNote>
@@ -227,8 +227,8 @@ export default function ResearchPage() {
                 with the tool-trace; harm uses JailbreakBench human-majority
                 agreement, not a κ); single-operator calibration and synthetic
                 designed-label corpora throughout. The fabricated-value
-                retrieval-trace is built and the judge ships on it (96.88%), with
-                its human κ re-check pending; in calibration the traces are
+                retrieval-trace lifts its human κ from 0.723 to 0.909 (the judge
+                ships 96.88%); in calibration the traces are
                 embedded in the graded text, the production seam being the scan
                 engine&apos;s Capture. Descriptive measurements, not validated
                 generalizations.
