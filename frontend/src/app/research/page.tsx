@@ -96,7 +96,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 Every breach verdict is an LLM judgment, so the judge is the
                 load-bearing weakness. It was validated four ways, three
                 against independent human-annotated benchmarks: blind stratified
@@ -109,7 +109,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-base text-foreground/90 leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               JBB exposed over-flagging. The v1 judge agreed with the human
               majority only{" "}
               <span className="text-foreground font-medium">
@@ -131,7 +131,7 @@ export default function ResearchPage() {
               .
             </p>
 
-            <p className="text-base text-foreground/90 leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               The fix, a{" "}
               <span className="text-foreground font-medium">
                 content-transfer-gate rubric (v3)
@@ -153,7 +153,7 @@ export default function ResearchPage() {
               <FalsePositiveModesFig />
             </div>
 
-            <p className="text-base text-foreground/90 leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               Then the honest part: re-judging the stored breach matrix under v3{" "}
               <span className="text-foreground font-medium">
                 dropped breach cells 2,429 → 1,371 (−43.6%)
@@ -189,7 +189,7 @@ export default function ResearchPage() {
             </NovelNote>
 
             <div className="pt-5 mt-2 border-t border-border/60 space-y-5">
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 <span className="text-foreground font-medium">
                   The gate isn&apos;t harm-specific, it&apos;s a calibration
                   discipline, an established practice taken rigorously, not a new
@@ -292,7 +292,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 A within-tier greedy reorder was replaced with a{" "}
                 <span className="text-foreground font-medium">
                   target-conditioned cross-tier scheduler
@@ -306,7 +306,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-base text-foreground/90 leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               A single-variable controlled experiment, same ladder, attacks,
               corpus, judge, and target (Claude Haiku, AdvBench + JailbreakBench);
               only the order changed, beat the production baseline on every
@@ -364,7 +364,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 Before building a grammar/AST attack-composition engine, a{" "}
                 <span className="text-foreground font-medium">
                   $0 observational study over 1,540 (primitive × target) cells
@@ -377,7 +377,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-base text-foreground/90 leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               Verdict <span className="text-foreground font-medium">weak/none</span>{" "}
 , the family label carries the predictive weight. Cross-family
               structural nodes show ~1.0 to 1.1× non-significant lift, and the
@@ -427,7 +427,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 $0 measurements from existing telemetry were used repeatedly to{" "}
                 <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
                 with an explicit trigger-to-revisit.
@@ -494,13 +494,13 @@ export default function ResearchPage() {
               aria-hidden
             />
             <div className="space-y-3">
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 These are honest constraints, not caveats buried in a footnote.
                 Targets are black-box live-API models whose versions are not
                 pinned; some cells are small-n (95% bootstrap CIs are persisted
                 precisely because of this); the judge is single-operator-calibrated.
               </p>
-              <p className="text-base text-foreground/90 leading-relaxed">
+              <p className="text-[17px] text-foreground leading-relaxed">
                 These are descriptive measurements of a live system, not
                 validated generalizations.
               </p>
@@ -547,7 +547,7 @@ function NovelNote({ children }: { children: React.ReactNode }) {
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
         why this is notable
       </p>
-      <p className="mt-1.5 text-sm text-foreground/80 leading-relaxed">
+      <p className="mt-1.5 text-[15px] text-foreground/85 leading-relaxed">
         {children}
       </p>
     </div>
@@ -564,7 +564,7 @@ function InvertedDecision({
   return (
     <li className="rogue-card border border-border rounded-xl p-4 md:p-5 bg-card/40 backdrop-blur-sm">
       <p className="text-base font-semibold text-foreground">{title}</p>
-      <p className="mt-1 text-sm text-foreground/80 leading-relaxed">
+      <p className="mt-1 text-[15px] text-foreground/85 leading-relaxed">
         {children}
       </p>
     </li>
