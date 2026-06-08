@@ -217,7 +217,12 @@ export default function ResearchPage() {
                 independence check names the missing evidence. Shown twice, on
                 unauthorized-action (a tool-call trace lifted second-labeler κ
                 from 0.746 to 0.917) and on fabricated-value (a retrieval trace
-                lifted κ from 0.723 to 0.909).
+                lifted κ from 0.723 to 0.909). The building blocks here are
+                established (trace-grounded agent evaluation, κ-gated calibration,
+                provenance attribution, cross-type judge generalization such as
+                CompliBench); the contribution is the rigor, an
+                independence-invariant discipline and a self-diagnosing harness,
+                plus the measured cross-type result, not a new mechanism.
               </NovelNote>
 
               <MethodNote>
