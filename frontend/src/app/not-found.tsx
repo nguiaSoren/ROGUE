@@ -19,7 +19,7 @@ export default function NotFound() {
           {"// 404 · no route"}
         </p>
         <h1 className="text-5xl md:text-6xl font-bold tracking-tight">404</h1>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-[17px] text-foreground leading-relaxed">
           That page isn&apos;t here. It may have moved, or never existed. The
           threat DB, breach matrix, and daily brief are all one click away.
         </p>

@@ -37,7 +37,7 @@ _OUT = _ROOT / "frontend" / "public" / "rogue-research-brief.pdf"
 GREEN = colors.HexColor("#1f9d55")
 INK = colors.HexColor("#14161b")
 BODY = colors.HexColor("#23262d")
-MUTED = colors.HexColor("#5b6views" if False else "#5b6068")
+MUTED = colors.HexColor("#525860")  # darker gray, more readable on white
 LIGHT = colors.HexColor("#f3f6f4")
 CHIPBG = colors.HexColor("#eef3f0")
 LINE = colors.HexColor("#d8ddd9")
@@ -50,33 +50,33 @@ def _styles() -> dict[str, ParagraphStyle]:
     base = getSampleStyleSheet()
     return {
         "brand": ParagraphStyle("brand", parent=base["Normal"], fontName="Helvetica-Bold",
-                                fontSize=17, leading=20, textColor=colors.white),
+                                fontSize=18, leading=21, textColor=colors.white),
         "tagline": ParagraphStyle("tag", parent=base["Normal"], fontName="Helvetica",
-                                  fontSize=9, leading=13, textColor=colors.HexColor("#aeb6b0")),
+                                  fontSize=9.5, leading=14, textColor=colors.HexColor("#b6beb8")),
         "meta": ParagraphStyle("meta", parent=base["Normal"], fontName="Helvetica",
                                fontSize=8.5, leading=12, textColor=MUTED),
         "h": ParagraphStyle("h", parent=base["Normal"], fontName="Helvetica-Bold",
-                            fontSize=12.5, leading=15.5, textColor=INK, spaceBefore=14, spaceAfter=5),
+                            fontSize=13.5, leading=17, textColor=INK, spaceBefore=18, spaceAfter=7),
         "body": ParagraphStyle("body", parent=base["Normal"], fontName="Helvetica",
-                               fontSize=10, leading=14.5, textColor=BODY, alignment=TA_LEFT, spaceAfter=5),
+                               fontSize=10.5, leading=16, textColor=BODY, alignment=TA_LEFT, spaceAfter=6),
         "chipval": ParagraphStyle("cv", parent=base["Normal"], fontName="Helvetica-Bold",
-                                  fontSize=12.5, leading=15, textColor=GREEN),
+                                  fontSize=13, leading=16, textColor=GREEN),
         "chiplbl": ParagraphStyle("cl", parent=base["Normal"], fontName="Helvetica",
-                                  fontSize=7, leading=9, textColor=MUTED),
+                                  fontSize=7.5, leading=10, textColor=MUTED),
         "notelbl": ParagraphStyle("nl", parent=base["Normal"], fontName="Helvetica-Bold",
                                   fontSize=7.5, leading=10, textColor=GREEN),
         "note": ParagraphStyle("note", parent=base["Normal"], fontName="Helvetica",
-                               fontSize=9, leading=13, textColor=colors.HexColor("#41454c")),
+                               fontSize=9.5, leading=14, textColor=colors.HexColor("#3c4047")),
         "li": ParagraphStyle("li", parent=base["Normal"], fontName="Helvetica",
-                             fontSize=10, leading=14, textColor=BODY),
+                             fontSize=10.5, leading=15.5, textColor=BODY),
         "limit": ParagraphStyle("lim", parent=base["Normal"], fontName="Helvetica",
-                                fontSize=9.5, leading=13.5, textColor=colors.HexColor("#41454c")),
+                                fontSize=10, leading=15, textColor=colors.HexColor("#3c4047")),
         "barlbl": ParagraphStyle("barlbl", parent=base["Normal"], fontName="Helvetica",
-                                 fontSize=8, leading=10, textColor=INK),
+                                 fontSize=8, leading=10.5, textColor=INK),
         "barval": ParagraphStyle("barval", parent=base["Normal"], fontName="Helvetica",
-                                 fontSize=8, leading=10, textColor=INK),
+                                 fontSize=8, leading=10.5, textColor=INK),
         "cap": ParagraphStyle("cap", parent=base["Normal"], fontName="Helvetica-Oblique",
-                              fontSize=7.5, leading=10.5, textColor=MUTED),
+                              fontSize=8, leading=11, textColor=MUTED),
     }
 
 

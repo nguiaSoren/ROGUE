@@ -89,7 +89,7 @@ export default function ProductPage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight max-w-2xl">
               Point it at your stack.
             </h2>
-            <p className="text-base text-muted-foreground leading-relaxed max-w-2xl">
+            <p className="text-[17px] text-foreground leading-relaxed max-w-2xl">
               Get on the list for{" "}
               <Link
                 href="/early-access"
