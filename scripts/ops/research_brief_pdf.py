@@ -1,7 +1,7 @@
 """Generate the ROGUE research-brief PDF served at /research and attachable to
 outreach emails.
 
-A designed, readable 2-page brief: dark header band, metric chips, boxed
+A designed, readable research brief: dark header band, metric chips, boxed
 "why this is notable" callouts, clean bullets, a footer rule. White page so it
 prints/reads well for an academic. All numbers are verbatim from the measured
 work (mirror of `frontend/src/app/research/page.tsx`). Writes to
@@ -245,6 +245,28 @@ def build() -> Path:
         "A named false-positive taxonomy for a safety judge, plus a measured finding that two respected "
         "benchmarks (WildGuardTest harm labels and StrongREJECT) themselves <i>over-count</i> relative to a "
         "strict content-transfer standard.")]
+    F += [Spacer(1, 6), Paragraph(
+        b("The gate is not harm-specific, it is a methodology.") + " The same content-transfer gate, "
+        "re-instantiated per breach type, calibrates two structurally different policies: a "
+        "<i>content</i> breach (information-disclosure, did the protected datum appear) and an "
+        "<i>action</i> breach (unauthorized-action, did the agent execute). The harness "
+        + b("self-diagnoses") + ": on the harder action type it returned <i>refine</i>, a targeted "
+        "rubric fix was applied, and re-measurement shipped it, the same diagnose then fix then "
+        "re-measure loop that produced v3, run again. The contribution is "
+        + b("a repeatable methodology for calibrating breach judges across breach classes") + ", "
+        "not a single judge.", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("94.7%", "info-disclosure agreement"),
+        ("0%", "FP-mode (31 traps)"),
+        ("97.8%", "unauth-action (1 refine)"),
+        ("100%", "recall, both types"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "The methodology exposes type-dependent failure: action consummation (did the agent execute) "
+        "is measurably harder than content (did the datum appear), for the judge and an independent "
+        "human alike. Per-type designed-label corpora (n=113 / n=90) with independent second-labeler "
+        "checks; single-operator calibration, synthetic labels, and a text-only action proxy, so these "
+        "are descriptive measurements, not validated generalizations.")]
 
     # 02
     F += [_heading("02", "Scheduling as a capability lever, not just an optimization.")]

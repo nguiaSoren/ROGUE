@@ -47,7 +47,7 @@ export default function ResearchPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-rogue-green/50 px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-colors hover:bg-rogue-green/10"
           >
             <Download className="h-4 w-4" aria-hidden />
-            Download the 2-page brief (PDF)
+            Download the research brief (PDF)
           </a>
         </Section>
 
@@ -154,6 +154,58 @@ export default function ResearchPage() {
               themselves <span className="text-foreground/90">over-count</span>{" "}
               relative to a strict content-transfer standard.
             </NovelNote>
+
+            <div className="pt-5 mt-2 border-t border-border/60 space-y-5">
+              <p className="text-base text-muted-foreground leading-relaxed">
+                <span className="text-foreground font-medium">
+                  The gate isn&apos;t harm-specific, it&apos;s a methodology.
+                </span>{" "}
+                The same content-transfer gate (
+                <span className="text-foreground/90">
+                  engagement ≠ breach; consummation = breach
+                </span>
+                ), re-instantiated per breach type, calibrates two structurally
+                different policies: a <em>content</em> breach
+                (information-disclosure, &ldquo;did the protected datum
+                appear?&rdquo;) and an <em>action</em> breach
+                (unauthorized-action, &ldquo;did the agent execute?&rdquo;). The
+                harness even{" "}
+                <span className="text-foreground font-medium">
+                  self-diagnoses
+                </span>
+                : on the harder action type it returned <em>refine</em>, a
+                targeted rubric fix was applied, and re-measurement shipped it, 
+                the same diagnose → fix → re-measure loop that produced v3, run
+                again.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Metric value="94.7%" label="info-disclosure agreement" accent="green" />
+                <Metric value="0%" label="FP-mode · 31 traps" accent="green" />
+                <Metric value="97.8%" label="unauth-action (after 1 refine)" accent="green" />
+                <Metric value="100%" label="recall · both types" accent="green" />
+              </div>
+
+              <NovelNote>
+                The contribution isn&apos;t &ldquo;a better harm judge&rdquo; but a{" "}
+                <span className="text-rogue-green">⚑</span>{" "}
+                <span className="text-foreground/90">
+                  repeatable methodology for calibrating breach judges across
+                  breach classes
+                </span>{" "}
+                that exposes type-dependent failure modes, action consummation
+                is measurably harder than content, for the judge and an
+                independent human alike (κ 0.75 vs 0.80).
+              </NovelNote>
+
+              <MethodNote>
+                Method, per-type designed-label corpora (information-disclosure
+                n=113, unauthorized-action n=90) with independent second-labeler
+                κ checks; single-operator calibration, synthetic labels, and a
+                text-only proxy for actions, descriptive measurements, not
+                validated generalizations.
+              </MethodNote>
+            </div>
           </div>
         </Section>
 
