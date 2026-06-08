@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Rocket, ClipboardCheck, FlaskConical, ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { COMMERCIAL } from "@/lib/flags";
 
 /**
