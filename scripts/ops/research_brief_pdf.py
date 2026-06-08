@@ -263,7 +263,7 @@ def build() -> Path:
         "simulate-or-claim confusion. This pattern generalizes: provenance-dependent breach types need an "
         "evidence trace, not a better rubric, and the independence check names the missing evidence, shown "
         "twice, a tool-call trace that lifted second-labeler kappa from 0.746 to 0.917 for unauthorized-action "
-        "and a retrieval trace (built and shipping) for fabricated-value. The contribution is "
+        "and a retrieval trace that lifted kappa from 0.723 to 0.909 for fabricated-value. The contribution is "
         + b("a repeatable methodology for calibrating breach judges across breach classes") + ", "
         "not a single judge.", S["body"])]
     F += [Spacer(1, 4), _chips([
@@ -277,7 +277,7 @@ def build() -> Path:
         "type-dependent difficulty: action consummation (did the agent execute) was the hardest, and the "
         "tool-call trace resolved it by making execution a recorded fact rather than a text-only proxy. "
         "Caveats stated plainly: single-operator kappa (the tool-trace lifted unauthorized-action from 0.746 "
-        "to 0.917; the fabricated-value retrieval-trace is built with its human kappa re-check pending); "
+        "to 0.917; the fabricated-value retrieval-trace lifted its human kappa from 0.723 to 0.909); "
         "corpora are synthetic. These are descriptive measurements, not validated generalizations.")]
 
     # 02
