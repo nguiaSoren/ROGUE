@@ -4,7 +4,7 @@
 Projects the escalation cost of a growth sweep as a function of the selection cap K,
 grounded in the two growth sweeps already run. It answers the COST half of the
 K-saturation question for free; the GRADUATION half (does yield hold as K rises?) is
-the irreducible unknown that needs a paid run (see docs/RESEARCH_TODO.md).
+the irreducible unknown that needs a paid run (see docs/research/RESEARCH_TODO.md).
 
 Model (every parameter measured, not assumed):
     cost(K) = n_parents × (fixed_rotation + K) × per_attempt

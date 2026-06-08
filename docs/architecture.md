@@ -174,7 +174,7 @@ This subsection documents a measurement layer that is purely additive to the fiv
 
 **Confound controls.** (1) Family collinearity: family-mirroring nodes (those derived directly from `family`) are flagged as near-circular and their lift is interpreted accordingly; Mantel–Haenszel stratification tests whether cross-family structural nodes show lift after controlling for `AttackFamily`. (2) Multiple comparisons: Benjamini–Hochberg FDR correction applied across all 23 per-node Fisher exact p-values. (3) Judge-version caveat: `breach_matrix` is graded by the v1/v2 judge (over-reports vs v3); all breach signals inherit that bias and are treated as v1/v2-baseline.
 
-**File map.** `src/rogue/schemas/grammar_node.py` (enum + wire type) · `src/rogue/grammar/` (`dataset.py`, `labeler.py`, `stats.py`, `combinations.py`) · migration `0027` · `docs/grammar_efficacy.md` (full design + methodology).
+**File map.** `src/rogue/schemas/grammar_node.py` (enum + wire type) · `src/rogue/grammar/` (`dataset.py`, `labeler.py`, `stats.py`, `combinations.py`) · migration `0027` · `docs/research/grammar_efficacy.md` (full design + methodology).
 
 ## What we deliberately do NOT do
 

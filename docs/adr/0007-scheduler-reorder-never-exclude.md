@@ -13,7 +13,7 @@ Every ladder-order mode is a **permutation of the same strategy list** — *reor
 
 ## Consequences
 
-- ASR/cost deltas between modes are attributable to ordering alone — a clean experiment, not a confound (the centerpiece of `docs/adaptive_orchestration_paper.md`).
+- ASR/cost deltas between modes are attributable to ordering alone — a clean experiment, not a confound (the centerpiece of `docs/research/adaptive_orchestration_paper.md`).
 - Run #0 reproducibility is intact because the prior modes are unchanged byte-for-byte.
 - "ASR↑ under contextual" is genuine capability (depth-cap reachability converting held goals into breaches), not a measurement artifact.
 

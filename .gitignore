@@ -129,14 +129,14 @@ scripts/youtube_research.py
 scripts/assemble_video.sh
 
 # Local-only research/working docs (WIP; not for the public repo)
-docs/adaptive_orchestration_systems.md
-docs/scheduler_allocation_study.md
-docs/adaptive_orchestration_paper.md
-docs/paper_figures.md
-docs/figs/
+docs/research/adaptive_orchestration_systems.md
+docs/research/scheduler_allocation_study.md
+docs/research/adaptive_orchestration_paper.md
+docs/research/paper_figures.md
+docs/research/figs/
 scripts/paper_figs.py
 scripts/export_paper_data.py
-docs/RESEARCH_TODO.md
+docs/research/RESEARCH_TODO.md
 # contingent roadmap (build-if-trigger), not implemented system
 docs/3b_v2_renderer_design.md
 .vercel
