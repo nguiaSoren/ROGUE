@@ -14,6 +14,14 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
+/**
+ * True only when a real API base is configured (set in Production). Preview/local builds leave
+ * NEXT_PUBLIC_API_BASE unset, so the build-time ISR prerender cannot reach the API — callers use
+ * this to degrade gracefully (render a placeholder) instead of failing the whole Vercel build,
+ * while staying strict in Production (a real fetch failure there must still fail loudly).
+ */
+export const API_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_API_BASE);
+
 const REVALIDATE_SECONDS = 300;
 
 // The API runs on Render's free tier, which spins the service down when idle
