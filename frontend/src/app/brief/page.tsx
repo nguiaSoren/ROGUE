@@ -1,4 +1,4 @@
-import { api, BriefJson } from "@/lib/api";
+import { api, BriefJson, API_CONFIGURED } from "@/lib/api";
 import { BriefMarkdown } from "@/components/brief-markdown";
 import { BriefExecSnapshot } from "@/components/brief-exec-snapshot";
 import { BriefDownloads } from "@/components/brief-downloads";
@@ -7,6 +7,28 @@ import { BriefDownloads } from "@/components/brief-downloads";
 // REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
 // data surfaces within the window instead of paying the full round-trip.
 export const revalidate = 300;
+
+/**
+ * Rendered only in preview/local builds where no API base is configured (NEXT_PUBLIC_API_BASE is
+ * Production-only), so the build-time brief fetch cannot reach the API. This lets the Vercel
+ * preview build succeed instead of failing on a prerender ECONNREFUSED; production always has the
+ * API base set and renders the real brief.
+ */
+function BriefUnavailable() {
+  return (
+    <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-20 text-center space-y-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-rogue-green">
+          daily threat brief
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Threat Brief</h1>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          This preview build has no API connection; the live brief renders in production.
+        </p>
+      </div>
+    </main>
+  );
+}
 
 /**
  * /brief, Threat Brief.
@@ -26,16 +48,24 @@ export default async function BriefPage() {
   // serving the last-good static brief instead of caching a "brief unavailable"
   // page for the full ISR window. The JSON form (exec snapshot) is non-critical.
   const [briefMarkdown, briefJsonRes] = await Promise.all([
-    api.brief(undefined, "markdown"),
+    api.brief(undefined, "markdown").catch((err) => {
+      // Production (API base set): fail loudly so Vercel keeps the last-good static brief.
+      // Preview/local (no API base): the build-time fetch can't reach the API — degrade below.
+      if (API_CONFIGURED) throw err;
+      return null;
+    }),
     api.brief(undefined, "json").catch(() => null),
   ]);
   const briefJson = (briefJsonRes?.json ?? null) as BriefJson | null;
 
-  // Successful fetch but no markdown payload is an anomaly (the brief is always
-  // generable from the matrix), throw so we keep the last-good brief rather
-  // than caching an empty one.
+  // No markdown payload: in Production an anomaly worth failing on (keep the last-good brief
+  // rather than caching an empty one); in a preview/local build with no API base, render the
+  // placeholder so the build still succeeds.
   if (!briefMarkdown?.markdown) {
-    throw new Error("brief markdown payload empty");
+    if (API_CONFIGURED) {
+      throw new Error("brief markdown payload empty");
+    }
+    return <BriefUnavailable />;
   }
 
   const summary = briefJson?.summary;
