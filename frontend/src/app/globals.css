@@ -123,6 +123,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Crisper light-on-dark text on macOS (make-interfaces-feel-better #8). */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     /* Guard against page-level horizontal scroll on mobile (overflowing wide
        elements). `clip` (not `hidden`) does not create a scroll container, so
        it leaves the sticky header working. */
@@ -131,6 +134,9 @@
   html {
     @apply font-sans;
   }
+  /* Fewer orphans + balanced headings (make-interfaces-feel-better #10). */
+  p { text-wrap: pretty; }
+  h1, h2, h3, h4 { text-wrap: balance; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -158,7 +164,7 @@
   --card: oklch(0.10 0.008 270);
   --card-foreground: oklch(0.96 0 0);
   --border: oklch(1 0 0 / 8%);
-  --muted-foreground: oklch(0.62 0 0);
+  --muted-foreground: oklch(0.70 0 0);
 }
 
 /* ------------------------------------------------------------------ */
