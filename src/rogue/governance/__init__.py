@@ -29,7 +29,15 @@ from rogue.schemas.governance import (
     RuleVerdict,
 )
 
+from .coverage import CoverageScore, score_pack_coverage
+from .decompose import decompose_policy, load_policy
+from .reaim import build_attack_pack, reaim_primitive
+from .report import attestation_rows, build_rule_breach_report, render_markdown
+from .rule_judge import RuleJudge, instantiate_rule_judge
+from .scan_runner import run_policy_scan
+
 __all__ = [
+    # schemas
     "BreachType",
     "CalibrationStatus",
     "ClientPolicy",
@@ -38,4 +46,20 @@ __all__ = [
     "RuleAttackPack",
     "RuleBreachReport",
     "RuleVerdict",
+    # §3 policy → attack pack
+    "decompose_policy",
+    "load_policy",
+    "build_attack_pack",
+    "reaim_primitive",
+    # §4 per-rule judge
+    "RuleJudge",
+    "instantiate_rule_judge",
+    # §5 coverage
+    "CoverageScore",
+    "score_pack_coverage",
+    # §6 report + orchestration
+    "build_rule_breach_report",
+    "render_markdown",
+    "attestation_rows",
+    "run_policy_scan",
 ]
