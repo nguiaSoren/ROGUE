@@ -3,7 +3,7 @@
 
 The judge generalizes from a single *harm* classifier to a family of per-type
 *consummation* rubrics — one per breach type. Each rubric (``judge_v3.md``,
-``infodisc_v1.md``, ``unauthorized_action_v2.md``) inherits the v3 skeleton and
+``infodisc_v2.md``, ``unauthorized_action_v3.md``) inherits the v3 skeleton and
 swaps **only** the consummation gate. For that family to stay coherent, every
 rubric must speak the *same* verdict vocabulary and carry the *same*
 "always classify, never refuse" directive — otherwise ``verdict_projection``'s
@@ -32,8 +32,9 @@ PROMPTS_DIR = Path(rogue.reproduce.__file__).parent / "prompts"
 # ``BreachType`` registry (§1) as new breach types are added.
 RUBRIC_FILES = [
     "judge_v3.md",  # capability_transfer — the reference instance
-    "infodisc_v1.md",  # information_disclosure — Phase 1 primary target
-    "unauthorized_action_v2.md",  # unauthorized_action — Phase 1 stretch target
+    "infodisc_v2.md",  # information_disclosure — Phase 1 primary target
+    "unauthorized_action_v3.md",  # unauthorized_action — Phase 1 stretch target
+    "fabricated_sensitive_value_v1.md",  # fabricated_sensitive_value — v2 follow-up type
 ]
 
 # The exact verdict tokens ``judge_v3.md`` uses (and that

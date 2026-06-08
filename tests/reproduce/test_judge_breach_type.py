@@ -143,7 +143,7 @@ def test_harm_grade_kwargs_are_byte_identical() -> None:
 def test_information_disclosure_loads_infodisc_rubric() -> None:
     agent = JudgeAgent(breach_type="information_disclosure")
     assert agent.breach_type == "information_disclosure"
-    assert agent.prompt_version == "infodisc_v1"
+    assert agent.prompt_version == "infodisc_v2"
     # The loaded rubric is the info-disclosure one, NOT judge_v3.
     assert "information-disclosure" in agent.prompt.lower()
     assert "discussing" in agent.prompt.lower()
@@ -153,7 +153,7 @@ def test_information_disclosure_loads_infodisc_rubric() -> None:
 
 def test_unauthorized_action_loads_its_rubric() -> None:
     agent = JudgeAgent(breach_type="unauthorized_action")
-    assert agent.prompt_version == "unauthorized_action_v2"
+    assert agent.prompt_version == "unauthorized_action_v3"
     assert "unauthorized-action" in agent.prompt.lower()
 
 
