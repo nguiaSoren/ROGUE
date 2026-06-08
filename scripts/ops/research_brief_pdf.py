@@ -1,12 +1,11 @@
-"""Generate the ROGUE research-brief PDF served at /research and attachable to
-outreach emails.
+"""Generate the ROGUE research-brief PDF served at /research and attached to outreach emails.
 
-A designed, readable research brief: dark header band, metric chips, boxed
-"why this is notable" callouts, clean bullets, a footer rule. White page so it
-prints/reads well for an academic. All numbers are verbatim from the measured
-work (mirror of `frontend/src/app/research/page.tsx`). Writes to
-`frontend/public/rogue-research-brief.pdf` (Next serves it at
-`/rogue-research-brief.pdf`).
+Editorial-offprint design: a serif masthead + lead/abstract, each finding numbered
+in a serif rail beside a serif title with a hairline rule above, the reading column
+indented under the title while figures and metric chips span full width. White page,
+print-clean, credible for an academic reader. All numbers are verbatim from the
+measured work (mirror of `frontend/src/app/research/page.tsx`). Writes to
+`frontend/public/rogue-research-brief.pdf`.
 
     uv run python scripts/ops/research_brief_pdf.py
 """
@@ -16,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -37,28 +36,45 @@ _OUT = _ROOT / "frontend" / "public" / "rogue-research-brief.pdf"
 GREEN = colors.HexColor("#1f9d55")
 INK = colors.HexColor("#14161b")
 BODY = colors.HexColor("#23262d")
-MUTED = colors.HexColor("#525860")  # darker gray, more readable on white
+MUTED = colors.HexColor("#525860")  # darker gray, readable on white
 LIGHT = colors.HexColor("#f3f6f4")
 CHIPBG = colors.HexColor("#eef3f0")
-LINE = colors.HexColor("#d8ddd9")
+LINE = colors.HexColor("#d3d8d4")
+HAIR = colors.HexColor("#c7ccc8")
 
 MARGIN = 0.8 * inch
 CONTENT_W = LETTER[0] - 2 * MARGIN
+RAIL_W = 0.86 * inch  # the serif-number rail; body indents to match
 
 
 def _styles() -> dict[str, ParagraphStyle]:
     base = getSampleStyleSheet()
     return {
-        "brand": ParagraphStyle("brand", parent=base["Normal"], fontName="Helvetica-Bold",
-                                fontSize=18, leading=21, textColor=colors.white),
-        "tagline": ParagraphStyle("tag", parent=base["Normal"], fontName="Helvetica",
-                                  fontSize=9.5, leading=14, textColor=colors.HexColor("#b6beb8")),
+        # --- masthead / lead (serif display) ---
+        "wordmark": ParagraphStyle("wordmark", parent=base["Normal"], fontName="Times-Bold",
+                                   fontSize=23, leading=25, textColor=INK),
+        "tag": ParagraphStyle("tag", parent=base["Normal"], fontName="Helvetica-Bold",
+                              fontSize=8, leading=11, textColor=GREEN, spaceBefore=3),
+        "metaR": ParagraphStyle("metaR", parent=base["Normal"], fontName="Helvetica",
+                                fontSize=8.5, leading=12.5, textColor=MUTED, alignment=TA_RIGHT),
+        "headline": ParagraphStyle("headline", parent=base["Normal"], fontName="Times-Bold",
+                                   fontSize=20, leading=23, textColor=INK, spaceBefore=2),
+        "abstract": ParagraphStyle("abstract", parent=base["Normal"], fontName="Times-Roman",
+                                   fontSize=11.5, leading=16.5, textColor=BODY, alignment=TA_LEFT),
         "meta": ParagraphStyle("meta", parent=base["Normal"], fontName="Helvetica",
                                fontSize=8.5, leading=12, textColor=MUTED),
-        "h": ParagraphStyle("h", parent=base["Normal"], fontName="Helvetica-Bold",
-                            fontSize=13.5, leading=17, textColor=INK, spaceBefore=18, spaceAfter=7),
+        # --- finding rail + title (serif) ---
+        "fnum": ParagraphStyle("fnum", parent=base["Normal"], fontName="Times-Bold",
+                               fontSize=27, leading=27, textColor=GREEN),
+        "flabel": ParagraphStyle("flabel", parent=base["Normal"], fontName="Helvetica-Bold",
+                                 fontSize=7, leading=9.5, textColor=MUTED, spaceBefore=3),
+        "ftitle": ParagraphStyle("ftitle", parent=base["Normal"], fontName="Times-Bold",
+                                 fontSize=14.5, leading=17.5, textColor=INK),
+        # --- body (sans, indented under the title) ---
         "body": ParagraphStyle("body", parent=base["Normal"], fontName="Helvetica",
-                               fontSize=10.5, leading=16, textColor=BODY, alignment=TA_LEFT, spaceAfter=6),
+                               fontSize=10.5, leading=16, textColor=BODY, alignment=TA_LEFT,
+                               spaceAfter=6, leftIndent=RAIL_W),
+        # --- chips / notes / figures (full width) ---
         "chipval": ParagraphStyle("cv", parent=base["Normal"], fontName="Helvetica-Bold",
                                   fontSize=13, leading=16, textColor=GREEN),
         "chiplbl": ParagraphStyle("cl", parent=base["Normal"], fontName="Helvetica",
@@ -84,23 +100,32 @@ S = _styles()
 b = lambda x: f"<b>{x}</b>"  # noqa: E731
 
 
-def _header() -> Table:
-    cell = [
-        Paragraph('<font color="#1f9d55">ROGUE</font>  ·  Research Brief', S["brand"]),
-        Paragraph(
-            "A solo research build of a continuous open-web LLM red-team. "
-            "The methods and the measured results, including the negative ones.",
-            S["tagline"],
-        ),
-    ]
-    t = Table([[cell]], colWidths=[CONTENT_W])
+def _masthead() -> Table:
+    """Editorial masthead: serif wordmark on the left, meta on the right, green rule below."""
+    left = [Paragraph('<font color="#1f9d55">ROGUE</font>', S["wordmark"]),
+            Paragraph("RESEARCH&nbsp;BRIEF", S["tag"])]
+    right = Paragraph(
+        "A continuous open-web LLM red-team.<br/>The methods and the measured results, "
+        "including the negative ones.", S["metaR"])
+    t = Table([[left, right]], colWidths=[CONTENT_W * 0.42, CONTENT_W * 0.58])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), INK),
-        ("LEFTPADDING", (0, 0), (-1, -1), 16),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 16),
-        ("TOPPADDING", (0, 0), (-1, -1), 14),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
-        ("LINEBELOW", (0, 0), (-1, -1), 3, GREEN),
+        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.6, GREEN),
+    ]))
+    return t
+
+
+def _finding(num: str, label: str, title: str) -> Table:
+    """A finding header: serif number + label in the rail, serif title beside it, hairline above."""
+    rail = [Paragraph(num, S["fnum"]), Paragraph(label.upper(), S["flabel"])]
+    t = Table([[rail, Paragraph(title, S["ftitle"])]], colWidths=[RAIL_W, CONTENT_W - RAIL_W])
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 13), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("LINEABOVE", (0, 0), (-1, 0), 0.75, HAIR),
     ]))
     return t
 
@@ -112,8 +137,8 @@ def _chips(items: list[tuple[str, str]]) -> Table:
     t = Table([cells], colWidths=[w] * len(items))
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), CHIPBG),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING", (0, 0), (-1, -1), 11),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 11),
         ("TOPPADDING", (0, 0), (-1, -1), 9),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -136,12 +161,8 @@ def _note(text: str) -> Table:
     return t
 
 
-def _heading(num: str, title: str) -> Paragraph:
-    return Paragraph(f'<font color="#1f9d55"><b>{num}</b></font>&nbsp;&nbsp;{b(title)}', S["h"])
-
-
 def _judgefig() -> Table:
-    """Horizontal bars: judge agreement vs the field (the last → tied-with-frontier story)."""
+    """Horizontal bars: judge agreement vs the field (the last to tied-with-frontier story)."""
     rows = [
         ("ROGUE v1", 70.3, colors.HexColor("#c0392b")),
         ("HarmBench", 78.3, colors.HexColor("#b9c2bb")),
@@ -171,12 +192,11 @@ def _judgefig() -> Table:
     ]))
     cap = Paragraph(
         "Judge agreement vs the field (JailbreakBench, % vs the human majority). "
-        "Recalibration moved ROGUE from last of five to 3rd, tied with the frontier classifiers.",
-        S["cap"])
+        "ROGUE v1 last; v3 tied with the frontier classifiers.", S["cap"])
     wrap = Table([[t], [cap]], colWidths=[CONTENT_W])
     wrap.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 1), (0, 1), 5), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
+        ("TOPPADDING", (0, 1), (0, 1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
     return wrap
 
@@ -202,18 +222,24 @@ def build() -> Path:
         title="ROGUE Research Brief", author="Soren Obounou Nguia",
     )
     F: list = [
-        _header(),
+        _masthead(),
+        Spacer(1, 16),
+        Paragraph("Four findings from a solo open-web LLM red-team, the negatives included.", S["headline"]),
         Spacer(1, 7),
         Paragraph(
+            "Every result here is measured and reproducible. An LLM-as-judge calibrated against human "
+            "labels and then generalized into a four-breach-type discipline; scheduling shown to be a "
+            "capability lever, not just an optimization; a publication-grade null result that redirected "
+            "engineering; and the measure-before-build habit behind all of it.", S["abstract"]),
+        Spacer(1, 4),
+        Paragraph(
             "Soren Obounou Nguia &nbsp;·&nbsp; Seoul &nbsp;·&nbsp; nguiasoren@gmail.com "
-            "&nbsp;·&nbsp; live evidence at /matrix, /analytics, /about",
-            S["meta"],
-        ),
-        Spacer(1, 10),
+            "&nbsp;·&nbsp; live evidence at /matrix, /analytics, /about", S["meta"]),
     ]
 
     # 01
-    F += [_heading("01", "Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it.")]
+    F += [_finding("01", "judge",
+                   "Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it.")]
     F += [Paragraph(
         "Every breach verdict is an LLM judgment, so the judge is the load-bearing weakness. It was "
         "validated four ways, three against independent human-annotated benchmarks: blind stratified "
@@ -285,7 +311,7 @@ def build() -> Path:
         "descriptive measurements, not validated generalizations.")]
 
     # 02
-    F += [_heading("02", "Scheduling as a capability lever, not just an optimization.")]
+    F += [_finding("02", "scheduling", "Scheduling as a capability lever, not just an optimization.")]
     F += [Paragraph(
         "A within-tier greedy reorder was replaced with a " + b("target-conditioned cross-tier scheduler") +
         ": a static, explainable blend (0.5 global, 0.3 vendor, 0.2 family breach-rate; Laplace-smoothed; "
@@ -306,7 +332,7 @@ def build() -> Path:
         "is &ldquo;reorder, never exclude&rdquo;: same ladder, different order, full reachability preserved.")]
 
     # 03
-    F += [_heading("03", "A publication-grade null result: grammar-component predictive power.")]
+    F += [_finding("03", "null result", "A publication-grade null result: grammar-component predictive power.")]
     F += [Paragraph(
         "Before building a grammar/AST attack-composition engine, a " + b("$0 observational study over "
         "1,540 (primitive × target) cells") + " tested whether grammar-structure nodes predict breach "
@@ -326,7 +352,7 @@ def build() -> Path:
         "a successful negative result.")]
 
     # 04
-    F += [_heading("04", "Measure-before-build discipline.")]
+    F += [_finding("04", "discipline", "Measure-before-build discipline.")]
     F += [Paragraph(
         "$0 measurements from existing telemetry were used repeatedly to <i>invert</i> &ldquo;build "
         "it&rdquo; decisions, each parked with an explicit trigger to revisit:", S["body"])]
@@ -342,7 +368,7 @@ def build() -> Path:
     ], bulletType="bullet", bulletColor=GREEN, bulletFontSize=6, spaceAfter=6)]
 
     # limitations
-    F += [Spacer(1, 8)]
+    F += [Spacer(1, 10)]
     lim = [Paragraph("LIMITATIONS, STATED PLAINLY", S["notelbl"]), Spacer(1, 3), Paragraph(
         "Targets are black-box live-API models whose versions are not pinned. Some cells are small-n "
         "(95% bootstrap confidence intervals are persisted precisely because of this). The judge is "
