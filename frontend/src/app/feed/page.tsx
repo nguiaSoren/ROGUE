@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, API_CONFIGURED } from "@/lib/api";
 import { FeedStream } from "@/components/feed-stream";
 import { AugmentationStrip } from "@/components/augmentation-strip";
 import { BanditWidget } from "@/components/bandit-widget";
@@ -14,6 +14,37 @@ import { StubbornnessWidget } from "@/components/stubbornness-widget";
 export const revalidate = 300;
 
 /**
+ * /feed default export — ONE try/catch around the whole render so a missing API base in a preview
+ * build (NEXT_PUBLIC_API_BASE is Production-scoped, hence unset in previews) can't fail the build.
+ * Production rethrows on a real failure (keep the last-good static feed, never cache an empty one);
+ * preview/local degrades to a placeholder so the preview build succeeds.
+ */
+export default async function FeedPage() {
+  try {
+    return await renderFeed();
+  } catch (err) {
+    if (API_CONFIGURED) throw err;
+    return <FeedUnavailable />;
+  }
+}
+
+function FeedUnavailable() {
+  return (
+    <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 text-center space-y-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+          /feed · live
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Live Feed</h1>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          This preview build has no API connection; the live feed renders in production.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/**
  * /feed, Live Feed.
  *
  * Layout: 4-tile KPI strip, the §10.7 augmentation A/B summary strip, then
@@ -23,7 +54,7 @@ export const revalidate = 300;
  *
  * Spec: ROGUE_PLAN §11.1.
  */
-export default async function FeedPage() {
+async function renderFeed() {
   // `attacks` is the critical dataset (the feed list + KPIs). Fetch it WITHOUT
   // allSettled so a failure throws and propagates: Next + Vercel then keep
   // serving the last-good static feed instead of caching an empty one (an
