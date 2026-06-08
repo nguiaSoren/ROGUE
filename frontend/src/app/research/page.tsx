@@ -211,20 +211,27 @@ export default function ResearchPage() {
                 (v3 tool-trace: 98.89%, 100% recall, false-positive mode driven
                 9.38 to 6.25 to 3.12%), and the new fabricated-sensitive-value
                 type (100%, 0% false-positive mode, first pass). The harness
-                exposes type-dependent failure modes, then resolves the hardest
-                one by upgrading the evidence, not the rubric.
+                exposes type-dependent failure modes, then resolves them by
+                upgrading the evidence, not the rubric. That pattern generalizes:
+                provenance-dependent breach types need an evidence trace, and the
+                independence check names the missing evidence. Shown twice, on
+                unauthorized-action (a tool-call trace lifted second-labeler κ
+                from 0.746 to 0.917) and on fabricated-value (a retrieval trace,
+                built and shipping).
               </NovelNote>
 
               <MethodNote>
                 Method: per-type designed-label corpora with independent
                 second-labeler κ checks (information-disclosure κ 0.80 base /
-                0.786 boundary, unauthorized-action κ 0.746 pre-trace; harm uses
-                JailbreakBench human-majority agreement, not a κ); single-operator calibration
-                and synthetic designed-label corpora throughout. The v3 tool-trace
-                and fabricated-value corpora are first-pass, κ-pending; in
-                calibration the tool-trace is embedded in the graded text, with
-                the production seam being the scan engine&apos;s Capture.
-                Descriptive measurements, not validated generalizations.
+                0.786 boundary, unauthorized-action κ 0.746 pre-trace then 0.917
+                with the tool-trace; harm uses JailbreakBench human-majority
+                agreement, not a κ); single-operator calibration and synthetic
+                designed-label corpora throughout. The fabricated-value
+                retrieval-trace is built and the judge ships on it (96.88%), with
+                its human κ re-check pending; in calibration the traces are
+                embedded in the graded text, the production seam being the scan
+                engine&apos;s Capture. Descriptive measurements, not validated
+                generalizations.
               </MethodNote>
             </div>
           </div>
