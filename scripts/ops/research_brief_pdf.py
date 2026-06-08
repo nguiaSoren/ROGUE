@@ -278,7 +278,10 @@ def build() -> Path:
         "tool-call trace resolved it by making execution a recorded fact rather than a text-only proxy. "
         "Caveats stated plainly: single-operator kappa (the tool-trace lifted unauthorized-action from 0.746 "
         "to 0.917; the fabricated-value retrieval-trace lifted its human kappa from 0.723 to 0.909); "
-        "corpora are synthetic. These are descriptive measurements, not validated generalizations.")]
+        "corpora are synthetic. The building blocks are established (trace-grounded agent eval, kappa-gated "
+        "calibration, provenance attribution, cross-type judge generalization like CompliBench); the "
+        "contribution is the rigor and the measured cross-type result, not a new mechanism. These are "
+        "descriptive measurements, not validated generalizations.")]
 
     # 02
     F += [_heading("02", "Scheduling as a capability lever, not just an optimization.")]
