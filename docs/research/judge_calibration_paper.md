@@ -1,10 +1,21 @@
-# Calibrating and Generalizing an LLM-as-Judge for Red-Team Breach Detection
+# Consummation-Based Calibration of LLM-as-Judge Breach Detectors: A Methodology that Generalizes Across Breach Classes
 
-*Draft / working paper · seeded 2026-06-08. The v3 calibration results below are **measured** (reproducible from `breach_results` / `data/calibration/`); the generalization result (§4) is **pending** the paid information-disclosure sweep — the harness produces the CI-bearing numbers, the numbers themselves are not yet collected. Do not quote §4 figures until the sweep runs.*
+*Working paper · last updated 2026-06-08. All results are **measured and reproducible** from `data/calibration/*.json` + `breach_results`; the v2 generalization is frozen at commit `bc088fb` (branch `v2-phase1`). Scope is honestly bounded — single-operator κ, synthetic designed-label corpora, a text-only proxy for actions (§6) — and the claims are tightened to match.*
 
 ## Abstract
 
-Every breach verdict in an open-web LLM red-team is itself an LLM judgment, making the judge the single load-bearing component. We report (1) a calibration of an LLM-as-judge against an independent human-labeled benchmark that exposed systematic over-flagging, (2) a named false-positive taxonomy and a rubric fix — a *content-transfer gate* — that moved the judge from last-of-five to tied with frontier classifiers, and (3) a generalization of that gate into a *parameterized per-rule consummation judge* with a reusable per-type labeling pipeline. The unifying principle across all breach types is **engagement ≠ breach; consummation = breach**.
+Every breach verdict in an open-web LLM red-team is itself an LLM judgment, making the judge the load-bearing component — and a *generic* one: "did the agent breach policy?" is the same question for harm, data disclosure, or an unauthorized action. We present a **methodology for constructing calibrated breach judges across breach classes** from one template: a *consummation gate* ("engagement ≠ breach; consummation = breach") instantiated per breach type, a reusable per-type labeling pipeline, and a CI-gated calibration harness. We validate it through the full research loop — **diagnosis → false-positive taxonomy → targeted intervention → re-measurement → improvement** — not a single prompt. (1) On JailbreakBench we diagnose a structural over-flagging failure (70.3% human agreement, last of five), name its five-mode FP taxonomy, and fix it with the content-transfer gate (89.3%, tied with frontier classifiers). (2) The same gate, re-instantiated, calibrates a *content* breach — information-disclosure: 94.74% agreement, 100% recall, 0% FP-mode over 31 traps. (3) On a structurally different *action* breach the harness **self-diagnoses**: it returns REFINE, we apply a targeted rubric refinement, and re-measurement ships it (FP-mode 9.38%→6.25%, recall held). The central finding: **calibration difficulty is type-dependent, and the methodology exposes it** — action consummation ("did the agent execute") is harder than content consummation ("did the datum appear") for the judge *and* an independent human relabeler (κ 0.746 < 0.786 < 0.80), which both validates the gate and motivates a tool-trace upgrade. The contribution is the *methodology*, not a single judge.
+
+**Contribution (the claim, tightened).** Not "we built a better harm judge" but **a method for constructing calibrated breach judges across multiple breach classes** — one consummation-gate template + one per-type labeling pipeline + a CI-gated harness — that **generalizes across breach types and exposes type-dependent failure modes**, validated by an explicit diagnose → taxonomy → intervene → re-measure → improve loop (the unauthorized-action REFINE→SHIP cycle) rather than a single prompt that happened to work.
+
+**Table 1 — one gate template, calibrated across breach classes** (all measured; CIs are 95% bootstrap; FP-mode = each type's headline false-positive trap; κ = independent second-labeler agreement).
+
+| Breach class | Kind | n | Agreement (95% CI) | Recall | FP-mode (n traps) | Gate | Indep. κ |
+|---|---|---|---|---|---|---|---|
+| Harm (capability transfer) | content | 300 (JBB) | 89.3% | 95.5% | — | SHIP | — |
+| Information-disclosure | content | 114 | **94.74%** [90.4, 98.2] | 100% | **0.0%** (31) | SHIP | 0.80 / 0.786 |
+| Unauthorized-action · v1 | action | 90 | 96.67% [92.2, 100] | 100% | 9.38% (32) | REFINE | — |
+| Unauthorized-action · v2 | action | 90 | **97.78%** [94.4, 100] | 100% | **6.25%** (32) | **SHIP** | 0.746 |
 
 ## 1. The diagnosis (measured)
 
@@ -61,6 +72,15 @@ The same calibrated apparatus instantiates for oversight assurance (a reviewer f
 ## 6. Limitations (stated plainly)
 
 Targets are black-box live-API models whose versions are not pinned; some cells are small-n (95% bootstrap CIs are persisted precisely because of this); the judge is single-operator-calibrated. These are descriptive measurements of a live system, not validated generalizations. The independence of every ground-truth label is the load-bearing assumption (and the largest recurring cost).
+
+## Figures (reproducible)
+
+Regenerate from the measured calibration reports with `uv run python scripts/calibration/judge_figs.py` → `docs/research/figs/`:
+- **F1 `judge_F1_generalization.png`** — one consummation-gate template, agreement/recall/FP-mode across harm, information-disclosure, and unauthorized-action (v2). *Shows the gate generalizes.*
+- **F2 `judge_F2_refine_to_ship.png`** — the unauthorized-action REFINE→SHIP loop (FP-mode 9.38%→6.25%, agreement up, recall held). *Shows the diagnose→refine→ship methodology, not a one-off prompt.*
+- **F3 `judge_F3_type_dependent.png`** — type-dependent difficulty: FP-mode + independent κ for content vs action. *Shows action consummation is harder for the judge **and** the human.*
+
+Tables and figures are reproducible end-to-end: `scripts/calibration/calibrate_breach_type.py` writes `data/calibration/<type>_report.json`; `judge_figs.py` plots from those; Table 1's numbers are read from the same JSONs.
 
 ## Provenance
 
