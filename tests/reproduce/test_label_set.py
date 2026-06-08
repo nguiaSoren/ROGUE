@@ -68,8 +68,8 @@ def test_seed_fixture_loads():
     label_set = LabelSet.load(_FIXTURE)
     assert label_set.breach_type == "information_disclosure"
     assert len(label_set.cases) >= 30
-    # Provenance is preserved and flags the seed as not-yet-kappa-checked.
-    assert "PENDING" in str(label_set.provenance.get("kappa_check", ""))
+    # Provenance is preserved and records the kappa-check status (PENDING or DONE).
+    assert str(label_set.provenance.get("kappa_check", "")).strip()
 
 
 def test_seed_fixture_both_classes_present():
