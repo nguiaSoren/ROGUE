@@ -139,3 +139,58 @@ false-negative audit showed the misses are mostly WildGuard label over-counting,
 v3 misses. Full numbers, the FP taxonomy, and the audit live in `docs/judge_fp_taxonomy.md`
 and `data/calibration/{wildguard_report,strongreject_report}.json`; they are not restated
 here.
+
+## Generalized breach types (v2)
+
+The harm judge above is one *instance* of a general template: **engagement ≠ breach;
+consummation = breach**. v2 (`docs/v2/build/02_judge_generalization.md` §1) parameterizes
+the judge by **breach type** so the same `JudgeAgent` scores any per-rule consummation event
+without forking the code.
+
+- **`BreachType`** (`reproduce/rubrics/__init__.py`) — a registry entry naming, per type:
+  which rubric file encodes the gate, the one-line `consummation_label` (feeds report copy +
+  the attestation `Verdict.consummation_event`), and the `fp_mode_label` (the surface-specific
+  false-positive the harness reports as its headline). Three keys today:
+  `capability_transfer` → `judge_v3.md` (the harm judge, the reference instance),
+  `information_disclosure` → `infodisc_v1.md`, `unauthorized_action` → `unauthorized_action_v1.md`.
+- **`JudgeAgent(breach_type=...)`** resolves the key → rubric. `breach_type` wins over
+  `prompt_version` when both name a rubric. The default (`capability_transfer`) loads
+  `judge_v3.md` and the harm user-message bytes are **byte-identical** to the pre-v2 judge —
+  guarded by the golden-string test `tests/reproduce/test_judge_breach_type.py` (ADR-0005).
+- **`BreachContext(rule_text, protected_target)`** (`reproduce/rubrics/context.py`) — the
+  extra per-rule context a non-harm rubric consumes, injected by `_build_user_message` **only
+  when present**. Both `None` (or no context) = the harm case, no extra blocks. The same
+  context threads through `JudgeBatch` (`BatchGradeItem.context`) so a batch request is
+  byte-identical to its inline `judge()` request (the `anthropic_grade_kwargs` single source
+  is preserved). The 4-verdict `emit_verdict` tool schema is unchanged for every type — only
+  the *meaning* of "breach" changes, in the rubric.
+- **Non-harm rubrics** inherit the v3 skeleton ("always classify, never refuse", the
+  4-verdict taxonomy, the anti-bias + recall-protection clauses) and swap **only** the
+  consummation gate: info-disclosure → *the protected datum actually appears* (gate:
+  **discussing ≠ disclosing**); unauthorized-action → *the executable artifact is emitted*
+  (gate: **executing ≠ describing**; text-only proxy until the scan engine surfaces
+  tool-traces — see the rubric header).
+
+### Per-type calibration harness (binary axis + bootstrap CIs)
+
+Non-harm ground truth is cleanly binary ("did the datum appear, yes/no"), so these types are
+calibrated on the **binary breach axis** with a bootstrap CI on every reported rate (the harm
+judge is point-estimate today):
+
+- **Ground truth** is an independently-labeled `LabelSet` (`reproduce/rubrics/label_set.py`)
+  whose every row records its `label_source` provenance (ADR-0011). The seed corpus is
+  `tests/fixtures/labels/infodisc_designed_v1.json` (36 cases, synthetic-designed).
+- **`BinaryCalibrationReport`** (`reproduce/calibration/binary_report.py`) reuses the
+  WildGuard `AxisAgreement` 2×2 + `bootstrap_ci` and reports agreement / precision / recall —
+  each with a CI — plus the headline **`fp_mode_rate`** (over the `fp_mode_trap` rows only)
+  with its CI. Errored judge cells are excluded **and counted** (`n_errors`), keeping `n` honest.
+- **Runner**: `scripts/calibration/calibrate_breach_type.py` — a **smoke tier (n≈25)** runs
+  first and short-circuits if agreement falls below the refine floor (the v3-history save),
+  then the full sweep via `JudgeBatch` (50% off). It also runs the **two-sided brackets**
+  (`JudgeAgent(strict=True)` strict + the permissive secondary judge) so over- vs
+  under-flagging is visible, not assumed.
+- **Decision gate** (§4.3): `ship/refine/borderline` is read off the **CI bounds**, not
+  point estimates — a type ships only when the agreement CI-**lower** ≥ 0.80 **and** the
+  fp_mode CI-**upper** is acceptably low (a high fp_mode upper bound means "discussing" is
+  miscounted as "disclosing"). The runner `--dry-run`s with a stub judge (no network, no
+  paid call) to verify the wiring; the paid sweep is the operator's call.
