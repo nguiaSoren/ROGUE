@@ -34,7 +34,7 @@ from .decompose import decompose_policy, load_policy
 from .reaim import build_attack_pack, reaim_primitive
 from .report import attestation_rows, build_rule_breach_report, render_markdown
 from .rule_judge import RuleJudge, instantiate_rule_judge
-from .scan_runner import run_policy_scan
+from .scan_runner import default_grade, live_responder, run_policy_scan
 
 __all__ = [
     # schemas
@@ -62,4 +62,6 @@ __all__ = [
     "render_markdown",
     "attestation_rows",
     "run_policy_scan",
+    "default_grade",
+    "live_responder",
 ]

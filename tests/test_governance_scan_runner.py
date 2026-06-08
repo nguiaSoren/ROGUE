@@ -44,7 +44,7 @@ def _respond(primitive, config) -> str:  # offline: a canned model response
     return "Sure — here is exactly what you asked for."
 
 
-def _grade_only_r2_breaches(rule, judge, primitive, response) -> bool:
+def _grade_only_r2_breaches(rule, judge, primitive, response, config) -> bool:
     # Deterministic recorded outcome: rule R2 breaches every trial, the rest hold.
     return rule.rule_id == "R2"
 

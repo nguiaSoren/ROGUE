@@ -7,15 +7,15 @@ builds the attack pack (§3), scores its coverage (§5), instantiates the per-ru
 :class:`RuleBreachReport` (§6).
 
 Both side-effecting steps are injected so the exit gate runs fully offline:
-  * ``respond(primitive, config) -> str`` — get a model response. In production this is
-    the scan engine / target adapter; in tests it is recorded transcripts.
-  * ``grade(rule, judge, primitive, response) -> bool`` — did this trial breach. Defaults
-    to :func:`default_grade` (the real per-rule judge); tests inject a recorded mock.
+  * ``respond(primitive, config) -> str`` — get a model response. Tests inject recorded
+    transcripts; :func:`live_responder` provides the real one (the §6 live seam).
+  * ``grade(rule, judge, primitive, response, config) -> bool`` — did this trial breach.
+    Defaults to :func:`default_grade` (the real per-rule judge); tests inject a mock.
 
-Wiring the *default* ``respond`` to the live scan engine is the one remaining §6 seam
-(inject the per-rule ``RuleJudge`` in place of the engine's default ``JudgeAgent``); the
-orchestration, CIs, calibration honesty, coverage gating, and report shape are all
-proven here on fixtures.
+:func:`live_responder` wires ``respond`` to the live scan path (``TargetPanel`` + the
+existing adapters); ``default_grade`` wires ``grade`` to area-02's per-rule judge. Both
+render via ``reproduce.instantiator.render`` (which needs the config), so the offline
+exit gate keeps ``run_policy_scan`` itself render-free and injects pure mocks.
 """
 
 from __future__ import annotations
@@ -32,21 +32,60 @@ from .report import build_rule_breach_report
 from .rule_judge import RuleJudge, instantiate_rule_judge
 
 Responder = Callable[[AttackPrimitive, object], str]
-Grader = Callable[["object", RuleJudge, AttackPrimitive, str], bool]
+Grader = Callable[[object, RuleJudge, AttackPrimitive, str, object], bool]
 
 
-def default_grade(rule, judge: RuleJudge, primitive: AttackPrimitive, response: str) -> bool:
-    """The live grader: render the primitive, judge the response against the rule, project to breach.
+def default_grade(
+    rule, judge: RuleJudge, primitive: AttackPrimitive, response: str, config
+) -> bool:
+    """The live grader: render the primitive against the config, judge the response, project to breach.
 
-    LIVE path (one LLM call per trial) — exercised when ``run_policy_scan`` is wired to
-    the scan engine, not in the offline exit gate (which injects a recorded grader).
+    LIVE path (one judge LLM call per trial) — exercised when ``run_policy_scan`` is wired
+    to real targets, not in the offline exit gate (which injects a recorded grader).
     """
     from rogue.reproduce.instantiator import render
     from rogue.schemas import BREACH_VERDICTS
 
-    rendered = render(primitive)
+    rendered = render(primitive, config)
     result = judge.grade_sync(rendered, response, primitive)
     return getattr(result, "verdict", None) in BREACH_VERDICTS
+
+
+def live_responder(panel=None, *, temperature: float = 0.7):
+    """Wire ``respond`` to the live scan path (TargetPanel + adapters) — the §6 live seam.
+
+    Returns ``(respond, stats)``. ``respond(primitive, config)`` renders the primitive
+    against the config and dispatches ONE real target trial, returning the response text
+    ("" on a modality-skip or empty result). ``stats`` is a mutable dict accumulating
+    ``calls`` and the cumulative target ``cost_usd`` so a caller can report the spend.
+
+    LIVE: each call costs a real model invocation; needs the target provider's API key.
+    """
+    import asyncio
+
+    from rogue.reproduce.instantiator import render
+    from rogue.reproduce.target_panel import TargetPanel
+
+    panel = panel or TargetPanel.from_env()
+    stats = {"calls": 0, "empty": 0, "target_cost_usd": 0.0}
+    # One persistent loop across all trials: asyncio.run() per call closes the loop
+    # between calls and the async HTTP client's deferred cleanup then errors noisily.
+    loop = asyncio.new_event_loop()
+
+    def respond(primitive: AttackPrimitive, config) -> str:
+        rendered = render(primitive, config)
+        responses = loop.run_until_complete(
+            panel.run_attack(rendered, config, temperature=temperature, n_trials=1)
+        )
+        stats["calls"] += 1
+        if not responses:
+            stats["empty"] += 1
+            return ""
+        r = responses[0]
+        stats["target_cost_usd"] += float(getattr(r, "cost_usd", 0.0) or 0.0)
+        return r.content
+
+    return respond, stats
 
 
 def _config_id(config: object) -> str:
@@ -81,7 +120,7 @@ def run_policy_scan(
         for prim in pack.primitives:
             for t in range(n_trials):
                 response = respond(prim, config)
-                breached = bool(grade(rule, judge, prim, response))
+                breached = bool(grade(rule, judge, prim, response, config))
                 outcomes.append(breached)
                 if breached:
                     transcript_refs.append(f"{rule.rule_id}::{prim.primitive_id}::t{t}")
