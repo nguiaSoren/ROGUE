@@ -20,10 +20,32 @@ from rogue.schemas.remediation import (
     RemediationResult,
 )
 
+from .generate import propose_candidates
+from .legit_corpus import available_rule_ids, load_legit_set
+from .loop import RemediationLoop, RemediationTask
+from .report import remediation_attestation_rows, render_remediation_markdown
+from .retest import apply_offline_mitigation, retest_vs_family, retest_vs_legitimate
+
 __all__ = [
+    # schemas
     "MitigationType",
     "MitigationCandidate",
     "OverBlockCheck",
     "RemediationResult",
     "CONFIG_APPLICABLE",
+    # §4 generation
+    "propose_candidates",
+    # §5 legitimate-traffic corpus
+    "load_legit_set",
+    "available_rule_ids",
+    # §6 re-test
+    "apply_offline_mitigation",
+    "retest_vs_family",
+    "retest_vs_legitimate",
+    # §7 loop
+    "RemediationLoop",
+    "RemediationTask",
+    # §8 render + attestation rows (data level)
+    "render_remediation_markdown",
+    "remediation_attestation_rows",
 ]
