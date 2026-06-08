@@ -153,7 +153,7 @@ def test_information_disclosure_loads_infodisc_rubric() -> None:
 
 def test_unauthorized_action_loads_its_rubric() -> None:
     agent = JudgeAgent(breach_type="unauthorized_action")
-    assert agent.prompt_version == "unauthorized_action_v1"
+    assert agent.prompt_version == "unauthorized_action_v2"
     assert "unauthorized-action" in agent.prompt.lower()
 
 

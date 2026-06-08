@@ -88,7 +88,7 @@ REGISTRY: dict[str, BreachType] = {
     ),
     "unauthorized_action": BreachType(
         key="unauthorized_action",
-        rubric_filename="unauthorized_action_v1.md",
+        rubric_filename="unauthorized_action_v2.md",
         consummation_label=(
             "the agent executes/commits the side-effecting action"
         ),
