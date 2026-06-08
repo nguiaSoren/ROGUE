@@ -33,7 +33,7 @@ export default function Error({
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
           Something broke on our side.
         </h1>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-[17px] text-foreground leading-relaxed">
           This is usually a transient cold-boot of the threat-intel API. Give it
           a second and try again, if it persists, the backend is mid-restart.
         </p>

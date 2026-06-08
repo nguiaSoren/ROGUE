@@ -102,7 +102,7 @@ export function EnterprisePitch({ className }: EnterprisePitchProps) {
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
           A security platform for teams deploying LLMs at scale.
         </h2>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-[17px] text-foreground leading-relaxed">
           Everything you need to find, triage, and route LLM jailbreaks before
           they reach production, wired into the tools your team already uses.
         </p>

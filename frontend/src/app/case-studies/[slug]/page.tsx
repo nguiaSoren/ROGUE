@@ -83,7 +83,7 @@ export default async function CaseStudyDetail({
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
             {cs.title}
           </h1>
-          <p className="text-base text-muted-foreground leading-relaxed">
+          <p className="text-[17px] text-foreground leading-relaxed">
             {cs.summary}
           </p>
 
@@ -113,13 +113,13 @@ export default async function CaseStudyDetail({
         {/* Canonical sections ----------------------------------------- */}
         <article className="space-y-14 md:space-y-16 max-w-3xl">
           <ReportSection eyebrow="01 · Problem" title="The problem">
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               {cs.problem}
             </p>
           </ReportSection>
 
           <ReportSection eyebrow="02 · Deployment" title="The deployment under test">
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               {cs.deployment}
             </p>
           </ReportSection>
@@ -133,7 +133,7 @@ export default async function CaseStudyDetail({
               {cs.remediation.map((r, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-3 text-base text-muted-foreground leading-relaxed"
+                  className="flex items-start gap-3 text-[17px] text-foreground leading-relaxed"
                 >
                   <span className="mt-2 size-1.5 rounded-full bg-rogue-green shrink-0" />
                   <span>{r}</span>
@@ -143,7 +143,7 @@ export default async function CaseStudyDetail({
           </ReportSection>
 
           <ReportSection eyebrow="05 · Outcome" title="The outcome">
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               {cs.outcome}
             </p>
           </ReportSection>
@@ -228,7 +228,7 @@ function Findings({ cs }: { cs: CaseStudy }) {
       {cs.findings.map((f, i) => (
         <li
           key={i}
-          className="flex items-start gap-3 text-base text-muted-foreground leading-relaxed"
+          className="flex items-start gap-3 text-[17px] text-foreground leading-relaxed"
         >
           <span className="mt-2 size-1.5 rounded-full bg-rogue-red shrink-0" />
           <span>{f}</span>

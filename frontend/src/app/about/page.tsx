@@ -33,7 +33,7 @@ export default function AboutPage() {
         {/* 2. THE STORY --------------------------------------------------- */}
         <Section eyebrow="the story" title="From hackathon to live platform.">
           <div className="max-w-3xl space-y-5">
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               ROGUE was built solo by{" "}
               <span className="text-foreground font-medium">Soren Nguia</span> in
               roughly six days during the{" "}
@@ -43,7 +43,7 @@ export default function AboutPage() {
               </span>{" "}
               in May 2026, an autonomous open-web LLM red-team agent.
             </p>
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               Since the hackathon it has been extended into a hosted,
               multi-tenant platform, SDK, REST API, dashboard, and an MCP
               server, that is permanently live in production.
@@ -81,7 +81,7 @@ export default function AboutPage() {
               strokeWidth={1.75}
               aria-hidden
             />
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               ROGUE is a solo research-and-engineering project, not a funded
               company. It began as a six-day hackathon build and kept getting
               extended, into a hosted platform, an MCP server, a benchmark
@@ -114,7 +114,7 @@ export default function AboutPage() {
         {/* 4. HOW IT WORKS ------------------------------------------------ */}
         <Section eyebrow="how it works" title="Harvest, reproduce, judge.">
           <div className="max-w-3xl space-y-5">
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               ROGUE harvests, reproduces, and judges LLM jailbreaks and
               prompt-injection from the open web, {" "}
               <span className="text-foreground font-medium">

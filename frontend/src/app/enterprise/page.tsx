@@ -131,7 +131,7 @@ export default function EnterprisePage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight max-w-2xl">
               Bring ROGUE to your stack.
             </h2>
-            <p className="text-base text-muted-foreground leading-relaxed max-w-2xl">
+            <p className="text-[17px] text-foreground leading-relaxed max-w-2xl">
               Tell us your deployment shape and we&apos;ll spin up the right
               mode. For how we handle your data and credentials, see{" "}
               <Link

@@ -147,7 +147,7 @@ export default function SecurityPage() {
               strokeWidth={1.75}
               aria-hidden
             />
-            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+            <p className="text-sm md:text-[17px] text-foreground leading-relaxed">
               The hosted platform fits most teams, but if your model can&apos;t be
               reached from the public internet, or your compliance posture
               requires data never leave your perimeter, ROGUE can run inside
