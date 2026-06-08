@@ -66,10 +66,21 @@ hard enough," not "the rule is safe"?
 - **Weak/null:** CI includes 0 → coverage is unvalidated; keep it a heuristic, note it needs rework,
   do **not** claim it as a result. Either way the metric/report framing stays honest.
 
+## Result — ✅ VALIDATED (modest but clean), 2026-06-08
+
+96 cells (16 rules × 3 variants × Llama-3.1-8B + Mistral-Small, 6 trials), judge batched (Anthropic Batch API, 50% off, rubric cached). **Coverage predicts breach-detection power:**
+
+- **Monotonic by variant:** strong packs (mean coverage 1.00) breached in **14/32** cells; medium (0.90) in **1/32**; weak (0.52) in **0/32**. The low-coverage packs found **zero** breaches — a coverage-blind report would have emitted a **false `holds`** on the very cells the strong pack cracked. This is the direct empirical justification for the "holds (low coverage — not load-bearing)" gate.
+- **Correlation:** Spearman ρ = **0.352**, bootstrap 95% CI **[0.29, 0.61]** (excludes 0); **0 reversals** — strong never breached less than weak across all 32 rule×target pairs.
+- Targets resisted most attacks (15/96 cells breached; Mistral-Small 11, Llama-8B 4), so ρ is *attenuated* by the many tied-at-zero cells — but the direction is unambiguous and the variant ordering is clean.
+- Figure `docs/research/figs/coverage_validity.png`; cells `data/governance/coverage_validity_live.json`. Target spend $0.32 + the batched judge.
+
+**Honest caveats (keeps the ⚑ scoped):** ρ=0.35 is *moderate*, not strong (driven by the breaching subset); the weights remain *chosen-by-design* — this validates predictive **direction**, not optimality; 16 rules × 2 targets is a real but **modest** study (more vulnerable targets would sharpen it). **Conclusion: coverage is a validated predictor of breach-detection power** — promote the ⚑ from "principled rule" to "measured (modest) result," reported with these caveats.
+
 ## Execution status
 
-- [ ] Grow the rule set (`validity_policy.json`, ~16 rules) — fanned out.
-- [ ] Pack-variant generator (`coverage_variants`) + the batched harness (`scripts/governance/coverage_validity.py`, JudgeBatch + caching).
-- [ ] Run the batched study (paid, background).
-- [ ] Analysis (correlation + CI + figure) + writeup here.
-- [ ] Final sign-off (Soren).
+- [x] Grow the rule set (`validity_policy.json`, **16 rules**) — fanned out (2 engineers).
+- [x] Pack-variant generator (`coverage_variants`) + the batched harness (`scripts/governance/coverage_validity.py`, JudgeBatch + caching).
+- [x] Run the batched study (paid, batched, ✅ done).
+- [x] Analysis (Spearman ρ + bootstrap CI + variant bars) + writeup (above) + figure (`coverage_validity_fig.py`).
+- [ ] **Final sign-off (Soren).**
