@@ -160,30 +160,42 @@ export default function ResearchPage() {
                 <span className="text-foreground font-medium">
                   The gate isn&apos;t harm-specific, it&apos;s a methodology.
                 </span>{" "}
-                The same content-transfer gate (
+                The same consummation gate (
                 <span className="text-foreground/90">
-                  engagement ≠ breach; consummation = breach
+                  engagement is not breach; consummation is breach
                 </span>
-                ), re-instantiated per breach type, calibrates two structurally
-                different policies: a <em>content</em> breach
-                (information-disclosure, &ldquo;did the protected datum
-                appear?&rdquo;) and an <em>action</em> breach
-                (unauthorized-action, &ldquo;did the agent execute?&rdquo;). The
-                harness even{" "}
+                ), re-instantiated per breach type, now calibrates{" "}
+                <span className="text-foreground/90">four</span> structurally
+                different policies: <em>harm</em> (capability transfer),{" "}
+                <em>information-disclosure</em> (content, &ldquo;did the
+                protected datum appear?&rdquo;), <em>unauthorized-action</em>{" "}
+                (action, &ldquo;did the agent execute?&rdquo;), and{" "}
+                <em>fabricated-sensitive-value</em> (a fabrication and trust
+                breach distinct from disclosure, &ldquo;did the model invent a
+                value it presents as real?&rdquo;). The harness{" "}
                 <span className="text-foreground font-medium">
                   self-diagnoses
                 </span>
-                : on the harder action type it returned <em>refine</em>, a
-                targeted rubric fix was applied, and re-measurement shipped it, 
-                the same diagnose → fix → re-measure loop that produced v3, run
-                again.
+                : it returned REFINE on the action type, a targeted rubric fix
+                was applied, and re-measurement shipped it. The deeper result is
+                that the{" "}
+                <span className="text-foreground font-medium">
+                  tool-trace upgrade turned a stated limitation into a measured
+                  resolution
+                </span>
+                . The action type&apos;s earlier weakness (κ 0.746 plus a
+                residual false-positive mode) was an artifact of the text-only
+                proxy, not the gate: once a tool-call trace makes
+                &ldquo;executed&rdquo; a fact rather than a prose inference, the
+                simulate-versus-claim confusion that tripped both judge and human
+                dissolves.
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric value="94.7%" label="info-disclosure agreement" accent="green" />
-                <Metric value="0%" label="FP-mode · 31 traps" accent="green" />
-                <Metric value="97.8%" label="unauth-action (after 1 refine)" accent="green" />
-                <Metric value="100%" label="recall · both types" accent="green" />
+                <Metric value="91.0%" label="harm · top-of-field" accent="green" />
+                <Metric value="97.35%" label="info-disclosure v2" accent="green" />
+                <Metric value="98.89%" label="unauth · tool-trace" accent="green" />
+                <Metric value="100%" label="fabricated · new type" accent="green" />
               </div>
 
               <NovelNote>
@@ -191,19 +203,28 @@ export default function ResearchPage() {
                 <span className="text-rogue-green">⚑</span>{" "}
                 <span className="text-foreground/90">
                   repeatable methodology for calibrating breach judges across
-                  breach classes
+                  four breach classes
                 </span>{" "}
-                that exposes type-dependent failure modes, action consummation
-                is measurably harder than content, for the judge and an
-                independent human alike (κ 0.75 vs 0.80).
+                from one gate template: harm (91.0%, top-of-field, above Llama-3
+                90.7% and GPT-4 90.3%), information-disclosure (v2: 97.35%
+                agreement, 100% recall, 0% false-positive mode), unauthorized-action
+                (v3 tool-trace: 98.89%, 100% recall, false-positive mode driven
+                9.38 to 6.25 to 3.12%), and the new fabricated-sensitive-value
+                type (100%, 0% false-positive mode, first pass). The harness
+                exposes type-dependent failure modes, then resolves the hardest
+                one by upgrading the evidence, not the rubric.
               </NovelNote>
 
               <MethodNote>
-                Method, per-type designed-label corpora (information-disclosure
-                n=113, unauthorized-action n=90) with independent second-labeler
-                κ checks; single-operator calibration, synthetic labels, and a
-                text-only proxy for actions, descriptive measurements, not
-                validated generalizations.
+                Method: per-type designed-label corpora with independent
+                second-labeler κ checks (information-disclosure κ 0.80 base /
+                0.786 boundary, unauthorized-action κ 0.746 pre-trace; harm uses
+                JailbreakBench human-majority agreement, not a κ); single-operator calibration
+                and synthetic designed-label corpora throughout. The v3 tool-trace
+                and fabricated-value corpora are first-pass, κ-pending; in
+                calibration the tool-trace is embedded in the graded text, with
+                the production seam being the scan engine&apos;s Capture.
+                Descriptive measurements, not validated generalizations.
               </MethodNote>
             </div>
           </div>

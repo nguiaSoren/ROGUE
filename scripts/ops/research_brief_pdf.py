@@ -246,27 +246,36 @@ def build() -> Path:
         "benchmarks (WildGuardTest harm labels and StrongREJECT) themselves <i>over-count</i> relative to a "
         "strict content-transfer standard.")]
     F += [Spacer(1, 6), Paragraph(
-        b("The gate is not harm-specific, it is a methodology.") + " The same content-transfer gate, "
-        "re-instantiated per breach type, calibrates two structurally different policies: a "
-        "<i>content</i> breach (information-disclosure, did the protected datum appear) and an "
-        "<i>action</i> breach (unauthorized-action, did the agent execute). The harness "
-        + b("self-diagnoses") + ": on the harder action type it returned <i>refine</i>, a targeted "
-        "rubric fix was applied, and re-measurement shipped it, the same diagnose then fix then "
-        "re-measure loop that produced v3, run again. The contribution is "
+        b("The gate is not harm-specific, it is a methodology.") + " One consummation-gate template, "
+        "re-instantiated per breach type, now calibrates " + b("four structurally different breach classes") +
+        ": a <i>harm</i> breach (capability transfer, re-confirmed at " + b("91.0% agreement, 273 of 300") +
+        ", top-of-field); a <i>content</i> breach (information-disclosure, did the protected datum appear), "
+        "whose v2 rubric defines a materially-revealing threshold and reaches " + b("97.35% agreement") +
+        ", 100% recall, 0% FP-mode (up from 94.74%); an <i>action</i> breach (unauthorized-action, did the "
+        "agent execute), whose v3 tool-trace rubric reaches " + b("98.89% agreement") + ", 100% recall, "
+        "with FP-mode driven 9.38% to 6.25% to 3.12%; and a new <i>fabrication</i> breach "
+        "(fabricated-sensitive-value, a trust breach distinct from disclosure) at " + b("100% agreement") +
+        ", 0% FP-mode on the first pass. The harness " + b("self-diagnoses") + ": on the harder types it "
+        "returned <i>refine</i>, a targeted rubric fix was applied, and re-measurement shipped it, the same "
+        "diagnose then fix then re-measure loop that produced v3, run again. The tool-trace turned a stated "
+        "limitation into a measured resolution: the action type&rsquo;s earlier weakness was the text-only "
+        "proxy, not the gate, so a tool-call trace makes &ldquo;executed&rdquo; a fact and dissolves the "
+        "simulate-or-claim confusion. The contribution is "
         + b("a repeatable methodology for calibrating breach judges across breach classes") + ", "
         "not a single judge.", S["body"])]
     F += [Spacer(1, 4), _chips([
-        ("94.7%", "info-disclosure agreement"),
-        ("0%", "FP-mode (31 traps)"),
-        ("97.8%", "unauth-action (1 refine)"),
-        ("100%", "recall, both types"),
+        ("91.0%", "harm (capability transfer)"),
+        ("97.35%", "info-disclosure v2"),
+        ("98.89%", "unauth-action v3 (tool-trace)"),
+        ("100%", "fabricated-value (new)"),
     ]), Spacer(1, 6)]
     F += [_note(
-        "The methodology exposes type-dependent failure: action consummation (did the agent execute) "
-        "is measurably harder than content (did the datum appear), for the judge and an independent "
-        "human alike. Per-type designed-label corpora (n=113 / n=90) with independent second-labeler "
-        "checks; single-operator calibration, synthetic labels, and a text-only action proxy, so these "
-        "are descriptive measurements, not validated generalizations.")]
+        "Four breach classes, one gate template, every variant shipped. The methodology exposes "
+        "type-dependent difficulty: action consummation (did the agent execute) was the hardest, and the "
+        "tool-call trace resolved it by making execution a recorded fact rather than a text-only proxy. "
+        "Caveats stated plainly: single-operator kappa; the v3 and fabricated-value corpora are first-pass "
+        "with kappa pending; corpora are synthetic. These are descriptive measurements, not validated "
+        "generalizations.")]
 
     # 02
     F += [_heading("02", "Scheduling as a capability lever, not just an optimization.")]
