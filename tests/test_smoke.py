@@ -102,8 +102,9 @@ def test_models_metadata_has_expected_tables() -> None:
     demo-request lead capture, migration 0028) added 2026-06-06.
     ``newsletter_subscribers`` (website newsletter sign-up, migration 0029) added
     2026-06-06. ``attestation_entries`` (ROGUE v2 signed-attestation layer,
-    per-org append-only hash chain, migration 0031) added 2026-06-08. Add new
-    entries here when migrations add tables.
+    per-org append-only hash chain, migration 0031) added 2026-06-08.
+    ``mitigations`` (ROGUE v2 Surface 1b measured-remediation results, migration
+    0032) added 2026-06-09. Add new entries here when migrations add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
     from rogue.db.models import Base
@@ -124,6 +125,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "ladder_attempts",
         "ladder_rotation_membership",
         "memberships",
+        "mitigations",
         "newsletter_subscribers",
         "organizations",
         "pair_refinement_steps",

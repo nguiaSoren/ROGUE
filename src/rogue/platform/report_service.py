@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import html as _html
 import re
+from typing import TYPE_CHECKING
 
 import rogue.report as _report
 from rogue.report import (
@@ -18,12 +19,15 @@ from rogue.report import (
     Finding,
     ScanReport,
     humanize_technique,
-    remediation_for,
+    remediation_section,
     technique_label,
 )
 
 from . import scoring
 from .interfaces import ReportService, ScanStore
+
+if TYPE_CHECKING:
+    from rogue.schemas.remediation import RemediationResult
 
 # Credential shapes that must never appear in a rendered artifact. The persisted payload should already
 # be secret-free (`TargetSpec.api_key` is excluded from the record), but example strings are harvested
@@ -123,14 +127,19 @@ class DefaultReportService(ReportService):
 
     # --- renderers ------------------------------------------------------------------------------
 
-    async def build_json(self, scan_id: str) -> dict:
+    async def build_json(
+        self,
+        scan_id: str,
+        *,
+        mitigations: "dict[str, RemediationResult] | None" = None,
+    ) -> dict:
         """The SDK report dict + the platform headline (`score` 0-100, its `risk_level`) + a coverage block.
 
         Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation` and `explanation`): we layer the platform `score`/`risk_level`/`score_methodology` headline, a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised), and a top-level `executive_summary` (the markdown narrative from `build_executive_summary`) so the dashboard renders the CISO summary without a second call. Each finding is also guaranteed a non-empty `explanation` — backfilled defensively here if `to_dict()` didn't already emit one — so a programmatic consumer never sees a finding without a plain-language meaning. The underlying SDK shape is untouched (additive only).
         """
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
-        out = report.to_dict()
+        out = report.to_dict(mitigations=mitigations)
         out["score"] = score
         out["risk_level"] = scoring.risk_level(score)
         out["score_methodology"] = SCORE_METHODOLOGY
@@ -147,10 +156,17 @@ class DefaultReportService(ReportService):
             if not (isinstance(f_dict.get("explanation"), str) and f_dict["explanation"].strip()):
                 f_dict["explanation"] = _explanation_for(f, f_dict)
         # Top-level exec summary so the dashboard renders the CISO narrative without a second round-trip.
-        out["executive_summary"] = await self.build_executive_summary(scan_id)
+        out["executive_summary"] = await self.build_executive_summary(
+            scan_id, mitigations=mitigations
+        )
         return out
 
-    async def build_executive_summary(self, scan_id: str) -> str:
+    async def build_executive_summary(
+        self,
+        scan_id: str,
+        *,
+        mitigations: "dict[str, RemediationResult] | None" = None,
+    ) -> str:
         """A CISO-ready MARKDOWN exec summary — the artifact a security buyer forwards to their boss.
 
         Narrative, not a stat dump. Four moves: (1) a one-line **risk-posture verdict** tying the
@@ -164,6 +180,7 @@ class DefaultReportService(ReportService):
         and degrades gracefully to a clean all-clear when nothing material breached.
         """
         report = await self._load_report(scan_id)
+        muts = mitigations or {}
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
 
@@ -214,7 +231,7 @@ class DefaultReportService(ReportService):
                 if f.family in seen_families:
                     continue
                 seen_families.add(f.family)
-                lines.append(f"{rank}. {remediation_for(f.family)}")
+                lines.append(f"{rank}. {remediation_section(f.family, muts.get(f.family))}")
                 rank += 1
             lines.append("")
         else:
@@ -248,7 +265,12 @@ class DefaultReportService(ReportService):
 
         return "\n".join(lines)
 
-    async def build_html(self, scan_id: str) -> str:
+    async def build_html(
+        self,
+        scan_id: str,
+        *,
+        mitigations: "dict[str, RemediationResult] | None" = None,
+    ) -> str:
         """Reuse `ScanReport.to_html()`, surfacing the platform score/risk_level in the header KPIs.
 
         `ScanReport.to_html()` accepts optional `score`/`risk_level` params and renders the Risk-score KPI natively; we pass them through. The `TypeError` fallback below is a defensive vestige for an older `rogue.report` that predates those params — it string-splices a Risk-score KPI in front of the KPI row so the headline number still leads the page even against that build.
@@ -258,7 +280,7 @@ class DefaultReportService(ReportService):
         level = scoring.risk_level(score)
 
         try:
-            return report.to_html(score=score, risk_level=level)
+            return report.to_html(score=score, risk_level=level, mitigations=mitigations)
         except TypeError:
             # Defensive: only reached against an older `to_html` that predates the score/risk_level
             # params. Splice a Risk-score KPI in front of the existing KPI row so the headline number
@@ -273,7 +295,12 @@ class DefaultReportService(ReportService):
                 page = page.replace(marker, marker + " " + kpi, 1)
             return page
 
-    async def build_pdf(self, scan_id: str) -> bytes:
+    async def build_pdf(
+        self,
+        scan_id: str,
+        *,
+        mitigations: "dict[str, RemediationResult] | None" = None,
+    ) -> bytes:
         """Render a CISO-ready PDF document (lazy-imports reportlab; raises if it's absent).
 
         Structure, top to bottom: a cover title, the headline Risk score + risk_level with the
@@ -302,6 +329,7 @@ class DefaultReportService(ReportService):
         import io  # noqa: PLC0415
 
         report = await self._load_report(scan_id)
+        muts = mitigations or {}
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
         styles = getSampleStyleSheet()
@@ -310,7 +338,7 @@ class DefaultReportService(ReportService):
         # The exec summary is markdown (one short paragraph + a findings list); for the PDF we want a
         # single prose paragraph as the lead-in, so take the markdown's headline/business-framing prose
         # rather than re-rendering its bullet list (the table below already enumerates the findings).
-        summary_md = await self.build_executive_summary(scan_id)
+        summary_md = await self.build_executive_summary(scan_id, mitigations=mitigations)
         summary_prose = self._summary_prose(summary_md)
 
         # --- Cover + headline -------------------------------------------------------------------
@@ -373,7 +401,9 @@ class DefaultReportService(ReportService):
                         f.success_pct,
                         Paragraph(_html.escape(technique_label(f.family)), body),
                         Paragraph(finding_cell, body),
-                        Paragraph(_html.escape(remediation_for(f.family)), body),
+                        Paragraph(
+                            _html.escape(remediation_section(f.family, muts.get(f.family))), body
+                        ),
                     ]
                 )
         if len(data) == 1:
