@@ -34,7 +34,7 @@ RUBRIC_FILES = [
     "judge_v3.md",  # capability_transfer — the reference instance
     "infodisc_v2.md",  # information_disclosure — Phase 1 primary target
     "unauthorized_action_v3.md",  # unauthorized_action — Phase 1 stretch target
-    "fabricated_sensitive_value_v1.md",  # fabricated_sensitive_value — v2 follow-up type
+    "fabricated_sensitive_value_v2.md",  # fabricated_sensitive_value — v2 follow-up type
 ]
 
 # The exact verdict tokens ``judge_v3.md`` uses (and that
