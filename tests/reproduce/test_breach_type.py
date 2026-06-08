@@ -23,7 +23,7 @@ EXPECTED_FILENAMES = {
     "capability_transfer": "judge_v3.md",
     "information_disclosure": "infodisc_v2.md",
     "unauthorized_action": "unauthorized_action_v3.md",
-    "fabricated_sensitive_value": "fabricated_sensitive_value_v1.md",
+    "fabricated_sensitive_value": "fabricated_sensitive_value_v2.md",
 }
 
 
