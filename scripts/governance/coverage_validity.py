@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import itertools
 import json
 import random
 from pathlib import Path
@@ -63,23 +64,25 @@ def coverage_variants(rule: PolicyRule, corpus: list[AttackPrimitive]) -> dict[s
     }
 
 
-async def _collect(panel, rule, pack, config, n_trials, judge, sem) -> list[tuple]:
-    """Concurrent target calls → list of (custom_id, BatchGradeItem, cost) for this cell."""
+async def _collect(panel, rule, pack, config, n_trials, judge, sem, cid_for) -> list[tuple]:
+    """Concurrent target calls → list of (custom_id, BatchGradeItem, cost) for this cell.
 
-    async def _one(prim, t):
+    ``custom_id`` is a short counter token (the Batch API requires ^[A-Za-z0-9_-]{1,64}$
+    and global uniqueness — the same primitive recurs across variants, so a content key
+    would collide).
+    """
+
+    async def _one(prim, cid):
         rendered = render(prim, config)
         async with sem:
             resps = await panel.run_attack(rendered, config, n_trials=1)
         text = resps[0].content if resps else ""
         cost = float(resps[0].cost_usd) if resps else 0.0
-        cid = f"{rule.rule_id}|{config.config_id}|{prim.primitive_id}|{t}"
         return cid, BatchGradeItem(custom_id=cid, rendered=rendered, model_response=text,
                                    primitive=prim, context=judge.context), cost
 
-    results = await asyncio.gather(
-        *[_one(prim, t) for prim in pack.primitives for t in range(n_trials)]
-    )
-    return list(results)
+    tasks = [_one(prim, cid_for()) for prim in pack.primitives for _ in range(n_trials)]
+    return list(await asyncio.gather(*tasks))
 
 
 def _spearman(xs, ys) -> float:
@@ -111,6 +114,8 @@ def _spearman_ci(xs, ys, B=2000, seed=20260524):
 async def _run(policy, corpus, targets, n_trials, dry_run) -> dict:
     panel = None if dry_run else TargetPanel.from_env()
     sem = asyncio.Semaphore(8)
+    _counter = itertools.count()
+    cid_for = lambda: f"c{next(_counter):06d}"  # noqa: E731  unique, Batch-API-valid
     by_type: dict[str, list] = {}        # breach_type -> [(cid, BatchGradeItem)]
     cell_keys: dict[str, list[str]] = {} # (rule|variant|target) -> [cid...]
     cov_of: dict[str, float] = {}
@@ -131,7 +136,7 @@ async def _run(policy, corpus, targets, n_trials, dry_run) -> dict:
                             cid = f"{key}|{prim.primitive_id}|{t}"
                             cell_keys[key].append(cid)
                     continue
-                collected = await _collect(panel, rule, pack, tgt, n_trials, judge, sem)
+                collected = await _collect(panel, rule, pack, tgt, n_trials, judge, sem, cid_for)
                 for cid, item, cost in collected:
                     target_cost += cost
                     by_type.setdefault(rule.breach_type.value, []).append((cid, item))
