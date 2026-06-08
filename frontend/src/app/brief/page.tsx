@@ -31,6 +31,22 @@ function BriefUnavailable() {
 }
 
 /**
+ * /brief default export — ONE try/catch around the whole render so no prerender-time fetch
+ * failure can fail the build. Production (NEXT_PUBLIC_API_BASE set): a real failure rethrows, so
+ * Vercel keeps the last-good static brief and never caches a broken one. Preview/local (no API
+ * base — the var is Production-scoped, so it's unset in previews): the build-time fetch can't
+ * reach the API, so we degrade to a placeholder and the preview build still succeeds.
+ */
+export default async function BriefPage() {
+  try {
+    return await renderBrief();
+  } catch (err) {
+    if (API_CONFIGURED) throw err;
+    return <BriefUnavailable />;
+  }
+}
+
+/**
  * /brief, Threat Brief.
  *
  * Reads like a daily CISO threat brief: a dated masthead with export actions,
@@ -42,30 +58,20 @@ function BriefUnavailable() {
  * snapshot + KPI strip, the markdown feeds the long-form report below. They
  * come from the same disk artifact so values cannot disagree.
  */
-export default async function BriefPage() {
-  // The markdown brief is the critical fetch, do NOT swallow its failure. If it
-  // throws (API mid-restart / cold Neon), let it propagate so Next + Vercel keep
-  // serving the last-good static brief instead of caching a "brief unavailable"
-  // page for the full ISR window. The JSON form (exec snapshot) is non-critical.
+async function renderBrief() {
+  // The markdown brief is the critical fetch. Any failure (API mid-restart / cold Neon / no API
+  // base in a preview build) propagates to BriefPage's try/catch above, which rethrows in
+  // production and degrades in preview. The JSON form (exec snapshot) is non-critical.
   const [briefMarkdown, briefJsonRes] = await Promise.all([
-    api.brief(undefined, "markdown").catch((err) => {
-      // Production (API base set): fail loudly so Vercel keeps the last-good static brief.
-      // Preview/local (no API base): the build-time fetch can't reach the API — degrade below.
-      if (API_CONFIGURED) throw err;
-      return null;
-    }),
+    api.brief(undefined, "markdown"),
     api.brief(undefined, "json").catch(() => null),
   ]);
   const briefJson = (briefJsonRes?.json ?? null) as BriefJson | null;
 
-  // No markdown payload: in Production an anomaly worth failing on (keep the last-good brief
-  // rather than caching an empty one); in a preview/local build with no API base, render the
-  // placeholder so the build still succeeds.
+  // Successful fetch but no markdown payload is an anomaly (the brief is always generable from the
+  // matrix) — throw so the wrapper keeps the last-good brief rather than caching an empty one.
   if (!briefMarkdown?.markdown) {
-    if (API_CONFIGURED) {
-      throw new Error("brief markdown payload empty");
-    }
-    return <BriefUnavailable />;
+    throw new Error("brief markdown payload empty");
   }
 
   const summary = briefJson?.summary;
