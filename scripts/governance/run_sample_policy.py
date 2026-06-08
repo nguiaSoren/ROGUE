@@ -31,10 +31,22 @@ def _policy() -> ClientPolicy:
     return ClientPolicy.model_validate_json((_FIX / "sample_policy.json").read_text())
 
 
-def _corpus() -> list[AttackPrimitive]:
-    raw = json.loads((_FIX / "mini_corpus.json").read_text())
-    rows = raw["primitives"] if isinstance(raw, dict) and "primitives" in raw else raw
-    return [AttackPrimitive.model_validate(r) for r in rows]
+def _corpus(mode: str) -> list[AttackPrimitive]:
+    if mode == "mini":
+        raw = json.loads((_FIX / "mini_corpus.json").read_text())
+        rows = raw["primitives"] if isinstance(raw, dict) and "primitives" in raw else raw
+        return [AttackPrimitive.model_validate(r) for r in rows]
+    # "packs": the real harvested packs (stronger + more primitives per family), deduped.
+    from rogue.packs import load_pack
+
+    seen: set[str] = set()
+    out: list[AttackPrimitive] = []
+    for name in ("aggressive", "default", "compliance"):
+        for p in load_pack(name):
+            if p.primitive_id not in seen:
+                seen.add(p.primitive_id)
+                out.append(p)
+    return out
 
 
 def _pick_config(config_id: str | None):
@@ -54,12 +66,14 @@ def main() -> None:
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--config-id", default=None)
+    ap.add_argument("--corpus", choices=("mini", "packs"), default="mini",
+                    help="'packs' = real harvested packs (aggressive+default+compliance), stronger")
     ap.add_argument("--n-trials", type=int, default=3)
     ap.add_argument("--dry-run", action="store_true", help="free: stub respond/grade, verify wiring")
     ap.add_argument("--yes", action="store_true", help="confirm the PAID live run")
     args = ap.parse_args()
 
-    policy, corpus, config = _policy(), _corpus(), _pick_config(args.config_id)
+    policy, corpus, config = _policy(), _corpus(args.corpus), _pick_config(args.config_id)
     print(
         f"policy={policy.policy_id} ({len(policy.rules)} rules) · "
         f"target={config.config_id} ({config.target_model}) · "
