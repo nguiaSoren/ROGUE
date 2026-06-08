@@ -29,6 +29,7 @@ from dataclasses import dataclass
 
 from rogue.reproduce.instantiator import RenderedAttack
 from rogue.reproduce.judge import JudgeAgent, JudgeResult
+from rogue.reproduce.rubrics.context import BreachContext
 from rogue.schemas import AttackPrimitive
 
 __all__ = ["BatchGradeItem", "JudgeBatch"]
@@ -39,12 +40,21 @@ _log = logging.getLogger("rogue.reproduce.judge_batch")
 @dataclass(frozen=True)
 class BatchGradeItem:
     """One cell to grade. ``custom_id`` must be unique within a batch and is
-    how results are mapped back (use the breach_id / cell key)."""
+    how results are mapped back (use the breach_id / cell key).
+
+    ``context`` carries the per-rule :class:`BreachContext` for a non-harm
+    breach type (``None`` for the harm case). It is threaded through the same
+    :meth:`JudgeAgent._build_user_message` path the inline judge uses, so a
+    batch item for a non-harm type is byte-identical to its inline ``judge()``
+    request (the ``anthropic_grade_kwargs`` single-source guarantee, build-02
+    §1).
+    """
 
     custom_id: str
     rendered: RenderedAttack
     model_response: str
     primitive: AttackPrimitive
+    context: BreachContext | None = None
 
 
 class JudgeBatch:
@@ -76,6 +86,7 @@ class JudgeBatch:
             rendered=item.rendered,
             model_response=item.model_response,
             primitive=item.primitive,
+            context=item.context,
         )
         return {
             "custom_id": item.custom_id,
@@ -139,6 +150,7 @@ class JudgeBatch:
             rendered=item.rendered,
             model_response=item.model_response,
             primitive=item.primitive,
+            context=item.context,
         )
         data = await self.judge._grade_via_openrouter(
             user_message, self.judge.fallback_model
