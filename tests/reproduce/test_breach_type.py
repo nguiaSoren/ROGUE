@@ -21,7 +21,7 @@ EXPECTED_KEYS = {
 EXPECTED_FILENAMES = {
     "capability_transfer": "judge_v3.md",
     "information_disclosure": "infodisc_v1.md",
-    "unauthorized_action": "unauthorized_action_v1.md",
+    "unauthorized_action": "unauthorized_action_v2.md",
 }
 
 
