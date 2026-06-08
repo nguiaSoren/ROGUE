@@ -16,12 +16,14 @@ EXPECTED_KEYS = {
     "capability_transfer",
     "information_disclosure",
     "unauthorized_action",
+    "fabricated_sensitive_value",
 }
 
 EXPECTED_FILENAMES = {
     "capability_transfer": "judge_v3.md",
-    "information_disclosure": "infodisc_v1.md",
-    "unauthorized_action": "unauthorized_action_v2.md",
+    "information_disclosure": "infodisc_v2.md",
+    "unauthorized_action": "unauthorized_action_v3.md",
+    "fabricated_sensitive_value": "fabricated_sensitive_value_v1.md",
 }
 
 
@@ -33,12 +35,12 @@ def test_capability_transfer_resolves_to_v3_rubric() -> None:
     assert bt.rubric_filename == "judge_v3.md"
 
 
-def test_registry_has_exactly_three_keys() -> None:
+def test_registry_has_exactly_four_keys() -> None:
     assert set(REGISTRY) == EXPECTED_KEYS
 
 
 @pytest.mark.parametrize("key", sorted(EXPECTED_KEYS))
-def test_all_three_keys_round_trip(key: str) -> None:
+def test_all_keys_round_trip(key: str) -> None:
     """Every key resolves, returns its own key back, and the expected rubric."""
     bt = get_breach_type(key)
     assert bt.key == key
