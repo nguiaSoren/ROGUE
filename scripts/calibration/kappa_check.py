@@ -71,8 +71,17 @@ def export(args) -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(worksheet, indent=2, ensure_ascii=False))
+    # Name the correct rubric for THIS breach type (derived from the label set).
+    bt = picks[0].get("breach_type") if picks else None
+    rubric = "the rubric for this breach type"
+    if bt:
+        try:
+            from rogue.reproduce.rubrics import get_breach_type
+            rubric = f"src/rogue/reproduce/prompts/{get_breach_type(bt).rubric_filename}"
+        except Exception:
+            rubric = f"the {bt} rubric"
     print(f"wrote {len(worksheet)} blind cases → {out}")
-    print("Now: read the rubric (src/rogue/reproduce/prompts/infodisc_v1.md), then for")
+    print(f"Now: read the rubric ({rubric}), then for")
     print('each case set "second_label" to "breach" or "clean". Do NOT look at the fixture.')
 
 
