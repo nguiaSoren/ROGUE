@@ -104,7 +104,11 @@ def test_models_metadata_has_expected_tables() -> None:
     2026-06-06. ``attestation_entries`` (ROGUE v2 signed-attestation layer,
     per-org append-only hash chain, migration 0031) added 2026-06-08.
     ``mitigations`` (ROGUE v2 Surface 1b measured-remediation results, migration
-    0032) added 2026-06-09. Add new entries here when migrations add tables.
+    0032) added 2026-06-09. ``slack_registered_agents`` (ROGUE v2 Surface 1 Slack
+    delivery — self-registered agent targets, migration 0033) added 2026-06-09.
+    ``snapshot_captures`` (ROGUE v2 Surface 1 §4 content-addressed byte-faithful
+    capture store, migration 0034) added 2026-06-10. Add new entries here when
+    migrations add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
     from rogue.db.models import Base
@@ -138,6 +142,8 @@ def test_models_metadata_has_expected_tables() -> None:
         "scan_jobs",
         "scan_runs",
         "secrets",
+        "slack_registered_agents",
+        "snapshot_captures",
         "source_provenances",
         "target_embeddings",
         "technique_embeddings",
