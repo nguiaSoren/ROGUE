@@ -83,8 +83,9 @@ export default function ResearchPage() {
             <GlanceCard
               href="#finding-05"
               eyebrow="05 · remediation"
-              headline="3% → 0%"
-              desc="Measured remediation: a generated fix is accepted only when a re-scan proves it closes the breach without over-blocking, else refused."
+              headline="0% → 20%"
+              desc="The calibrated over-block judge caught an over-block a marker heuristic scored 0%, flipping a would-be accept into a correct refusal."
+              accent="red"
             />
           </div>
         </Section>
@@ -505,39 +506,57 @@ export default function ResearchPage() {
               </div>
 
               <p className="text-[17px] text-foreground leading-relaxed">
-                It closes what&rsquo;s closable and refuses what isn&rsquo;t, both
-                measured: a system-prompt-extraction breach closed{" "}
-                <span className="text-foreground font-medium">3.0% → 0.0%</span> at
-                0% over-block and was{" "}
-                <span className="text-foreground font-medium">accepted</span>{" "}
-                (verified by re-scan), while a medical/financial-directive patch{" "}
-                <span className="text-foreground font-medium">did not hold</span>{" "}
-                (<span className="text-foreground font-medium">20.8% → ~25%</span>)
-                and was refused for an architecture change rather than shipped. The
-                &ldquo;without over-blocking&rdquo; claim is itself{" "}
-                <span className="text-foreground font-medium">calibrated</span>: an
-                over-block judge scored against a 50-case independent set reaches{" "}
+                Across live runs it{" "}
+                <span className="text-foreground font-medium">
+                  refused every offline patch
+                </span>
+                , each for a distinct measured reason. A medical/financial-directive
+                patch{" "}
+                <span className="text-foreground font-medium">
+                  didn&rsquo;t reduce the breach
+                </span>{" "}
+                (<span className="text-foreground font-medium">20.8% → ~25%</span>).
+                A system-prompt-extraction patch{" "}
+                <span className="text-foreground font-medium">
+                  over-blocked legitimate traffic
+                </span>
+                , the calibrated over-block judge flagged{" "}
+                <span className="text-foreground font-medium">~20%</span> where a
+                marker heuristic had scored{" "}
+                <span className="text-foreground font-medium">0%</span>, so the loop
+                refused it and recommended an architecture change rather than ship a
+                fix that doesn&rsquo;t measurably work.
+              </p>
+
+              <p className="text-[17px] text-foreground leading-relaxed">
+                The &ldquo;without over-blocking&rdquo; check is itself{" "}
+                <span className="text-foreground font-medium">calibrated</span>, and
+                it earned its keep: an over-block judge scored against a 50-case
+                independent set reaches{" "}
                 <span className="text-foreground font-medium">
                   98% agreement, 100% precision, 0% over-flag
                 </span>{" "}
-                and ships, against an 88% marker heuristic that wrongly flagged 23%
-                of hedged-but-helpful answers.
+                (vs an 88% marker heuristic), and it{" "}
+                <span className="text-foreground font-medium">
+                  caught the over-block the heuristic missed
+                </span>
+                .
               </p>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <Metric value="3.0 → 0.0%" label="breach closed · accepted" accent="green" />
-                <Metric value="20.8 → ~25%" label="patch didn't hold · refused" accent="red" />
-                <Metric value="98%" label="over-block judge agreement" accent="green" />
-                <Metric value="0%" label="over-flag (false-block)" accent="green" />
+                <Metric value="0% → ~20%" label="RD04 over-block: heuristic → judge" accent="red" />
+                <Metric value="20.8 → ~25%" label="RA06 patch: no reduction" accent="red" />
+                <Metric value="98% / 0%" label="over-block judge: agree / over-flag" accent="green" />
+                <Metric value="88 → 98%" label="over-block detector calibrated" accent="green" />
               </div>
 
               <MethodNote>
-                Method, the calibrated per-rule judge scores breach rate pre/post
-                on a re-scan of a mutated test config; over-block on an independent
-                legitimate-traffic set; a candidate is accepted only on a
-                CI-confident reduction with over-block near 0, else the loop emits
-                an architecture recommendation. Five live runs, one accept and four
-                refusals, each for a distinct measured reason.
+                Method, the calibrated per-rule judge scores breach rate pre/post on
+                a re-scan of a mutated test config; over-block on an independent
+                legitimate-traffic set via the calibrated over-block judge; a
+                candidate is accepted only on a CI-confident reduction with
+                over-block near 0, else architecture. Across the live runs no
+                offline patch met both bars on these demo models.
               </MethodNote>
 
               <NovelNote>
@@ -547,10 +566,12 @@ export default function ResearchPage() {
                   accepted only when a re-scan proves it closes the breach without
                   over-blocking
                 </span>
-                , and refused otherwise. A runtime guardrail asserts it blocks;
-                this <em>measures</em> it, and says so when a patch doesn&rsquo;t
-                hold. <span className="text-rogue-green">⚑</span> Catching a
-                non-working fix is the point.
+                , and refused otherwise, and the calibrated judge is what makes
+                &ldquo;doesn&rsquo;t over-block&rdquo; trustworthy: it flipped a
+                would-be accept (heuristic 0% over-block) into a correct refusal
+                (judge ~20%). A runtime guardrail asserts it blocks; this{" "}
+                <em>measures</em> it, and says no when a patch doesn&rsquo;t hold or
+                over-blocks. <span className="text-rogue-green">⚑</span>
               </NovelNote>
             </FindingCard>
           </div>

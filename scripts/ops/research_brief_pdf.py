@@ -375,24 +375,26 @@ def build() -> Path:
         "<i>measures</i>, by re-scanning a mutated test config with the same calibrated judge, whether it "
         "closes the breach " + b("without over-blocking") + " legitimate traffic, and " + b("refuses") + " any "
         "it cannot prove (it generates and verifies; the client deploys; it never sits in the request path). "
-        "It closes what is closable and refuses what is not, both measured: a system-prompt-extraction breach "
-        "closed " + b("3.0% → 0.0%") + " at 0% over-block and was accepted, while a medical/financial-directive "
-        "patch " + b("did not hold") + " (" + b("20.8% → ~25%") + ", the instruction-override attack overrides "
-        "the appended prompt) and was refused for an architecture change rather than shipped. The "
-        "&ldquo;without over-blocking&rdquo; claim is itself calibrated: an over-block judge, the same judge "
-        "family pointed at a refuse-versus-answer question, scored against a 50-case independent set reaches "
-        + b("98% agreement, 0% over-flag") + " and ships, against an 88% marker heuristic that wrongly flagged "
-        "23% of hedged-but-helpful answers.", S["body"])]
+        "Across live runs it " + b("refused every offline patch") + ", each for a distinct measured reason: a "
+        "medical/financial-directive patch " + b("did not reduce the breach") + " (" + b("20.8% → ~25%") + "), "
+        "and a system-prompt-extraction patch " + b("over-blocked legitimate traffic") + ", the calibrated "
+        "over-block judge flagged " + b("~20%") + " where a marker heuristic had scored " + b("0%") + ", so the "
+        "loop refused it for an architecture change. The &ldquo;without over-blocking&rdquo; check is itself "
+        "calibrated and earned its keep: an over-block judge scored against a 50-case independent set reaches "
+        + b("98% agreement, 100% precision, 0% over-flag") + " (vs an 88% marker heuristic) and caught the "
+        "over-block the heuristic missed.", S["body"])]
     F += [Spacer(1, 4), _chips([
-        ("3.0 → 0.0%", "RD04 breach closed · accepted"),
-        ('<font color="#c0392b">20.8 → ~25%</font>', "RA06 patch refused → arch."),
+        ('<font color="#c0392b">0% → ~20%</font>', "RD04 over-block: heuristic → judge"),
+        ('<font color="#c0392b">20.8 → ~25%</font>', "RA06 patch: no reduction"),
         ("98% / 0%", "over-block judge: agree / over-flag"),
-        ("1 of 5", "live runs accepted"),
+        ("88 → 98%", "over-block detector calibrated"),
     ]), Spacer(1, 6)]
     F += [_note(
         "The contribution is not a new mitigation but the discipline: a fix is accepted only when a re-scan "
-        "proves it closes the breach without over-blocking, and refused otherwise. A runtime guardrail asserts "
-        "it blocks; this measures it, and says so when a patch does not hold.")]
+        "proves it closes the breach without over-blocking, and refused otherwise, and the calibrated judge is "
+        "what makes &ldquo;does not over-block&rdquo; trustworthy. It flipped a would-be accept (heuristic 0% "
+        "over-block) into a correct refusal (judge ~20%). A runtime guardrail asserts it blocks; this measures "
+        "it, and says no when a patch does not hold or over-blocks.")]
 
     # limitations
     F += [Spacer(1, 10)]
