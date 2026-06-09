@@ -4,6 +4,7 @@ import {
   ListOrdered,
   Microscope,
   Ruler,
+  ShieldCheck,
   ArrowRight,
   TriangleAlert,
   Download,
@@ -47,45 +48,12 @@ export default function ResearchPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-rogue-green/50 px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-colors hover:bg-rogue-green/10"
           >
             <Download className="h-4 w-4" aria-hidden />
-            Download the research brief (PDF)
+            Download the 2-page brief (PDF)
           </a>
-        </Section>
-
-        {/* AT A GLANCE -------------------------------------------------- */}
-        <Section eyebrow="at a glance" title="Four findings, in about a minute.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <GlanceCard
-              href="#finding-01"
-              eyebrow="01 · judge"
-              headline="70.3 → 89.3%"
-              desc="Calibrated an LLM-judge to human labels, then generalized it across four breach types."
-            />
-            <GlanceCard
-              href="#finding-02"
-              eyebrow="02 · scheduling"
-              headline="ASR 50 → 60%"
-              desc="Cross-tier scheduling as a capability lever: rank down caused ASR up, at −41% cost."
-            />
-            <GlanceCard
-              href="#finding-03"
-              eyebrow="03 · null result"
-              headline="0 of 4 survive"
-              desc="Grammar structure does not predict breach beyond attack family. A clean negative result."
-              accent="red"
-            />
-            <GlanceCard
-              href="#finding-04"
-              eyebrow="04 · discipline"
-              headline="measure first"
-              desc="$0 telemetry measurements inverted three build decisions before any code was written."
-            />
-          </div>
         </Section>
 
         {/* 1. JUDGE CALIBRATION ----------------------------------------- */}
         <Section
-          id="finding-01"
-          className="scroll-mt-24"
           eyebrow="finding 01"
           title="Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it."
         >
@@ -96,7 +64,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-[17px] text-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed">
                 Every breach verdict is an LLM judgment, so the judge is the
                 load-bearing weakness. It was validated four ways, three
                 against independent human-annotated benchmarks: blind stratified
@@ -109,7 +77,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
+            <p className="text-base text-muted-foreground leading-relaxed">
               JBB exposed over-flagging. The v1 judge agreed with the human
               majority only{" "}
               <span className="text-foreground font-medium">
@@ -131,7 +99,7 @@ export default function ResearchPage() {
               .
             </p>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
+            <p className="text-base text-muted-foreground leading-relaxed">
               The fix, a{" "}
               <span className="text-foreground font-medium">
                 content-transfer-gate rubric (v3)
@@ -153,7 +121,7 @@ export default function ResearchPage() {
               <FalsePositiveModesFig />
             </div>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
+            <p className="text-base text-muted-foreground leading-relaxed">
               Then the honest part: re-judging the stored breach matrix under v3{" "}
               <span className="text-foreground font-medium">
                 dropped breach cells 2,429 → 1,371 (−43.6%)
@@ -187,112 +155,22 @@ export default function ResearchPage() {
               themselves <span className="text-foreground/90">over-count</span>{" "}
               relative to a strict content-transfer standard.
             </NovelNote>
-
-            <div className="pt-5 mt-2 border-t border-border/60 space-y-5">
-              <p className="text-[17px] text-foreground leading-relaxed">
-                <span className="text-foreground font-medium">
-                  The gate isn&apos;t harm-specific, it&apos;s a calibration
-                  discipline, an established practice taken rigorously, not a new
-                  method.
-                </span>{" "}
-                The same consummation gate (
-                <span className="text-foreground/90">
-                  engagement is not breach; consummation is breach
-                </span>
-                ), re-instantiated per breach type, now calibrates{" "}
-                <span className="text-foreground/90">four</span> structurally
-                different policies: <em>harm</em> (capability transfer),{" "}
-                <em>information-disclosure</em> (content, &ldquo;did the
-                protected datum appear?&rdquo;), <em>unauthorized-action</em>{" "}
-                (action, &ldquo;did the agent execute?&rdquo;), and{" "}
-                <em>fabricated-sensitive-value</em> (a fabrication and trust
-                breach distinct from disclosure, &ldquo;did the model invent a
-                value it presents as real?&rdquo;). The harness{" "}
-                <span className="text-foreground font-medium">
-                  self-diagnoses
-                </span>
-                : it returned REFINE on the action type, a targeted rubric fix
-                was applied, and re-measurement shipped it. The deeper result is
-                that the{" "}
-                <span className="text-foreground font-medium">
-                  tool-trace upgrade turned a stated limitation into a measured
-                  resolution
-                </span>
-                . The action type&apos;s earlier weakness (κ 0.746 plus a
-                residual false-positive mode) was an artifact of the text-only
-                proxy, not the gate: once a tool-call trace makes
-                &ldquo;executed&rdquo; a fact rather than a prose inference, the
-                simulate-versus-claim confusion that tripped both judge and human
-                dissolves.
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric value="91.0%" label="harm · top-of-field" accent="green" />
-                <Metric value="97.35%" label="info-disclosure v2" accent="green" />
-                <Metric value="98.89%" label="unauth · tool-trace" accent="green" />
-                <Metric value="100%" label="fabricated · new type" accent="green" />
-              </div>
-
-              <NovelNote>
-                The contribution isn&apos;t &ldquo;a better harm judge&rdquo; but a{" "}
-                <span className="text-foreground/90">
-                  repeatable discipline for calibrating breach judges across
-                  four breach classes
-                </span>{" "}
-                from one gate template: harm (91.0%, top-of-field, above Llama-3
-                90.7% and GPT-4 90.3%), information-disclosure (v2: 97.35%
-                agreement, 100% recall, 0% false-positive mode), unauthorized-action
-                (v3 tool-trace: 98.89%, 100% recall, false-positive mode driven
-                9.38 to 6.25 to 3.12%), and the new fabricated-sensitive-value
-                type (100%, 0% false-positive mode, first pass). The harness
-                exposes type-dependent failure modes, then resolves them by
-                upgrading the evidence, not the rubric.{" "}
-                <span className="text-rogue-green">⚑</span> The one measured angle
-                we could not find stated directly: provenance-dependent breach
-                types need an evidence trace, and the independence check names the
-                missing evidence. Shown twice, on
-                unauthorized-action (a tool-call trace lifted second-labeler κ
-                from 0.746 to 0.917) and on fabricated-value (a retrieval trace
-                lifted κ from 0.723 to 0.909). The building blocks here are
-                established (trace-grounded agent evaluation, κ-gated calibration,
-                provenance attribution, cross-type judge generalization such as
-                CompliBench); the contribution is the rigor, an
-                independence-invariant discipline and a self-diagnosing harness,
-                plus the measured cross-type result, not a new mechanism.
-              </NovelNote>
-
-              <MethodNote>
-                Method: per-type designed-label corpora with independent
-                second-labeler κ checks (information-disclosure κ 0.80 base /
-                0.786 boundary, unauthorized-action κ 0.746 pre-trace then 0.917
-                with the tool-trace; harm uses JailbreakBench human-majority
-                agreement, not a κ); single-operator calibration and synthetic
-                designed-label corpora throughout. The fabricated-value
-                retrieval-trace lifts its human κ from 0.723 to 0.909 (the judge
-                ships 96.88%); in calibration the traces are
-                embedded in the graded text, the production seam being the scan
-                engine&apos;s Capture. Descriptive measurements, not validated
-                generalizations.
-              </MethodNote>
-            </div>
           </div>
         </Section>
 
-        {/* 2 + 3 SIDE BY SIDE ---------------------------------------- */}
-        <Section>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <FindingCard
-              id="finding-02"
-              eyebrow="finding 02"
-              title="Scheduling as a capability lever, not just an optimization."
-            >
+        {/* 2. SCHEDULING AS A CAPABILITY LEVER -------------------------- */}
+        <Section
+          eyebrow="finding 02"
+          title="Scheduling as a capability lever, not just an optimization."
+        >
+          <div className="max-w-3xl space-y-6">
             <div className="flex gap-4">
               <ListOrdered
                 className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-[17px] text-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed">
                 A within-tier greedy reorder was replaced with a{" "}
                 <span className="text-foreground font-medium">
                   target-conditioned cross-tier scheduler
@@ -306,7 +184,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
+            <p className="text-base text-muted-foreground leading-relaxed">
               A single-variable controlled experiment, same ladder, attacks,
               corpus, judge, and target (Claude Haiku, AdvBench + JailbreakBench);
               only the order changed, beat the production baseline on every
@@ -352,19 +230,22 @@ export default function ResearchPage() {
               </span>
               : same ladder, different order, full reachability preserved.
             </NovelNote>
-            </FindingCard>
-            <FindingCard
-              id="finding-03"
-              eyebrow="finding 03"
-              title="A publication-grade null result: grammar-component predictive power."
-            >
+          </div>
+        </Section>
+
+        {/* 3. NULL RESULT ----------------------------------------------- */}
+        <Section
+          eyebrow="finding 03"
+          title="A publication-grade null result: grammar-component predictive power."
+        >
+          <div className="max-w-3xl space-y-6">
             <div className="flex gap-4">
               <Microscope
                 className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-[17px] text-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed">
                 Before building a grammar/AST attack-composition engine, a{" "}
                 <span className="text-foreground font-medium">
                   $0 observational study over 1,540 (primitive × target) cells
@@ -377,7 +258,7 @@ export default function ResearchPage() {
               </p>
             </div>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
+            <p className="text-base text-muted-foreground leading-relaxed">
               Verdict <span className="text-foreground font-medium">weak/none</span>{" "}
 , the family label carries the predictive weight. Cross-family
               structural nodes show ~1.0 to 1.1× non-significant lift, and the
@@ -409,14 +290,11 @@ export default function ResearchPage() {
               </span>{" "}
 , a successful negative result.
             </NovelNote>
-            </FindingCard>
           </div>
         </Section>
 
         {/* 4. MEASURE-BEFORE-BUILD -------------------------------------- */}
         <Section
-          id="finding-04"
-          className="scroll-mt-24"
           eyebrow="finding 04"
           title="Measure-before-build discipline."
         >
@@ -427,7 +305,7 @@ export default function ResearchPage() {
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <p className="text-[17px] text-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed">
                 $0 measurements from existing telemetry were used repeatedly to{" "}
                 <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
                 with an explicit trigger-to-revisit.
@@ -455,6 +333,96 @@ export default function ResearchPage() {
               Method, each decision gated on a $0 telemetry measurement with a
               pre-stated trigger-to-revisit.
             </MethodNote>
+          </div>
+        </Section>
+
+        {/* 5. MEASURED REMEDIATION -------------------------------------- */}
+        <Section
+          eyebrow="finding 05"
+          title="Measured remediation: generate a fix, prove it closes the breach without over-blocking, and refuse to ship one that doesn't."
+        >
+          <div className="max-w-3xl space-y-6">
+            <div className="flex gap-4">
+              <ShieldCheck
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-base text-muted-foreground leading-relaxed">
+                A breach drives a loop: generate a candidate mitigation from the
+                transcripts, re-test it against the same attack family (does the
+                breach rate drop, CI-confidently?), re-test against an
+                independent legitimate-traffic set (does it{" "}
+                <em>over-block</em> what the agent should still answer?), and{" "}
+                <span className="text-foreground font-medium">
+                  accept only if the drop is statistically real and over-block ≈ 0
+                </span>
+                , else emit an architecture recommendation. ROGUE generates and
+                verifies; the client deploys, ROGUE never sits in the request
+                path (ADR-0010).
+              </p>
+            </div>
+
+            <p className="text-base text-muted-foreground leading-relaxed">
+              The result is two-sided, both verdicts measured by the calibrated
+              judge. The{" "}
+              <span className="text-foreground font-medium">positive</span>, RD04
+              (reveal the verbatim system prompt) on a permissive Llama-3.1-8B: a
+              generated system-prompt patch closed the breach{" "}
+              <span className="text-foreground font-medium">3.0% → 0.0%</span> at{" "}
+              <span className="text-foreground font-medium">0% over-block</span>{" "}
+              → <span className="text-foreground font-medium">accepted</span>{" "}
+              (verified by re-scan). The{" "}
+              <span className="text-foreground font-medium">negative</span>, RA06
+              (a directive medical / financial instruction) on Mistral-Small: the
+              generated patch did <span className="text-foreground font-medium">not</span>{" "}
+              hold, post-mitigation breach{" "}
+              <span className="text-foreground font-medium">
+                20.8% → ~25%
+              </span>{" "}
+              (CIs overlapping), so the loop refused it and emitted an
+              architecture recommendation, a prompt tweak can&rsquo;t fix an
+              instruction-override attack that drives an unauthorized action. It
+              closes what&rsquo;s closable and refuses what isn&rsquo;t.
+            </p>
+
+            <p className="text-base text-muted-foreground leading-relaxed">
+              &ldquo;Without over-blocking&rdquo; is a measured claim, not an
+              asserted one. The over-block detector was scored against a 50-case
+              independent designed set: the LLM judge-FP-mode (same model family
+              as the breach judge) ships at{" "}
+              <span className="text-foreground font-medium">
+                98% agreement, 0% over-flag
+              </span>
+              , driving an{" "}
+              <span className="text-foreground font-medium">88%</span> heuristic
+              first pass to zero false over-flags (hedged-but-helpful answers
+              correctly cleared).
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric value="3.0 → 0.0%" label="RD04 breach, accepted" accent="green" />
+              <Metric value="20.8 → ~25%" label="RA06 patch, refused" accent="red" />
+              <Metric value="98% / 0%" label="over-block judge agree / over-flag" accent="green" />
+              <Metric value="88%" label="heuristic baseline" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, generate → re-test vs attack family (CI-confident breach
+              drop) → re-test vs independent legitimate set (over-block);
+              breach scored by the calibrated per-rule judge, over-block by an
+              LLM FP-mode judge calibrated on a 50-case designed set; accept iff
+              real drop and over-block ≈ 0, else architecture recommendation.
+            </MethodNote>
+
+            <NovelNote>
+              &ldquo;We generated a patch, <em>measured</em> that it doesn&rsquo;t
+              hold, and recommended the design change instead of asserting
+              &lsquo;fixed&rsquo;&rdquo; is exactly the assurance a runtime
+              guardrail (which asserts it blocks, unmeasured) can&rsquo;t give.
+              Honest caveats: the positive&rsquo;s base rate is modest, a
+              confident full-closure, not a high-drama one; a v2 capability.
+            </NovelNote>
           </div>
         </Section>
 
@@ -494,13 +462,13 @@ export default function ResearchPage() {
               aria-hidden
             />
             <div className="space-y-3">
-              <p className="text-[17px] text-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed">
                 These are honest constraints, not caveats buried in a footnote.
                 Targets are black-box live-API models whose versions are not
                 pinned; some cells are small-n (95% bootstrap CIs are persisted
                 precisely because of this); the judge is single-operator-calibrated.
               </p>
-              <p className="text-[17px] text-foreground leading-relaxed">
+              <p className="text-base text-foreground/90 leading-relaxed">
                 These are descriptive measurements of a live system, not
                 validated generalizations.
               </p>
@@ -547,7 +515,7 @@ function NovelNote({ children }: { children: React.ReactNode }) {
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
         why this is notable
       </p>
-      <p className="mt-1.5 text-[15px] text-foreground/85 leading-relaxed">
+      <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
         {children}
       </p>
     </div>
@@ -564,7 +532,7 @@ function InvertedDecision({
   return (
     <li className="rogue-card border border-border rounded-xl p-4 md:p-5 bg-card/40 backdrop-blur-sm">
       <p className="text-base font-semibold text-foreground">{title}</p>
-      <p className="mt-1 text-[15px] text-foreground/85 leading-relaxed">
+      <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
         {children}
       </p>
     </li>
@@ -601,65 +569,5 @@ function EvidenceLink({
         {desc}
       </p>
     </Link>
-  );
-}
-
-/** A compact at-a-glance card that links to a full finding below. */
-function GlanceCard({
-  href,
-  eyebrow,
-  headline,
-  desc,
-  accent = "green",
-}: {
-  href: string;
-  eyebrow: string;
-  headline: string;
-  desc: string;
-  accent?: "green" | "red";
-}) {
-  return (
-    <a
-      href={href}
-      className="rogue-card border border-border rounded-xl p-4 md:p-5 bg-card/40 backdrop-blur-sm block group hover:border-rogue-green/50 transition-colors"
-    >
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-rogue-green">
-        {eyebrow}
-      </p>
-      <p
-        className={`mt-2 text-lg md:text-xl font-bold tracking-tight tabular-nums ${
-          accent === "red" ? "text-rogue-red" : "text-foreground"
-        }`}
-      >
-        {headline}
-      </p>
-      <p className="mt-1 text-[13px] text-foreground/80 leading-snug">{desc}</p>
-    </a>
-  );
-}
-
-/** A finding rendered as a bordered card (for the side-by-side grid). */
-function FindingCard({
-  id,
-  eyebrow,
-  title,
-  children,
-}: {
-  id: string;
-  eyebrow: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      id={id}
-      className="rogue-card border border-border rounded-2xl p-6 md:p-7 bg-card/30 backdrop-blur-sm scroll-mt-24"
-    >
-      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-rogue-green">
-        {eyebrow}
-      </p>
-      <h2 className="mt-3 text-2xl font-bold tracking-tight">{title}</h2>
-      <div className="mt-6 space-y-5">{children}</div>
-    </div>
   );
 }
