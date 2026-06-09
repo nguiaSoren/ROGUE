@@ -151,13 +151,22 @@ def main() -> None:
     ap.add_argument("--vulnerable", action="store_true",
                     help="override the target's system prompt with a permissive one (high base rate)")
     ap.add_argument("--n-trials", type=int, default=6)
+    ap.add_argument("--run-budget", type=int, default=600,
+                    help="abort the whole run after N seconds — fail-fast vs a slow/unresponsive "
+                         "provider (per-call timeout is already 90s; this bounds the WHOLE run)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
     if not args.dry_run and not args.yes:
         print("PAID live remediation run. Re-run with --yes (or --dry-run for a free check).")
         return
-    asyncio.run(_amain(args))
+    try:
+        asyncio.run(asyncio.wait_for(_amain(args), timeout=args.run_budget))
+    except (asyncio.TimeoutError, TimeoutError):
+        print(f"\n⚠️ run exceeded the {args.run_budget}s budget — likely a slow/unresponsive "
+              f"provider (each call has a 90s timeout; this bounds the whole run). Re-run, or "
+              f"lower --n-trials.")
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":
