@@ -29,7 +29,7 @@ from rogue.platform.schemas import ScanRecord, ScanSpec, TargetSpec
 
 from .harvest_hook import newly_landed_primitives
 from .policy import ensure_client_policy
-from .registration import slack_agent_to_config
+from .registration import config_id_for, slack_agent_to_config
 
 logger = logging.getLogger("rogue.integrations.slack.trigger")
 
@@ -87,6 +87,23 @@ async def run_sandbox_cycle(
         # keep passing it to filter the corpus down to THIS cycle's primitives.
         selected = sorted(p.primitive_id for prims in newly.values() for p in prims)
 
+        # Surface-1 context (build-06 §5): make the worker's auto-signed `scan` attestation entry
+        # self-describing — agent identity + the families fired this cycle + per-breach-type pointers
+        # to area-02's independent label provenance (ADR-0011). Frozen shape the §5 reader depends on.
+        surface1_context = {
+            "agent": {
+                "org_id": target.org_id,
+                "agent_name": target.agent_name,
+                "workspace": target.workspace,
+                "config_id": config_id_for(target),
+            },
+            "families": sorted(f.value for f in newly),
+            "ground_truth_refs": {
+                rule.breach_type.value: "area02-calibration:" + rule.breach_type.value
+                for rule in policy.rules
+            },
+        }
+
         spec = ScanSpec(
             target=TargetSpec(
                 endpoint=config.base_url,
@@ -98,6 +115,7 @@ async def run_sandbox_cycle(
             attacks=selected,
             max_tests=max(max_tests, len(selected)),
             n_trials=n_trials,
+            surface1_context=surface1_context,
         )
 
         # Deterministic idempotency key encoding (agent identity, run_day, family-set), ≤80 chars

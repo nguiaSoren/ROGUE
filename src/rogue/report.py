@@ -434,6 +434,11 @@ class ScanReport:
     # scan mode; `to_dict()` emits the `rule_breach_report` key ONLY when this is set, so a non-policy
     # report's dict stays byte-identical to before.
     rule_breach_report: dict | None = None
+    # Surface-1 (Slack) context the platform threads through so the auto-signed attestation entry can
+    # be self-describing (build-06 §5): {"agent": {...}, "families": [...], "ground_truth_refs": {...}}.
+    # None for every non-Slack scan; `to_dict()` emits the `surface1_context` key ONLY when set, so a
+    # report without it stays byte-identical to before (load-bearing for the attestation entry hash).
+    surface1_context: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -550,6 +555,10 @@ class ScanReport:
         # policy-mode scan set it, so every other report's dict is unchanged.
         if self.rule_breach_report is not None:
             out["rule_breach_report"] = self.rule_breach_report
+        # Additive: carry the Surface-1 context through to the persisted payload ONLY when a Slack
+        # cycle set it, so every other report's dict is byte-identical to before.
+        if self.surface1_context is not None:
+            out["surface1_context"] = self.surface1_context
         return out
 
     def to_json(

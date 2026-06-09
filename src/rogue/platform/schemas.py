@@ -80,6 +80,11 @@ class ScanSpec(BaseModel):
     # policy-mode only: the decomposed customer policy (§3 output). Default None so every existing
     # spec is unchanged; the engine raises clearly if mode="policy" and this is None.
     policy: ClientPolicy | None = None
+    # Surface-1 (Slack) context the cycle trigger threads through so the auto-signed attestation
+    # entry is self-describing: {"agent": {...}, "families": [...], "ground_truth_refs": {...}}.
+    # Default None so every existing spec — and every existing signed entry — is byte-identical;
+    # build-06 §5 (ChangeWitness) reads this exact shape. Opaque JSON-able dict to the engine.
+    surface1_context: dict | None = None
 
 
 class ScanRecord(BaseModel):
