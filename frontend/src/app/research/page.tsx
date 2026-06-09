@@ -4,6 +4,7 @@ import {
   ListOrdered,
   Microscope,
   Ruler,
+  ShieldCheck,
   ArrowRight,
   TriangleAlert,
   Download,
@@ -52,8 +53,8 @@ export default function ResearchPage() {
         </Section>
 
         {/* AT A GLANCE -------------------------------------------------- */}
-        <Section eyebrow="at a glance" title="Four findings, in about a minute.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Section eyebrow="at a glance" title="Five findings, in about a minute.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <GlanceCard
               href="#finding-01"
               eyebrow="01 · judge"
@@ -78,6 +79,12 @@ export default function ResearchPage() {
               eyebrow="04 · discipline"
               headline="measure first"
               desc="$0 telemetry measurements inverted three build decisions before any code was written."
+            />
+            <GlanceCard
+              href="#finding-05"
+              eyebrow="05 · remediation"
+              headline="3% → 0%"
+              desc="Measured remediation: a generated fix is accepted only when a re-scan proves it closes the breach without over-blocking, else refused."
             />
           </div>
         </Section>
@@ -455,6 +462,102 @@ export default function ResearchPage() {
               Method, each decision gated on a $0 telemetry measurement with a
               pre-stated trigger-to-revisit.
             </MethodNote>
+          </div>
+        </Section>
+
+        {/* 5. MEASURED REMEDIATION -------------------------------------- */}
+        <Section
+          id="finding-05"
+          className="scroll-mt-24"
+          eyebrow="finding 05"
+          title="Measured remediation: prove a fix closes the breach without over-blocking, or refuse to ship it."
+        >
+          <div className="max-w-3xl space-y-6">
+            <div className="flex gap-4">
+              <ShieldCheck
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-[17px] text-foreground leading-relaxed">
+                Finding a breach is half the job. ROGUE also{" "}
+                <span className="text-foreground font-medium">
+                  generates a candidate fix
+                </span>
+                , then <em>measures</em>, by re-scanning a mutated test config
+                with the same calibrated judge, whether it actually closes the
+                breach{" "}
+                <span className="text-foreground font-medium">
+                  without over-blocking
+                </span>{" "}
+                legitimate traffic. A fix that can&rsquo;t be proven is{" "}
+                <span className="text-foreground font-medium">refused</span>, not
+                asserted. ROGUE generates and verifies; the client deploys; it
+                never sits in the request path.
+              </p>
+            </div>
+
+            <p className="text-[17px] text-foreground leading-relaxed">
+              The loop closes what&rsquo;s closable and refuses what isn&rsquo;t,
+              both verdicts measured. On a system-prompt-extraction rule, a
+              generated &ldquo;never reveal your instructions&rdquo; patch dropped
+              the breach rate{" "}
+              <span className="text-foreground font-medium">3.0% → 0.0%</span>{" "}
+              with <span className="text-foreground font-medium">0% over-block</span>
+              , and was{" "}
+              <span className="text-foreground font-medium">accepted</span>{" "}
+              (verified by re-scan). On a medical/financial-directive rule, the
+              generated patch{" "}
+              <span className="text-foreground font-medium">did not hold</span>{" "}
+              (<span className="text-foreground font-medium">20.8% → ~25%</span>,
+              the instruction-override attack overrides the appended prompt), so
+              the loop{" "}
+              <span className="text-foreground font-medium">refused it</span> and
+              recommended an architecture change rather than ship a fix that
+              doesn&rsquo;t work.
+            </p>
+
+            <p className="text-[17px] text-foreground leading-relaxed">
+              The &ldquo;without over-blocking&rdquo; claim is itself{" "}
+              <span className="text-foreground font-medium">calibrated</span>. An
+              over-block judge, the same judge family pointed at a
+              refuse-versus-answer question, was scored against a 50-case
+              independent set of should-answer requests:{" "}
+              <span className="text-foreground font-medium">
+                98% agreement, 100% precision, 0% over-flag
+              </span>{" "}
+              (it ships), against a marker heuristic that managed only 88% and
+              wrongly flagged 23% of hedged-but-helpful answers.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric value="3.0 → 0.0%" label="breach closed · accepted" accent="green" />
+              <Metric value="20.8 → ~25%" label="patch didn't hold · refused" accent="red" />
+              <Metric value="98%" label="over-block judge agreement" accent="green" />
+              <Metric value="0%" label="over-flag (false-block)" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, the calibrated per-rule judge scores breach rate pre/post on
+              a re-scan of a mutated test config; over-block is scored on an
+              independent legitimate-traffic set; a candidate is accepted only on
+              a CI-confident reduction with over-block near 0, else the loop
+              iterates or emits an architecture recommendation. Five live runs,
+              one accept and four refusals, each for a distinct measured reason.
+            </MethodNote>
+
+            <NovelNote>
+              The contribution isn&rsquo;t a new mitigation, it&rsquo;s that a fix
+              is{" "}
+              <span className="text-foreground/90">
+                accepted only when a re-scan proves it closes the breach without
+                over-blocking
+              </span>
+              , and refused otherwise. A runtime guardrail asserts it blocks; this{" "}
+              <em>measures</em> it, and says so when a patch doesn&rsquo;t hold.{" "}
+              <span className="text-rogue-green">⚑</span> Catching a non-working
+              fix is the point.
+            </NovelNote>
           </div>
         </Section>
 
