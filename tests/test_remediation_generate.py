@@ -128,7 +128,8 @@ def test_unauthorized_action_dispatch_shape() -> None:
     rule = _rule_for(BreachType.UNAUTHORIZED_ACTION)
     cands = propose_candidates(rule, _TRANSCRIPTS, complete=_fake_complete_factory())
     types = {c.mitigation_type for c in cands}
-    assert MitigationType.TOOL_PERMISSION_SCOPE in types
+    assert MitigationType.TOOL_PERMISSION_SCOPE in types  # preferred
+    assert MitigationType.SYSTEM_PROMPT_PATCH in types  # deterrent when there's no tool to scope
     assert MitigationType.HUMAN_GATE_ROUTE in types
     # The human-gate route is recommend-now: no measured false-approve backing until Surface 2.
     gate = next(c for c in cands if c.mitigation_type == MitigationType.HUMAN_GATE_ROUTE)
