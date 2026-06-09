@@ -58,6 +58,7 @@ __all__ = [
     "RuleJudge",
     "instantiate_rule_judge",
     "calibration_for_rule",
+    "calibration_for_breach_type",
     "stamp_calibration",
     "CALIBRATION_DIR",
 ]
@@ -219,12 +220,19 @@ def calibration_for_rule(
     gate, malformed JSON, or an absent precision field all degrade to
     ``uncalibrated`` with ``None``.
     """
-    return _read_calibration(rule.breach_type)
+    return calibration_for_breach_type(rule.breach_type)
 
 
-def _read_calibration(
+def calibration_for_breach_type(
     breach_type: BreachType,
 ) -> tuple[CalibrationStatus, float | None]:
+    """The canonical by-breach-type calibration reader: ``(calibration_status, judge_precision)``
+    for a ``BreachType``, read from area-02's ``data/calibration/<breach_type>_report.json``
+    (``uncalibrated, None`` when no report shipped — never fabricated, ADR-0011).
+
+    ``calibration_for_rule`` wraps this for a ``PolicyRule``; Surface-1 §7 (RedlineGuard) consumes
+    it directly with a ``BreachType`` in hand, so it is the canonical attestable source of the
+    judge's precision (no re-reading the JSON elsewhere)."""
     path = _report_path(breach_type)
     if not path.exists():
         return "uncalibrated", None

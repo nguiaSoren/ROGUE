@@ -36,7 +36,8 @@ from .registration import (
     register_slack_agent,
     slack_agent_to_config,
 )
-from .tripwire import TripwirePrediction, predict_breach
+from .redline_guard import RedlineScore, score_inbound
+from .tripwire import TripwirePrediction, classify_inbound_family, predict_breach
 from .trigger import run_sandbox_cycle
 
 __all__ = [
@@ -60,4 +61,7 @@ __all__ = [
     "append_cycle_mitigations",
     "TripwirePrediction",
     "predict_breach",
+    "classify_inbound_family",
+    "RedlineScore",
+    "score_inbound",
 ]
