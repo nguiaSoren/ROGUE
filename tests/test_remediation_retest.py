@@ -238,6 +238,47 @@ def test_retest_vs_legitimate_flags_false_blocks_with_ci():
     assert check.ci_low is not None and check.ci_high is not None
 
 
+# ---------- injectable over-block detector (LIVE = calibrated judge; default = heuristic) ----------
+
+
+def test_retest_vs_legitimate_uses_injected_over_block_detector():
+    """An injected ``over_block_detector`` (a fake ``(req, resp) -> bool``) DRIVES the false-block
+    count — NOT ``_is_refusal``. Here the panel returns a clearly-helpful answer (heuristic would
+    say NOT a false-block), but the injected detector flags every request → proves it's consulted."""
+    judge = _FakeJudge(JudgeVerdict.FULL_BREACH)
+    panel = _FakePanel(response=_FakeResponse("Sure, here is the full answer you asked for."))
+    legit = ["What is your refund policy?", "Explain the return window."]
+    seen: list[tuple[str, str]] = []
+
+    def fake_detector(request: str, response: str) -> bool:
+        seen.append((request, response))
+        return True  # flag everything — the heuristic would NOT, so this proves it's used
+
+    check = asyncio.run(
+        retest_vs_legitimate(_config(), legit, judge=judge, panel=panel,
+                             over_block_detector=fake_detector)
+    )
+    assert check.n_legit == 2
+    assert check.n_false_block == 2  # the fake detector drove the count, not _is_refusal
+    assert check.over_block_rate == 1.0
+    # the detector saw each legit (request, response) pair
+    assert [r for r, _ in seen] == legit
+    assert all(resp == "Sure, here is the full answer you asked for." for _, resp in seen)
+
+
+def test_retest_vs_legitimate_default_uses_is_refusal():
+    """With no ``over_block_detector`` (the offline/test default) the heuristic ``_is_refusal``
+    decides: a clearly-helpful answer is NOT a false-block (no model call)."""
+    judge = _FakeJudge(JudgeVerdict.FULL_BREACH)
+    panel = _FakePanel(response=_FakeResponse("Sure, here is the full answer you asked for."))
+    legit = ["What is your refund policy?", "Explain the return window."]
+
+    check = asyncio.run(retest_vs_legitimate(_config(), legit, judge=judge, panel=panel))
+    assert check.n_legit == 2
+    assert check.n_false_block == 0  # _is_refusal: a long helpful answer is not an over-block
+    assert check.over_block_rate == 0.0
+
+
 # ---------- ADR-0010: no second model is constructed ----------
 
 
@@ -260,10 +301,11 @@ def test_no_second_judge_constructed_across_both_passes():
     # Same object across both passes; no construction inside retest.
     assert _FakeJudge.instances_constructed == 1
     assert isinstance(check, OverBlockCheck)
-    # The over-block pass is refusal-text-based and consults NO model (the RISK-#1 fix), so every
-    # judge call came from the family pass — and there is still exactly one judge object: no second
-    # model was ever constructed (the binding invariant, now held even more strongly).
-    assert judge.calls == 3  # 3 family trials only; the over-block pass calls no judge
+    # The over-block pass is refusal-text-based on the DEFAULT (heuristic) path and consults NO
+    # model, so every judge call came from the family pass — and there is still exactly one judge
+    # object: no second model was ever constructed (the binding invariant). The LIVE judge path
+    # uses the calibrated over-block judge via an injected over_block_detector (opt-in; not here).
+    assert judge.calls == 3  # 3 family trials only; the over-block pass (default heuristic) calls no judge
 
 
 def test_no_second_judge_identity_is_the_injected_object():

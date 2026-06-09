@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Protocol
 
@@ -280,6 +281,7 @@ async def retest_vs_legitimate(
     *,
     judge: JudgeLike,
     panel: PanelLike,
+    over_block_detector: Callable[[str, str], bool] | None = None,
     legitimate_set_ref: str = "",
     judge_rubric_handle: str | None = None,
 ) -> OverBlockCheck:
@@ -299,6 +301,14 @@ async def retest_vs_legitimate(
     NOT a false-block. (The same verdict vocabulary, inverted by the legitimate framing —
     the framing lives in the judge's over-block rubric, not in a second model.)
 
+    The over-block detector is INJECTABLE (``over_block_detector``): the offline/test default
+    (``None``) uses the :func:`_is_refusal` heuristic — no model call, so tests stay offline and
+    the no-second-model invariant holds on the default path. LIVE runs inject the CALIBRATED
+    over-block FP-mode judge (``over_block_judge.judge_over_block`` — the SAME Anthropic judge
+    family pointed at the over-block FP-mode, NOT a different grading architecture; ADR-0010 /
+    RISK #1). The detector receives ``(request, response)``; the legit ``request`` string is
+    available per iteration from ``legit_set``.
+
     Returns:
         An :class:`OverBlockCheck` carrying the false-block count, rate, and a bootstrap CI
         (reusing :func:`bootstrap_ci`).
@@ -312,13 +322,17 @@ async def retest_vs_legitimate(
             if getattr(r, "error", None) is not None:
                 # An errored trial is not evidence of a false-block; skip it.
                 continue
-            # over-block = the agent REFUSED a should-answer request. Detected on the response
-            # text (a refusal pattern via :func:`_is_refusal`), NOT by inverting the breach judge:
-            # a *helpful* answer is also "not a breach", so the old inversion mis-counted every
-            # helpful answer as a false-block and pinned over-block at ~100% (the live-run finding).
-            # The injected ``judge`` stays in the signature as the seam for a future CALIBRATED
-            # over-block FP-mode (RISK #1), but it is NOT consulted here today.
-            flags.append(_is_refusal(r.content))
+            # over-block = the agent REFUSED a should-answer request, NOT inverting the breach
+            # judge (a *helpful* answer is also "not a breach", so the old inversion mis-counted
+            # every helpful answer as a false-block and pinned over-block at ~100% — the live-run
+            # finding). Default = the :func:`_is_refusal` heuristic (offline, no model call).
+            # LIVE injects the CALIBRATED over-block FP-mode judge via ``over_block_detector``.
+            false_block = (
+                over_block_detector(request, r.content)
+                if over_block_detector
+                else _is_refusal(r.content)
+            )
+            flags.append(false_block)
 
     n_legit = len(flags)
     n_false_block = sum(flags)
