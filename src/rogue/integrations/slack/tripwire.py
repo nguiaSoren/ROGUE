@@ -38,6 +38,7 @@ __all__ = [
     "TripwirePrediction",
     "predict_breach",
     "format_advisory",
+    "classify_inbound_family",
 ]
 
 
@@ -149,6 +150,26 @@ def _keyword_family_match(message: str) -> AttackFamily | None:
     return None
 
 
+def classify_inbound_family(
+    message: str,
+    *,
+    matcher: Callable[[str], AttackFamily | None] | None = None,
+) -> AttackFamily | None:
+    """Classify an inbound message to an :class:`AttackFamily`, or ``None``.
+
+    The shared inbound family classifier for the Slack cycle: §6 ``predict_breach``
+    (the empirical-prior predictor) and §7 ``redline_guard.score_inbound`` (the
+    calibrated-precision gate-rule emitter) both route through here so they can
+    never diverge on what "family X matched this message" means.
+
+    ``matcher`` is the injectable upgrade — the embedding ``retrieval/`` retriever
+    wires in here later; when ``None`` the v1 :func:`_keyword_family_match` heuristic
+    is used. PURE: no side effects.
+    """
+    classify = matcher if matcher is not None else _keyword_family_match
+    return classify(message)
+
+
 def _excerpt(message: str, limit: int = 160) -> str:
     """A single-line, length-capped excerpt of the inbound message for the advisory."""
     collapsed = " ".join((message or "").split())
@@ -194,8 +215,7 @@ def predict_breach(
     4. ``advisory`` always frames the result as advice ("⚠️ Tripwire (advisory — not a
        block): …"), never as an enforced block.
     """
-    classify = matcher if matcher is not None else _keyword_family_match
-    family = classify(inbound_message)
+    family = classify_inbound_family(inbound_message, matcher=matcher)
     excerpt = _excerpt(inbound_message)
 
     if family is None:
