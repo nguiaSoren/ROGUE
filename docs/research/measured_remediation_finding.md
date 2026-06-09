@@ -41,10 +41,13 @@ guarded: (1) reject **no-op** candidates up front; (2) require a **CI-confident*
 
 ## Honest caveats (what is NOT yet claimable)
 
-- **The over-block detector is a first-pass heuristic** ("decline-without-helping": empty, or short
-  + a refusal marker; a long hedged-but-helpful answer is not an over-block). It is correct-in-
-  direction but **not calibrated** — the proper version is a judge over-block-FP-mode with its own
-  labeled set + κ (the same discipline as the breach judge; RISK #1). No attested over-block number
+- **The over-block detector is a first-pass heuristic, now MEASURED** ("decline-without-helping":
+  empty, or short + a refusal marker; a long hedged-but-helpful answer is not an over-block).
+  Calibrated against a 50-case independent designed set (`over_block_designed_v1.json`,
+  `scripts/calibration/calibrate_over_block.py`): **agreement 88.0% [78, 96], precision/recall
+  84.2%, FP-mode (over-flag) 23.1% [0, 46] (n=13) → GATE: REFINE.** So it's a decent first pass but
+  **not yet attestable**; the ship-able version is a calibrated **judge over-block-FP-mode** (its own
+  labeled set + κ, the same discipline as the breach judge — RISK #1). No public over-block number
   until then. NOTE the distinction from the breach side: the "refused-but-still-leaked" failure mode
   lives entirely on the **breach** side (handled by the calibrated judge), not here — the over-block
   detector only runs on *legitimate* requests, where there is no protected datum to leak.
