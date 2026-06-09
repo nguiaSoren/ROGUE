@@ -56,13 +56,15 @@ class _ContextBoundJudge:
     so re-test's context-free ``judge.judge(...)`` scores against THIS rule, not the harm default."""
 
     def __init__(self, rule_judge):
-        self._agent = rule_judge.agent
-        self._context = rule_judge.context
+        # Public so retest's scale path can BATCH with them (JudgeBatch needs the Anthropic agent;
+        # each batch item carries this per-rule context). Inline grading uses .judge() below.
+        self.agent = rule_judge.agent
+        self.context = rule_judge.context
         self.calibration_status = rule_judge.calibration_status
         self.judge_precision = rule_judge.judge_precision
 
     async def judge(self, rendered, model_response, primitive, context=None):
-        return await self._agent.judge(rendered, model_response, primitive, context=self._context)
+        return await self.agent.judge(rendered, model_response, primitive, context=self.context)
 
 
 class RemediationLoop:
