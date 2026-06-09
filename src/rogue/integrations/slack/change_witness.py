@@ -32,7 +32,12 @@ if TYPE_CHECKING:
     from rogue.platform.models import AttestationEntry
     from rogue.schemas.remediation import RemediationResult
 
-__all__ = ["ChangeWitnessSummary", "latest_change_witness", "append_cycle_mitigations"]
+__all__ = [
+    "ChangeWitnessSummary",
+    "latest_agent_scan_entry",
+    "latest_change_witness",
+    "append_cycle_mitigations",
+]
 
 
 @dataclass(frozen=True)
@@ -154,6 +159,29 @@ def _verified_mitigations(service: "AttestationService", org_id: str, scan_id: s
     return out
 
 
+def latest_agent_scan_entry(
+    org_id: str,
+    agent_name: str,
+    *,
+    attestation_service: "AttestationService",
+):
+    """The agent's most-recent signed ``scan`` entry (max ``seq``), or ``None``.
+
+    Lists the org's ``scan`` entries, keeps those whose embedded
+    ``surface1_context.agent.agent_name`` matches ``agent_name``, and returns the
+    highest-``seq`` one (``list_entries`` is seq-ascending). ``None`` when the agent
+    has no signed scan entry. The single shared "find the latest scan" path —
+    :func:`latest_change_witness` (§5) and Tripwire's ``predict_breach`` (§6) both
+    route through here so they can never diverge on what "latest scan" means.
+    """
+    scans = attestation_service.list_entries(org_id, entry_type="scan", limit=500)
+    matching = [e for e in scans if _agent_name_of(e) == agent_name]
+    if not matching:
+        return None
+    # list_entries is seq-ascending; the latest cycle is the highest seq.
+    return max(matching, key=lambda e: _attr(e, "seq"))
+
+
 def latest_change_witness(
     org_id: str,
     agent_name: str,
@@ -163,9 +191,8 @@ def latest_change_witness(
 ) -> ChangeWitnessSummary | None:
     """Read the LATEST signed Slack ``scan`` entry for one agent into a summary.
 
-    1. List the org's ``scan`` entries, keep those whose embedded
-       ``surface1_context.agent.agent_name`` matches ``agent_name``, take the
-       highest-``seq`` one (``list_entries`` is seq-ascending). None → return None.
+    1. Take the agent's highest-``seq`` signed ``scan`` entry via
+       :func:`latest_agent_scan_entry`. None → return None.
     2. Render the breaching per-rule verdicts (``n_breaches > 0``) with holds N/M + CI.
     3. Find + render this cycle's mitigation entries (payload links to the same scan_id).
     4. ``framing`` = the entry's own stored ``payload["framing"]`` when present, else
@@ -173,12 +200,11 @@ def latest_change_witness(
     5. When ``report_loader`` is given, run :func:`replay` and set ``replay_ok`` to its
        ``reproducible`` flag (None on any error / when no loader).
     """
-    scans = attestation_service.list_entries(org_id, entry_type="scan", limit=500)
-    matching = [e for e in scans if _agent_name_of(e) == agent_name]
-    if not matching:
+    entry = latest_agent_scan_entry(
+        org_id, agent_name, attestation_service=attestation_service
+    )
+    if entry is None:
         return None
-    # list_entries is seq-ascending; the latest cycle is the highest seq.
-    entry = max(matching, key=lambda e: _attr(e, "seq"))
 
     payload = _payload(entry)
     scan_id = str(payload.get("scan_id") or _attr(entry, "reproducibility_ref") or "")
