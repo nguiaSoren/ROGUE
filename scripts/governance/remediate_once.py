@@ -138,8 +138,11 @@ async def _amain(args) -> None:
 
 
 def main() -> None:
+    import logging
+
     from dotenv import load_dotenv
 
+    logging.basicConfig(level=logging.INFO, format="%(message)s")  # surface the loop's per-candidate decisions
     load_dotenv()
     ap = argparse.ArgumentParser()
     ap.add_argument("--rule", default="R3")  # R3 = no-legal-opinions (unauthorized_action)
