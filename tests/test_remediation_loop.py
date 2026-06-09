@@ -135,6 +135,26 @@ def test_loop_statistical_guard_rejects_noisy_reduction():
     assert not res.breach_reduced
 
 
+def test_loop_threads_over_block_detector_to_retest():
+    # An injected over_block_detector reaches retest_vs_legitimate: the panel returns a HELPFUL
+    # answer (the default _is_refusal would say no over-block), but the fake detector flags every
+    # legit request → over_block_rate > eps → the clean fix is REJECTED on over-block. This proves
+    # the detector threaded through from the loop ctor to the over-block pass.
+    seen: list[tuple[str, str]] = []
+
+    def fake_detector(request: str, response: str) -> bool:
+        seen.append((request, response))
+        return True  # flag everything as an over-block
+
+    loop = RemediationLoop(panel=_FakePanel(_ANSWER), judge=_FixedJudge(JudgeVerdict.REFUSED),
+                           complete=_fake_complete, n_trials=3, over_block_detector=fake_detector)
+    res = asyncio.run(loop.run(_task("R1", _attacks())))
+    # breach closes but the injected detector reports over-block → no clean accept → architecture
+    assert res.candidate.mitigation_type == MitigationType.ARCHITECTURE_RECOMMENDATION
+    assert res.verified_by == "by_construction_out_of_band"
+    assert seen, "the injected over_block_detector must have been consulted by retest"
+
+
 def test_reverify_flags_regression():
     attacks = _attacks(0, 2)
     res = asyncio.run(_loop(judge=_FixedJudge(JudgeVerdict.REFUSED)).run(_task("R1", attacks)))

@@ -73,11 +73,16 @@ class _ContextBoundJudge:
 class RemediationLoop:
     """Orchestrate generate(§4) → retest(§6) → accept/iterate, with budget caps (re-test spends)."""
 
-    def __init__(self, *, panel, judge=None, complete=None, n_trials: int = 5,
-                 max_candidates: int = 6, over_block_eps: float = OVER_BLOCK_EPS):
+    def __init__(self, *, panel, judge=None, complete=None, over_block_detector=None,
+                 n_trials: int = 5, max_candidates: int = 6,
+                 over_block_eps: float = OVER_BLOCK_EPS):
         self.panel = panel
         self._judge_override = judge  # tests inject a fake; live builds the per-rule judge per task
         self._complete = complete     # generation LLM callable; tests inject a fake (no spend)
+        # Over-block detector (request, response) -> bool. Default None → the _is_refusal heuristic
+        # in retest (offline, no model call, no-second-model invariant). LIVE injects the calibrated
+        # over-block FP-mode judge (ADR-0010 / RISK #1).
+        self._over_block_detector = over_block_detector
         self.n_trials = n_trials
         self.max_candidates = max_candidates  # per-breach candidate cap (budget guard)
         self.over_block_eps = over_block_eps
@@ -111,7 +116,9 @@ class RemediationLoop:
             post_rate, post_ci = await retest_vs_family(
                 post_config, task.primitives, judge=judge, panel=self.panel, n_trials=self.n_trials)
             over_block = (
-                await retest_vs_legitimate(post_config, legit_set, judge=judge, panel=self.panel)
+                await retest_vs_legitimate(
+                    post_config, legit_set, judge=judge, panel=self.panel,
+                    over_block_detector=self._over_block_detector)
                 if legit_set else None
             )
             # A statistically meaningful reduction: the post-breach CI UPPER bound is below the pre

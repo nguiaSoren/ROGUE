@@ -70,6 +70,9 @@ guarded: (1) reject **no-op** candidates up front; (2) require a **CI-confident*
 
 ## Status / next
 
-The loop is **validated as trustworthy** (no false-accepts; honest verdicts). For a *public* claim:
-(1) a clean breach-closed positive, (2) the over-block FP-mode calibrated. Until both, this stays a
-lab note + the pitch's positioning — not a measured `/research` headline.
+**Both `/research` gates are now MET (2026-06-09):** (1) a clean breach-closed positive
+(RD04/Llama 3%→0%, accepted) and (2) the over-block FP-mode calibrated (LLM judge 98%/SHIP). The
+finding is published on `/research` as "finding 05". The calibrated over-block judge is wired into
+the live `retest_vs_legitimate` (injectable detector — judge for live, `_is_refusal` heuristic for
+offline/tests). Remaining: the v2 production ship. The loop is validated as trustworthy (no
+false-accepts; honest verdicts).

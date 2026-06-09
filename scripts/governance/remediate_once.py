@@ -6,9 +6,10 @@ the post-mitigation breach rate + the generated patch.
 
 SCOPE (post the live-run fixes): the breach reduction is scored by the CALIBRATED per-rule judge,
 and acceptance now requires a *statistically meaningful* drop (post-CI upper < pre) and rejects
-no-op candidates. Over-block is detected by refusal-text heuristic (`_is_refusal`) and DOES gate
-acceptance at the loop default; the fully-CALIBRATED over-block judge-FP-mode is the future upgrade
-(RISK #1), so the over-block figure is a sound first-pass, not yet a calibrated number.
+no-op candidates. Over-block is scored by the CALIBRATED over-block FP-mode judge
+(`over_block_judge.judge_over_block` — injected here for LIVE runs) and DOES gate acceptance; it is
+the same Anthropic judge family pointed at the over-block question (ADR-0010 / RISK #1), not the
+offline `_is_refusal` heuristic (which remains the default for offline/tests).
 
 PAID. `--dry-run` is free (fakes, verifies wiring). `--yes` confirms the live run.
 
@@ -25,6 +26,7 @@ from pathlib import Path
 from rogue.governance import build_attack_pack
 from rogue.packs import load_pack
 from rogue.remediation import RemediationLoop, RemediationTask, render_remediation_markdown
+from rogue.remediation.over_block_judge import judge_over_block
 from rogue.remediation.retest import retest_vs_family
 from rogue.schemas import AttackPrimitive, JudgeVerdict, demo_deployment_configs
 from rogue.schemas.governance import ClientPolicy
@@ -110,7 +112,11 @@ async def _amain(args) -> None:
     from rogue.reproduce.target_panel import TargetPanel
 
     panel = TargetPanel.from_env()
-    loop = RemediationLoop(panel=panel, n_trials=args.n_trials)  # over-block now gates (default eps)
+    # LIVE: gate the over-block on the CALIBRATED over-block FP-mode judge (the same Anthropic judge
+    # family pointed at the over-block question — ADR-0010), not the offline _is_refusal heuristic.
+    loop = RemediationLoop(panel=panel, n_trials=args.n_trials,
+                           over_block_detector=lambda req, resp: judge_over_block(req, resp))
+    print("over-block scored by the CALIBRATED over-block judge (not the _is_refusal heuristic)")
     judge = loop._judge_for(rule)  # the calibrated per-rule judge (live)
 
     print("measuring pre-mitigation breach rate (live, unpatched config)…")
@@ -129,7 +135,7 @@ async def _amain(args) -> None:
           f"verified_by={result.verified_by} · iterations={result.iterations} ---")
     print(f"--- breach {pre_rate:.3f} → {result.post_breach_rate:.3f} (calibrated judge) ---")
     if ob is not None:
-        print(f"--- over-block (refusal-heuristic, GATING; calibrated judge-FP-mode is future): "
+        print(f"--- over-block (CALIBRATED over-block judge, GATING): "
               f"{ob.over_block_rate:.3f} on {ob.n_legit} legit requests ---")
     _OUT.mkdir(parents=True, exist_ok=True)
     dest = _OUT / f"remediation_{rule.rule_id}_{config.config_id}.json"
