@@ -23,6 +23,7 @@ from .agent_store import (
 from .change_witness import (
     ChangeWitnessSummary,
     append_cycle_mitigations,
+    latest_agent_scan_entry,
     latest_change_witness,
 )
 from .diff_post import build_security_post, post_breach_diff
@@ -35,6 +36,7 @@ from .registration import (
     register_slack_agent,
     slack_agent_to_config,
 )
+from .tripwire import TripwirePrediction, predict_breach
 from .trigger import run_sandbox_cycle
 
 __all__ = [
@@ -53,6 +55,9 @@ __all__ = [
     "build_security_post",
     "post_breach_diff",
     "ChangeWitnessSummary",
+    "latest_agent_scan_entry",
     "latest_change_witness",
     "append_cycle_mitigations",
+    "TripwirePrediction",
+    "predict_breach",
 ]
