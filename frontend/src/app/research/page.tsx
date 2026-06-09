@@ -420,144 +420,139 @@ export default function ResearchPage() {
           </div>
         </Section>
 
-        {/* 4. MEASURE-BEFORE-BUILD -------------------------------------- */}
-        <Section
-          id="finding-04"
-          className="scroll-mt-24"
-          eyebrow="finding 04"
-          title="Measure-before-build discipline."
-        >
-          <div className="max-w-3xl space-y-6">
-            <div className="flex gap-4">
-              <Ruler
-                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
-                strokeWidth={1.75}
-                aria-hidden
-              />
+        {/* 4 + 5 SIDE BY SIDE ---------------------------------------- */}
+        <Section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <FindingCard
+              id="finding-04"
+              eyebrow="finding 04"
+              title="Measure-before-build discipline."
+            >
+              <div className="flex gap-4">
+                <Ruler
+                  className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <p className="text-[17px] text-foreground leading-relaxed">
+                  $0 measurements from existing telemetry were used repeatedly to{" "}
+                  <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
+                  with an explicit trigger-to-revisit.
+                </p>
+              </div>
+
+              <ul className="space-y-3">
+                <li className="text-[15px] text-foreground/85 leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    Per-model ladder routing
+                  </span>{" "}
+                  — the spread was a model{" "}
+                  <span className="text-foreground/90">main effect</span>, not a
+                  family×model interaction, so not worth the rewrite.
+                </li>
+                <li className="text-[15px] text-foreground/85 leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    LLM renderer-synthesis
+                  </span>{" "}
+                  — synthesis-grade backlog flat at{" "}
+                  <span className="text-foreground/90">7</span> across two
+                  widening harvests, so parked.
+                </li>
+                <li className="text-[15px] text-foreground/85 leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    HF jailbreak-dataset bulk-import
+                  </span>{" "}
+                  — measured{" "}
+                  <span className="text-foreground/90">
+                    0 new attack families
+                  </span>
+                  , so declined.
+                </li>
+              </ul>
+
+              <MethodNote>
+                Method, each decision gated on a $0 telemetry measurement with a
+                pre-stated trigger-to-revisit.
+              </MethodNote>
+            </FindingCard>
+
+            <FindingCard
+              id="finding-05"
+              eyebrow="finding 05"
+              title="Measured remediation: prove a fix closes the breach without over-blocking, or refuse to ship it."
+            >
+              <div className="flex gap-4">
+                <ShieldCheck
+                  className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <p className="text-[17px] text-foreground leading-relaxed">
+                  Finding a breach is half the job. ROGUE also{" "}
+                  <span className="text-foreground font-medium">
+                    generates a candidate fix
+                  </span>
+                  , then <em>measures</em>, by re-scanning a mutated test config
+                  with the same calibrated judge, whether it closes the breach{" "}
+                  <span className="text-foreground font-medium">
+                    without over-blocking
+                  </span>{" "}
+                  legitimate traffic, and{" "}
+                  <span className="text-foreground font-medium">refuses</span> any
+                  it can&rsquo;t prove. It generates and verifies; the client
+                  deploys; it never sits in the request path.
+                </p>
+              </div>
+
               <p className="text-[17px] text-foreground leading-relaxed">
-                $0 measurements from existing telemetry were used repeatedly to{" "}
-                <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
-                with an explicit trigger-to-revisit.
-              </p>
-            </div>
-
-            <ul className="space-y-3">
-              <InvertedDecision title="Per-model ladder routing">
-                The spread was a model{" "}
-                <span className="text-foreground/90">main effect</span>, not a
-                family×model interaction → not worth the rewrite.
-              </InvertedDecision>
-              <InvertedDecision title="LLM renderer-synthesis">
-                Synthesis-grade backlog flat at{" "}
-                <span className="text-foreground/90">7</span> across two widening
-                harvests → parked.
-              </InvertedDecision>
-              <InvertedDecision title="HF jailbreak-dataset bulk-import">
-                Measured <span className="text-foreground/90">0 new attack families</span>{" "}
-                → declined.
-              </InvertedDecision>
-            </ul>
-
-            <MethodNote>
-              Method, each decision gated on a $0 telemetry measurement with a
-              pre-stated trigger-to-revisit.
-            </MethodNote>
-          </div>
-        </Section>
-
-        {/* 5. MEASURED REMEDIATION -------------------------------------- */}
-        <Section
-          id="finding-05"
-          className="scroll-mt-24"
-          eyebrow="finding 05"
-          title="Measured remediation: prove a fix closes the breach without over-blocking, or refuse to ship it."
-        >
-          <div className="max-w-3xl space-y-6">
-            <div className="flex gap-4">
-              <ShieldCheck
-                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <p className="text-[17px] text-foreground leading-relaxed">
-                Finding a breach is half the job. ROGUE also{" "}
+                It closes what&rsquo;s closable and refuses what isn&rsquo;t, both
+                measured: a system-prompt-extraction breach closed{" "}
+                <span className="text-foreground font-medium">3.0% → 0.0%</span> at
+                0% over-block and was{" "}
+                <span className="text-foreground font-medium">accepted</span>{" "}
+                (verified by re-scan), while a medical/financial-directive patch{" "}
+                <span className="text-foreground font-medium">did not hold</span>{" "}
+                (<span className="text-foreground font-medium">20.8% → ~25%</span>)
+                and was refused for an architecture change rather than shipped. The
+                &ldquo;without over-blocking&rdquo; claim is itself{" "}
+                <span className="text-foreground font-medium">calibrated</span>: an
+                over-block judge scored against a 50-case independent set reaches{" "}
                 <span className="text-foreground font-medium">
-                  generates a candidate fix
-                </span>
-                , then <em>measures</em>, by re-scanning a mutated test config
-                with the same calibrated judge, whether it actually closes the
-                breach{" "}
-                <span className="text-foreground font-medium">
-                  without over-blocking
+                  98% agreement, 100% precision, 0% over-flag
                 </span>{" "}
-                legitimate traffic. A fix that can&rsquo;t be proven is{" "}
-                <span className="text-foreground font-medium">refused</span>, not
-                asserted. ROGUE generates and verifies; the client deploys; it
-                never sits in the request path.
+                and ships, against an 88% marker heuristic that wrongly flagged 23%
+                of hedged-but-helpful answers.
               </p>
-            </div>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
-              The loop closes what&rsquo;s closable and refuses what isn&rsquo;t,
-              both verdicts measured. On a system-prompt-extraction rule, a
-              generated &ldquo;never reveal your instructions&rdquo; patch dropped
-              the breach rate{" "}
-              <span className="text-foreground font-medium">3.0% → 0.0%</span>{" "}
-              with <span className="text-foreground font-medium">0% over-block</span>
-              , and was{" "}
-              <span className="text-foreground font-medium">accepted</span>{" "}
-              (verified by re-scan). On a medical/financial-directive rule, the
-              generated patch{" "}
-              <span className="text-foreground font-medium">did not hold</span>{" "}
-              (<span className="text-foreground font-medium">20.8% → ~25%</span>,
-              the instruction-override attack overrides the appended prompt), so
-              the loop{" "}
-              <span className="text-foreground font-medium">refused it</span> and
-              recommended an architecture change rather than ship a fix that
-              doesn&rsquo;t work.
-            </p>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <Metric value="3.0 → 0.0%" label="breach closed · accepted" accent="green" />
+                <Metric value="20.8 → ~25%" label="patch didn't hold · refused" accent="red" />
+                <Metric value="98%" label="over-block judge agreement" accent="green" />
+                <Metric value="0%" label="over-flag (false-block)" accent="green" />
+              </div>
 
-            <p className="text-[17px] text-foreground leading-relaxed">
-              The &ldquo;without over-blocking&rdquo; claim is itself{" "}
-              <span className="text-foreground font-medium">calibrated</span>. An
-              over-block judge, the same judge family pointed at a
-              refuse-versus-answer question, was scored against a 50-case
-              independent set of should-answer requests:{" "}
-              <span className="text-foreground font-medium">
-                98% agreement, 100% precision, 0% over-flag
-              </span>{" "}
-              (it ships), against a marker heuristic that managed only 88% and
-              wrongly flagged 23% of hedged-but-helpful answers.
-            </p>
+              <MethodNote>
+                Method, the calibrated per-rule judge scores breach rate pre/post
+                on a re-scan of a mutated test config; over-block on an independent
+                legitimate-traffic set; a candidate is accepted only on a
+                CI-confident reduction with over-block near 0, else the loop emits
+                an architecture recommendation. Five live runs, one accept and four
+                refusals, each for a distinct measured reason.
+              </MethodNote>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <Metric value="3.0 → 0.0%" label="breach closed · accepted" accent="green" />
-              <Metric value="20.8 → ~25%" label="patch didn't hold · refused" accent="red" />
-              <Metric value="98%" label="over-block judge agreement" accent="green" />
-              <Metric value="0%" label="over-flag (false-block)" accent="green" />
-            </div>
-
-            <MethodNote>
-              Method, the calibrated per-rule judge scores breach rate pre/post on
-              a re-scan of a mutated test config; over-block is scored on an
-              independent legitimate-traffic set; a candidate is accepted only on
-              a CI-confident reduction with over-block near 0, else the loop
-              iterates or emits an architecture recommendation. Five live runs,
-              one accept and four refusals, each for a distinct measured reason.
-            </MethodNote>
-
-            <NovelNote>
-              The contribution isn&rsquo;t a new mitigation, it&rsquo;s that a fix
-              is{" "}
-              <span className="text-foreground/90">
-                accepted only when a re-scan proves it closes the breach without
-                over-blocking
-              </span>
-              , and refused otherwise. A runtime guardrail asserts it blocks; this{" "}
-              <em>measures</em> it, and says so when a patch doesn&rsquo;t hold.{" "}
-              <span className="text-rogue-green">⚑</span> Catching a non-working
-              fix is the point.
-            </NovelNote>
+              <NovelNote>
+                The contribution isn&rsquo;t a new mitigation, it&rsquo;s that a fix
+                is{" "}
+                <span className="text-foreground/90">
+                  accepted only when a re-scan proves it closes the breach without
+                  over-blocking
+                </span>
+                , and refused otherwise. A runtime guardrail asserts it blocks;
+                this <em>measures</em> it, and says so when a patch doesn&rsquo;t
+                hold. <span className="text-rogue-green">⚑</span> Catching a
+                non-working fix is the point.
+              </NovelNote>
+            </FindingCard>
           </div>
         </Section>
 
@@ -654,23 +649,6 @@ function NovelNote({ children }: { children: React.ReactNode }) {
         {children}
       </p>
     </div>
-  );
-}
-
-function InvertedDecision({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <li className="rogue-card border border-border rounded-xl p-4 md:p-5 bg-card/40 backdrop-blur-sm">
-      <p className="text-base font-semibold text-foreground">{title}</p>
-      <p className="mt-1 text-[15px] text-foreground/85 leading-relaxed">
-        {children}
-      </p>
-    </li>
   );
 }
 
