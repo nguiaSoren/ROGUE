@@ -4,10 +4,11 @@ Takes a known-breaching (rule, config), measures the pre-mitigation breach rate 
 `RemediationLoop` (real LLM generation + real target + the calibrated per-rule judge), and reports
 the post-mitigation breach rate + the generated patch.
 
-HONEST SCOPE (spec §9 RISK #1): the breach reduction is scored by the CALIBRATED per-rule judge
-(trustworthy). The over-block number is the calibration-gated piece — it is REPORTED but NOT used
-as an accept gate here (`over_block_eps=1.0`); acceptance = the breach rate dropped. The over-block
-figure is preliminary until its FP-mode is calibrated.
+SCOPE (post the live-run fixes): the breach reduction is scored by the CALIBRATED per-rule judge,
+and acceptance now requires a *statistically meaningful* drop (post-CI upper < pre) and rejects
+no-op candidates. Over-block is detected by refusal-text heuristic (`_is_refusal`) and DOES gate
+acceptance at the loop default; the fully-CALIBRATED over-block judge-FP-mode is the future upgrade
+(RISK #1), so the over-block figure is a sound first-pass, not yet a calibrated number.
 
 PAID. `--dry-run` is free (fakes, verifies wiring). `--yes` confirms the live run.
 
@@ -86,7 +87,7 @@ async def _amain(args) -> None:
         loop = RemediationLoop(
             panel=_DryPanel(), judge=_DryJudge([p.primitive_id for p in pack.primitives]),
             complete=lambda prompt: "MITIGATION: the agent must refuse this action.",
-            n_trials=args.n_trials, over_block_eps=1.0)
+            n_trials=args.n_trials)
         task = RemediationTask(rule=rule, config=config, primitives=pack.primitives,
                                transcripts=transcripts, pre_breach_rate=1.0)
         result = await loop.run(task)
@@ -97,7 +98,7 @@ async def _amain(args) -> None:
     from rogue.reproduce.target_panel import TargetPanel
 
     panel = TargetPanel.from_env()
-    loop = RemediationLoop(panel=panel, n_trials=args.n_trials, over_block_eps=1.0)
+    loop = RemediationLoop(panel=panel, n_trials=args.n_trials)  # over-block now gates (default eps)
     judge = loop._judge_for(rule)  # the calibrated per-rule judge (live)
 
     print("measuring pre-mitigation breach rate (live, unpatched config)…")
@@ -116,8 +117,8 @@ async def _amain(args) -> None:
           f"verified_by={result.verified_by} · iterations={result.iterations} ---")
     print(f"--- breach {pre_rate:.3f} → {result.post_breach_rate:.3f} (calibrated judge) ---")
     if ob is not None:
-        print(f"--- over-block (⚠ uncalibrated, NOT gating — RISK #1): {ob.over_block_rate:.3f} "
-              f"on {ob.n_legit} legit requests ---")
+        print(f"--- over-block (refusal-heuristic, GATING; calibrated judge-FP-mode is future): "
+              f"{ob.over_block_rate:.3f} on {ob.n_legit} legit requests ---")
     _OUT.mkdir(parents=True, exist_ok=True)
     dest = _OUT / f"remediation_{rule.rule_id}_{config.config_id}.json"
     dest.write_text(result.model_dump_json(indent=2))
