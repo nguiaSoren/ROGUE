@@ -97,13 +97,22 @@ class RemediationLoop:
                 rejected.append(cand)  # not provable by re-scan here (§6.note) — offered as an alt
                 continue
             post_config = apply_offline_mitigation(task.config, cand)
+            if post_config == task.config:
+                # No-op: the candidate didn't change the config (e.g. a tool-scope with no tool to
+                # scope), so it CANNOT be a fix — and a stochastic post<pre would otherwise falsely
+                # "accept" it (the live-run finding). Reject it without spending a re-test.
+                rejected.append(cand)
+                continue
             post_rate, post_ci = await retest_vs_family(
                 post_config, task.primitives, judge=judge, panel=self.panel, n_trials=self.n_trials)
             over_block = (
                 await retest_vs_legitimate(post_config, legit_set, judge=judge, panel=self.panel)
                 if legit_set else None
             )
-            breach_ok = post_rate < task.pre_breach_rate
+            # A statistically meaningful reduction: the post-breach CI UPPER bound is below the pre
+            # rate — NOT a bare point-estimate post<pre that stochastic noise can satisfy (1/48 vs
+            # 2/48 "looks" lower but its CI overlaps pre, so it is not a real fix).
+            breach_ok = post_ci[1] < task.pre_breach_rate
             ob_ok = over_block is not None and over_block.over_block_rate <= self.over_block_eps
             if breach_ok and ob_ok:
                 return RemediationResult(

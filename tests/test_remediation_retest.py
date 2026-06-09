@@ -260,8 +260,10 @@ def test_no_second_judge_constructed_across_both_passes():
     # Same object across both passes; no construction inside retest.
     assert _FakeJudge.instances_constructed == 1
     assert isinstance(check, OverBlockCheck)
-    # The over-block pass actually used the injected judge (calls accrued on the same object).
-    assert judge.calls >= 4  # 3 family trials + ≥1 legit probe
+    # The over-block pass is refusal-text-based and consults NO model (the RISK-#1 fix), so every
+    # judge call came from the family pass — and there is still exactly one judge object: no second
+    # model was ever constructed (the binding invariant, now held even more strongly).
+    assert judge.calls == 3  # 3 family trials only; the over-block pass calls no judge
 
 
 def test_no_second_judge_identity_is_the_injected_object():
