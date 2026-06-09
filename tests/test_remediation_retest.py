@@ -304,5 +304,56 @@ def test_nonconfig_note_distinguishes_guardrail_from_out_of_band():
         assert "out-of-band" in note
 
 
+# ---------- batching at scale (JudgeBatch) ----------
+
+
+def test_retest_vs_family_batches_at_scale(monkeypatch):
+    """At/above ``batch_threshold`` with a BATCHABLE judge (one exposing an Anthropic ``agent``),
+    breach grading routes through ``JudgeBatch`` — NOT the inline judge. We trip the batch path with
+    a low threshold + a judge that exposes an Anthropic agent and whose inline ``.judge`` raises."""
+    seen: dict = {}
+
+    class _FakeBatch:
+        def __init__(self, agent):
+            seen["agent_model"] = getattr(agent, "model", None)
+
+        async def grade(self, items):
+            seen["n_items"] = len(items)
+            return {it.custom_id: _Verdict(JudgeVerdict.FULL_BREACH) for it in items}
+
+    monkeypatch.setattr("rogue.reproduce.judge_batch.JudgeBatch", _FakeBatch)
+
+    class _StubAgent:
+        model = "anthropic/claude-sonnet-4-6"
+
+    class _BatchableJudge:  # exposes .agent (+ .context) → _batchable() is True
+        agent = _StubAgent()
+        context = None
+
+        async def judge(self, *a, **k):
+            raise AssertionError("at scale the inline judge must NOT be called")
+
+    panel = _FakePanel(response=_FakeResponse("breach text"))
+    rate, _ci = asyncio.run(
+        retest_vs_family(_config(), [_primitive(), _primitive("prim-retest-2")],
+                         judge=_BatchableJudge(), panel=panel, n_trials=3, batch_threshold=4)
+    )
+    assert seen["n_items"] == 6  # 2 primitives × 3 trials, all routed to the batch
+    assert seen["agent_model"] == "anthropic/claude-sonnet-4-6"
+    assert rate == 1.0  # every cell graded FULL_BREACH by the batch
+
+
+def test_retest_vs_family_inline_below_threshold():
+    """Below ``batch_threshold`` grading stays inline — the fake judge (no ``.agent``) is consulted
+    directly, no JudgeBatch path taken (the small/interactive-run behaviour)."""
+    judge = _FakeJudge(JudgeVerdict.FULL_BREACH)
+    panel = _FakePanel(response=_FakeResponse("breach"))
+    rate, _ = asyncio.run(
+        retest_vs_family(_config(), [_primitive()], judge=judge, panel=panel, n_trials=3,
+                         batch_threshold=999)
+    )
+    assert rate == 1.0 and judge.calls == 3  # inline: 3 grades on the injected judge
+
+
 if __name__ == "__main__":  # pragma: no cover
     pytest.main([__file__, "-q"])
