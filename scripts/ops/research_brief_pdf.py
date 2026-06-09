@@ -367,6 +367,33 @@ def build() -> Path:
                            "it was declined.", S["li"]), leftIndent=14, value="circle"),
     ], bulletType="bullet", bulletColor=GREEN, bulletFontSize=6, spaceAfter=6)]
 
+    # 05
+    F += [_finding("05", "remediation",
+                   "Measured remediation: prove a fix closes the breach without over-blocking, or refuse to ship it.")]
+    F += [Paragraph(
+        "Finding a breach is half the job. ROGUE also " + b("generates a candidate fix") + ", then "
+        "<i>measures</i>, by re-scanning a mutated test config with the same calibrated judge, whether it "
+        "closes the breach " + b("without over-blocking") + " legitimate traffic, and " + b("refuses") + " any "
+        "it cannot prove (it generates and verifies; the client deploys; it never sits in the request path). "
+        "It closes what is closable and refuses what is not, both measured: a system-prompt-extraction breach "
+        "closed " + b("3.0% → 0.0%") + " at 0% over-block and was accepted, while a medical/financial-directive "
+        "patch " + b("did not hold") + " (" + b("20.8% → ~25%") + ", the instruction-override attack overrides "
+        "the appended prompt) and was refused for an architecture change rather than shipped. The "
+        "&ldquo;without over-blocking&rdquo; claim is itself calibrated: an over-block judge, the same judge "
+        "family pointed at a refuse-versus-answer question, scored against a 50-case independent set reaches "
+        + b("98% agreement, 0% over-flag") + " and ships, against an 88% marker heuristic that wrongly flagged "
+        "23% of hedged-but-helpful answers.", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("3.0 → 0.0%", "RD04 breach closed · accepted"),
+        ('<font color="#c0392b">20.8 → ~25%</font>', "RA06 patch refused → arch."),
+        ("98% / 0%", "over-block judge: agree / over-flag"),
+        ("1 of 5", "live runs accepted"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "The contribution is not a new mitigation but the discipline: a fix is accepted only when a re-scan "
+        "proves it closes the breach without over-blocking, and refused otherwise. A runtime guardrail asserts "
+        "it blocks; this measures it, and says so when a patch does not hold.")]
+
     # limitations
     F += [Spacer(1, 10)]
     lim = [Paragraph("LIMITATIONS, STATED PLAINLY", S["notelbl"]), Spacer(1, 3), Paragraph(

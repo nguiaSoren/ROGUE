@@ -22,7 +22,7 @@ import {
 export const metadata = {
   title: "Research, ROGUE",
   description:
-    "The methods and measured results behind ROGUE, a solo research build of a continuous open-web LLM red-team. Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, and measure-before-build discipline. Including the negative results.",
+    "The methods and measured results behind ROGUE, a solo research build of a continuous open-web LLM red-team. Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, measure-before-build discipline, and measured remediation. Including the negative results.",
 };
 
 /**
