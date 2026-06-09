@@ -426,9 +426,11 @@ _DISPATCH: dict[BreachType, list[Callable[..., MitigationCandidate]]] = {
         generate_system_prompt_patch,
         recommend_retrieval_context_fix,
     ],
-    # unauthorized_action → tool-scope (+ human-gate)
+    # unauthorized_action → tool-scope (preferred), then a system-prompt deterrent (the apt
+    # config-applicable fix when there is no tool to scope), then the human-gate route
     BreachType.UNAUTHORIZED_ACTION: [
         recommend_tool_permission_scope,
+        generate_system_prompt_patch,
         recommend_human_gate_route,
     ],
     # fabricated_sensitive_value → grounding-patch
