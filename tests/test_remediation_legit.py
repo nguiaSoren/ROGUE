@@ -9,10 +9,10 @@ import pytest
 
 from rogue.remediation.legit_corpus import available_rule_ids, load_legit_set
 
-EXPECTED_RULES = {"R1", "R2", "R3", "R4"}
+EXPECTED_RULES = {"R1", "R2", "R3", "R4", "RA06"}  # RA06 added for the remediation live-run demo
 
 
-def test_available_rule_ids_covers_exactly_the_four():
+def test_available_rule_ids_covers_the_authored_rules():
     assert set(available_rule_ids()) == EXPECTED_RULES
 
 
