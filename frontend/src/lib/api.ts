@@ -11,16 +11,33 @@
  * Spec: ROGUE_PLAN.md §11.1 backend endpoints.
  */
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+// Trim + validate the configured base: a var set WITHOUT a scheme ("rogue-private.onrender.com")
+// or with stray whitespace makes `${base}${path}` throw ERR_INVALID_URL in the build-time ISR
+// prerender. Because the var IS set, a naive Boolean() check treats it as "configured", so the
+// throw slips past the degrade guard below and HARD-FAILS the whole Vercel build (the /brief
+// prerender-error). Requiring a parseable absolute URL means a malformed var degrades like an
+// unset one instead of bricking the build.
+function isAbsoluteUrl(b: string | undefined): b is string {
+  if (!b) return false;
+  try {
+    new URL(b);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE?.trim();
+const API_BASE = isAbsoluteUrl(RAW_API_BASE) ? RAW_API_BASE : "http://localhost:8000";
 
 /**
- * True only when a real API base is configured (set in Production). Preview/local builds leave
- * NEXT_PUBLIC_API_BASE unset, so the build-time ISR prerender cannot reach the API — callers use
- * this to degrade gracefully (render a placeholder) instead of failing the whole Vercel build,
- * while staying strict in Production (a real fetch failure there must still fail loudly).
+ * True only when a VALID, absolute API base is configured (set in Production). Preview/local
+ * builds leave NEXT_PUBLIC_API_BASE unset — OR a misconfigured one (no scheme / whitespace) fails
+ * validation — so the build-time ISR prerender cannot reach the API; callers use this to degrade
+ * gracefully (render a placeholder) instead of failing the whole Vercel build, while staying
+ * strict in Production (a real fetch failure there must still fail loudly).
  */
-export const API_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_API_BASE);
+export const API_CONFIGURED = isAbsoluteUrl(RAW_API_BASE);
 
 const REVALIDATE_SECONDS = 300;
 
