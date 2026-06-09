@@ -175,9 +175,11 @@ def _is_refusal(text: str) -> bool:
 
 # ---------- §6: breach grading — inline below scale, JudgeBatch at scale ----------
 
-BATCH_THRESHOLD = 64  # grade via the Anthropic Batch API at/above this many items; inline below
-# (the Batch API's 50% + cached rubric only beats sequential once the queue latency is amortized;
-# small/interactive re-tests stay inline so they finish in seconds — see the live-run reasoning).
+BATCH_THRESHOLD = 200  # grade via the Anthropic Batch API at/above this many items; inline below.
+# Set ABOVE a single interactive remediation re-test (one candidate = pack × trials, ≤ ~90 items) so
+# those stay inline + finish in seconds — the Batch API's 50% + cached rubric only beats sequential
+# once its 10-30min queue latency is amortized over genuinely many grades. (A too-low 64 made a
+# normal R1 re-test, 11 prims × 6 trials = 66, batch by accident and stall on the queue for 33 min.)
 
 
 def _batchable(judge: JudgeLike) -> bool:
