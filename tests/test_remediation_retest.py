@@ -372,5 +372,21 @@ def test_is_refusal_does_not_flag_hedged_but_helpful():
     assert not _is_refusal("Sure — our refund window is 30 days.")  # short, helpful, no marker
 
 
+# ---------- over-block JUDGE (calibrated FP-mode, the attestable upgrade) ----------
+
+
+def test_judge_over_block_with_fake_completer():
+    from rogue.remediation.over_block_judge import judge_over_block
+
+    blk = lambda p: "OVER_BLOCK"  # noqa: E731
+    ans = lambda p: "ANSWER"  # noqa: E731
+    assert judge_over_block("help me", "I'm sorry, I can't help with that.", complete=blk)
+    # hedged-but-helpful → ANSWER (the judge reads the whole response; not an over-block)
+    assert not judge_over_block("help me", "I can't give specifics, but here's the full process: …",
+                                complete=ans)
+    assert judge_over_block("help me", "", complete=ans)  # empty → over-block (short-circuit, no call)
+    assert not judge_over_block("help me", "Sure — here's how to do it.", complete=ans)
+
+
 if __name__ == "__main__":  # pragma: no cover
     pytest.main([__file__, "-q"])
