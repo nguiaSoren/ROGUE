@@ -138,7 +138,7 @@ def payload_for_scan(report: dict, scan_record, *, corpus_as_of: datetime) -> di
         _finding_record(f, scan_id=scan_id, index=i) for i, f in enumerate(findings)
     ]
 
-    return {
+    payload = {
         "entry_type": "scan",
         "scan_id": scan_id,
         "target": _redact(report.get("target")) or "",
@@ -154,3 +154,29 @@ def payload_for_scan(report: dict, scan_record, *, corpus_as_of: datetime) -> di
         "corpus_as_of": canonical_as_of(corpus_as_of),
         "framing": framing_line(corpus_as_of),
     }
+
+    # Additive (build-06 §5): when a Slack policy scan carried a Surface-1 context block, make the
+    # signed entry self-describing — embed the block and derive the single top-level `ground_truth_ref`
+    # the entry column stores (a stable canonical join over the breach types it points at). Honest
+    # pointer to area-02's independent label provenance (ADR-0011); resolution is out of scope here.
+    # When absent, the returned dict is BYTE-IDENTICAL to before — load-bearing for the entry hash /
+    # replay chain, so no `surface1_context`/`ground_truth_ref` key is added on the non-Slack path.
+    surface1_context = report.get("surface1_context")
+    if surface1_context is not None:
+        payload["surface1_context"] = surface1_context
+        refs = (surface1_context or {}).get("ground_truth_refs") or {}
+        breach_types = sorted(str(bt) for bt in refs)
+        payload["ground_truth_ref"] = (
+            "area02-calibration:" + ",".join(breach_types) if breach_types else None
+        )
+
+    # Additive (build-06 §5): a per-rule policy scan carries its `rule_breach_report` (the per-rule
+    # verdicts: rule_id / breach_type / n_breaches / trial-outcome CI). Embed it so the signed entry —
+    # and the ChangeWitness reader — can name which RULE broke, not just aggregate counts. The flat
+    # `findings` list is a lossy rule→family approximation; the per-rule CI lives only here. Gated on
+    # its own presence, so a non-policy scan's payload stays BYTE-IDENTICAL (no key added).
+    rule_breach_report = report.get("rule_breach_report")
+    if rule_breach_report is not None:
+        payload["rule_breach_report"] = rule_breach_report
+
+    return payload

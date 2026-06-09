@@ -294,6 +294,10 @@ class DefaultScanEngine(ScanEngine):
             cost_usd=0.0,  # best-effort: the §6 runner doesn't surface spend on the report object.
             findings=findings,
             rule_breach_report=report_dict,
+            # Additive: ride the Surface-1 context (agent identity + ground-truth refs) the Slack
+            # cycle threaded through into the persisted payload, so the auto-signed attestation
+            # entry is self-describing (build-06 §5). Absent ⇒ None ⇒ report dict unchanged.
+            surface1_context=spec.surface1_context,
         )
 
     # --- operation #1b: ladder scan -----------------------------------------------------------

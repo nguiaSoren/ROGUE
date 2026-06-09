@@ -171,6 +171,10 @@ class ScanWorker:
                 entry_type="scan",
                 payload=payload,
                 reproducibility_ref=job.scan_id,
+                # Additive: populate the entry's ground_truth_ref column from the payload's derived
+                # pointer (set only on Surface-1/Slack policy scans, ADR-0011). Absent ⇒ None ⇒
+                # identical to before for every other scan.
+                ground_truth_ref=payload.get("ground_truth_ref"),
                 corpus_as_of=corpus_as_of,
             )
         except Exception as e:  # noqa: BLE001 — attestation is additive; never fail a completed scan.

@@ -20,6 +20,11 @@ from .agent_store import (
     SlackAgentStore,
     build_postgres_slack_agent_store,
 )
+from .change_witness import (
+    ChangeWitnessSummary,
+    append_cycle_mitigations,
+    latest_change_witness,
+)
 from .diff_post import build_security_post, post_breach_diff
 from .harvest_hook import newly_landed_primitives
 from .policy import ensure_client_policy
@@ -47,4 +52,7 @@ __all__ = [
     "ensure_client_policy",
     "build_security_post",
     "post_breach_diff",
+    "ChangeWitnessSummary",
+    "latest_change_witness",
+    "append_cycle_mitigations",
 ]
