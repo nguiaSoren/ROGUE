@@ -7,6 +7,8 @@ The single home for **our own** research writeups (manuscripts, focused studies,
 | File | What it is | Status |
 |---|---|---|
 | `judge_calibration_paper.md` | **Judge calibration + generalization** (the v3 content-transfer gate → per-rule consummation judges). Seeded 2026-06-08. | tracked · draft |
+| `coverage_validity_study.md` | **Attack-coverage calibration** validity study — does coverage predict breach-detection power? (ρ=0.35, validated modest). 2026-06-08. | tracked |
+| `measured_remediation_finding.md` | **Surface-1b measured remediation** lab note — catching a fix that *doesn't hold* (RA06 + the accept-loop hardening). 2026-06-09. | tracked |
 | `grammar_efficacy.md` | The grammar-component predictive-power **null result** study (#TRS-C). | tracked |
 | `bandit_for_humans.md` | The discovery/yield-bandit write-up (live-vs-observational honesty). | tracked |
 | `adaptive_orchestration_paper.md` | The workshop paper — the cross-tier scheduler result. | gitignored (local) |
