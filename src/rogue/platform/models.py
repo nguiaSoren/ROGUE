@@ -164,6 +164,62 @@ class Integration(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class SlackRegisteredAgent(Base):
+    """A per-org self-registered Slack agent target — the customer's own consented agent endpoint.
+
+    Stored as a lightweight row separate from `integrations` (different cardinality/lifecycle:
+    one org runs many short-lived agents; we do NOT overload that table). Carries enough to
+    faithfully reconstruct the target's `DeploymentConfig` (model + system prompt + declared
+    tools + forbidden topics).
+
+    `system_prompt_ref` holds EITHER the inline system prompt OR a `secref_…` handle into the
+    `secrets` table: by convention (no extra column), a value starting with `"secref_"` is a
+    SecretStore handle to resolve; otherwise it is the literal prompt. The sandbox binding
+    (`sandbox_channel_id`) is mandatory / fail-closed — kept non-nullable here, enforced in app code.
+    """
+
+    __tablename__ = "slack_registered_agents"
+    __table_args__ = (UniqueConstraint("org_id", "agent_name", name="uq_slack_agent_org_name"),)
+    agent_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    agent_name: Mapped[str] = mapped_column(String(80))
+    workspace: Mapped[str] = mapped_column(String(120))
+    base_url: Mapped[str] = mapped_column(String(500))
+    model: Mapped[str] = mapped_column(String(100))
+    system_prompt_ref: Mapped[str] = mapped_column(Text)  # inline prompt OR secref_ → secrets table
+    declared_tools: Mapped[list] = mapped_column(JSON, default=list)
+    forbidden_topics: Mapped[list] = mapped_column(JSON, default=list)
+    sandbox_channel_id: Mapped[str] = mapped_column(String(64))  # NOT NULL — sandbox binding mandatory
+    security_channel_id: Mapped[str] = mapped_column(String(64))
+    rule_pack_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    client_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # cached serialized ClientPolicy (governance.decompose_policy) — None until first derived
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SnapshotCapture(Base):
+    """Content-addressed capture store — byte-faithful evidence for reproducibility (ADR-0012-adjacent).
+
+    Each row holds the raw captured bytes of an artifact (a transcript, a target response, a JSON
+    payload) keyed by its content address `snapshot_ref` (`"sha256:" + hexdigest`). Dedup is
+    per-tenant: the same content within an org maps to the same `snapshot_ref`, so a re-capture is
+    an idempotent write (the `uq_snapshot_org_ref` constraint collapses duplicates). The sandbox-scan
+    post (§4) links to a `snapshot_ref` instead of inlining transcripts, keeping the post-row small
+    while the heavy bytes live here once per (org, content).
+    """
+
+    __tablename__ = "snapshot_captures"
+    __table_args__ = (
+        UniqueConstraint("org_id", "snapshot_ref", name="uq_snapshot_org_ref"),
+        Index("ix_snapshot_captures_org_ref", "org_id", "snapshot_ref"),
+    )
+    id: Mapped[str] = mapped_column(String(48), primary_key=True)  # surrogate, _new_id("snap")
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    snapshot_ref: Mapped[str] = mapped_column(String(80))  # content address: "sha256:" + hexdigest
+    content_type: Mapped[str] = mapped_column(String(40))  # transcript | response | json
+    content: Mapped[bytes] = mapped_column(LargeBinary)  # byte-faithful captured bytes
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class AttestationEntry(Base):
     """One line in an org's append-only, hash-chained attestation record (v2 §2.5 / ADR-0012).
 
@@ -206,5 +262,5 @@ class AttestationEntry(Base):
 __all__ = [
     "Organization", "User", "Membership", "Project", "ApiKey",
     "ScanRun", "ScanJob", "Report", "Secret", "Integration",
-    "AttestationEntry",
+    "SlackRegisteredAgent", "AttestationEntry",
 ]

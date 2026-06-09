@@ -48,6 +48,8 @@ class DefaultScanEngine(ScanEngine):
         repertoire_loader: Any = None,
         escalation_ctx_builder: Any = None,
         ladder_runner: Any = None,
+        policy_runner: Any = None,
+        snapshot_store: Any = None,
     ) -> None:
         # All injectable so tests run fully offline. When left None, the real panel / judge are built
         # lazily inside ``run`` (so importing this module never needs API keys), the repertoire is
@@ -59,6 +61,11 @@ class DefaultScanEngine(ScanEngine):
         self._repertoire_loader = repertoire_loader
         self._escalation_ctx_builder = escalation_ctx_builder
         self._ladder_runner = ladder_runner
+        # policy-mode (build-04 §6 per-rule scanner) seams. ``policy_runner`` is the test seam: a fake
+        # returns a RuleBreachReport with no network; when None the real ``run_policy_scan`` is used.
+        # ``snapshot_store`` is optional transcript capture; when None, capture is skipped gracefully.
+        self._policy_runner = policy_runner
+        self._snapshot_store = snapshot_store
 
     def _load_repertoire(self, spec: ScanSpec) -> list:
         """Source primitives for a ``mode="repertoire"`` scan from the live harvested corpus."""
@@ -187,6 +194,107 @@ class DefaultScanEngine(ScanEngine):
             logging.getLogger(__name__).warning(
                 "ladder telemetry logging failed (non-fatal): %s", exc
             )
+
+    # --- operation #1a: policy (per-rule) scan ------------------------------------------------
+
+    async def _run_policy(self, spec: ScanSpec, config, progress: ProgressCallback | None = None):
+        """Per-rule policy scan (build-04 §6 path A): score the target rule-by-rule against this
+        cycle's corpus and roll the :class:`RuleBreachReport` into a :class:`ScanReport`.
+
+        The corpus is the newly-landed selection the trigger chose (``spec.attacks`` = primitive ids)
+        out of the live repertoire; ``run_policy_scan`` re-aims it per rule. The per-rule report is
+        carried verbatim into the persisted payload (``ScanReport.rule_breach_report``) so §4's
+        diff_post can render "holds N/M" for each rule.
+
+        The injected ``policy_runner`` is the offline test seam:
+        ``policy_runner(policy, config, corpus, *, n_trials) -> RuleBreachReport``.
+        """
+        from rogue.governance.scan_runner import default_grade, live_responder, run_policy_scan
+        from rogue.report import Finding, ScanReport, technique_label
+
+        if spec.policy is None:
+            raise ValueError(
+                "policy-mode scan requires spec.policy (a decomposed ClientPolicy)"
+            )
+
+        # Source the corpus from the live repertoire, filtered to the trigger's selection when given.
+        corpus = self._load_repertoire(spec)
+        if spec.attacks:
+            wanted = set(spec.attacks)
+            corpus = [p for p in corpus if getattr(p, "primitive_id", None) in wanted]
+
+        if self._policy_runner is not None:
+            report = self._policy_runner(spec.policy, config, corpus, n_trials=spec.n_trials)
+        else:
+            # LIVE path: real per-rule judge + real target trials (one model call per trial).
+            respond, _stats = live_responder(self._panel)
+            report = run_policy_scan(
+                spec.policy,
+                config,
+                corpus,
+                respond=respond,
+                grade=default_grade,
+                n_trials=spec.n_trials,
+            )
+
+        verdicts = list(report.rule_verdicts)
+        n_tests = sum(v.n_trials for v in verdicts)
+        n_breaches = sum(v.n_breaches for v in verdicts)
+
+        # One Finding per rule verdict. A rule is not an attack family, so populate the shared Finding
+        # faithfully where it maps (family from the verdict's attack_family, hit rate from the trials)
+        # and rely on the carried `rule_breach_report` for per-rule detail diff_post renders.
+        findings: list[Finding] = []
+        for v in verdicts:
+            family = v.attack_family.value if v.attack_family is not None else "unknown"
+            findings.append(
+                Finding(
+                    family=family,
+                    technique=technique_label(family),
+                    vector="user_turn",
+                    severity="high" if v.n_breaches > 0 else "low",
+                    title=f"Policy rule {v.rule_id}",
+                    success_rate=v.breach_rate,
+                    n_trials=v.n_trials,
+                    n_breach=v.n_breaches,
+                    example_attack=None,
+                    example_response=None,
+                )
+            )
+
+        # Capture transcripts as pointers when a snapshot store is wired. NOTE: the §6 runner records
+        # transcripts as `transcript_refs` strings (rule::primitive::trial markers), not raw blobs, and
+        # the engine has no `org_id` (it lives on the worker's LeasedJob, not on ScanSpec). So there is
+        # no transcript text to content-address here — this is a thin, explicitly-marked seam that §4's
+        # diff_post fills (it has the org_id + the live transcripts). When a store IS injected we put a
+        # small audit marker so the wiring is exercised end-to-end; the real per-breach capture is
+        # diff_post's job. The marker ref is NOT threaded back into findings (no per-finding transcript
+        # exists at this layer), keeping this strictly a capability seam.
+        if self._snapshot_store is not None:
+            try:
+                org_id = getattr(spec.policy, "customer_id", None) or "platform"
+                self._snapshot_store.put(
+                    f"policy-scan:{report.policy_id}:{report.config_id}",
+                    org_id=org_id,
+                    content_type="policy_scan_marker",
+                )
+            except Exception:  # noqa: BLE001 — capture is best-effort, never fails a scan.
+                pass
+
+        # top_attack falls out of the breached findings (ScanReport.top_attack); surface the
+        # highest-breach-rate rule's family as the example_response on its finding is N/A here.
+        # mode="json" so str-Enums (AttackFamily/BreachType) serialize to their wire VALUES, not enum
+        # objects — otherwise a consumer reading the in-process ScanReport (before it crosses the
+        # JSON-column boundary in the durable path) would render enum reprs like "AttackFamily.X".
+        report_dict = report.model_dump(mode="json")
+        return ScanReport(
+            target=config.base_url or config.target_model,
+            n_tests=n_tests,
+            n_breaches=n_breaches,
+            cost_usd=0.0,  # best-effort: the §6 runner doesn't surface spend on the report object.
+            findings=findings,
+            rule_breach_report=report_dict,
+        )
 
     # --- operation #1b: ladder scan -----------------------------------------------------------
 
@@ -321,6 +429,10 @@ class DefaultScanEngine(ScanEngine):
         from rogue.scan import run_scan
 
         config = self._build_config(spec)
+        if spec.mode == "policy":
+            # Path A: scan a decomposed ClientPolicy rule-by-rule against this cycle's corpus
+            # (build-04 §6 per-rule scanner). Separate branch — returns early, like the ladder.
+            return await self._run_policy(spec, config, progress)
         if spec.mode == "ladder":
             # The deepest path: escalate each goal through the full multi-tier ladder (graduated
             # techniques + CoJ + structured + image/audio renderers). Separate loop — return early.

@@ -429,6 +429,11 @@ class ScanReport:
     n_breaches: int
     cost_usd: float
     findings: list[Finding] = field(default_factory=list)
+    # Policy-mode only (platform §4 path A): the full per-rule RuleBreachReport (model_dump()) so the
+    # Slack diff_post can render "breaks on YOUR rule R3, holds 2/5" per rule. None for every other
+    # scan mode; `to_dict()` emits the `rule_breach_report` key ONLY when this is set, so a non-policy
+    # report's dict stays byte-identical to before.
+    rule_breach_report: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -532,7 +537,7 @@ class ScanReport:
             # human label so a JSON consumer doesn't have to guess what "success" means.
             d["breach_label"] = f.breach_label
             findings.append(d)
-        return {
+        out = {
             "target": self.target,
             "n_tests": self.n_tests,
             "n_breaches": self.n_breaches,
@@ -541,6 +546,11 @@ class ScanReport:
             "cost_usd": round(self.cost_usd, 6),
             "findings": findings,
         }
+        # Additive: carry the per-rule policy report through to the persisted payload ONLY when a
+        # policy-mode scan set it, so every other report's dict is unchanged.
+        if self.rule_breach_report is not None:
+            out["rule_breach_report"] = self.rule_breach_report
+        return out
 
     def to_json(
         self,

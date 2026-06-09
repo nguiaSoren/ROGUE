@@ -13,6 +13,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from rogue.schemas.governance import ClientPolicy
+
 
 class ScanStatus(str, Enum):
     QUEUED = "queued"
@@ -66,13 +68,18 @@ class ScanSpec(BaseModel):
     # "pack" = a small curated JSON pack (default/aggressive/compliance). "repertoire" = the live
     # harvested corpus (most-reproducible first). "ladder" = escalate each goal through the full
     # multi-tier arsenal (graduated techniques + CoJ + structured + image/audio renderers) — the
-    # deepest + most expensive mode; budget defaults to a safe cap if unset.
-    mode: Literal["pack", "repertoire", "ladder"] = "pack"
+    # deepest + most expensive mode; budget defaults to a safe cap if unset. "policy" = scan a
+    # decomposed ClientPolicy rule-by-rule against this cycle's corpus (build-04 §6 per-rule scanner);
+    # requires `policy` to be set (a None policy in policy-mode fails clearly in the engine).
+    mode: Literal["pack", "repertoire", "ladder", "policy"] = "pack"
     pack: str = "default"
     attacks: list[str] | None = None
     max_tests: int = Field(default=50, ge=1, le=1000)
     n_trials: int = Field(default=1, ge=1, le=10)
     budget: float | None = Field(default=None, ge=0)
+    # policy-mode only: the decomposed customer policy (§3 output). Default None so every existing
+    # spec is unchanged; the engine raises clearly if mode="policy" and this is None.
+    policy: ClientPolicy | None = None
 
 
 class ScanRecord(BaseModel):
