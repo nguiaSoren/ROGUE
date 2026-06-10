@@ -52,6 +52,9 @@ _ENV_NAMES: dict[str, str] = {
     "judge_model": "JUDGE_MODEL",
     "judge_fallback_model": "JUDGE_FALLBACK_MODEL",
     "slack_webhook_url": "SLACK_WEBHOOK_URL",
+    # build-06 §8 Surface-1 Slack delivery: bot token + request-signature secret.
+    "slack_bot_token": "SLACK_BOT_TOKEN",
+    "slack_signing_secret": "SLACK_SIGNING_SECRET",
     "secret_encryption_key": "SECRET_ENCRYPTION_KEY",
     "redis_url": "REDIS_URL",
     "mcp_transport": "ROGUE_MCP_TRANSPORT",
@@ -69,6 +72,8 @@ _SECRET_FIELDS: frozenset[str] = frozenset(
         "groq_api_key",
         "gemini_api_key",
         "slack_webhook_url",
+        "slack_bot_token",
+        "slack_signing_secret",
         "secret_encryption_key",
     }
 )
@@ -101,6 +106,9 @@ class Settings(BaseModel):
 
     # ---------- Notifications (credential) ----------
     slack_webhook_url: SecretStr | None = None
+    # build-06 §8 Surface-1 Slack delivery: bot OAuth token + request-signature secret.
+    slack_bot_token: SecretStr | None = None
+    slack_signing_secret: SecretStr | None = None
 
     # ---------- Future queue ----------
     redis_url: str | None = None

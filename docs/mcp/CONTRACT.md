@@ -2,10 +2,11 @@
 
 This is the **single source of truth** for ROGUE's producer-side MCP tool surface — the tools a Claude Desktop / Cursor / Windsurf / hosted MCP client sees when it connects to the ROGUE MCP server. It is the MCP equivalent of `sdk/CONTRACT.md`: where that document freezes the SDK ⇄ Hosted-API *wire* protocol, this one freezes the MCP *tool* protocol (tool names, input parameters, and output shapes). An integrator builds against this; the code in `src/rogue/mcp_server/` implements it.
 
-The surface is two layers on one `FastMCP` instance (`src/rogue/mcp_server/server.py`):
+The surface is three layers on one `FastMCP` instance (`src/rogue/mcp_server/server.py`):
 
 - **Read tools** (6) — query ROGUE's own continuously-harvested threat-intelligence DB. Read-only, global, take no customer target, spend no money. Registered as module-level `@mcp.tool()` functions in `server.py`.
 - **Action tools** (14, of which one is a back-compat alias) — run and report the whole scan/benchmark/integration lifecycle against the *caller's* endpoint. Registered by `register_scan_tools(...)` in `src/rogue/mcp_server/scan_tools.py`, routed through the same `ScanService` / `ReportService` / `ScanEngine` / `BenchmarkService` that back the SDK, the HTTP API, and the dashboard. They cost real money and write per-tenant records.
+- **Slack Surface-1 tools** (5) — register and continuously red-team the caller's consented Slack agent, then read the signed result back and assess inbound messages against it. Registered by `register_slack_tools(...)` in `src/rogue/mcp_server/slack_tools.py`, routed through the `rogue.integrations.slack` package plus the same `ScanService` / `AttestationService`. `run_sandbox_cycle` costs real money (it enqueues scans); the others are reads / pure predictions.
 
 ## What `v1` promises
 
@@ -157,6 +158,47 @@ File a Jira ticket for each **critical/high breached** finding of a scan, **idem
 
 ---
 
+## Slack Surface-1 tools
+
+Five tools from `register_slack_tools(...)` (`src/rogue/mcp_server/slack_tools.py`), the build-area 06 §8 surface for red-teaming a consented Slack agent. All are `async`, all are org-scoped to the server-bound org (no `org_id` parameter — the same hard rule as the action tools), and **none raises across the MCP boundary** — a recoverable failure returns `{"error": "<message>"}`. They route through the `rogue.integrations.slack` package plus the shared `ScanService` / `AttestationService`; there is no business logic in the tools.
+
+`tripwire_predict` and `redline_score` are **advisory only** (ADR-0010): ROGUE never sits in the request path, never blocks, never mutates a message — it reads prior signed scans and returns a prediction / a deploy-by-client gate rule.
+
+### Register
+
+#### `register_slack_agent(agent_name, base_url, model, system_prompt, workspace, sandbox_channel_id, security_channel_id, declared_tools=None, forbidden_topics=None, rule_pack_ref=None)`
+Register a consented Slack agent as a ROGUE deployment config so its deployed configuration (model × system prompt × tools) can be continuously red-teamed. The system prompt + declared tools are **customer-supplied** (ROGUE does not introspect Slack); `base_url` is the agent's OpenAI-compatible endpoint (which routes it through ROGUE's custom-endpoint adapter). The sandbox + security channel bindings are mandatory.
+- **Params:** `agent_name: str`, `base_url: str`, `model: str`, `system_prompt: str`, `workspace: str`, `sandbox_channel_id: str`, `security_channel_id: str`; optional `declared_tools: list[str] | None`, `forbidden_topics: list[str] | None`, `rule_pack_ref: str | None`.
+- **Returns:** `{agent_id: str, config_id: str` (`"slack-<workspace>-<agent_name>"`)`, name: str}`. Fail-closed validation (a missing/blank required field, or a config id under 10 chars) → `{error: <message>}`.
+
+### Cycle
+
+#### `run_sandbox_cycle(since_hours=24, max_tests=50, n_trials=1)`
+Enqueue a sandbox red-team cycle over the agents that newly-landed primitives apply to. **COSTLY downstream** — each enqueued scan spends real money on endpoint + judge LLM calls; a deliberate invocation, never a loop. Returns immediately; poll each `scan_id` via the scan tools.
+- **Params:** `since_hours: int = 24` (test against primitives landed within this window); `max_tests: int = 50`; `n_trials: int = 1`.
+- **Returns:** `{enqueued: [{scan_id: str}], count: int}` — or `{error: <message>}`.
+
+### Witness
+
+#### `get_change_witness(agent_name)`
+Read the latest signed ChangeWitness for one Slack agent — the auditable projection of its most-recent signed sandbox `scan` entry.
+- **Params:** `agent_name: str`.
+- **Returns:** `{agent_name: str, org_id: str, scan_id: str, entry_id: str, entry_hash: str, corpus_as_of: str, framing: str` (the non-negotiable scope line)`, breaching_rules: [{rule_id, breach_type, family, holds` (`"<n_clean>/<n_trials>"`)`, ci: [low, high] | null}], verified_mitigations: [{mitigation_type, accepted, artifact_excerpt, post_breach_rate}], ground_truth_ref: str | null, replay_ok: bool | null}`. No signed scan entry yet → `{error: "no signed ChangeWitness for <agent_name>"}`.
+
+### Inbound (advisory)
+
+#### `tripwire_predict(agent_name, message)`
+Predict — from this agent's prior signed scan — whether an inbound message breaks it. **Advisory only** (ADR-0010): no Slack call, no block, no message mutation.
+- **Params:** `agent_name: str`, `message: str`.
+- **Returns:** `{inbound_excerpt: str, matched_family: str | null, calibrated: bool, prior_breach_rate: float | null, ci: [low, high] | null, n_trials: int, n_breaches: int, scan_id: str | null, recommendation: str, advisory: str}` — or `{error: <message>}`.
+
+#### `redline_score(agent_name, message)`
+Emit a deployable inbound-gate **rule** for a message, whose confidence is the area-02 calibrated judge's measured precision for the message's breach class (`null` with an honest "uncalibrated" status when that class wasn't shipped — never fabricated, ADR-0011). **Advisory only** (ADR-0010): ROGUE generates + verifies the rule; the CLIENT deploys + enforces it — ROGUE never blocks.
+- **Params:** `agent_name: str`, `message: str`.
+- **Returns:** `{matched_family: str | null, breach_type: str | null, risk: str` (`calibrated-flag` | `uncalibrated-advisory` | `no-match`)`, confidence: float | null, calibration_status: str` (`calibrated` | `uncalibrated` | `n/a`)`, over_block: dict | null` (`null` in v1)`, recommendation: str, rule: <MitigationCandidate dict> | null` (a `GUARDRAIL_RULE` the client deploys)`}` — or `{error: <message>}`.
+
+---
+
 ## Vocabularies (source of truth, not redefined here)
 
 The string values that appear in tool outputs are owned by the schemas — this contract references them so they can never drift:
@@ -174,7 +216,7 @@ The string values that appear in tool outputs are owned by the schemas — this 
 
 ## Versioning rules
 
-**The `v1` stable set is exactly the 20 tools above** — 6 read tools + 14 action tools (`get_scan` being the alias of `get_scan_status`). These names, their documented inputs, and their documented output keys are frozen for `v1` under the promises at the top of this document. Additive evolution (new optional params with safe defaults; new output keys) is allowed in `v1`; renames/removals/retypes/required-additions are not.
+**The `v1` stable set is exactly the 25 tools above** — 6 read tools + 14 action tools (`get_scan` being the alias of `get_scan_status`) + 5 Slack Surface-1 tools. These names, their documented inputs, and their documented output keys are frozen for `v1` under the promises at the top of this document. Additive evolution (new optional params with safe defaults; new output keys) is allowed in `v1`; renames/removals/retypes/required-additions are not.
 
 **Not in the `v1` contract** (roadmap; will arrive as new tools / new optional params, never as breaking changes to the above):
 
