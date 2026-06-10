@@ -65,6 +65,16 @@ data/*
 # Bandit arm stats — harmless (no secrets/PII); published so /api/bandit/stats
 # renders on a fresh clone + the Render build can COPY it.
 !data/discovery_bandit.json
+# Per-breach-type judge calibration SUMMARIES — Surface-1 RedlineGuard + the per-rule judge read
+# these at runtime (data/calibration/<breach_type>_report.json) to report REAL precision; without
+# them prod degrades to "uncalibrated". Small summary stats only (precision/recall/agreement CIs +
+# gate + one summary line) — NO eval cases / transcripts / PII. Eval corpora, kappa worksheets,
+# benchmark reports (over_block/strongreject/wildguard), and backups stay local.
+!data/calibration/
+data/calibration/*
+!data/calibration/information_disclosure_report.json
+!data/calibration/unauthorized_action_report.json
+!data/calibration/fabricated_sensitive_value_report.json
 
 # LeakHub session capture — Playwright storage_state JSON. Effectively your
 # signed-in session; never commit. See scripts/_capture_leakhub_storage.py.
