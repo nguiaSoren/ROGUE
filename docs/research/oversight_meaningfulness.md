@@ -1,0 +1,20 @@
+# Measuring whether human oversight is *meaningful* (not just present)
+
+*Lab note · ROGUE Surface 2 (the human gate) · build-07 · 2026-06-11. Companion to the judge-calibration + measured-remediation findings.*
+
+## The claim
+When a risky agent action escalates to a human for sign-off, the usual assumption is that the human *is* the safety control — "a person approved it." That assumption is untested. ROGUE Surface 2 measures it directly: the headline is a **human false-approve rate with a bootstrap CI** — how often the reviewer APPROVES a case whose correct disposition was DENY — scored against an answer key that is **provably independent** of (a) the regulation text, (b) the reviewers' own votes, and (c) the verifier model's own opinion (ADR-0011). The same instrument as Surface 1 (fire inputs → capture a decider's decision → score against an independent standard → sign the record), pointed at a human instead of a model.
+
+## Why it's novel
+- It reframes oversight from a *checkbox* ("a human reviewed it") to a *measured quantity* ("the human gate let through N% of the things it should have stopped, CI […]"). The defensible justifications for a gate become **measurement** and **structured sign-off** — never headcount ("more reviewers = safer" is disconfirmed).
+- **The bias-laundering guard** (the load-bearing honesty rule for any learning-to-defer ladder built on top): the system is **never trained on "what the humans approved"** — it is trained on **what the corpus verified was actually right**. The human ✅/❌ is only the *trigger* that logs a case for labeling; the label is the verified outcome, never the vote. Train on votes and you build a machine that reproduces automation-bias / selective-adherence failures faster and with less accountability. Staged autonomy promotes a case-class only when an agent's measured accuracy provably meets-or-beats the human gate's *with bootstrap-CI separation*; high-stakes classes may never leave the full-human rung — a feature.
+- **Engagement ≠ breach** carries over from the judge-calibration work: deliberating, asking questions, taking time are NOT failures; only a consummated wrong approval is. (The human analogue of the over-block FP-mode distinction.)
+
+## Methodology + honest status
+- **The answer key is the product.** A weak/leaky/unbalanced corpus is a *signed attestation of a number that was never established* — worse than no product. Enforced by an automated **independence lint** (CI-gated, fails the build) that rejects regulation-derived rationales, verifier provenance, ungrounded cases, and imbalance.
+- **The corpus is real, not invented.** 91 cases (46 DENY / 45 APPROVE) across large-wire / high-value-refund / vendor-change, harvested via Bright Data from real public fraud + legitimate-transaction write-ups, every case `source_refs`-cited (Toyota Boshoku $37M BEC, Facebook/Google $121M Rimasauskas, Arup $25.6M deepfake, refund rings, …). Provenance is **synthetic-designed-but-grounded** (`label_provenance=synthetic_designed` + real source URLs) — honestly NOT expert-adjudicated and NOT the customer's historical_resolved tickets (those are production sources, modeled-now-populated-later).
+- **Methods constraint (reusable):** Bright Data policy-blocks all `.gov` domains (Unlocker + Scraping Browser), so named DOJ/court incidents are grounded on reputable coverage that *quotes* the primary record, not on the `.gov` page itself.
+- **Status:** the instrument is built + the Phase-3 exit gate is met in *simulation* (a stub reviewer at a configured error rate produces e.g. `false-approve 26% [13%, 39%]` against the independent key). **The real number awaits real reviewers** — a static click-to-review HTML (`scripts/oversight/build_review_html.py`) feeds `run_gate_measurement.py --mode decisions`. No real human false-approve rate is claimed yet.
+
+## What would make it a paper
+A real reviewer cohort (n≥30 reviewers × the corpus) producing a measured human false-approve rate with CI, ideally vs a measured agent/judge rate on the same cases — the "does oversight add accuracy, or only accountability?" question, answered with numbers.

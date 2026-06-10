@@ -24,3 +24,4 @@ The single home for **our own** research writeups (manuscripts, focused studies,
 - **Tracked vs local:** drafts that are still moving or that duplicate internal planning are gitignored; writeups that are stable / partly public (grammar null-result, bandit, the judge paper) are tracked.
 - **One topic per paper.** The scheduler/orchestration work and the judge-calibration work are *separate* papers (different subjects); the grammar null-result is its own study.
 - **Provenance + honesty:** every reported number traces to `breach_results` / `data/calibration/` / a named external benchmark; mark pending/unmeasured results as pending (do not quote a number we haven't collected).
+- [Oversight meaningfulness](oversight_meaningfulness.md) — Surface-2 human-gate: measuring a false-approve rate vs an independent key + the bias-laundering guard (novel; real number pending reviewers)
