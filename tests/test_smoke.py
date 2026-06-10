@@ -107,7 +107,10 @@ def test_models_metadata_has_expected_tables() -> None:
     0032) added 2026-06-09. ``slack_registered_agents`` (ROGUE v2 Surface 1 Slack
     delivery — self-registered agent targets, migration 0033) added 2026-06-09.
     ``snapshot_captures`` (ROGUE v2 Surface 1 §4 content-addressed byte-faithful
-    capture store, migration 0034) added 2026-06-10. Add new entries here when
+    capture store, migration 0034) added 2026-06-10. ``gated_cases``,
+    ``review_sessions`` and ``gated_decisions`` (ROGUE v2 Surface 2 human-gate
+    oversight schema — answer-key corpus + org-scoped review sessions/decisions,
+    migration 0036) added 2026-06-10. Add new entries here when
     migrations add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
@@ -125,6 +128,8 @@ def test_models_metadata_has_expected_tables() -> None:
         "demo_requests",
         "deployment_configs",
         "fetch_cache",
+        "gated_cases",
+        "gated_decisions",
         "integrations",
         "ladder_attempts",
         "ladder_rotation_membership",
@@ -139,6 +144,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "renderer_capabilities",
         "reports",
         "retrieval_metrics",
+        "review_sessions",
         "scan_jobs",
         "scan_runs",
         "secrets",

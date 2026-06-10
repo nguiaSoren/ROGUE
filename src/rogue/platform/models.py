@@ -260,8 +260,71 @@ class AttestationEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class GatedCase(Base):
+    """One entry in the answer-key corpus — the shared, designed-label key (Surface 2, §2/§5).
+
+    Global (NOT org-scoped): the designed labels are the fixed key every reviewer's decisions are
+    scored against, so the corpus is the same across tenants. `designed_label` is the intended
+    verdict (APPROVE|DENY); `label_provenance` records how that label was set; `source_refs` points
+    at the originating exemplars (incl. negative exemplars, kept per §5). Decisions live in
+    `gated_decisions`, captured per (org) review session in `review_sessions`.
+    """
+
+    __tablename__ = "gated_cases"
+    case_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    case_class: Mapped[str] = mapped_column(String(40))
+    facts: Mapped[dict] = mapped_column(JSON, default=dict)
+    designed_label: Mapped[str] = mapped_column(String(10))  # APPROVE|DENY
+    designed_rationale: Mapped[str] = mapped_column(Text)
+    label_provenance: Mapped[str] = mapped_column(String(40))
+    source_refs: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ReviewSession(Base):
+    """A reviewer's working session over one gated case (org-scoped, ADR-0006 tenancy).
+
+    Links a tenant reviewer (`reviewer_user_id`) to a global `gated_cases` row for the duration of a
+    review. `status` walks assigned → decided (or expires). The captured decision lands in
+    `gated_decisions`, referencing this session.
+    """
+
+    __tablename__ = "review_sessions"
+    __table_args__ = (Index("ix_review_sessions_org_id", "org_id"),)
+    session_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    reviewer_user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"))
+    case_id: Mapped[str] = mapped_column(ForeignKey("gated_cases.case_id"))
+    status: Mapped[str] = mapped_column(String(20))  # assigned|decided|expired
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class GatedDecision(Base):
+    """A reviewer's captured decision on a gated case (org-scoped, ADR-0006 tenancy).
+
+    The human-gate decision row scored against the case's `designed_label`. The capture is a pointer
+    (`snapshot_ref` → `snapshot_captures`, NOT an inline blob — unified §3). The `(org_id, case_id)`
+    index serves the "every action over threshold where the gate approved" query path.
+    """
+
+    __tablename__ = "gated_decisions"
+    __table_args__ = (Index("ix_gated_decisions_org_case", "org_id", "case_id"),)
+    decision_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(40), index=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("review_sessions.session_id"))
+    case_id: Mapped[str] = mapped_column(String(64), index=True)
+    reviewer_user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id"))
+    decision: Mapped[str] = mapped_column(String(10))  # APPROVE|DENY
+    deliberation_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decision_latency_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    snapshot_ref: Mapped[str | None] = mapped_column(String(80), nullable=True)  # capture pointer
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 __all__ = [
     "Organization", "User", "Membership", "Project", "ApiKey",
     "ScanRun", "ScanJob", "Report", "Secret", "Integration",
     "SlackRegisteredAgent", "AttestationEntry",
+    "GatedCase", "ReviewSession", "GatedDecision",
 ]

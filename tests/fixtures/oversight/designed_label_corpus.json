@@ -1,0 +1,1824 @@
+[
+  {
+    "case_id": "wire-001",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 37,000,000",
+      "parties": "Toyota Boshoku subsidiary finance/accounting staff -> third party impersonating a known business partner -> attacker-controlled account",
+      "request_type": "urgent electronic-funds-transfer with changed banking details",
+      "what_was_flagged": "request to change beneficiary banking details on an EFT came by email from a party impersonating a trusted business partner (vendor email compromise)",
+      "verification_done": "none; staff acted on the emailed instruction without out-of-band confirmation",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "an emailed last-minute change of beneficiary banking details from a party impersonating a trusted partner, acted on with no out-of-band callback, is the vendor-email-compromise BEC pattern",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples"
+    ]
+  },
+  {
+    "case_id": "wire-002",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 46,700,000",
+      "parties": "Ubiquiti Hong Kong subsidiary finance dept -> external party posing as company executives -> overseas attacker accounts",
+      "request_type": "instruction to wire funds to overseas accounts",
+      "what_was_flagged": "executive-impersonation emails making fraudulent transfer requests from an external source; no multi-step verification existed",
+      "verification_done": "none; the company lacked a multi-step verification control",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "executive-impersonation wire instruction from an external source with no multi-step verification is CEO-fraud / BEC; absence of any verification on a large overseas transfer is itself disqualifying",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples"
+    ]
+  },
+  {
+    "case_id": "wire-003",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 121,000,000 (over 2013-2015)",
+      "parties": "Facebook and Google finance staff -> Evaldas Rimasauskas posing as an external vendor (Quanta) -> bank accounts worldwide",
+      "request_type": "payment against convincing invoices from a purported known vendor",
+      "what_was_flagged": "invoices and payment requests came from an impersonator posing as a real hardware vendor; funds were moved on immediately once paid",
+      "verification_done": "none; payments wired on the strength of emailed invoices alone",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "payment on emailed invoices from an impersonated vendor, with no confirmation against the genuine vendor relationship, is invoice/vendor-impersonation BEC",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples"
+    ]
+  },
+  {
+    "case_id": "wire-004",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 3,600,000",
+      "parties": "Children's Healthcare of Atlanta accounts-payable -> fraudster impersonating the CFO -> fraudulent account",
+      "request_type": "update bank account details on file, then transfer",
+      "what_was_flagged": "a fraudster impersonating the CFO induced AP to change the account on file, redirecting payment to a fraudulent account",
+      "verification_done": "none recorded; AP changed the account on the impersonator's say-so",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a payee/account change driven by CFO-impersonation and actioned without independent verification of the requester is the CEO-fraud BEC pattern",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples"
+    ]
+  },
+  {
+    "case_id": "wire-005",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 25,000,000",
+      "parties": "finance worker at a multinational firm (Hong Kong) -> deepfake video personas of the CFO and senior staff -> attacker accounts",
+      "request_type": "make a series of payments authorized on a video conference",
+      "what_was_flagged": "initiated by a suspicious email, then a video call whose 'CFO and colleagues' were AI deepfakes; pressure plus apparent executive authority",
+      "verification_done": "none through an independent known channel; the worker relied on the call itself",
+      "channel": "email + deepfake video conference"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a large payout authorized only via a suspicious-email-seeded video call with no independent out-of-band confirmation is executive-impersonation fraud, even though the 'authority' looked real",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.mcafee.com/learn/is-that-really-your-boss/"
+    ]
+  },
+  {
+    "case_id": "wire-006",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "EUR 19,000,000",
+      "parties": "Pathe Dutch division CEO and CFO -> scammers impersonating French parent-company executives -> account for a fake Dubai acquisition",
+      "request_type": "series of urgent, confidential wire transfers for a purported acquisition",
+      "what_was_flagged": "spoofed executive emails using secrecy and authority to push urgent transfers for a 'confidential' deal, bypassing standard procedures",
+      "verification_done": "none; standard procedures were deliberately bypassed under the secrecy pretext",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "urgent + confidential framing used to bypass standard procedure on a spoofed executive request is the classic CEO-fraud pressure pattern; secrecy that blocks verification is itself a red flag",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.mcafee.com/learn/is-that-really-your-boss/"
+    ]
+  },
+  {
+    "case_id": "wire-007",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 18,500,000",
+      "parties": "Tecnimont India executive -> hackers impersonating group leadership -> banks in Hong Kong",
+      "request_type": "transfer funds citing supposed regulatory barriers to moving money from Italy",
+      "what_was_flagged": "executive-impersonation emails inventing a regulatory pretext to justify routing a large transfer to Hong Kong",
+      "verification_done": "none through the genuine group leadership",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "an impersonated-executive request with an invented regulatory pretext to a high-risk destination, not confirmed with the real leadership, is CEO fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.adaptivesecurity.com/blog/ceo-fraud"
+    ]
+  },
+  {
+    "case_id": "wire-008",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 47,000,000",
+      "parties": "FACC (Austrian aerospace parts maker) staff -> single fraudulent email impersonating leadership -> fraudulent account",
+      "request_type": "transfer in response to a fraudulent email",
+      "what_was_flagged": "a single fraudulent CEO-fraud email induced the transfer; no verification step caught it",
+      "verification_done": "none",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "acting on a lone fraudulent executive email with no independent confirmation is CEO fraud; the absence of any verification control is the failure point",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.adaptivesecurity.com/blog/ceo-fraud"
+    ]
+  },
+  {
+    "case_id": "wire-009",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 793,000",
+      "parties": "North Carolina church construction-fund staff -> fraudster posing as the contractor (one letter altered in the email address) -> attacker account",
+      "request_type": "redirect construction-fund payment to a 'new' account",
+      "what_was_flagged": "a look-alike email address (single altered letter) impersonating the known contractor redirected funds",
+      "verification_done": "none; the altered address was not detected and not confirmed by phone",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a payment redirect from a look-alike (one-character-off) domain impersonating a known contractor, with no callback, is payment-redirect BEC",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples"
+    ]
+  },
+  {
+    "case_id": "wire-010",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 2,800,000",
+      "parties": "Grand Rapids Public Schools (MI) -> scammers who took over the benefits coordinator's email -> different account",
+      "request_type": "redirect the district's insurance payments to a different account",
+      "what_was_flagged": "a compromised internal email account was used to intercept communications and redirect recurring insurance payments",
+      "verification_done": "none; the takeover let the request appear internal and trusted",
+      "channel": "email (account takeover)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "redirecting recurring payments off a hijacked internal mailbox without out-of-band confirmation of the change is account-takeover payment-redirect fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples"
+    ]
+  },
+  {
+    "case_id": "wire-011",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 580,000",
+      "parties": "electronics firm AP -> impersonated supplier (request injected into email) -> fraudulent account; genuine supplier later confirmed no request",
+      "request_type": "wire for a component order to a payment account stated by email",
+      "what_was_flagged": "no shipping confirmation arrived after three days; on a direct call the supplier said they had never sent the payment request",
+      "verification_done": "out-of-band call to the supplier's known number AFTER sending — confirmed the request was fraudulent",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "the supplier on a known-number callback disowned the request and the payment account did not belong to the real supplier — confirmed impersonation, so the instruction must be rejected",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://harris-sliwoski.com/blog/the-bank-account-switch-scam-what-to-do-before-and-after-it-happens-to-you/"
+    ]
+  },
+  {
+    "case_id": "wire-012",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "approximately USD 700,000 (three invoices)",
+      "parties": "manufacturing company accounting manager -> established Mexican supplier of 2 years (impersonated) -> requested new account in Hong Kong",
+      "request_type": "pay three outstanding invoices to a NEW account citing 'banking efficiency improvements'",
+      "what_was_flagged": "long-standing supplier suddenly requesting a new Hong Kong account; reason ('banking efficiency') felt off to a manager who knew the relationship",
+      "verification_done": "out-of-band call to the supplier's main number BEFORE paying — supplier said no such request was sent; real invoices still due to the original account",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "the known-number callback established the change request did not come from the real supplier and the original account was still correct; the new-account instruction is fraudulent and must be blocked",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://harris-sliwoski.com/blog/the-bank-account-switch-scam-what-to-do-before-and-after-it-happens-to-you/"
+    ]
+  },
+  {
+    "case_id": "wire-013",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "transfers above the firm's dual-control threshold",
+      "parties": "AP initiator -> named, pre-authorized approver -> known existing supplier account",
+      "request_type": "wire to an existing supplier on an unchanged, previously verified account",
+      "what_was_flagged": "nothing adverse: payee and account unchanged from prior invoices; passed dual control (two separate approvals) and the standardized verification procedure",
+      "verification_done": "dual control (two approvers) plus callback on a pre-verified phone number; account matched prior invoices",
+      "channel": "internal AP workflow with callback control"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "payee and account match prior invoices and the transfer cleared dual control plus a pre-verified callback — no change, no impersonation signal, controls satisfied",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-014",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "large transfer to a new supplier",
+      "parties": "AP initiator -> two designated approvers -> new supplier, account confirmed in person",
+      "request_type": "wire to a new supplier whose payment instructions were verified in person and via a known number",
+      "what_was_flagged": "nothing adverse: new payee instructions confirmed by an in-person verification and a call to a known, previously verified number before payment",
+      "verification_done": "in-person verification of payment instructions plus callback to a known number; MFA on the digital approvals",
+      "channel": "in-person + phone confirmation"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "new-supplier instructions independently confirmed in person and by a known-number callback, with MFA-backed dual approval, satisfy the standard verification procedure",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-015",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "payment matching an existing contract",
+      "parties": "finance initiator -> approver -> sender's known executive on a previously verified number",
+      "request_type": "executive-requested payment confirmed against a known number and matching contract terms",
+      "what_was_flagged": "nothing adverse: full sender email address verified (no look-alike), instructions confirmed by calling the executive on a previously verified number, amount matched the contract",
+      "verification_done": "callback to a previously verified phone number; full email address checked for look-alike spoofing; amount reconciled to contract",
+      "channel": "email request, phone-verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the request was confirmed by an out-of-band call to a previously verified number, the full email address showed no look-alike spoofing, and the amount reconciled to a real contract",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.huntress.com/business-email-compromise-guide/business-email-compromise-examples",
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-001",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "millions in aggregate; per-order high-value consumer goods (Amazon, Walmart, Target, Wayfair, Dell, Kate Spade, Dick's, HP, Adidas)",
+      "parties": "Artemis Refund Group (ARG) as a paid service -> customers who bought items -> retailer customer service / refund process",
+      "request_type": "refund while keeping the product (item-not-as-described / non-return refund), reason tailored per-retailer",
+      "what_was_flagged": "refund requested but item kept; reasons engineered specifically to each retailer's policy; service advertised in online forums and took a 15-20% cut",
+      "verification_done": "exposed by investigation; the refunds did not correspond to genuine returns",
+      "channel": "retailer customer-service / online refund request"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "refund claimed while the goods are retained, with reasons engineered to game per-retailer policy, is organized refund fraud — no genuine return underlies the refund",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.fox23.com/news/11-individuals-involved-in-refund-fraud-ring-targeting-online-retailers-receive-sentences/article_ba1f518b-b7a8-458a-ac8d-c2580c38f75a.html"
+    ]
+  },
+  {
+    "case_id": "refund-002",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "claimed over USD 1,200,000 processed for customers",
+      "parties": "'Noir's Luxury Refunds' Telegram channel (5,900+ followers) -> paying customers -> multiple retailers",
+      "request_type": "'instant refunds' on orders without genuine returns",
+      "what_was_flagged": "an as-a-service operation advertising instant refunds; refunds issued without items being returned",
+      "verification_done": "dismantled via coordinated law-enforcement action; refunds not backed by real returns",
+      "channel": "retailer refund process via social-engineered customer service"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "'instant refund' as a paid service with no corresponding returned merchandise is refund-fraud abuse, not a legitimate refund",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://trustworthyshopping.aboutamazon.com/inside-amazons-fight-against-refund-fraud"
+    ]
+  },
+  {
+    "case_id": "refund-003",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "more than USD 4,000,000 in losses to retailers",
+      "parties": "operator of 'Simple Refunds' (Dearborn, MI) -> paying customers -> retailers nationwide",
+      "request_type": "fraudulent-refund scheme on purchased goods",
+      "what_was_flagged": "an organized fake-refund scheme causing over $4M in retailer losses; operator received a three-year prison sentence",
+      "verification_done": "established by criminal prosecution; refunds were fraudulent, not policy-matching returns",
+      "channel": "retailer refund process"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a fake-refund scheme that extracts refunds without legitimate returns, confirmed by prosecution, is refund fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://trustworthyshopping.aboutamazon.com/inside-amazons-fight-against-refund-fraud"
+    ]
+  },
+  {
+    "case_id": "refund-004",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "approximately EUR 2,500,000 / EUR 6,000,000 in seized assets",
+      "parties": "operator of REKK refund-fraud group (Lithuania) -> customers across Telegram/Reddit -> Amazon and others",
+      "request_type": "paid fraudulent-refund service on orders",
+      "what_was_flagged": "openly advertised fraudulent-refund service across platforms; operator arrested, ~EUR 6M illicit assets seized",
+      "verification_done": "established by international investigation and arrest; refunds were fraudulent",
+      "channel": "retailer refund process via social engineering"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a commercialized fraudulent-refund operation with no genuine returns behind the refunds is refund fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://trustworthyshopping.aboutamazon.com/inside-amazons-fight-against-refund-fraud"
+    ]
+  },
+  {
+    "case_id": "refund-005",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "high-value gadget refund",
+      "parties": "customer presenting a found or doctored receipt -> retailer returns desk",
+      "request_type": "refund on a high-value item using a found/altered proof of purchase ('receipt fraud' / 'receipt swapping')",
+      "what_was_flagged": "the proof of purchase was photocopied/altered or a discarded receipt matched to a shelf item; the claimant never legitimately bought the item",
+      "verification_done": "fails verification: receipt does not tie to a genuine purchase by the claimant",
+      "channel": "in-store returns"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a refund backed by a found or altered receipt that does not correspond to a real purchase by the claimant is receipt-fraud refund abuse",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.pindrop.com/article/common-examples-retail-return-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-006",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "full refund on a designer dress",
+      "parties": "customer who bought, used, then returned -> retailer returns process",
+      "request_type": "full refund on apparel worn once then returned ('wardrobing')",
+      "what_was_flagged": "item shows wear / tags reattached after use; returned for full refund though no longer sellable as new",
+      "verification_done": "fails inspection: item used, not in resalable condition",
+      "channel": "returns desk / online return"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "returning a used item as if unworn for a full refund (wardrobing) is return abuse — the goods are not in the policy-required resalable condition",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.pindrop.com/article/common-examples-retail-return-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-007",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "higher refund than original cost",
+      "parties": "fraudster who bought/stole an item at one store -> a different store with a similar product line",
+      "request_type": "cross-retailer return of an item not purchased at that store for a higher refund/credit",
+      "what_was_flagged": "item not bought at the receiving store; exploits price differences and lack of barcode/SKU verification across retailers",
+      "verification_done": "fails: no matching purchase record at the store processing the refund",
+      "channel": "in-store returns"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "returning an item to a store where it was never purchased, to capture a higher refund, has no matching order at that retailer and is cross-retailer return fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.pindrop.com/article/common-examples-retail-return-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-008",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund on stolen-tender purchase",
+      "parties": "fraudster who acquired goods via stolen credit card / counterfeit bills / scam-obtained gift cards -> retailer refund",
+      "request_type": "return of merchandise obtained through fraudulent or stolen tender for a refund",
+      "what_was_flagged": "the underlying purchase was made with stolen/fraudulent tender (cited by 55% of retailers as a top return-fraud type)",
+      "verification_done": "fails: the original tender was fraudulent, so the refund would launder stolen value",
+      "channel": "returns / refund process"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "refunding a purchase made on stolen or counterfeit tender converts stolen value to clean funds — the originating transaction is not legitimate",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.pindrop.com/article/common-examples-retail-return-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-009",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "within-policy refund on a recent order",
+      "parties": "verified account customer -> retailer returns process",
+      "request_type": "refund for an unwanted item returned within the stated return window",
+      "what_was_flagged": "nothing adverse: request falls inside the policy's eligibility window (e.g. within 30 days of purchase) and item returned in original packaging/condition",
+      "verification_done": "order matched in system; return window and item-condition eligibility satisfied per policy",
+      "channel": "online returns portal"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the refund ties to a real order, is within the stated return window, and the item meets the unused/original-packaging condition — it satisfies the documented eligibility criteria",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.returnprime.com/blog/return-refund-policy-examples-tips"
+    ]
+  },
+  {
+    "case_id": "refund-010",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund for a defective item matching the order total",
+      "parties": "customer with a matching purchase record -> retailer returns process",
+      "request_type": "refund for a defective product returned with proof of purchase",
+      "what_was_flagged": "nothing adverse: genuine defective item, valid receipt/proof of purchase, returned within the accepted timeframe",
+      "verification_done": "proof of purchase validated against the order; eligibility (defective, in-window) confirmed",
+      "channel": "returns desk with receipt"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "a defective item returned with a verified proof of purchase inside the accepted timeframe is a genuine return meeting the policy's eligibility requirements",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.returnprime.com/blog/return-refund-policy-examples-tips"
+    ]
+  },
+  {
+    "case_id": "refund-011",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund matching the original order amount",
+      "parties": "long-standing customer account -> retailer refund process",
+      "request_type": "refund where the item was actually returned and received back into inventory",
+      "what_was_flagged": "nothing adverse: distinguished from organized refund fraud because the merchandise was genuinely returned (not kept), and the account has normal history",
+      "verification_done": "return receipt of goods confirmed; refund corresponds to merchandise actually received back",
+      "channel": "online return with tracked shipment"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "unlike refund-fraud where the buyer keeps the item, here the merchandise was genuinely returned and received back — the refund matches a real, completed return",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://trustworthyshopping.aboutamazon.com/inside-amazons-fight-against-refund-fraud"
+    ]
+  },
+  {
+    "case_id": "refund-012",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund within the retailer's stated terms",
+      "parties": "customer -> retailer with a clearly defined return policy",
+      "request_type": "refund meeting the published eligibility (time limit, condition, proof) of the return policy",
+      "what_was_flagged": "nothing adverse: request satisfies the six essential policy components (eligibility window, item condition, valid proof) the retailer publishes",
+      "verification_done": "checked against the published return policy eligibility; all conditions met",
+      "channel": "standard return process"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the refund request meets every published eligibility condition (window, condition, proof of purchase) — it is an in-policy return, not abuse",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.returnprime.com/blog/return-refund-policy-examples-tips"
+    ]
+  },
+  {
+    "case_id": "vendor-001",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "more than USD 100,000 (potential total loss)",
+      "parties": "local business AP -> spoofed vendor 'ABC Inc.' (ABCinc@email.net vs real ABCinc@email.com) -> repeatedly changing payee banks",
+      "request_type": "switch from check to ACH/wire, then repeated bank-account changes",
+      "what_was_flagged": "vendor email halted checks and asked for ACH; then claimed account-closed and changed banks twice more; all on a look-alike .net (vs real .com) domain",
+      "verification_done": "the business only 'verified' by replying to the same (spoofed) email thread, never calling a previously known number",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "repeated bank-account changes confirmed only by replying within a look-alike-domain email thread (no callback to a previously known number) is vendor-impersonation fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/business-email-compromise-fraud-real-case-studies/"
+    ]
+  },
+  {
+    "case_id": "vendor-002",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "more than USD 12,000 (about USD 10,000 recovered)",
+      "parties": "client AP -> compromised vendor-employee email (slightly misspelled) -> new bank, different beneficiary company name",
+      "request_type": "update wire payment instructions to a new account",
+      "what_was_flagged": "slight change in the vendor's email spelling; the new beneficiary used a DIFFERENT company name at a different bank",
+      "verification_done": "none before sending; fraud found only weeks later",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a bank-change request from a misspelled vendor address routing to a different beneficiary name at a different bank, with no out-of-band verification, is vendor email compromise",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/business-email-compromise-fraud-real-case-studies/"
+    ]
+  },
+  {
+    "case_id": "vendor-003",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "six-figure wire (nearly sent)",
+      "parties": "company AP lead -> attacker who sat in the vendor's mailbox for weeks -> updated banking details in a real invoice thread",
+      "request_type": "process an updated-banking payment before month-end on a genuine invoice",
+      "what_was_flagged": "reply within an active thread, same sender, real invoice number, real invoice — but updated bank details and end-of-month urgency; no system control flagged it",
+      "verification_done": "AP lead called the vendor directly (out-of-band) and caught it before sending",
+      "channel": "email (vendor mailbox compromise)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "even inside a genuine invoice thread, a sudden banking-detail change pushed with month-end urgency that the vendor disowns on a direct call is vendor-email-compromise fraud and must be blocked",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.reddit.com/r/Accounting/comments/1rxy6t1/vendor_email_compromise_nearly_cost_us_a_six/"
+    ]
+  },
+  {
+    "case_id": "vendor-004",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "high-value recurring supplier payments",
+      "parties": "construction-products company AP -> fraudsters fed inside info by an overseas employee -> multiple suppliers' payments rerouted to Hong Kong",
+      "request_type": "multiple payee bank changes within a two-week window, all to Hong Kong accounts",
+      "what_was_flagged": "an unusual cluster of payment-instruction changes for several suppliers in two weeks, all pointing to Hong Kong accounts",
+      "verification_done": "USD 320,000 sent across three transactions before suspicion; forensic review found an insider leaking invoice timing",
+      "channel": "email + insider collusion"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a sudden cluster of payee-bank changes across multiple suppliers all routing to one high-risk destination is an anomalous pattern inconsistent with legitimate vendor updates",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://harris-sliwoski.com/blog/the-bank-account-switch-scam-what-to-do-before-and-after-it-happens-to-you/"
+    ]
+  },
+  {
+    "case_id": "vendor-005",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "thousands per fraudulent payment-change",
+      "parties": "AP staff -> perpetrators running fake online accounts mimicking the vendor's email/website -> attacker bank details",
+      "request_type": "update ACH/wire routing and account information for a 'vendor'",
+      "what_was_flagged": "fake accounts closely mimicking the legitimate business's email and website domain; request to update electronic-payment routing came unsolicited by email",
+      "verification_done": "none; the request was not confirmed via a trusted previously existing contact",
+      "channel": "email (look-alike domain)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "an unsolicited payment-routing change from an address/website that mimics the real vendor, not confirmed through a previously known contact, is vendor-impersonation fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/business-email-compromise-fraud-real-case-studies/"
+    ]
+  },
+  {
+    "case_id": "vendor-006",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "abrupt switch from established process",
+      "parties": "AP -> party impersonating a known supplier -> new account",
+      "request_type": "supplier bank-account change pushed via a sudden switch to email-only correspondence",
+      "what_was_flagged": "abrupt switch from phone calls to email-only contact accompanying the bank-change request — a documented red flag",
+      "verification_done": "none confirmed via a known landline/direct number before processing",
+      "channel": "email"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a bank-detail change accompanied by an abrupt move to email-only contact, not confirmed by calling a known number, fits the vendor-impersonation playbook",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://harris-sliwoski.com/blog/the-bank-account-switch-scam-what-to-do-before-and-after-it-happens-to-you/"
+    ]
+  },
+  {
+    "case_id": "vendor-007",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "recurring vendor payments",
+      "parties": "AP -> attacker who phished the vendor's mailbox -> legitimate-looking but fake change request",
+      "request_type": "update routing/account info via an email from the (compromised) genuine vendor address",
+      "what_was_flagged": "request originated from the vendor's real (but compromised) mailbox, so it looked authentic; only an independent callback could distinguish it",
+      "verification_done": "none independent; relying on the email alone cannot detect a compromised-account VEC",
+      "channel": "email (genuine compromised mailbox)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a change request that even comes from the vendor's genuine-but-compromised mailbox cannot be trusted without an independent callback; absent that, the change must be refused",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.eftsure.com/blog/processes/call-back-controls/"
+    ]
+  },
+  {
+    "case_id": "vendor-008",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "verified change to an existing supplier's banking details",
+      "parties": "AP -> existing supplier's accounts-receivable contact reached at an independently sourced number",
+      "request_type": "update an existing supplier's ACH bank details",
+      "what_was_flagged": "nothing adverse: AP independently confirmed by calling the supplier's billing/AR department at a number from an independent source (not the emailed one) and matched the last 4 digits of the account",
+      "verification_done": "out-of-band callback to a known/independently sourced contact; banking details validated verbally and documented with contact name/phone",
+      "channel": "email request, phone-validated"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the change was independently confirmed by calling the supplier on a number from an independent source and verbally validating the account — the documented out-of-band verification passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://finance.unc.edu/news/2020/06/15/safely-updating-vendor-bank-accounts/"
+    ]
+  },
+  {
+    "case_id": "vendor-009",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "new-supplier onboarding payment setup",
+      "parties": "AP -> new supplier verified by callback before first payment",
+      "request_type": "set up banking details for a newly onboarded supplier",
+      "what_was_flagged": "nothing adverse: callback verification performed at onboarding (the recommended trigger) before any EFT was processed",
+      "verification_done": "call-back verification conducted at supplier onboarding to confirm the banking details before processing payment",
+      "channel": "onboarding workflow with callback control"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "banking details confirmed via the prescribed call-back at onboarding, before any payment, satisfies the required verification control for a new supplier",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.eftsure.com/blog/processes/call-back-controls/"
+    ]
+  },
+  {
+    "case_id": "vendor-010",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "approximately USD 700,000 in pending invoices (no funds lost)",
+      "parties": "manufacturing accounting manager -> established Mexican supplier of 2 years (verified) -> original account retained",
+      "request_type": "evaluate a bank-change request; on verification, keep paying the existing verified account",
+      "what_was_flagged": "the suspicious 'new Hong Kong account' request was disowned by the supplier; the REAL invoices were still payable to the original, already-verified Mexican account",
+      "verification_done": "out-of-band call to the supplier's main number confirmed no change was requested; original account confirmed correct",
+      "channel": "phone-verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "after the callback confirmed no change was requested, paying the established supplier on the original, verified account matches the genuine relationship and outstanding invoices",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://harris-sliwoski.com/blog/the-bank-account-switch-scam-what-to-do-before-and-after-it-happens-to-you/"
+    ]
+  },
+  {
+    "case_id": "vendor-011",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "existing supplier bank-detail update",
+      "parties": "AP -> existing supplier confirmed via dual checks (independent phone + records match)",
+      "request_type": "update an existing supplier's bank details after a change request",
+      "what_was_flagged": "nothing adverse: change request handled via the AP call-back process triggered specifically because an existing supplier requested a banking-detail change, then verified",
+      "verification_done": "call-back verification triggered by the change request (the documented trigger) and completed against a known contact before updating the Vendor Master File",
+      "channel": "email request, callback-verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the bank-detail change request triggered the prescribed call-back and was confirmed with a known contact before the master file was updated — the control fired and passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.eftsure.com/blog/processes/call-back-controls/"
+    ]
+  },
+  {
+    "case_id": "vendor-012",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "verified vendor banking update",
+      "parties": "AP -> supplier AR contact at a phone number from an independent source",
+      "request_type": "validate updated ACH banking information for a supplier",
+      "what_was_flagged": "nothing adverse: department refused to accept new/updated ACH info by email alone and independently confirmed by phone to a trusted, verified contact, documenting the validation",
+      "verification_done": "verbal validation by telephone to a trusted, verified contact (not the emailed number); validation documented in the supplier record",
+      "channel": "phone-validated, documented"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the update was not accepted on email alone; it was verbally validated with a trusted, independently sourced contact and documented — meeting the required verification standard",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://finance.unc.edu/news/2020/06/15/safely-updating-vendor-bank-accounts/"
+    ]
+  },
+  {
+    "case_id": "wire-016",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "transfer above the dual-control dollar threshold",
+      "parties": "AP initiator -> two designated approvers with MFA -> existing supplier, unchanged account",
+      "request_type": "scheduled wire to an existing supplier on previously verified instructions",
+      "what_was_flagged": "nothing adverse: only designated people initiated/approved; transfer exceeded the threshold so it required two approvals, both given; instructions unchanged from prior payments",
+      "verification_done": "dual control (two separate approvals) with multi-factor authentication on the digital approvals; payment instructions unchanged and previously verified",
+      "channel": "internal AP workflow"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "an above-threshold transfer to an existing supplier on unchanged, previously verified instructions that cleared MFA-backed dual control has no impersonation or change signal and meets the control",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-017",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "payment matching an older invoice on file",
+      "parties": "AP -> supplier reached on a known previously-verified number (from an older invoice)",
+      "request_type": "new payment instructions confirmed before paying",
+      "what_was_flagged": "nothing adverse: AP did not rely on email; called the sender on a known, previously verified number from an older invoice and confirmed the instructions, with no look-alike in the full email address",
+      "verification_done": "callback to a known number taken from an older invoice; emailed instructions confirmed live before sending",
+      "channel": "email request, phone-confirmed"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the instructions were confirmed by calling a known number from a prior invoice rather than trusting email, and the full sender address showed no look-alike — the standard verification passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-018",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "urgent-seeming executive payment",
+      "parties": "finance worker -> executive confirmed in person before action",
+      "request_type": "executive-requested payment that was paused for verification despite urgency",
+      "what_was_flagged": "nothing adverse: request carried urgency, but the worker slowed down and confirmed it in person with the executive on a known channel before acting, and it checked out",
+      "verification_done": "in-person confirmation with the executive on a known channel before any transfer; urgency did not bypass procedure",
+      "channel": "internal request, in-person verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the urgent request was confirmed in person with the executive on a known channel before action — slowing down and verifying resolved the only red flag (urgency), so it is a genuine, verified payment",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.mcafee.com/learn/is-that-really-your-boss/"
+    ]
+  },
+  {
+    "case_id": "refund-013",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "chargeback/refund by a legitimate cardholder for an order issue",
+      "parties": "genuine cardholder -> merchant -> card issuer",
+      "request_type": "refund for an order the cardholder actually placed and has a genuine issue with",
+      "what_was_flagged": "nothing adverse: the cardholder is the legitimate purchaser; CVV and 2FA passed at purchase; the issue is a real order problem rather than a reclaim of a valid purchase",
+      "verification_done": "purchaser identity matched (legitimate cardholder, CVV/2FA cleared at purchase); order and a genuine fulfillment issue confirmed",
+      "channel": "merchant refund process"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the refund is to the genuine cardholder for a real order issue, distinct from friendly fraud where a cardholder reclaims money on a purchase they actually received — here a legitimate problem underlies the refund",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.signifyd.com/blog/friendly-fraud-chargebacks/"
+    ]
+  },
+  {
+    "case_id": "refund-014",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund where delivery was not completed",
+      "parties": "customer -> merchant with order-confirmation and delivery-tracking records",
+      "request_type": "refund for an order that tracking shows was not delivered",
+      "what_was_flagged": "nothing adverse: order-confirmation and delivery-tracking evidence supports the customer's claim (item not received), so the refund is warranted",
+      "verification_done": "order confirmation and delivery tracking checked; records corroborate non-delivery",
+      "channel": "merchant refund process"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "order-confirmation and delivery-tracking records corroborate that the customer did not receive the item, so the refund matches a genuine, evidenced fulfillment failure",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.signifyd.com/blog/friendly-fraud-chargebacks/"
+    ]
+  },
+  {
+    "case_id": "refund-015",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund/exchange for an established trusted customer",
+      "parties": "long-history good-standing customer -> merchant returns process",
+      "request_type": "refund or exchange for a returned item from a trusted customer",
+      "what_was_flagged": "nothing adverse: the customer has a normal purchase/return history (not a serial abuser), and the item was genuinely returned",
+      "verification_done": "account history reviewed (no abuse pattern); return of merchandise confirmed",
+      "channel": "returns process for trusted customers"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "a trusted customer with normal history who genuinely returned the item is not the serial-abuser/refund-fraud profile — the refund corresponds to a real return",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.signifyd.com/blog/friendly-fraud-chargebacks/"
+    ]
+  },
+  {
+    "case_id": "vendor-013",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "supplier payment-instruction change",
+      "parties": "AP -> known supplier contact reached at a phone number already on file",
+      "request_type": "change of payment instructions confirmed verbally before processing",
+      "what_was_flagged": "nothing adverse: AP did not rely on email; made an outbound call to a trusted contact at a number already on file and verbally confirmed the new instructions live, which checked out",
+      "verification_done": "outbound verbal verification to a known contact at an on-file number; new instructions confirmed live before processing",
+      "channel": "email request, verbally verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the change was not processed on email alone; it was verbally confirmed live with a known contact at a number already on file — the prescribed verification control fired and passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.fhb.com/en/resource-center/small-business/protect-your-business-from-vendor-impersonation-and-invoice-fraud"
+    ]
+  },
+  {
+    "case_id": "vendor-014",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "updated remittance on an invoice",
+      "parties": "AP -> known supplier contact (number on file) verifying an unexpected updated invoice",
+      "request_type": "validate an invoice carrying updated remittance information before paying",
+      "what_was_flagged": "nothing adverse: although the invoice had updated remittance info, AP applied strict verbal verification to a known contact before paying and the change was confirmed genuine",
+      "verification_done": "strict verbal verification to a known contact before processing the payment instruction change; confirmed legitimate",
+      "channel": "email/invoice, verbally verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the updated-remittance invoice was held for strict verbal verification with a known contact before payment and confirmed genuine — the verification standard was met before any funds moved",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.fhb.com/en/resource-center/small-business/protect-your-business-from-vendor-impersonation-and-invoice-fraud"
+    ]
+  },
+  {
+    "case_id": "vendor-015",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "existing-supplier bank-detail change",
+      "parties": "AP -> supplier confirmed before the Vendor Master File / ERP was updated",
+      "request_type": "update existing supplier banking details in the ERP after a change request",
+      "what_was_flagged": "nothing adverse: the change request (the documented trigger) prompted a call-back to a known contact, completed before the ERP/Vendor Master File record was changed",
+      "verification_done": "call-back verification on the existing-supplier change request completed before updating the ERP / Vendor Master File",
+      "channel": "change request, callback-verified before ERP update"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the existing-supplier change request triggered the required call-back, which was completed and confirmed before the ERP record was updated — the control was applied at the correct moment and passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.eftsure.com/blog/processes/call-back-controls/"
+    ]
+  },
+  {
+    "case_id": "refund-016",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "in-window refund on a verified order",
+      "parties": "customer with a matching order record -> retailer returns process",
+      "request_type": "refund for an item returned within the eligibility window in resalable condition",
+      "what_was_flagged": "nothing adverse: order found in system, return within the stated window, item in original/unused condition — none of the wardrobing/receipt-fraud/cross-retailer abuse markers present",
+      "verification_done": "order matched; return-window and item-condition eligibility verified; no abuse markers",
+      "channel": "standard returns process"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the return matches a real order, is in-window and in resalable condition, and shows none of the documented return-fraud markers — it is a legitimate in-policy refund",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.pindrop.com/article/common-examples-retail-return-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-019",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "recurring large payment to a known supplier",
+      "parties": "AP -> existing supplier, account matching a prior invoice",
+      "request_type": "wire to an existing supplier with no change to payment instructions",
+      "what_was_flagged": "nothing adverse: no payment-instruction change at all; beneficiary and account match an existing prior invoice on file",
+      "verification_done": "account reconciled against a previously verified invoice; no change requested, so no new-instruction risk",
+      "channel": "internal AP workflow"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "there is no change to instructions and the account matches a prior verified invoice — the central fraud lever (a beneficiary/account change) is absent, so the payment is consistent with the genuine relationship",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-020",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "large transfer requiring two approvals",
+      "parties": "designated initiator -> designated approver -> known counterparty",
+      "request_type": "transfer routed through the standardized verification procedure and dual control",
+      "what_was_flagged": "nothing adverse: the standardized wire-verification procedure was followed end-to-end and two designated approvers signed off; counterparty and account were known and unchanged",
+      "verification_done": "standardized verification procedure followed; dual control satisfied by two designated approvers",
+      "channel": "internal AP workflow"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the transfer followed the standardized verification procedure and cleared dual control to a known, unchanged counterparty — every required control was satisfied with no anomaly",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://firstbusiness.bank/resource-center/how-to-prevent-wire-transfer-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-021",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "supplier payment with new instructions",
+      "parties": "AP -> supplier confirmed live on a number already on file",
+      "request_type": "wire on updated instructions that were verbally confirmed before sending",
+      "what_was_flagged": "nothing adverse: the updated instructions were not paid on email alone; AP made an outbound call to a number already on file and verbally confirmed them before the wire",
+      "verification_done": "outbound verbal confirmation to a known on-file number before processing; instructions confirmed genuine",
+      "channel": "email request, verbally verified"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "updated wire instructions were verbally confirmed live with the counterparty at a number already on file before sending — the verification offsets the only risk factor (changed instructions)",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.fhb.com/en/resource-center/small-business/protect-your-business-from-vendor-impersonation-and-invoice-fraud"
+    ]
+  },
+  {
+    "case_id": "vendor-016",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "supplier bank-detail update",
+      "parties": "AP -> supplier billing/AR department reached at an independently sourced number",
+      "request_type": "validate an ACH detail change by phoning the supplier's AR department",
+      "what_was_flagged": "nothing adverse: AP refused to accept the new ACH info by email and called the supplier's billing/AR department at an independently sourced number, matching the last 4 digits of the account",
+      "verification_done": "phone validation to the AR department at an independently sourced number; last-4 account digits matched and documented",
+      "channel": "email request, phone-validated"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the detail change was validated by phoning the supplier's AR department on an independently sourced number and matching the account's last 4 digits — the out-of-band check confirmed legitimacy",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://finance.unc.edu/news/2020/06/15/safely-updating-vendor-bank-accounts/"
+    ]
+  },
+  {
+    "case_id": "vendor-017",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "new-supplier banking setup",
+      "parties": "AP -> newly onboarded supplier verified by call-back before first EFT",
+      "request_type": "establish a new supplier's bank details with verification at onboarding",
+      "what_was_flagged": "nothing adverse: call-back verification was performed at onboarding (the recommended trigger) and the details were confirmed before any payment was processed",
+      "verification_done": "call-back verification at onboarding completed and confirmed before the first EFT",
+      "channel": "onboarding workflow with callback control"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "a new supplier's banking details were confirmed via the prescribed onboarding call-back before any payment — the verification control was applied at the right trigger and passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.eftsure.com/blog/processes/call-back-controls/"
+    ]
+  },
+  {
+    "case_id": "wire-022",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 25,600,000 (HKD 200,000,000)",
+      "date": "2024",
+      "year": "2024",
+      "parties": "Arup (London-based engineering firm) Hong Kong finance worker -> AI deepfake video personas of the CFO and colleagues -> fraudster-controlled accounts",
+      "request_type": "a 'secret' urgent series of payments authorized on a video conference",
+      "what_was_flagged": "the worker initially suspected a phishing email (it demanded a secret transaction), but proceeded after a video call whose 'CFO and colleagues' were all deepfake re-creations he recognized by face and voice",
+      "domains_involved": "none named; initiated by a phishing email impersonating the UK head office",
+      "dollar_amount": "USD 25.6M across 15 separate transactions",
+      "verification_steps": "none through an independent known channel; the worker relied on the deepfake video call itself to dispel his initial doubt",
+      "outcome": "HKD 200M (~USD 25.6M) paid across 15 transactions; reported to Hong Kong police January 2024; funds not recovered"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a large payout authorized only via a phishing-seeded video call whose participants were AI deepfakes, with no independent out-of-band confirmation, is executive-impersonation fraud — the worker's own initial phishing suspicion was the correct signal and the realistic video did not constitute verification",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.cnn.com/2024/05/16/tech/arup-deepfake-scam-loss-hong-kong-intl-hnk",
+      "https://www.weforum.org/stories/2025/02/deepfake-ai-cybercrime-arup/"
+    ]
+  },
+  {
+    "case_id": "wire-023",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "USD 243,000",
+      "date": "2019",
+      "year": "2019",
+      "parties": "UK energy firm CEO -> criminals using AI voice-cloning to impersonate the German parent-company boss by phone -> Hungarian supplier account (then moved to Mexico and elsewhere)",
+      "request_type": "urgent phone instruction to transfer funds to a 'Hungarian supplier', promised reimbursement 'right away'",
+      "what_was_flagged": "a vishing (voice-phishing) call whose voice was an AI clone so close to the German parent CEO that the UK exec noticed no difference; urgency plus a reimbursement promise",
+      "domains_involved": "phone-channel vishing; no email domain",
+      "dollar_amount": "USD 243,000 (first known AI-voice-fraud of this size)",
+      "verification_steps": "none; the exec acted on the cloned voice alone with no call-back to a known number",
+      "outcome": "USD 243,000 transferred to the Hungarian account, then rapidly laundered to Mexico and other locations; not recovered"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "an urgent transfer authorized solely on a phone call — even one that sounds exactly like a known executive — with no independent call-back verification is vishing/voice-cloning executive-impersonation fraud; a voice match is not authentication",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://blog.avast.com/deepfake-voice-fraud-causes-243k-scam"
+    ]
+  },
+  {
+    "case_id": "wire-024",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "more than USD 100,000,000 (about USD 23M from Google in 2013; about USD 98M from Facebook 2013-2015)",
+      "date": "2013-2015",
+      "year": "2015",
+      "parties": "Google and Facebook AP staff -> Evaldas Rimasauskas operating a fake Latvian company named 'Quanta Computer' impersonating the real Taiwan hardware vendor -> accounts in Latvia/Cyprus then laundered worldwide",
+      "request_type": "payment of forged invoices purporting to be from the genuine hardware vendor Quanta",
+      "what_was_flagged": "forged invoices, contracts, letters and corporate stamps from a doppelganger company with the same name as a real vendor both firms did business with",
+      "domains_involved": "a Latvia-registered shell company reusing the real vendor's name 'Quanta Computer'",
+      "dollar_amount": "over USD 100M total; defendant forfeited USD 49.7M",
+      "verification_steps": "none against the genuine Quanta vendor relationship; payments wired on the forged invoices alone",
+      "outcome": "Rimasauskas pleaded guilty to wire fraud (SDNY, indictment 1:16-Cr-00841-GBD), agreed to forfeit USD 49.7M; Google and Facebook said they recouped all or most of the funds"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "payment of invoices from a company merely sharing a real vendor's name, with no confirmation against the genuine vendor relationship, is invoice/vendor-impersonation fraud — the forged paperwork looked authentic but no independent check tied it to the real Quanta",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.npr.org/2019/03/25/706715377/man-pleads-guilty-to-phishing-scheme-that-fleeced-facebook-google-of-100-million"
+    ]
+  },
+  {
+    "case_id": "wire-025",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "employee net pay (recurring)",
+      "date": "2023",
+      "year": "2023",
+      "parties": "employer payroll/HR -> attacker who phished an employee's HR self-service portal credentials -> attacker-controlled bank account",
+      "request_type": "change of an employee's direct-deposit bank account in the HR self-service portal",
+      "what_was_flagged": "a direct-deposit destination change submitted through a compromised employee self-service login shortly before a pay run; no confirmation to the employee through a separate channel",
+      "domains_involved": "phished HR self-service portal login page",
+      "dollar_amount": "one or more payroll cycles of the employee's net pay",
+      "verification_steps": "none; the change was accepted in-portal with no out-of-band confirmation to the employee on a known number",
+      "outcome": "paycheck redirected to the fraudster's account for the affected pay run (payroll diversion)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a direct-deposit destination change submitted just before payday with no out-of-band confirmation to the employee is payroll-diversion fraud — a self-service credential can be phished, so the portal login alone does not verify the request",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.dayforce.com/blog/payroll-diversion-fraud",
+      "https://www.nbtc.com/learn/protect-your-business-the-growing-threat-of-payroll-diversion-fraud"
+    ]
+  },
+  {
+    "case_id": "wire-026",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "freight load payment",
+      "date": "2023",
+      "year": "2023",
+      "parties": "freight broker / shipper -> fraudster posing as a legitimate motor carrier using a hijacked carrier identity (MC number) -> fraudster account; the real carrier that hauled the load goes unpaid",
+      "request_type": "payment for a delivered freight load to the 'carrier's' bank details",
+      "what_was_flagged": "the entity that booked the load re-brokered it to an unwitting real carrier and collected the shipper's payment under a stolen carrier identity; payment details did not match the carrier that actually performed",
+      "domains_involved": "spoofed carrier identity / hijacked MC authority",
+      "dollar_amount": "the load's freight charge; the performing carrier left unpaid",
+      "verification_steps": "none; the booking party's identity and banking were not independently confirmed against the authority on file",
+      "outcome": "shipper paid the double-broker, the carrier that hauled the load was not paid and pursued the broker (double-brokering fraud)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "paying a freight booking party whose identity and banking were not independently confirmed against the carrier authority on file is double-brokering fraud — the payee is impersonating the real carrier and the performing carrier goes unpaid",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.grantthornton.com/insights/articles/transportation/2023/double-brokering-fraud-in-the-transportation-industry",
+      "https://www.reddit.com/r/FreightBrokers/comments/18mg3tw/double_brokering_scam_delivering_carrier_pay/"
+    ]
+  },
+  {
+    "case_id": "wire-027",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "victim's life savings (real-time bank transfer)",
+      "date": "2024",
+      "year": "2024",
+      "parties": "bank customer (payer) -> fraudster running a purchase/impersonation scam -> fraudster-controlled account via a real-time/instant payment",
+      "request_type": "a customer-authorized push payment (the payer themselves initiates the transfer) induced by a scam",
+      "what_was_flagged": "the payment was technically authorized by the genuine account holder but induced by deception (impersonation / fake purchase); real-time settlement left no window to claw it back",
+      "domains_involved": "scam contact channel (impersonation); funds sent over instant-payment rails",
+      "dollar_amount": "a large lump sum the victim was deceived into pushing",
+      "verification_steps": "none effective; the payer was deceived about who they were really paying and why",
+      "outcome": "funds pushed irrevocably over real-time rails; addressed under the UK APP-fraud mandatory reimbursement regime"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a payment the account holder authorizes but only because they were deceived about the true payee and purpose is authorized-push-payment (APP) fraud — genuine authorization by the victim does not make the underlying instruction legitimate",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.aciworldwide.com/app-fraud",
+      "https://www.ukfinance.org.uk/authorised-push-payment-fraud-reimbursement"
+    ]
+  },
+  {
+    "case_id": "wire-028",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "average UK business invoice-fraud loss about GBP 295,000/year",
+      "date": "2024",
+      "year": "2024",
+      "parties": "business AP -> criminal who intercepted/altered a genuine supplier invoice to swap in fraudulent bank details -> fraudulent account",
+      "request_type": "payment of a real-looking invoice carrying changed remittance bank details",
+      "what_was_flagged": "a legitimate-looking invoice (often impersonating a real vendor) with the bank details swapped to the criminal's account; supplier invoice fraud accounts for ~55% of UK business fraud",
+      "domains_involved": "intercepted/altered invoice; look-alike or compromised sender",
+      "dollar_amount": "UK businesses lose an average of GBP 295,000/year to invoice fraud",
+      "verification_steps": "none; the altered bank details on the invoice were paid without confirming the change with the supplier on a known number",
+      "outcome": "payment routed to the fraudster's account (invoice-redirection / mandate fraud)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "paying changed bank details on an invoice without confirming the change with the supplier on an independently known number is invoice-redirection (mandate) fraud — the swapped remittance details are the fraud lever and they were never verified",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.rdj.ie/insights/gone-in-an-instant-how-invoice-redirection-fraud-threatens-your-business",
+      "https://www.nortonrosefulbright.com/en/inside-disputes/blog/202309-supplier-invoice-fraud-who-pays-up"
+    ]
+  },
+  {
+    "case_id": "wire-029",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "urgent executive payment request",
+      "date": "2024",
+      "year": "2024",
+      "parties": "finance worker -> apparent executive on a video/phone call -> payee",
+      "request_type": "an urgent executive-style payment that the worker paused on, suspecting a deepfake, and confirmed out-of-band",
+      "what_was_flagged": "nothing adverse on resolution: the request had deepfake-scam markers (urgency, secrecy, a video call), but the worker did NOT act on the call — they hung up and confirmed with the executive on a separately dialed known number, which checked out as genuine",
+      "domains_involved": "none; verification was by call-back to a known number, not the inbound channel",
+      "dollar_amount": "matched a known, expected payment once confirmed",
+      "verification_steps": "out-of-band call-back to the executive on a pre-known number (NOT a number supplied in the request); identity and instruction confirmed before any transfer",
+      "outcome": "payment released only after the independent call-back confirmed it was genuine; no loss"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the only red flags were urgency and an unusual channel, and the worker neutralized them by confirming with the executive on an independently known number before acting — the deepfake-defeating control (out-of-band call-back) fired and the request was confirmed genuine",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.cnn.com/2024/05/16/tech/arup-deepfake-scam-loss-hong-kong-intl-hnk",
+      "https://www.weforum.org/stories/2025/02/deepfake-ai-cybercrime-arup/"
+    ]
+  },
+  {
+    "case_id": "wire-030",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "recovered/blocked APP payment",
+      "date": "2024",
+      "year": "2024",
+      "parties": "bank customer (payer) -> intended genuine payee -> after the bank's confirmation-of-payee and warning step, the customer confirmed the payee was real",
+      "request_type": "a real-time push payment to a payee the customer genuinely intended to pay, cleared after the bank's APP-fraud confirmation step",
+      "what_was_flagged": "nothing adverse: the bank's confirmation-of-payee/name-check matched and the customer, prompted by the scam-warning step, confirmed they knew the payee and the purpose was a real obligation (not a scam)",
+      "domains_involved": "none; payee name-match confirmed at the bank",
+      "dollar_amount": "matched the genuine obligation the customer intended to settle",
+      "verification_steps": "bank confirmation-of-payee name match plus an explicit customer confirmation against the APP-fraud scam-warning prompts; payee and purpose genuine",
+      "outcome": "payment completed to the correct, genuine payee; no scam present"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the payment cleared the bank's APP-fraud safeguards — payee name-match plus the customer confirming a real, intended obligation against the scam-warning prompts — so the authorization reflects a genuine payee and purpose rather than deception",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.aciworldwide.com/app-fraud",
+      "https://www.ukfinance.org.uk/authorised-push-payment-fraud-reimbursement"
+    ]
+  },
+  {
+    "case_id": "wire-031",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "freight load payment to the performing carrier",
+      "date": "2023",
+      "year": "2023",
+      "parties": "freight broker/shipper -> the actual carrier that hauled the load, whose MC authority and banking were verified -> carrier's on-file account",
+      "request_type": "payment for a delivered load to the carrier confirmed to have actually performed it",
+      "what_was_flagged": "nothing adverse: the broker confirmed the carrier's MC authority/identity, that this carrier (not a re-broker) physically performed the haul, and paid the banking details already on file for that authority",
+      "domains_involved": "none; carrier identity matched the authority on file",
+      "dollar_amount": "the agreed freight charge to the carrier that performed",
+      "verification_steps": "carrier MC authority/identity verified, performance confirmed (the carrier that booked is the one that hauled), payment to the on-file account for that authority",
+      "outcome": "the carrier that actually delivered the load was paid; no double-brokering"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the payee was confirmed to be the carrier that actually performed the haul, with identity matched to the authority on file and paid to the on-file account — none of the double-brokering markers (mismatched performer, unverified identity, off-file banking) are present",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.grantthornton.com/insights/articles/transportation/2023/double-brokering-fraud-in-the-transportation-industry",
+      "https://www.trailerbridge.com/insights-resources/blogs/double-brokering-freight-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-032",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "employee direct-deposit change",
+      "date": "2023",
+      "year": "2023",
+      "parties": "payroll/HR -> the genuine employee, confirmed in person/by known contact -> the employee's real new bank account",
+      "request_type": "a direct-deposit bank-account change for an employee, confirmed before the next pay run",
+      "what_was_flagged": "nothing adverse: although a direct-deposit change is the payroll-diversion lever, payroll confirmed the change directly with the employee through a known/independent channel (not just the portal submission) and it was genuine",
+      "domains_involved": "none; confirmed with the employee directly",
+      "dollar_amount": "the employee's net pay, correctly routed",
+      "verification_steps": "out-of-band confirmation with the employee (in person or via a known number) before applying the bank-account change; identity and request confirmed genuine",
+      "outcome": "the employee's pay went to their real new account; no diversion"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the direct-deposit change was confirmed directly with the genuine employee through an independent channel before the pay run — the payroll-diversion lever (an unverified self-service change) was neutralized by out-of-band confirmation",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.dayforce.com/blog/payroll-diversion-fraud",
+      "https://www.nbtc.com/learn/protect-your-business-the-growing-threat-of-payroll-diversion-fraud"
+    ]
+  },
+  {
+    "case_id": "wire-033",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "invoice payment on unchanged remittance details",
+      "date": "2024",
+      "year": "2024",
+      "parties": "business AP -> established supplier, invoice carrying the SAME bank details as prior paid invoices",
+      "request_type": "payment of a routine supplier invoice with no change to remittance bank details",
+      "what_was_flagged": "nothing adverse: the invoice's remittance bank details matched the details on prior legitimately paid invoices for this supplier; no change was requested, so the invoice-redirection lever is absent",
+      "domains_involved": "sender domain matched the supplier's real domain (no look-alike)",
+      "dollar_amount": "matched the agreed invoice amount",
+      "verification_steps": "remittance details reconciled against prior paid invoices for the same supplier; full sender address checked for look-alike spoofing (none)",
+      "outcome": "paid to the supplier's established, previously verified account; no redirection"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the invoice's bank details match prior legitimately paid invoices and no change was requested, and the sender shows no look-alike — the central invoice-redirection lever (changed remittance details) is absent, so payment is consistent with the genuine relationship",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.rdj.ie/insights/gone-in-an-instant-how-invoice-redirection-fraud-threatens-your-business",
+      "https://www.barclayscorporate.com/insights/fraud-protection/invoice-fraud/"
+    ]
+  },
+  {
+    "case_id": "wire-034",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "consumer wire transfer the account holder genuinely initiated",
+      "date": "2024",
+      "year": "2024",
+      "parties": "bank customer (genuine account holder) -> a payee the customer chose -> payee account",
+      "request_type": "a wire the customer themselves initiated for their own genuine purpose (not induced by any third party)",
+      "what_was_flagged": "nothing adverse: the customer originated the transfer for a real purpose of their own; there was no impersonator, no scammer-supplied payee, and no inducement",
+      "domains_involved": "none",
+      "dollar_amount": "the amount the customer intended to send",
+      "verification_steps": "account-holder identity authenticated by the bank; payer confirmed the payee and purpose were their own genuine intent (no third-party inducement)",
+      "outcome": "funds delivered to the payee the customer genuinely intended; legitimate transfer"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the genuine account holder initiated the transfer for their own real purpose with no impersonation or third-party inducement — there is no fraud lever (no scammer-chosen payee, no deception), so it is a legitimate authorized transfer",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://katten.com/federal-court-consumer-wire-transfers-electronic-funds-transfer-act",
+      "https://www.fredlaw.com/alert-consumer-wire-transfers-and-new-liability-claims"
+    ]
+  },
+  {
+    "case_id": "wire-035",
+    "case_class": "large_wire",
+    "facts": {
+      "amount": "executive payment on a known channel",
+      "date": "2024",
+      "year": "2024",
+      "parties": "finance staff -> genuine executive reachable on an established internal channel -> known counterparty account",
+      "request_type": "an executive-requested payment confirmed on the executive's established internal channel, matching an expected obligation",
+      "what_was_flagged": "nothing adverse: the request came through the executive's normal established channel (not a new email/number), the full sender showed no look-alike, and the amount matched a known expected obligation",
+      "domains_involved": "executive's genuine, established internal address (no look-alike)",
+      "dollar_amount": "reconciled to an expected, known obligation",
+      "verification_steps": "confirmed on the executive's established internal channel; sender address checked for spoofing (none); amount reconciled to a known obligation",
+      "outcome": "payment to a known counterparty on a reconciled obligation; legitimate"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the request came through the executive's genuine established channel with no look-alike sender and reconciled to a known obligation to a known counterparty — none of the CEO-fraud markers (new channel, urgency-to-bypass, unknown payee) are present",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.eckertseamans.com/legal-updates/business-email-compromise-fraud-what-it-is-and-what-you-can-do",
+      "https://www.wendellodom.com/business-email-compromise-bec-fraud-is-under-dojs-microscope/"
+    ]
+  },
+  {
+    "case_id": "refund-017",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "millions in aggregate across major online retailers",
+      "date": "2023",
+      "year": "2023",
+      "parties": "international refund-fraud ring (ten people charged in Oklahoma / N.D. Okla.) recruiting legitimate shoppers -> Amazon, Walmart and other online retailers",
+      "request_type": "buy an item, obtain a refund, and keep the refunded item (non-return refund) for personal use or resale",
+      "what_was_flagged": "a federal indictment described a crime ring recruiting genuine shoppers to purchase, get the purchase refunded, and 'through various means keep the refunded item'",
+      "domains_involved": "retailer refund/customer-service channels",
+      "dollar_amount": "millions in aggregate retailer losses",
+      "verification_steps": "established by federal prosecution; the refunds did not correspond to genuine returned merchandise",
+      "outcome": "ten defendants charged in Oklahoma (N.D. Okla.) in an international refund-fraud ring"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a refund issued while the buyer keeps the item, organized as a recruited scheme, is non-return refund fraud — there is no genuine return behind the refund, confirmed by federal indictment",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.fox23.com/news/ten-charged-in-oklahoma-for-involvement-in-international-refund-fraud-ring/article_b09564fa-8256-11ee-8648-3f0248950334.html",
+      "https://www.businessinsider.com/retailers-lost-millions-in-organized-online-refund-fraud-scheme-2023-11"
+    ]
+  },
+  {
+    "case_id": "refund-018",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "chargeback reclaiming a delivered, used purchase",
+      "date": "2024",
+      "year": "2024",
+      "parties": "cardholder who genuinely placed and received an order -> issuing bank (chargeback) -> merchant",
+      "request_type": "a chargeback claiming non-receipt/dissatisfaction on an item the cardholder actually ordered, received and used (first-party / friendly fraud)",
+      "what_was_flagged": "the cardholder authorized the purchase, received delivery, then disputed it to reclaim the money while keeping the goods — first-party misuse, not a real fulfillment problem",
+      "domains_involved": "merchant order with matching AVS/CVV at purchase and delivery confirmation",
+      "dollar_amount": "the original order amount, reclaimed via chargeback",
+      "verification_steps": "merchant records show the genuine cardholder ordered (AVS/CVV cleared) and the item was delivered (tracking confirmed delivery) — contradicting the dispute claim",
+      "outcome": "first-party/friendly-fraud chargeback; not a legitimate refund (the goods were received and kept)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a dispute that contradicts the merchant's own evidence — genuine cardholder ordered, AVS/CVV cleared, delivery confirmed — is first-party (friendly) fraud reclaiming a valid, received purchase, not a refund owed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://corporate.visa.com/en/solutions/visa-protect/insights/friendly-fraud.html",
+      "https://www.riskified.com/learning/chargebacks/friendly-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-019",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund as a paid 'service'",
+      "date": "2023",
+      "year": "2023",
+      "parties": "refunding-as-a-service operator advertising on social platforms -> paying customers -> Amazon/Walmart/Target and other retailers",
+      "request_type": "obtain a refund without returning the item, sold as a fee-based service taking a cut of the refund",
+      "what_was_flagged": "an advertised refunding service that engineers refunds (empty-box, item-not-received, partial-refund claims) without genuine returns, for a fee",
+      "domains_involved": "social-platform storefronts (e.g. Telegram channels) advertising the service",
+      "dollar_amount": "per-order high-value refunds, aggregating to millions across customers",
+      "verification_steps": "exposed by investigation; refunds had no corresponding returned merchandise",
+      "outcome": "refunding-as-a-service operations dismantled; refunds were fraudulent"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "refunds obtained as a paid service with no merchandise returned are organized refund fraud — engineered claims (empty-box / not-received) substitute for a genuine return that never happened",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.businessinsider.com/retailers-lost-millions-in-organized-online-refund-fraud-scheme-2023-11",
+      "https://trustworthyshopping.aboutamazon.com/inside-amazons-fight-against-refund-fraud"
+    ]
+  },
+  {
+    "case_id": "refund-020",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "repeated high-value 'item not received' refunds",
+      "date": "2024",
+      "year": "2024",
+      "parties": "serial first-party-fraud customer -> merchant refund process",
+      "request_type": "repeated refund claims of 'item not received' on delivered orders",
+      "what_was_flagged": "an account with an abnormal pattern of 'not received' refund claims against orders that carrier tracking shows were delivered to the customer's address",
+      "domains_involved": "merchant account with delivery-tracking on each disputed order",
+      "dollar_amount": "multiple high-value orders refunded despite confirmed delivery",
+      "verification_steps": "delivery tracking confirms each disputed order was delivered; the repeat 'not received' pattern contradicts the records",
+      "outcome": "first-party 'INR' (item-not-received) abuse pattern; claims not supported by the delivery evidence"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "repeated 'item not received' refund claims on orders that tracking confirms were delivered is first-party-fraud abuse — the delivery evidence contradicts the claim, so no refund is owed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.ethoca.com/first-party-fraud",
+      "https://www.riskified.com/learning/chargebacks/friendly-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-021",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "over USD 4,000,000 in retailer losses (one ring); part of broader schemes",
+      "date": "2022",
+      "year": "2022",
+      "parties": "organized refunding ring members (prosecuted, W.D. Wash. among others) -> retailers nationwide",
+      "request_type": "systematic fraudulent refunds on purchased goods via social-engineered customer service",
+      "what_was_flagged": "an organized ring extracting refunds through engineered claims; multiple members charged and sentenced",
+      "domains_involved": "retailer customer-service channels social-engineered at scale",
+      "dollar_amount": "over USD 4M in losses attributed to the ring",
+      "verification_steps": "established by criminal prosecution; refunds were fraudulent, not policy-matching returns",
+      "outcome": "members of the organized refunding ring sentenced (e.g. a second defendant sentenced to 30 months)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "systematic refunds extracted by an organized ring through engineered claims, with no genuine returns and confirmed by prosecution, are refund fraud",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.fox23.com/news/11-individuals-involved-in-refund-fraud-ring-targeting-online-retailers-receive-sentences/article_ba1f518b-b7a8-458a-ac8d-c2580c38f75a.html",
+      "https://www.businessinsider.com/retailers-lost-millions-in-organized-online-refund-fraud-scheme-2023-11"
+    ]
+  },
+  {
+    "case_id": "refund-022",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "chargeback on a delivered, signed-for high-value item",
+      "date": "2024",
+      "year": "2024",
+      "parties": "cardholder -> issuer (chargeback citing 'fraud/unauthorized') -> merchant who holds delivery + AVS/CVV evidence",
+      "request_type": "an 'unauthorized transaction' chargeback on an order the cardholder placed and received",
+      "what_was_flagged": "the 'unauthorized' claim is contradicted by compelling evidence: AVS/CVV matched at purchase, the cardholder's account history, and signed delivery confirmation to the cardholder's address",
+      "domains_involved": "merchant order with AVS/CVV match and signed delivery proof",
+      "dollar_amount": "the original high-value order amount",
+      "verification_steps": "AVS/CVV match, prior order history, and signed delivery confirmation all tie the genuine cardholder to the received order — the 'unauthorized' claim fails",
+      "outcome": "first-party fraud disguised as an unauthorized-transaction dispute; the refund claim is not legitimate"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "an 'unauthorized' chargeback contradicted by AVS/CVV match, account history and signed delivery to the cardholder is friendly fraud reclaiming a genuine received purchase — the evidence shows the cardholder authorized and received it",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.chargebackgurus.com/blog/compelling-evidence-how-to-win-a-chargeback-dispute",
+      "https://corporate.visa.com/en/solutions/visa-protect/insights/friendly-fraud.html"
+    ]
+  },
+  {
+    "case_id": "refund-023",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund/representment on a delivered order",
+      "date": "2024",
+      "year": "2024",
+      "parties": "genuine cardholder -> merchant -> issuer; merchant won representment with compelling evidence",
+      "request_type": "a transaction the merchant successfully defended as valid via representment, OR a refund the merchant grants because the evidence supports the customer",
+      "what_was_flagged": "nothing adverse: the dispute was adjudicated on compelling evidence — shipping/delivery confirmation, AVS/CVV match and the transaction record — and the transaction was found valid (chargeback reversed in the merchant's favor)",
+      "domains_involved": "none; resolution by card-network representment on documentary evidence",
+      "dollar_amount": "the original transaction amount, ruled valid",
+      "verification_steps": "compelling evidence (delivery confirmation, AVS/CVV match, transaction logs) submitted to the issuer; chargeback reversed — the purchase was adjudicated legitimate",
+      "outcome": "chargeback reversed in the merchant's favor; the transaction was ruled valid"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the disposition was adjudicated on compelling documentary evidence (delivery confirmation, AVS/CVV match) and the transaction was ruled valid with the chargeback reversed — an adjudicated-legitimate outcome, not abuse",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.chargebackgurus.com/blog/compelling-evidence-how-to-win-a-chargeback-dispute",
+      "https://solidgate.com/blog/chargeback-representment/"
+    ]
+  },
+  {
+    "case_id": "refund-024",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "EMV chip / tap-to-pay in-store purchase",
+      "date": "2024",
+      "year": "2024",
+      "parties": "genuine cardholder -> merchant who processed an EMV chip / contactless transaction in compliance",
+      "request_type": "defense of a 'fraud' chargeback on a card-present EMV transaction the merchant processed correctly",
+      "what_was_flagged": "nothing adverse: the merchant inserted the EMV chip / used tap-to-pay and followed processing rules, so under the liability-shift the issuer (not the merchant) bears fraud claims and the transaction stands as a valid card-present sale",
+      "domains_involved": "none; card-present EMV transaction record",
+      "dollar_amount": "the in-store purchase amount",
+      "verification_steps": "EMV chip read / contactless used with full processing compliance — the card-present authentication that shifts fraud liability away from the merchant",
+      "outcome": "the EMV-compliant card-present transaction is upheld as valid"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "a card-present EMV/contactless transaction processed in full compliance is an authenticated, valid sale under the EMV liability shift — there is no fraud-related basis to treat it as illegitimate",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.chargebackgurus.com/blog/compelling-evidence-how-to-win-a-chargeback-dispute",
+      "https://www.verifi.com/chargebacks-disputes-faq/what-is-chargeback-representment.html"
+    ]
+  },
+  {
+    "case_id": "refund-025",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund where credit-card dispute was investigated and resolved for the customer",
+      "date": "2025",
+      "year": "2025",
+      "parties": "customer who paid by credit card for contracted services -> issuer (investigated the dispute) -> merchant",
+      "request_type": "a credit-card dispute over a breach-of-contract/service problem that the issuer investigated and resolved by crediting the customer",
+      "what_was_flagged": "nothing adverse: the issuer investigated the dispute and resolved it in the customer's favor (amount credited) over a genuine service/contract grievance the customer separately pursued in small claims",
+      "domains_involved": "none; issuer dispute investigation on a real services contract",
+      "dollar_amount": "the disputed labor/parts charge, credited after investigation",
+      "verification_steps": "the issuer formally investigated and resolved the dispute, crediting the customer; the underlying grievance was a documented service/contract problem",
+      "outcome": "dispute investigated and resolved in the customer's favor; refund credited"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the issuer investigated a genuine service/contract grievance and resolved it for the customer — an adjudicated dispute resolved on its merits, distinct from a customer reclaiming a satisfactory delivered purchase",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.avvo.com/legal-answers/does-a-credit-card-chargeback-against-a-merchant-t-6235846.html",
+      "https://chargebacks911.com/chargeback-legal-process/"
+    ]
+  },
+  {
+    "case_id": "refund-026",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund for a genuinely non-delivered order",
+      "date": "2024",
+      "year": "2024",
+      "parties": "customer -> merchant whose carrier tracking shows the order was NOT delivered",
+      "request_type": "refund for an order the customer paid for but never received",
+      "what_was_flagged": "nothing adverse: carrier tracking shows the order was not delivered (no delivery scan / returned to sender), corroborating the customer's non-receipt claim — the opposite of the friendly-fraud INR pattern",
+      "domains_involved": "none; carrier tracking record shows non-delivery",
+      "dollar_amount": "the original order amount",
+      "verification_steps": "delivery tracking checked and confirms non-delivery; order record matches the customer",
+      "outcome": "refund warranted; genuine, evidenced fulfillment failure"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "carrier tracking confirms the order was never delivered, corroborating a genuine non-receipt claim — unlike INR friendly fraud (where tracking shows delivery), the evidence here supports a real fulfillment failure",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.ethoca.com/first-party-fraud",
+      "https://www.riskified.com/learning/chargebacks/friendly-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-027",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund matching a genuinely returned, received-back item",
+      "date": "2024",
+      "year": "2024",
+      "parties": "customer with normal account history -> retailer that received the merchandise back",
+      "request_type": "refund where the high-value item was actually shipped back and scanned into the retailer's returns",
+      "what_was_flagged": "nothing adverse: the merchandise was genuinely returned and received back (return scan confirmed), distinguishing it from refund-ring fraud where the item is kept; account shows normal history, not a serial-abuse pattern",
+      "domains_involved": "none; inbound return tracking + warehouse receipt scan",
+      "dollar_amount": "matches the original order amount",
+      "verification_steps": "inbound return tracking and warehouse receipt scan confirm the item was returned and received; account history reviewed (no abuse pattern)",
+      "outcome": "refund corresponds to a real, completed return; legitimate"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the refund corresponds to merchandise that was genuinely shipped back and scanned into the retailer's returns by a normal-history account — the opposite of refund-ring fraud where the item is kept, so the refund matches a real completed return",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://trustworthyshopping.aboutamazon.com/inside-amazons-fight-against-refund-fraud",
+      "https://www.riskified.com/learning/chargebacks/friendly-fraud/"
+    ]
+  },
+  {
+    "case_id": "refund-028",
+    "case_class": "high_value_refund",
+    "facts": {
+      "amount": "refund the merchant proactively granted on clear evidence",
+      "date": "2024",
+      "year": "2024",
+      "parties": "genuine cardholder with a real issue -> merchant who reviewed the evidence and refunded directly (pre-dispute)",
+      "request_type": "a refund the merchant grants before any chargeback because its own records support the customer's claim",
+      "what_was_flagged": "nothing adverse: the merchant's records (e.g. a documented defect, a confirmed non-delivery, or a duplicate charge) substantiate the claim, so the merchant refunds directly rather than contesting — a legitimate, evidenced refund",
+      "domains_involved": "none; merchant's own transaction/fulfillment records",
+      "dollar_amount": "the amount supported by the merchant's records",
+      "verification_steps": "merchant reviewed its transaction and fulfillment records and found they substantiate the customer's claim (defect / non-delivery / duplicate charge) before issuing the refund",
+      "outcome": "merchant issued a legitimate refund supported by its own evidence; no dispute needed"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the merchant's own records substantiate the customer's claim (documented defect, confirmed non-delivery, or duplicate charge), so the refund is evidenced and warranted rather than an attempt to reclaim a satisfactory purchase",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://solidgate.com/blog/chargeback-representment/",
+      "https://www.verifi.com/chargebacks-disputes-faq/what-is-chargeback-representment.html"
+    ]
+  },
+  {
+    "case_id": "vendor-018",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "fraudulent invoice payment",
+      "date": "2021",
+      "year": "2021",
+      "parties": "company accounting employee -> attacker impersonating a known vendor from a look-alike domain (e.g. real 'acmehomes.com' vs fake 'acmehome.com', dropping the 's') posing as the vendor's Assistant Controller/HR Administrator -> attacker account",
+      "request_type": "pay an 'overdue invoice' to an updated bank account, with bank details to follow on reply",
+      "what_was_flagged": "a look-alike domain (one letter dropped) impersonating a known vendor, an urgency framing ('overdue'), and a pandemic pretext for the bank-detail change; not the vendor's genuine domain",
+      "domains_involved": "acmehome.com (fake) vs acmehomes.com (real) — single dropped 's'",
+      "dollar_amount": "the 'overdue invoice' amount requested",
+      "verification_steps": "none; the look-alike domain was not detected and the change was not confirmed with the vendor on a known number",
+      "outcome": "vendor-impersonation invoice-fraud attack (caught/flagged as impersonation by the email-security review)"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "an 'overdue invoice' demanding payment to an updated account, sent from a one-letter-off look-alike domain impersonating a known vendor, is vendor-impersonation fraud — the look-alike sender and unverified bank-detail change are the disqualifying signals",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://abnormal.ai/blog/abnormal-attack-stories-vendor-impersonation-fraud",
+      "https://www.barclayscorporate.com/insights/fraud-protection/invoice-fraud/"
+    ]
+  },
+  {
+    "case_id": "vendor-019",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "UK businesses lose an average of GBP 295,000/year to invoice fraud",
+      "date": "2024",
+      "year": "2024",
+      "parties": "business AP -> criminal impersonating a real supplier -> fraudulent account; supplier invoice fraud is ~55% of UK business fraud",
+      "request_type": "change of the supplier's remittance bank details on an invoice/mandate",
+      "what_was_flagged": "a bank-mandate/remittance change attributed to a real supplier but routed to a new account, with no confirmation back to the supplier; the broad pattern (mandate fraud) drives ~55% of UK business fraud",
+      "domains_involved": "impersonated supplier identity on an altered invoice/mandate",
+      "dollar_amount": "average GBP 295,000/year per UK business",
+      "verification_steps": "none; the mandate/bank-detail change was actioned without an independent call-back to the supplier",
+      "outcome": "mandate (bank-detail change) fraud; payment routed to the criminal's account"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a supplier bank-mandate change actioned without an independent call-back to the supplier is mandate fraud — the unverified change of remittance details is the fraud lever regardless of how routine the invoice looks",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.cygnetise.com/blog/mandate-fraud-in-banking-corporate-treasury",
+      "https://www.nortonrosefulbright.com/en/inside-disputes/blog/202309-supplier-invoice-fraud-who-pays-up"
+    ]
+  },
+  {
+    "case_id": "vendor-020",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "freight payment under a stolen carrier identity",
+      "date": "2023",
+      "year": "2023",
+      "parties": "broker/shipper AP -> party that booked freight using a hijacked legitimate carrier's identity/MC authority and then re-brokered the load -> fraudster account",
+      "request_type": "set the 'carrier's' payment bank details to a new account for a delivered load",
+      "what_was_flagged": "the booking party used a real carrier's stolen identity and re-brokered the haul to an unwitting carrier; the payment banking did not belong to the carrier that performed",
+      "domains_involved": "hijacked carrier MC authority / spoofed carrier identity",
+      "dollar_amount": "the freight charge for the load",
+      "verification_steps": "none; the payee identity and banking were not confirmed against the real carrier authority, and performance was not matched to the payee",
+      "outcome": "double-brokering fraud; the real carrier that hauled the load is left unpaid"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "setting payment banking for a 'carrier' whose identity is not confirmed against the real authority on file, and who did not perform the haul, is double-brokering fraud — the payee is impersonating the legitimate carrier",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.grantthornton.com/insights/articles/transportation/2023/double-brokering-fraud-in-the-transportation-industry",
+      "https://www.trailerbridge.com/insights-resources/blogs/double-brokering-freight-fraud/"
+    ]
+  },
+  {
+    "case_id": "vendor-021",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "supplier payment redirected via altered invoice",
+      "date": "2024",
+      "year": "2024",
+      "parties": "business AP -> criminal who intercepted a genuine supplier invoice and swapped the bank details -> fraudulent account",
+      "request_type": "pay a genuine-looking supplier invoice carrying changed bank details",
+      "what_was_flagged": "a real supplier invoice intercepted and altered so only the bank details changed; everything else looked authentic, and the change was pushed for prompt payment",
+      "domains_involved": "intercepted invoice; altered remittance bank details",
+      "dollar_amount": "the invoice amount, routed to the fraudster",
+      "verification_steps": "none; the changed bank details were paid without confirming the change with the supplier on a known number",
+      "outcome": "invoice-redirection fraud; funds sent to the criminal's account"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "paying an invoice whose only change is the bank details, without confirming that change with the supplier on an independently known number, is invoice-redirection fraud — the swapped remittance details were never verified",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.rdj.ie/insights/gone-in-an-instant-how-invoice-redirection-fraud-threatens-your-business",
+      "https://www.barclayscorporate.com/insights/fraud-protection/invoice-fraud/"
+    ]
+  },
+  {
+    "case_id": "vendor-022",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "vendor bank-detail change pushed with urgency",
+      "date": "2024",
+      "year": "2024",
+      "parties": "AP -> party impersonating a known vendor -> new account, 'verified' only by emailing the same requester",
+      "request_type": "update vendor banking details, with the requester offering to 'verify' by replying to their own email",
+      "what_was_flagged": "the only 'verification' offered was confirming through the same email/contact that made the request — a circular check that cannot detect impersonation or a compromised mailbox",
+      "domains_involved": "requester-supplied contact (same channel as the request)",
+      "dollar_amount": "the next payment(s) to that vendor",
+      "verification_steps": "none independent; 'verification' was circular (replying to or calling a number supplied in the request itself)",
+      "outcome": "vendor-impersonation fraud enabled by self-referential 'verification'"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "a bank-detail change 'verified' only through contact details supplied in the request itself is not verified at all — a circular check cannot detect impersonation or a compromised mailbox, so the change must be refused",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.paymentworks.com/2021/09/21/vendor-verification-how-not-to-do-it/",
+      "https://trustpair.com/blog/call-back-procedures/"
+    ]
+  },
+  {
+    "case_id": "vendor-023",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "six-figure invoice loss (small-business victim)",
+      "date": "2024",
+      "year": "2024",
+      "parties": "small business AP -> scammer sending a legit-looking invoice impersonating a real vendor but with swapped bank details -> scammer account",
+      "request_type": "pay a legit-looking vendor invoice whose bank details were swapped to the scammer's",
+      "what_was_flagged": "a convincing invoice impersonating a real vendor with the bank details replaced; the payer noticed nothing odd and did not call the vendor to confirm the account change",
+      "domains_involved": "impersonated-vendor invoice; swapped bank details",
+      "dollar_amount": "a six-figure payment lost",
+      "verification_steps": "none; the swapped bank details were paid without an out-of-band call to the vendor",
+      "outcome": "money lost to invoice fraud; payment went to the scammer's account"
+    },
+    "designed_label": "DENY",
+    "designed_rationale": "paying a vendor invoice with swapped bank details and no out-of-band confirmation to the vendor is invoice-impersonation fraud — the unverified account change is the lever, and a convincing-looking invoice is not verification",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.reddit.com/r/smallbusinessUS/comments/1sbetra/has_anyone_here_actually_lost_money_to_invoice/",
+      "https://hoxhunt.com/blog/invoice-fraud"
+    ]
+  },
+  {
+    "case_id": "vendor-024",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "verified vendor bank-detail change",
+      "date": "2024",
+      "year": "2024",
+      "parties": "AP -> known vendor reached via an independently sourced number (not the one in the request) -> change confirmed genuine",
+      "request_type": "update a vendor's banking details, confirmed by a documented out-of-band call-back",
+      "what_was_flagged": "nothing adverse: AP followed the call-back procedure — used a number from an independent source (master file / prior invoice / directory), not the request — and the vendor confirmed the change was genuine",
+      "domains_involved": "none; number sourced independently of the request",
+      "dollar_amount": "the next payment to the vendor, on confirmed new details",
+      "verification_steps": "call-back to an independently sourced vendor number (NOT the requester-supplied one); change confirmed live and documented before updating the master file",
+      "outcome": "change confirmed genuine and documented; legitimate update"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the bank-detail change was confirmed by a call-back to an independently sourced number — not one supplied in the request — and documented before the master file was updated, so the prescribed verification control fired and passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://trustpair.com/blog/call-back-procedures/",
+      "https://www.paymentworks.com/2021/09/21/vendor-verification-how-not-to-do-it/"
+    ]
+  },
+  {
+    "case_id": "vendor-025",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "vendor bank change handled via the documented 5-step procedure",
+      "date": "2024",
+      "year": "2024",
+      "parties": "AP -> vendor contact verified through the documented anti-fraud change procedure -> on-file vendor record updated after verification",
+      "request_type": "a vendor banking-detail change processed through a documented step-by-step verification before payment",
+      "what_was_flagged": "nothing adverse: AP ran the change through the documented procedure (independent contact, confirm the change request is genuine, validate details, document, then update) before any payment moved",
+      "domains_involved": "none; verification through an independently confirmed vendor contact",
+      "dollar_amount": "the payment held until the change was verified",
+      "verification_steps": "the documented multi-step verification (independent contact, confirm authenticity of the change, validate banking details, document the verification) completed before updating the record",
+      "outcome": "change verified through the documented procedure and confirmed genuine before payment; legitimate"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the banking-detail change was run end-to-end through the documented multi-step verification — independent contact, confirmation of authenticity, validation, documentation — before any payment, so every required step fired and the change was confirmed genuine",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://debrarrichardson.com/blog/5-steps-to-avoid-a-fraudulent-payment-when-changing-vendor-banking-details",
+      "https://trustpair.com/blog/call-back-procedures/"
+    ]
+  },
+  {
+    "case_id": "vendor-026",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "carrier payment to the verified performing carrier",
+      "date": "2023",
+      "year": "2023",
+      "parties": "broker AP -> carrier whose MC authority and identity were verified and who actually performed the haul -> on-file account for that authority",
+      "request_type": "pay a freight load to the carrier confirmed to hold the authority and to have performed the delivery",
+      "what_was_flagged": "nothing adverse: the broker verified the carrier's MC authority/identity, confirmed this carrier (not a re-broker) performed the haul, and paid the banking on file for that verified authority",
+      "domains_involved": "none; carrier identity matched the verified authority",
+      "dollar_amount": "the agreed freight charge",
+      "verification_steps": "carrier MC authority/identity verified; performance confirmed (booked carrier == hauling carrier); paid to the on-file account for that authority",
+      "outcome": "the verified, performing carrier was paid; no double-brokering"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "payment went to the carrier whose authority and identity were verified and who actually performed the haul, on the on-file account for that authority — none of the double-brokering markers (mismatched performer, unverified identity, off-file banking) are present",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.trailerbridge.com/insights-resources/blogs/double-brokering-freight-fraud/",
+      "https://www.grantthornton.com/insights/articles/transportation/2023/double-brokering-fraud-in-the-transportation-industry"
+    ]
+  },
+  {
+    "case_id": "vendor-027",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "updated-mandate invoice held and verified",
+      "date": "2024",
+      "year": "2024",
+      "parties": "AP -> supplier confirmed on a known number before the mandate/bank-detail change was applied",
+      "request_type": "validate a supplier mandate (bank-detail) change before paying",
+      "what_was_flagged": "nothing adverse: although a mandate change is the classic fraud lever, AP held the payment and confirmed the change with the supplier on a known number before updating the mandate, and it was genuine",
+      "domains_involved": "none; confirmed on a known supplier number",
+      "dollar_amount": "the invoice amount, paid only after the mandate change was verified",
+      "verification_steps": "payment held; bank-mandate change confirmed with the supplier on a known/independent number before the mandate was updated; confirmed genuine",
+      "outcome": "mandate change verified as genuine before payment; legitimate"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "the supplier mandate change was held and confirmed with the supplier on a known number before the mandate was updated and any funds moved — the mandate-fraud lever was neutralized by independent verification",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.cygnetise.com/blog/mandate-fraud-in-banking-corporate-treasury",
+      "https://www.barclayscorporate.com/insights/fraud-protection/invoice-fraud/"
+    ]
+  },
+  {
+    "case_id": "vendor-028",
+    "case_class": "vendor_change",
+    "facts": {
+      "amount": "vendor change confirmed before money moved",
+      "date": "2024",
+      "year": "2024",
+      "parties": "AP -> vendor reached on an independently sourced contact -> change refused on email-alone and verified out-of-band",
+      "request_type": "a vendor banking change that AP refused to accept on email alone and verified before processing",
+      "what_was_flagged": "nothing adverse: AP explicitly would not accept the new banking by email; it independently contacted the vendor (not via requester-supplied details) and confirmed the change before processing",
+      "domains_involved": "none; vendor contact sourced independently of the request",
+      "dollar_amount": "the next payment, processed only after confirmation",
+      "verification_steps": "refused email-only acceptance; independently sourced the vendor contact and confirmed the change live before processing; documented",
+      "outcome": "change confirmed genuine via independent contact before processing; legitimate"
+    },
+    "designed_label": "APPROVE",
+    "designed_rationale": "AP refused to act on the email alone and confirmed the change through an independently sourced vendor contact before processing — the verification did not rely on any detail supplied in the request, so it can detect impersonation and it passed",
+    "label_provenance": "synthetic_designed",
+    "source_refs": [
+      "https://www.paymentworks.com/2021/09/21/vendor-verification-how-not-to-do-it/",
+      "https://trustpair.com/blog/call-back-procedures/"
+    ]
+  }
+]

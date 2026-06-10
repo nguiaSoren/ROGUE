@@ -163,3 +163,9 @@ assets/captures/
 assets/music/
 assets/rogue-*.png
 assets/0531.mp4
+
+# Surface-2 oversight: the harvested-page provenance CACHE is bulky (~5.7M) + reproducible from
+# source_refs — keep it local. The answer-key corpus + notes + the lightweight index ARE committed
+# (the corpus is the moat; the CI lint + tests load it).
+tests/fixtures/oversight/_raw/*
+!tests/fixtures/oversight/_raw/_index.json
