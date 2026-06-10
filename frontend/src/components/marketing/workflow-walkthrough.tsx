@@ -24,7 +24,7 @@ export function WorkflowWalkthrough({ className }: { className?: string }) {
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
           From endpoint to filed ticket in four steps
         </h2>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-[17px] text-foreground leading-relaxed">
           Point ROGUE at a model, escalate every goal through the full arsenal,
           and let the criticals route themselves to your tracker.
         </p>

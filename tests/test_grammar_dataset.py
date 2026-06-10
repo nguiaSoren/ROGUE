@@ -199,6 +199,15 @@ def live_session():
         )
     Session = sessionmaker(bind=engine)
     session = Session()
+    # Reachable-but-EMPTY DB (e.g. a fresh CI Postgres) must SKIP, not fail: these
+    # tests assert a non-empty grammar dataset built from the live corpus, which CI
+    # does not seed.
+    from sqlalchemy import text
+
+    if session.execute(text("SELECT count(*) FROM attack_primitives")).scalar() == 0:
+        session.close()
+        engine.dispose()
+        pytest.skip("DB reachable but has no corpus data (e.g. a fresh CI DB) — grammar dataset would be empty")
     yield session
     session.close()
     engine.dispose()
