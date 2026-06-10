@@ -60,6 +60,9 @@ jobs:
       - name: Tests (pytest)
         run: uv run pytest -q
 
+      - name: Independence lint (ADR-0011 exit gate)
+        run: uv run python -m rogue.oversight.independence_lint
+
   frontend:
     name: frontend (lint + typecheck)
     runs-on: ubuntu-latest
