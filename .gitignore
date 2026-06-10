@@ -169,3 +169,8 @@ assets/0531.mp4
 # (the corpus is the moat; the CI lint + tests load it).
 tests/fixtures/oversight/_raw/*
 !tests/fixtures/oversight/_raw/_index.json
+
+# Surface-3 skill-pool harvested-page provenance CACHE — bulky + reproducible from source_refs; local.
+# The skill pool + canary ground-truth + manifest ARE committed (the moat; tests/lint load them).
+tests/fixtures/memory/_raw/*
+!tests/fixtures/memory/_raw/_index.json

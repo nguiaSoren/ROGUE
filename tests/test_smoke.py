@@ -110,8 +110,11 @@ def test_models_metadata_has_expected_tables() -> None:
     capture store, migration 0034) added 2026-06-10. ``gated_cases``,
     ``review_sessions`` and ``gated_decisions`` (ROGUE v2 Surface 2 human-gate
     oversight schema — answer-key corpus + org-scoped review sessions/decisions,
-    migration 0036) added 2026-06-10. Add new entries here when
-    migrations add tables.
+    migration 0036) added 2026-06-10. ``skills``, ``skill_edges`` and
+    ``skill_verifications`` (ROGUE v2 Surface 3 agent-memory skill pool —
+    org/cohort-scoped assured substrate, combination-risk adjacency graph, and
+    the verification audit spine, migration 0037) added 2026-06-11. Add new
+    entries here when migrations add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
     from rogue.db.models import Base
@@ -148,6 +151,9 @@ def test_models_metadata_has_expected_tables() -> None:
         "scan_jobs",
         "scan_runs",
         "secrets",
+        "skill_edges",
+        "skill_verifications",
+        "skills",
         "slack_registered_agents",
         "snapshot_captures",
         "source_provenances",
