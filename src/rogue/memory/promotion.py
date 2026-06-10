@@ -261,6 +261,18 @@ def _verdict_of(scored: Any) -> NetEffectVerdict:
     return NetEffectVerdict(str(verdict).strip().lower().replace(" ", "_").replace("-", "_"))
 
 
+def _grade(judge: Any, **kwargs: Any) -> Any:
+    """Score one rollout pair, accepting EITHER a callable judge_fn OR a judge object.
+
+    ``net_effect_judge()`` canonically returns a ``MemoryJudge`` whose ``.grade`` is ASYNC;
+    its ``.grade_sync`` is the blocking wrapper for this sync gate. Tests inject a bare
+    callable stub. Prefer ``grade_sync`` → ``grade`` → the object-as-callable, so the live
+    default path (a judge object) works, not just the tested callable-stub path.
+    """
+    grade_fn = getattr(judge, "grade_sync", None) or getattr(judge, "grade", None) or judge
+    return grade_fn(**kwargs)
+
+
 def evaluate_promotion(
     skill: Skill,
     cohort_id: str,
@@ -337,7 +349,8 @@ def evaluate_promotion(
     decisive: list[int] = []  # 1 = repair, 0 = regression (neutrals carry no net-effect signal)
     for instance in held_out_set:
         without_output, with_output = runner.rollout(skill, instance)
-        scored = judge(
+        scored = _grade(
+            judge,
             task=instance.get("task", ""),
             expected_outcome=instance.get("expected_outcome", ""),
             output_without_skill=without_output,

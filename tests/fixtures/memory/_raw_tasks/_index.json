@@ -1,0 +1,122 @@
+[
+  {
+    "url": "https://cwe.mitre.org/data/definitions/89.html",
+    "slug": "cwe-mitre-org-data-definitions-89-html",
+    "status_code": 200,
+    "bytes": 60897,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-89-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/78.html",
+    "slug": "cwe-mitre-org-data-definitions-78-html",
+    "status_code": 200,
+    "bytes": 68669,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-78-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/79.html",
+    "slug": "cwe-mitre-org-data-definitions-79-html",
+    "status_code": 200,
+    "bytes": 71006,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-79-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/798.html",
+    "slug": "cwe-mitre-org-data-definitions-798-html",
+    "status_code": 200,
+    "bytes": 47522,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-798-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/918.html",
+    "slug": "cwe-mitre-org-data-definitions-918-html",
+    "status_code": 200,
+    "bytes": 26272,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-918-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/22.html",
+    "slug": "cwe-mitre-org-data-definitions-22-html",
+    "status_code": 200,
+    "bytes": 68630,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-22-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/327.html",
+    "slug": "cwe-mitre-org-data-definitions-327-html",
+    "status_code": 200,
+    "bytes": 44171,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-327-html.md"
+  },
+  {
+    "url": "https://cwe.mitre.org/data/definitions/502.html",
+    "slug": "cwe-mitre-org-data-definitions-502-html",
+    "status_code": 200,
+    "bytes": 36707,
+    "ok": true,
+    "file": "cwe-mitre-org-data-definitions-502-html.md"
+  },
+  {
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+    "slug": "cheatsheetseries-owasp-org-cheatsheets-SQL-Injection-Prevention-Cheat-Sheet-html",
+    "status_code": 200,
+    "bytes": 35714,
+    "ok": true,
+    "file": "cheatsheetseries-owasp-org-cheatsheets-SQL-Injection-Prevention-Cheat-Sheet-html.md"
+  },
+  {
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html",
+    "slug": "cheatsheetseries-owasp-org-cheatsheets-OS-Command-Injection-Defense-Cheat-Sheet-html",
+    "status_code": 200,
+    "bytes": 24860,
+    "ok": true,
+    "file": "cheatsheetseries-owasp-org-cheatsheets-OS-Command-Injection-Defense-Cheat-Sheet-html.md"
+  },
+  {
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+    "slug": "cheatsheetseries-owasp-org-cheatsheets-Server-Side-Request-Forgery-Prevention-Cheat-Sheet-html",
+    "status_code": 200,
+    "bytes": 41630,
+    "ok": true,
+    "file": "cheatsheetseries-owasp-org-cheatsheets-Server-Side-Request-Forgery-Prevention-Cheat-Sheet-html.md"
+  },
+  {
+    "url": "https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/",
+    "slug": "www-geeksforgeeks-org-sql-best-practices-for-sql-query-optimizations",
+    "status_code": 200,
+    "bytes": 16066,
+    "ok": true,
+    "file": "www-geeksforgeeks-org-sql-best-practices-for-sql-query-optimizations.md"
+  },
+  {
+    "url": "https://www.geeksforgeeks.org/python/python-mutable-default-arguments/",
+    "slug": "www-geeksforgeeks-org-python-python-mutable-default-arguments",
+    "status_code": 200,
+    "bytes": 5767,
+    "ok": true,
+    "file": "www-geeksforgeeks-org-python-python-mutable-default-arguments.md"
+  },
+  {
+    "url": "https://www.geeksforgeeks.org/python/iterate-over-a-dictionary-in-python/",
+    "slug": "www-geeksforgeeks-org-python-iterate-over-a-dictionary-in-python",
+    "status_code": 200,
+    "bytes": 15284,
+    "ok": true,
+    "file": "www-geeksforgeeks-org-python-iterate-over-a-dictionary-in-python.md"
+  },
+  {
+    "url": "https://docs.crewai.com/en/learn/create-custom-tools",
+    "slug": "docs-crewai-com-en-learn-create-custom-tools",
+    "status_code": 200,
+    "bytes": 13680,
+    "ok": true,
+    "file": "docs-crewai-com-en-learn-create-custom-tools.md"
+  }
+]

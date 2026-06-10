@@ -43,6 +43,7 @@ from rogue.memory.promotion import (
     JudgeFn,
     RolloutRunner,
     VerificationStore,
+    _grade,
     _new_verification_id,
     _verdict_of,
 )
@@ -101,7 +102,8 @@ def reverify_skill(
     decisive: list[int] = []  # 1 = repair, 0 = regression (neutrals carry no net-effect signal)
     for instance in held_out_set:
         without_output, with_output = runner.rollout(skill, instance)
-        scored = judge(
+        scored = _grade(
+            judge,
             task=instance.get("task", ""),
             expected_outcome=instance.get("expected_outcome", ""),
             output_without_skill=without_output,

@@ -174,3 +174,7 @@ tests/fixtures/oversight/_raw/*
 # The skill pool + canary ground-truth + manifest ARE committed (the moat; tests/lint load them).
 tests/fixtures/memory/_raw/*
 !tests/fixtures/memory/_raw/_index.json
+
+# Surface-3 held-out-task harvested-page cache — bulky + reproducible; local. Tasks + manifest committed.
+tests/fixtures/memory/_raw_tasks/*
+!tests/fixtures/memory/_raw_tasks/_index.json
