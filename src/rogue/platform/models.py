@@ -192,6 +192,7 @@ class SlackRegisteredAgent(Base):
     sandbox_channel_id: Mapped[str] = mapped_column(String(64))  # NOT NULL — sandbox binding mandatory
     security_channel_id: Mapped[str] = mapped_column(String(64))
     rule_pack_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    target_api_key_ref: Mapped[str | None] = mapped_column(String(48), nullable=True)  # SecretStore handle to the target endpoint's bearer key — None for open/keyless endpoints
     client_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # cached serialized ClientPolicy (governance.decompose_policy) — None until first derived
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

@@ -71,6 +71,7 @@ class SlackAgentTarget:
     security_channel_id: str = ""  # where diffs post; separate id, also required
     rule_pack_ref: str | None = None  # area-04 rule-pack handle; optional until 04's packs land
     system_prompt_sensitive: bool = False  # if True, persist the prompt via SecretStore, not inline
+    api_key: str | None = None  # the target endpoint's bearer key (optional — open/self-gatewayed endpoints need none); secret → persisted via SecretStore
 
     def __post_init__(self) -> None:
         required = {
@@ -112,6 +113,7 @@ class SlackAgentTarget:
         security_channel_id: str = "",
         rule_pack_ref: str | None = None,
         system_prompt_sensitive: bool = False,
+        api_key: str | None = None,
     ) -> "SlackAgentTarget":
         """Factory accepting plain `list[str]` for the collection fields, normalized to tuples
         so callers don't have to pass tuples to keep the dataclass frozen/hashable."""
@@ -128,6 +130,7 @@ class SlackAgentTarget:
             security_channel_id=security_channel_id,
             rule_pack_ref=rule_pack_ref,
             system_prompt_sensitive=system_prompt_sensitive,
+            api_key=api_key,
         )
 
 

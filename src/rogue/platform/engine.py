@@ -20,6 +20,7 @@ and no spend.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from .interfaces import ProgressCallback, ScanEngine
@@ -49,6 +50,7 @@ class DefaultScanEngine(ScanEngine):
         escalation_ctx_builder: Any = None,
         ladder_runner: Any = None,
         policy_runner: Any = None,
+        grader: Any = None,
         snapshot_store: Any = None,
     ) -> None:
         # All injectable so tests run fully offline. When left None, the real panel / judge are built
@@ -63,8 +65,12 @@ class DefaultScanEngine(ScanEngine):
         self._ladder_runner = ladder_runner
         # policy-mode (build-04 §6 per-rule scanner) seams. ``policy_runner`` is the test seam: a fake
         # returns a RuleBreachReport with no network; when None the real ``run_policy_scan`` is used.
+        # ``grader`` is a finer seam INSIDE the live path: a fake grader (no judge network) lets a test
+        # exercise the REAL live_responder + run_policy_scan offline; when None the real ``default_grade``
+        # (one judge LLM call per trial) is used.
         # ``snapshot_store`` is optional transcript capture; when None, capture is skipped gracefully.
         self._policy_runner = policy_runner
+        self._grader = grader
         self._snapshot_store = snapshot_store
 
     def _load_repertoire(self, spec: ScanSpec) -> list:
@@ -207,7 +213,9 @@ class DefaultScanEngine(ScanEngine):
         diff_post can render "holds N/M" for each rule.
 
         The injected ``policy_runner`` is the offline test seam:
-        ``policy_runner(policy, config, corpus, *, n_trials) -> RuleBreachReport``.
+        ``policy_runner(policy, config, corpus, *, n_trials) -> RuleBreachReport``. The finer
+        ``grader`` seam stays INSIDE the live path (real ``live_responder`` + ``run_policy_scan``)
+        and only swaps the judge: ``grader(rule, judge, primitive, response, config) -> bool``.
         """
         from rogue.governance.scan_runner import default_grade, live_responder, run_policy_scan
         from rogue.report import Finding, ScanReport, technique_label
@@ -223,19 +231,30 @@ class DefaultScanEngine(ScanEngine):
             wanted = set(spec.attacks)
             corpus = [p for p in corpus if getattr(p, "primitive_id", None) in wanted]
 
-        if self._policy_runner is not None:
-            report = self._policy_runner(spec.policy, config, corpus, n_trials=spec.n_trials)
-        else:
-            # LIVE path: real per-rule judge + real target trials (one model call per trial).
-            respond, _stats = live_responder(self._panel)
-            report = run_policy_scan(
+        # The scan body is synchronous (``live_responder`` drives the target panel via its OWN
+        # event loop). Run it in a worker thread so that loop is created and used entirely there,
+        # never colliding with the outer loop ``run`` is awaited inside (the worker / the API) —
+        # which would otherwise raise "Cannot run the event loop while another loop is running".
+        def _blocking_policy_scan():
+            if self._policy_runner is not None:
+                return self._policy_runner(spec.policy, config, corpus, n_trials=spec.n_trials)
+            # LIVE path: real per-rule judge + real target trials (one model call per trial). When
+            # no panel is injected, build one carrying the target key so a keyed endpoint actually
+            # authenticates (no api_key ⇒ no Authorization header ⇒ 401).
+            from rogue.reproduce.target_panel import TargetPanel
+
+            panel = self._panel or TargetPanel(adapter_extra=self._adapter_extra(spec))
+            respond, _stats = live_responder(panel)
+            return run_policy_scan(
                 spec.policy,
                 config,
                 corpus,
                 respond=respond,
-                grade=default_grade,
+                grade=(self._grader or default_grade),
                 n_trials=spec.n_trials,
             )
+
+        report = await asyncio.to_thread(_blocking_policy_scan)
 
         verdicts = list(report.rule_verdicts)
         n_tests = sum(v.n_trials for v in verdicts)

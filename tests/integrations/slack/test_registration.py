@@ -292,6 +292,136 @@ def test_sensitive_prompt_persists_as_secref_not_plaintext_postgres():
         engine.dispose()
 
 
+# ---------------------------------------------------------------------------
+# 7. Target endpoint api_key — carried on the target; default None; never inline in the row.
+# ---------------------------------------------------------------------------
+def test_create_carries_api_key_and_defaults_none():
+    """`SlackAgentTarget.create(api_key=...)` carries the key; omitted ⇒ None (keyless endpoint)."""
+    keyed = _fake_target(api_key="sk-x")
+    assert keyed.api_key == "sk-x"
+
+    keyless = _fake_target()
+    assert keyless.api_key is None
+
+
+def test_api_key_persists_as_secref_not_plaintext_postgres():
+    """PostgresSlackAgentStore + InMemorySecretStore against a REAL local Postgres session.
+
+    A target endpoint api_key must be persisted as a `secref_…` handle in `target_api_key_ref`
+    (NOT the literal key), and `get` / `all_targets` must resolve it back to the original key.
+    Skips cleanly if the local container is unavailable. Pinned to the LOCAL url — never Neon.
+    """
+    from sqlalchemy import create_engine, select, text
+    from sqlalchemy.orm import sessionmaker
+
+    from rogue.db.models import Base
+    from rogue.integrations.slack import PostgresSlackAgentStore
+    from rogue.platform.models import SlackRegisteredAgent
+    from rogue.platform.secrets import InMemorySecretStore
+
+    assert "localhost" in _LOCAL_DATABASE_URL and "neon" not in _LOCAL_DATABASE_URL.lower()
+    try:
+        engine = create_engine(_LOCAL_DATABASE_URL, pool_pre_ping=True, pool_timeout=5)
+        with engine.connect() as c:
+            c.execute(text("select 1"))
+        # Note: this requires the migrated schema (the `target_api_key_ref` column from
+        # migration 0035). create_all with checkfirst won't ADD a missing column to an
+        # existing table, so a pre-0035 DB would surface here as a missing-column error
+        # rather than a silent skip — which is the honest signal.
+        Base.metadata.create_all(engine, tables=[SlackRegisteredAgent.__table__], checkfirst=True)
+    except Exception as e:  # pragma: no cover — house convention: skip cleanly if DB unavailable
+        pytest.skip(f"local Postgres unavailable for DB round-trip: {e}")
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    secrets = InMemorySecretStore()
+    store = PostgresSlackAgentStore(factory, secret_store=secrets)
+
+    secret_key = "sk-secret"
+    target = _fake_target(
+        org_id="org_dbkey",
+        agent_name="db-keyed-bot",
+        api_key=secret_key,
+    )
+    try:
+        store.put(target)
+
+        # The stored row holds a secref handle, NOT the literal key.
+        with factory() as s:
+            row = s.execute(
+                select(SlackRegisteredAgent).where(
+                    SlackRegisteredAgent.org_id == "org_dbkey",
+                    SlackRegisteredAgent.agent_name == "db-keyed-bot",
+                )
+            ).scalar_one()
+            assert row.target_api_key_ref is not None
+            assert row.target_api_key_ref.startswith("secref_")
+            assert secret_key not in row.target_api_key_ref
+
+        # get() and all_targets() both resolve the secref back to the original key.
+        got = store.get("org_dbkey", "db-keyed-bot")
+        assert got is not None
+        assert got.api_key == secret_key
+
+        all_t = [t for t in store.all_targets("org_dbkey") if t.agent_name == "db-keyed-bot"]
+        assert len(all_t) == 1
+        assert all_t[0].api_key == secret_key
+
+        # list() never surfaces the key or its secref.
+        listing = store.list("org_dbkey")
+        assert secret_key not in repr(listing)
+    finally:
+        with factory() as s:
+            s.execute(
+                text("delete from slack_registered_agents where org_id = :o"),
+                {"o": "org_dbkey"},
+            )
+            s.commit()
+        engine.dispose()
+
+
+def test_keyless_target_persists_null_api_key_ref_postgres():
+    """A keyless target (api_key=None) ⇒ `target_api_key_ref` stays NULL and resolves back to None."""
+    from sqlalchemy import create_engine, select, text
+    from sqlalchemy.orm import sessionmaker
+
+    from rogue.db.models import Base
+    from rogue.integrations.slack import PostgresSlackAgentStore
+    from rogue.platform.models import SlackRegisteredAgent
+    from rogue.platform.secrets import InMemorySecretStore
+
+    try:
+        engine = create_engine(_LOCAL_DATABASE_URL, pool_pre_ping=True, pool_timeout=5)
+        with engine.connect() as c:
+            c.execute(text("select 1"))
+        Base.metadata.create_all(engine, tables=[SlackRegisteredAgent.__table__], checkfirst=True)
+    except Exception as e:  # pragma: no cover
+        pytest.skip(f"local Postgres unavailable for DB round-trip: {e}")
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    store = PostgresSlackAgentStore(factory, secret_store=InMemorySecretStore())
+    target = _fake_target(org_id="org_dbkeyless", agent_name="db-keyless-bot")  # api_key=None
+    try:
+        store.put(target)
+        with factory() as s:
+            row = s.execute(
+                select(SlackRegisteredAgent).where(
+                    SlackRegisteredAgent.org_id == "org_dbkeyless"
+                )
+            ).scalar_one()
+            assert row.target_api_key_ref is None
+        got = store.get("org_dbkeyless", "db-keyless-bot")
+        assert got is not None
+        assert got.api_key is None
+    finally:
+        with factory() as s:
+            s.execute(
+                text("delete from slack_registered_agents where org_id = :o"),
+                {"o": "org_dbkeyless"},
+            )
+            s.commit()
+        engine.dispose()
+
+
 def test_inline_prompt_path_postgres_stores_literal():
     """Non-sensitive prompt stores inline (no secref). Real local Postgres; skips cleanly if down."""
     from sqlalchemy import create_engine, select, text
