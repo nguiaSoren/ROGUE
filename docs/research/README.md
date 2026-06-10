@@ -25,3 +25,4 @@ The single home for **our own** research writeups (manuscripts, focused studies,
 - **One topic per paper.** The scheduler/orchestration work and the judge-calibration work are *separate* papers (different subjects); the grammar null-result is its own study.
 - **Provenance + honesty:** every reported number traces to `breach_results` / `data/calibration/` / a named external benchmark; mark pending/unmeasured results as pending (do not quote a number we haven't collected).
 - [Oversight meaningfulness](oversight_meaningfulness.md) — Surface-2 human-gate: measuring a false-approve rate vs an independent key + the bias-laundering guard (novel; real number pending reviewers)
+- [Skill-pool leakage](skill_pool_leakage.md) — Surface-3: measured adversarial leakage on a privacy-contained agent-skill pool (10% [0-25%] first real run; canary ground truth; publishable)
