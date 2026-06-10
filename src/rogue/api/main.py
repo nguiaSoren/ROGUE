@@ -519,6 +519,9 @@ def health() -> dict[str, Any]:
     from rogue.reproduce.ladder_priors import ladder_order_mode
 
     ladder_order = ladder_order_mode()
+    # Deployed commit SHA so a deploy is byte-verifiable from outside. Render sets
+    # RENDER_GIT_COMMIT automatically; "dev" locally where it's unset.
+    commit = (os.environ.get("RENDER_GIT_COMMIT") or "dev")[:12]
     try:
         # Pull the session manually here so health doesn't error when DB
         # is briefly down — return `db: down` instead of 500.
@@ -543,6 +546,7 @@ def health() -> dict[str, Any]:
             ).scalar() or 0
             return {
                 "status": "ok",
+                "commit": commit,
                 "db": "up",
                 "ladder_order": ladder_order,
                 "n_primitives": int(n_primitives),
@@ -554,12 +558,13 @@ def health() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - health endpoint must never 500
         return {
             "status": "ok",
+            "commit": commit,
             "db": "down",
             "ladder_order": ladder_order,
             "error": f"{type(exc).__name__}: {exc}",
             "now": datetime.now(timezone.utc).isoformat(),
         }
-    return {"status": "ok", "db": "unknown", "ladder_order": ladder_order}  # unreachable but typing-safe
+    return {"status": "ok", "commit": commit, "db": "unknown", "ladder_order": ladder_order}  # unreachable but typing-safe
 
 
 # --------------------------------------------------------------------------- #
