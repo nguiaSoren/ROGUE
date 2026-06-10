@@ -317,6 +317,7 @@ try:  # pragma: no cover - exercised at process start
 
         from rogue.mcp_server.scan_tools import register_scan_tools
 
+        _mcp_org_id = _os.environ.get("ROGUE_MCP_ORG_ID", "demo")
         register_scan_tools(
             rogue_mcp,
             scan_service=scan_service,
@@ -324,7 +325,24 @@ try:  # pragma: no cover - exercised at process start
             benchmark_service=benchmark_service,
             engine=engine,
             integration_store=integration_store,
-            org_id=_os.environ.get("ROGUE_MCP_ORG_ID", "demo"),
+            org_id=_mcp_org_id,
+        )
+
+        # Register the Surface-1 Slack action tools on the same server (build-area 06 §8): register a
+        # consented Slack agent, run a sandbox cycle, read its signed ChangeWitness, and get a
+        # Tripwire prediction / RedlineGuard gate rule for an inbound message. Same org binding and
+        # same services as the scan tools (org is bound here, never an LLM tool arg).
+        from rogue.integrations.slack import build_postgres_slack_agent_store
+        from rogue.mcp_server.slack_tools import register_slack_tools
+
+        register_slack_tools(
+            rogue_mcp,
+            agent_store=build_postgres_slack_agent_store(secret_store),  # lazy engine — no connection until used
+            scan_service=scan_service,
+            attestation_service=attestation_service,
+            org_id=_mcp_org_id,
+            secret_store=secret_store,
+            integration_store=integration_store,
         )
 
     _wire_platform()
