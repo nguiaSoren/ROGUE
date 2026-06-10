@@ -105,6 +105,13 @@ class PostgresSlackAgentStore(SlackAgentStore):
         else:
             system_prompt_ref = target.system_prompt
 
+        # The target endpoint's bearer key is a secret → stored via the SecretStore (mirror the
+        # system_prompt secref pattern). No key, or no secret store ⇒ ref stays None (keyless).
+        if target.api_key and self._secrets is not None:
+            target_api_key_ref = self._secrets.put(target.api_key, org_id=target.org_id)
+        else:
+            target_api_key_ref = None
+
         with self._sf() as s:
             row = s.execute(
                 select(SlackRegisteredAgent).where(
@@ -122,6 +129,7 @@ class PostgresSlackAgentStore(SlackAgentStore):
                 row.sandbox_channel_id = target.sandbox_channel_id
                 row.security_channel_id = target.security_channel_id
                 row.rule_pack_ref = target.rule_pack_ref
+                row.target_api_key_ref = target_api_key_ref
                 agent_id = row.agent_id
             else:
                 agent_id = _new_id("slackagent")
@@ -139,6 +147,7 @@ class PostgresSlackAgentStore(SlackAgentStore):
                         sandbox_channel_id=target.sandbox_channel_id,
                         security_channel_id=target.security_channel_id,
                         rule_pack_ref=target.rule_pack_ref,
+                        target_api_key_ref=target_api_key_ref,
                         created_at=datetime.now(timezone.utc),
                     )
                 )
@@ -157,6 +166,14 @@ class PostgresSlackAgentStore(SlackAgentStore):
             system_prompt = ref
             sensitive = False
 
+        # Resolve the target endpoint's bearer key from its SecretStore handle (mirror the prompt
+        # path). Older rows / keyless endpoints have no ref ⇒ api_key stays None.
+        key_ref = getattr(row, "target_api_key_ref", None)
+        if key_ref and self._secrets is not None:
+            api_key = self._secrets.resolve(key_ref, org_id=row.org_id) or None
+        else:
+            api_key = None
+
         return SlackAgentTarget(
             org_id=row.org_id,
             agent_name=row.agent_name,
@@ -170,6 +187,7 @@ class PostgresSlackAgentStore(SlackAgentStore):
             security_channel_id=row.security_channel_id or "",
             rule_pack_ref=row.rule_pack_ref,
             system_prompt_sensitive=sensitive,
+            api_key=api_key,
         )
 
     def get(self, org_id: str, agent_name: str) -> SlackAgentTarget | None:

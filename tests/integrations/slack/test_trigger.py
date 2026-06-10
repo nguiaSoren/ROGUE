@@ -115,7 +115,13 @@ class FakeScanService:
         return rec
 
 
-def _target(agent_name: str, *, org_id: str = "orgA", model: str = "gpt-5.4-nano") -> SlackAgentTarget:
+def _target(
+    agent_name: str,
+    *,
+    org_id: str = "orgA",
+    model: str = "gpt-5.4-nano",
+    api_key: str | None = None,
+) -> SlackAgentTarget:
     return SlackAgentTarget.create(
         org_id=org_id,
         agent_name=agent_name,
@@ -126,6 +132,7 @@ def _target(agent_name: str, *, org_id: str = "orgA", model: str = "gpt-5.4-nano
         declared_tools=["web_fetch"],
         sandbox_channel_id="C-SANDBOX-001",
         security_channel_id="C-SECURITY-001",
+        api_key=api_key,
     )
 
 
@@ -183,6 +190,36 @@ async def test_one_scan_per_agent_with_newly_landed_selection():
         assert call.spec.target.endpoint == tgt.base_url
         assert call.spec.target.model == tgt.model
         assert call.actor == "slack-sandbox-cycle"
+
+
+# ---------------------------------------------------------------------------
+# api_key threading: the target's endpoint key flows onto the enqueued ScanSpec.target,
+# so the worker/engine can authenticate the keyed endpoint (else 401). A keyless agent
+# threads None.
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_target_api_key_threaded_onto_scan_spec():
+    store = InMemorySlackAgentStore()
+    keyed = _target("keyed-bot", api_key="sk-endpoint-secret")
+    keyless = _target("keyless-bot")  # api_key=None
+    store.put(keyed)
+    store.put(keyless)
+    fake = FakeScanService()
+
+    await run_sandbox_cycle(
+        "orgA",
+        agent_store=store,
+        scan_service=fake,
+        since=_CUTOFF,
+        now=_NOW,
+        corpus=_mixed_corpus(),
+        decomposer=_MockDecomposer(),
+    )
+
+    by_endpoint = {c.spec.target.endpoint: c for c in fake.calls}
+    assert by_endpoint[keyed.base_url].spec.target.api_key == "sk-endpoint-secret"
+    assert by_endpoint[keyed.base_url].spec.target.api_key == keyed.api_key
+    assert by_endpoint[keyless.base_url].spec.target.api_key is None
 
 
 @pytest.mark.asyncio

@@ -109,6 +109,9 @@ async def run_sandbox_cycle(
                 endpoint=config.base_url,
                 model=config.target_model,
                 system_prompt=config.system_prompt,
+                # The target endpoint's bearer key (None for open/self-gatewayed endpoints). Flows
+                # to the engine's adapter_extra so a keyed endpoint authenticates (else 401).
+                api_key=target.api_key,
             ),
             mode="policy",
             policy=policy,
