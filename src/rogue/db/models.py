@@ -14,6 +14,7 @@ See ROGUE_PLAN.md §A.5 and §8.3 for the canonical spec.
 
 from __future__ import annotations
 
+import enum
 from datetime import datetime, timezone
 from typing import Optional, get_args
 
@@ -30,6 +31,7 @@ from sqlalchemy import (
     Index,
     Integer,
     LargeBinary,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -1040,6 +1042,204 @@ class Mitigation(Base):
     )
 
 
+# --------------------------------------------------------------------------- #
+# Surface 3 — skill pool (build-area 08, Section A; migration 0037; ADR-0009)
+#
+# Storage-only lifecycle enums (no Pydantic wire twin — like BanditState, the
+# skill pool is runtime memory-pool state, not a harvested wire object). Defined
+# here and stored as native PostgreSQL enums via the same VALUE-serializing
+# convention (``values_callable=_enum_values``) so storage can't drift from code.
+# --------------------------------------------------------------------------- #
+
+
+class SkillStatus(str, enum.Enum):
+    """Lifecycle of a shared skill — admitted to ``active`` only by the
+    verified-promotion gate (net-effect CI-lower-bound > 0); demoted to
+    ``quarantined`` on a net-negative re-check; ``retired`` is terminal."""
+
+    CANDIDATE = "candidate"
+    ACTIVE = "active"
+    QUARANTINED = "quarantined"
+    RETIRED = "retired"
+
+
+class SkillSourceKind(str, enum.Enum):
+    """Where a candidate skill came from (SoK ingest source)."""
+
+    CORRECTION = "correction"
+    TRAJECTORY = "trajectory"
+    DISTILLED = "distilled"
+
+
+class SkillEdgeType(str, enum.Enum):
+    """Combination-risk graph edge kind (ADR-0009 adjacency)."""
+
+    CO_INVOCATION = "co_invocation"
+    COMPOSITION = "composition"
+    SEMANTIC = "semantic"
+
+
+class SkillVerificationKind(str, enum.Enum):
+    """Which verification produced a ``skill_verifications`` audit row."""
+
+    PROMOTION = "promotion"
+    REVERIFICATION = "reverification"
+    LEAKAGE = "leakage"
+    COMBINATION = "combination"
+
+
+class SkillVerificationVerdict(str, enum.Enum):
+    """Pass/fail outcome of a verification."""
+
+    PASS = "pass"
+    FAIL = "fail"
+
+
+class Skill(Base):
+    """One shared skill in the assured pool (Surface 3, ADR-0009).
+
+    Org/cohort/trust-domain-scoped Markdown skill carrying a 1536-d pgvector
+    ``embedding`` (for dedup/retrieval — mirrors ``AttackPrimitive.payload_embedding``,
+    same ivfflat cosine ANN index). ``applicability_condition`` is the SoK ``C``
+    precondition (the cheap applicability pre-filter reads it). A skill reaches
+    ``status='active'`` ONLY via the verified-promotion gate; popularity is
+    explicitly NOT a field here (>90% of high-popularity skills failed audit —
+    popularity is never a safety signal).
+    """
+
+    __tablename__ = "skills"
+
+    skill_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    org_id: Mapped[str] = mapped_column(
+        String(40), ForeignKey("organizations.org_id"), nullable=False
+    )
+    cohort_id: Mapped[str] = mapped_column(String(64))
+    trust_domain: Mapped[str] = mapped_column(String(64))
+    skill_md: Mapped[str] = mapped_column(Text)
+
+    # 1536-d to match text-embedding-3-small, cosine ops — mirrors attack_primitives.
+    embedding: Mapped[Optional[list[float]]] = mapped_column(Vector(1536), nullable=True)
+
+    status: Mapped[SkillStatus] = mapped_column(
+        SAEnum(SkillStatus, name="skill_status", values_callable=_enum_values),
+        default=SkillStatus.CANDIDATE,
+        server_default="candidate",
+    )
+    applicability_condition: Mapped[dict] = mapped_column(JSON, default=dict)
+    source_kind: Mapped[SkillSourceKind] = mapped_column(
+        SAEnum(SkillSourceKind, name="skill_source_kind", values_callable=_enum_values),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    promoted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_verified_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_skills_embedding",
+            "embedding",
+            postgresql_using="ivfflat",
+            postgresql_with={"lists": 100},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        Index("ix_skills_org_cohort_status", "org_id", "cohort_id", "status"),
+    )
+
+
+class SkillEdge(Base):
+    """One edge of the combination-risk graph (ADR-0009: Postgres adjacency +
+    recursive CTE, NOT a graph DB).
+
+    Two benign skills can compose into malicious behavior; this table is the
+    adjacency the ``WITH RECURSIVE`` neighborhood / connected-component queries
+    traverse. ``risk_score`` + ``evidence_breach_id`` are written when a
+    co-invoked set is judged to *produce* harmful behavior (composition breach).
+    PK is the triple ``(skill_a, skill_b, edge_type)``; BOTH endpoints are
+    indexed so neighborhood traversal can start from either node.
+    """
+
+    __tablename__ = "skill_edges"
+
+    skill_a: Mapped[str] = mapped_column(
+        String(64), ForeignKey("skills.skill_id"), primary_key=True
+    )
+    skill_b: Mapped[str] = mapped_column(
+        String(64), ForeignKey("skills.skill_id"), primary_key=True
+    )
+    edge_type: Mapped[SkillEdgeType] = mapped_column(
+        SAEnum(SkillEdgeType, name="skill_edge_type", values_callable=_enum_values),
+        primary_key=True,
+    )
+    risk_score: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    evidence_breach_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        Index("ix_skill_edges_skill_a", "skill_a"),
+        Index("ix_skill_edges_skill_b", "skill_b"),
+    )
+
+
+class SkillVerification(Base):
+    """One verification outcome row — the SQL-queryable audit spine the
+    attestation reads (ADR-0009).
+
+    Records each verified-promotion / re-verification / leakage / combination
+    decision with its measured ``net_effect = repairs - regressions`` on the
+    held-out set + bootstrap ``ci_low``/``ci_high``, the ``leakage_rate`` (for
+    ``kind='leakage'``), and provenance to the calibrated judge
+    (``judge_calibration_ref``) + the scan run (``scan_run_id``). ``verdict``
+    is the pass/fail the gate emitted.
+    """
+
+    __tablename__ = "skill_verifications"
+
+    verification_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    skill_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("skills.skill_id"), index=True
+    )
+    cohort_id: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[SkillVerificationKind] = mapped_column(
+        SAEnum(
+            SkillVerificationKind,
+            name="skill_verification_kind",
+            values_callable=_enum_values,
+        ),
+    )
+    net_effect: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    repairs: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    regressions: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    ci_low: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    ci_high: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    leakage_rate: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    held_out_n: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    judge_calibration_ref: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True
+    )
+    scan_run_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    verdict: Mapped[SkillVerificationVerdict] = mapped_column(
+        SAEnum(
+            SkillVerificationVerdict,
+            name="skill_verification_verdict",
+            values_callable=_enum_values,
+        ),
+    )
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -1063,4 +1263,7 @@ __all__ = [
     "DemoRequest",
     "NewsletterSubscriber",
     "Mitigation",
+    "Skill",
+    "SkillEdge",
+    "SkillVerification",
 ]

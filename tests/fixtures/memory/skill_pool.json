@@ -1,0 +1,717 @@
+[
+  {
+    "skill_id": "skill-001",
+    "skill_md": "Create a basic Agent Skill as a folder with a SKILL.md file containing YAML frontmatter and instructions. Frontmatter requires only two fields: `name` (a unique identifier, lowercase, hyphens for spaces) and `description` (a complete description of what the skill does AND when to use it). Below the frontmatter put the instructions Claude follows when the skill is active, then `## Examples` and `## Guidelines` sections:\n\n```markdown\n---\nname: my-skill-name\ndescription: A clear description of what this skill does and when to use it\n---\n# My Skill Name\n[Instructions Claude will follow when this skill is active]\n## Examples\n- Example usage 1\n## Guidelines\n- Guideline 1\n```",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "markdown",
+      "when": "authoring a reusable Claude/agent skill so it loads dynamically for a specialized task"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/anthropics/skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-002",
+    "skill_md": "A good agent skill makes three things explicit: (1) when to use it, (2) what steps to take, (3) what good output looks like. Form skills around jobs-to-be-done — concrete, repeatable workflows like 'debug a GitHub Actions failure' or 'draft a release announcement', NOT abstract capabilities like 'know about CI' or 'write good prose'. A wrong framing is 'skills for tools': skills get invoked in the loop of trying to accomplish a JOB, not when trying to use a tool. If you design a skill around a tool, the agent has to remember to use it; if you design it around a job, the agent reaches for it when the job shows up.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "agent-design",
+      "when": "deciding whether and how to encode a repeated workflow as a reusable skill"
+    },
+    "source_refs": [
+      "https://ericmjl.github.io/blog/2026/1/18/how-to-build-self-improving-coding-agents-part-2/"
+    ]
+  },
+  {
+    "skill_id": "skill-003",
+    "skill_md": "Iterate a skill via a feedback loop: feed the agent a few examples of what 'good' output looks like and store those examples as assets inside the skill itself. When you edit the agent's generated output (e.g. a release announcement), feed the revised version back and tell the agent to update the skill with the new example — the skill then evolves as your taste evolves. Markdown is the interface; add deterministic scripts inside the skill only when you need determinism. A skill is reviewable: open a PR so collaborators can comment on both the output and the process that produced it.",
+    "source_kind": "trajectory",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "agent-design",
+      "when": "a skill's output isn't quite right yet and you want it to improve from corrections over time"
+    },
+    "source_refs": [
+      "https://ericmjl.github.io/blog/2026/1/18/how-to-build-self-improving-coding-agents-part-2/"
+    ]
+  },
+  {
+    "skill_id": "skill-004",
+    "skill_md": "When asked to 'install this skill' or 'update this skill from this URL', the agent must resolve two questions before acting: (1) is this repo-local or machine-global? and (2) which harnesses should discover it? `.agent/skills` is NOT a universal discovery standard — different tools look in `.claude/skills`, `.github/skills`, `.opencode`, or other locations, so you must know what your harness actually reads. Universal-mode installers place skills in `.agent/skills` (repo) and `~/.agent/skills` (machine); confirm the target harness reads that path.",
+    "source_kind": "correction",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "tooling",
+      "when": "installing or distributing an agent skill across machines/harnesses"
+    },
+    "source_refs": [
+      "https://ericmjl.github.io/blog/2026/1/18/how-to-build-self-improving-coding-agents-part-2/"
+    ]
+  },
+  {
+    "skill_id": "skill-005",
+    "skill_md": "Skills should be task-oriented, not general advice, and not loaded globally. (1) Don't make a skill that's just basic project instructions an agent can already infer (e.g. 'this is a WordPress project, here's the plugin file structure') — that's a maintenance burden. (2) A skill carries a short description so the agent knows IF it's useful and only loads it then, keeping irrelevant instructions out of context. (3) Because a skill loads only when relevant, make it shape very specific actions or architecture decisions ('build a new block this way by following these steps; use these specific tools from the Store API when modifying the cart').",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "agent-design",
+      "when": "deciding what belongs in a skill vs. project-level instructions"
+    },
+    "source_refs": [
+      "https://www.briancoords.com/agent-skills-are-the-markdown-files-ive-been-waiting-for/"
+    ]
+  },
+  {
+    "skill_id": "skill-006",
+    "skill_md": "Skill anatomy that enforces engineering discipline — every skill follows: Frontmatter (name, description with 'Use when…') → Overview (what it does) → When to Use (triggering conditions) → Process (step-by-step workflow) → Rationalizations (common excuses agents use to skip steps, e.g. 'I'll add tests later', each with a documented counter-argument) → Red Flags (signs something's wrong) → Verification (evidence requirements). Key choices: process not prose (steps, checkpoints, exit criteria); verification is non-negotiable ('seems right' is never sufficient — require tests passing, build output, runtime data); progressive disclosure (SKILL.md is the entry point, references load only when needed).",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "agent-design",
+      "when": "structuring a production-grade skill so an agent can't shortcut quality gates"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-007",
+    "skill_md": "Spec-driven development: write a PRD covering objectives, commands, structure, code style, testing, and boundaries BEFORE any code. Use when starting a new project, feature, or significant change. Principle: spec before code.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "planning",
+      "language_or_domain": "software-engineering",
+      "when": "starting a new project, feature, or significant change before writing code"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-008",
+    "skill_md": "Incremental implementation: ship thin vertical slices — implement, test, verify, commit — one slice at a time. Use feature flags, safe defaults, and rollback-friendly changes. Apply to any change touching more than one file. Principle: one slice at a time.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "coding",
+      "language_or_domain": "software-engineering",
+      "when": "any change touching more than one file"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-009",
+    "skill_md": "Debugging and error recovery — five-step triage: (1) reproduce, (2) localize, (3) reduce, (4) fix, (5) guard (add a regression test or check so it can't recur). Apply the stop-the-line rule (halt forward work until the failure is understood) and prefer safe fallbacks. Use when tests fail, builds break, or behavior is unexpected.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "debugging",
+      "language_or_domain": "software-engineering",
+      "when": "tests fail, builds break, or behavior is unexpected"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-010",
+    "skill_md": "Doubt-driven development: adversarial fresh-context review of every non-trivial in-flight decision, following CLAIM → EXTRACT → DOUBT → RECONCILE → STOP, with optional user-authorized cross-model escalation. Use when stakes are high (production, security, irreversible), when working in unfamiliar code, or when a confident output is cheaper to verify now than to debug later.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "code-review",
+      "language_or_domain": "software-engineering",
+      "when": "stakes are high (production/security/irreversible) or you're working in unfamiliar code"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-011",
+    "skill_md": "Source-driven development: ground every framework decision in official documentation — verify behavior against the docs, cite sources, and explicitly flag what's unverified. Use when you want authoritative, source-cited code for any framework or library rather than relying on recalled (possibly stale) API knowledge.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "coding",
+      "language_or_domain": "software-engineering",
+      "when": "using a framework/library API where recalled knowledge may be stale or wrong"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-012",
+    "skill_md": "Test-driven development workflow: Red-Green-Refactor with a test pyramid (≈80% small/unit, 15% medium/integration, 5% large/E2E). Prefer DAMP over DRY in tests (readability over deduplication). Apply the Beyonce Rule — 'if you liked it you should have put a test on it' (untested behavior may be broken by anyone). Use when implementing logic, fixing bugs, or changing behavior.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "testing",
+      "language_or_domain": "software-engineering",
+      "when": "implementing logic, fixing a bug, or changing behavior"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-013",
+    "skill_md": "Code simplification under behavior preservation: apply Chesterton's Fence (don't remove something until you understand why it's there) and the Rule of 500 (watch files/functions growing past ~500 lines). Reduce complexity while preserving EXACT behavior — clarity over cleverness. Use when code works but is harder to read or maintain than it should be.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "code-review",
+      "language_or_domain": "software-engineering",
+      "when": "code works but is harder to read/maintain than it should be"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-014",
+    "skill_md": "API and interface design: contract-first design; respect Hyrum's Law (with enough users, every observable behavior of your interface will be depended on, regardless of your contract); follow the One-Version Rule; define clear error semantics and validate at boundaries. Use when designing APIs, module boundaries, or public interfaces.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "api-integration",
+      "language_or_domain": "software-engineering",
+      "when": "designing an API, module boundary, or public interface"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-015",
+    "skill_md": "Git workflow and versioning: trunk-based development with atomic commits; keep change size around ~100 lines; treat each commit as a save-point (commit-as-save-point pattern) so any change is rollback-friendly. Apply to any code change, always.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "git",
+      "when": "making any code change and managing version-control hygiene"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-016",
+    "skill_md": "Interview-me elicitation: when an ask is underspecified, run a one-question-at-a-time interview that extracts what the user actually wants (rather than what they think they should want), continuing until ~95% confidence before proceeding. Use when the request is vague or the user invokes 'interview me' / 'grill me'.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "planning",
+      "language_or_domain": "requirements",
+      "when": "the request is underspecified and you need to clarify intent before acting"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-017",
+    "skill_md": "Build a CrewAI custom tool by subclassing BaseTool: define `name`, `description`, an `args_schema` (a pydantic BaseModel) for input validation, and implement `_run`:\n\n```python\nfrom typing import Type\nfrom crewai.tools import BaseTool\nfrom pydantic import BaseModel, Field\n\nclass MyToolInput(BaseModel):\n    \"\"\"Input schema for MyCustomTool.\"\"\"\n    argument: str = Field(..., description=\"Description of the argument.\")\n\nclass MyCustomTool(BaseTool):\n    name: str = \"Name of my tool\"\n    description: str = \"What this tool does. It's vital for effective utilization.\"\n    args_schema: Type[BaseModel] = MyToolInput\n    def _run(self, argument: str) -> str:\n        # tool logic here\n        return \"Tool's result\"\n```",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "api-integration",
+      "language_or_domain": "python",
+      "when": "giving a CrewAI agent a new capability that needs validated structured input"
+    },
+    "source_refs": [
+      "https://docs.crewai.com/en/learn/create-custom-tools"
+    ]
+  },
+  {
+    "skill_id": "skill-018",
+    "skill_md": "Define a quick CrewAI tool with the `@tool` decorator instead of subclassing — the function's docstring becomes the tool description:\n\n```python\nfrom crewai.tools import tool\n\n@tool(\"Tool Name\")\ndef my_simple_tool(question: str) -> str:\n    \"\"\"Tool description for clarity.\"\"\"\n    # Tool logic here\n    return \"Tool output\"\n```",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "api-integration",
+      "language_or_domain": "python",
+      "when": "you need a small single-function agent tool without a full class"
+    },
+    "source_refs": [
+      "https://docs.crewai.com/en/learn/create-custom-tools"
+    ]
+  },
+  {
+    "skill_id": "skill-019",
+    "skill_md": "Make a CrewAI tool non-blocking for I/O-bound work (HTTP requests, DB queries) by defining it async — either an `async def` under `@tool`, or by subclassing BaseTool and implementing both `_run` (sync) and `_arun` (async):\n\n```python\nimport aiohttp\nfrom crewai.tools import tool\n\n@tool(\"Async Web Fetcher\")\nasync def fetch_webpage(url: str) -> str:\n    \"\"\"Fetch content from a webpage asynchronously.\"\"\"\n    async with aiohttp.ClientSession() as session:\n        async with session.get(url) as response:\n            return await response.text()\n```",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "api-integration",
+      "language_or_domain": "python",
+      "when": "an agent tool performs network or other I/O-bound work and you want non-blocking execution"
+    },
+    "source_refs": [
+      "https://docs.crewai.com/en/learn/create-custom-tools"
+    ]
+  },
+  {
+    "skill_id": "skill-020",
+    "skill_md": "Add caching to a CrewAI tool via the `cache_function` attribute — a function `(arguments: dict, result: str) -> bool` that decides whether a given result is cacheable:\n\n```python\n@tool(\"Tool with Caching\")\ndef cached_tool(argument: str) -> str:\n    \"\"\"Tool functionality description.\"\"\"\n    return \"Cacheable result\"\n\ndef my_cache_strategy(arguments: dict, result: str) -> bool:\n    return True if some_condition else False\n\ncached_tool.cache_function = my_cache_strategy\n```",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "api-integration",
+      "language_or_domain": "python",
+      "when": "an agent re-calls an expensive tool with repeating arguments and you want to cache results"
+    },
+    "source_refs": [
+      "https://docs.crewai.com/en/learn/create-custom-tools"
+    ]
+  },
+  {
+    "skill_id": "skill-021",
+    "skill_md": "Six-step procedure to build an LLM agent. Step 1 — Define the job with 5-10 concrete examples: pick something a smart intern could do; the examples both validate scope and become your benchmark. Step 2 — Write a detailed step-by-step Standard Operating Procedure (SOP) of how a human would do the task, which surfaces the decisions and tools the agent needs. Step 3 — Build an MVP focused on the single most critical LLM reasoning task with hand-fed inputs (most agents fail because the LLM can't reason well enough). Step 4 — Connect & orchestrate real data sources. Step 5 — Test & iterate (manual first, then automated with success metrics + tracing). Step 6 — Deploy, scale, refine; treat launch as the beginning of iteration.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "llm",
+      "when": "scoping and building a new LLM agent from scratch"
+    },
+    "source_refs": [
+      "https://www.langchain.com/blog/how-to-build-an-agent"
+    ]
+  },
+  {
+    "skill_id": "skill-022",
+    "skill_md": "Red flags that you should NOT build an agent for a task: (1) you can't come up with concrete examples — your scope is probably too broad; (2) traditional software would work better — if the logic is simple, fixed, and already implemented elsewhere, just use that (agents are slow, expensive, and finicky); (3) you're expecting magic that doesn't exist, e.g. connecting to APIs or datasets that don't exist or can't be built yet.",
+    "source_kind": "correction",
+    "applicability_condition": {
+      "task_type": "planning",
+      "language_or_domain": "llm",
+      "when": "evaluating whether an LLM agent is the right solution for a task"
+    },
+    "source_refs": [
+      "https://www.langchain.com/blog/how-to-build-an-agent"
+    ]
+  },
+  {
+    "skill_id": "skill-023",
+    "skill_md": "Define agent success criteria across distinct axes before testing, e.g. for an email agent: Tone & Safety (professional, respectful, no hallucinated/inappropriate content), Intent & Priority Detection (correctly categorized by sender + content), Tool Usage Efficiency (trigger ONLY necessary tools — e.g. don't check the calendar if no scheduling is required), and Output Quality (clear, relevant, accurate given the input context). Run all examples programmatically, define automated success metrics, and use human review selectively to catch what metrics miss.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "testing",
+      "language_or_domain": "llm",
+      "when": "evaluating an agent's behavior and quantifying performance before adding complexity"
+    },
+    "source_refs": [
+      "https://www.langchain.com/blog/how-to-build-an-agent"
+    ]
+  },
+  {
+    "skill_id": "skill-024",
+    "skill_md": "Agent memory write-manage-read loop: treat memory as a loop, not just store-and-retrieve. WRITE (decide what to persist), MANAGE (maintain, prune, compress, consolidate), READ (retrieve relevant memory and inject into context). The management step is the one most often ignored — be explicit about rules for what to store, what to summarize, when to escalate to long-term memory, and when to let things age out.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "llm",
+      "when": "designing how a long-running agent persists and reuses state across sessions"
+    },
+    "source_refs": [
+      "https://towardsdatascience.com/a-practical-guide-to-memory-for-autonomous-llm-agents/"
+    ]
+  },
+  {
+    "skill_id": "skill-025",
+    "skill_md": "Use episodic memory as a searchable timeline: have each agent write a brief end-of-task summary of what it did, what it found, and what it escalated (a 'daily standup log'). These accumulate so agents can look back at yesterday's work, spot patterns, and avoid repeating failures. Tools like Claude Code won't do this unless you set up instructions that force the behavior.",
+    "source_kind": "trajectory",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "llm",
+      "when": "you want a multi-session agent to learn from and not repeat its past work"
+    },
+    "source_refs": [
+      "https://towardsdatascience.com/a-practical-guide-to-memory-for-autonomous-llm-agents/"
+    ]
+  },
+  {
+    "skill_id": "skill-026",
+    "skill_md": "Failure mode — summarization drift: repeatedly compressing history to fit a context window throws away details each pass, so eventually your 'memory' no longer matches what actually happened. Seen in Claude Code / Kiro CLI when coding sessions cover too many features without starting new threads. Mitigation: keep raw memories LINKED to their summarized/consolidated versions so detail can be recovered, and start fresh threads rather than endlessly compacting one.",
+    "source_kind": "correction",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "llm",
+      "when": "an agent's context is being repeatedly summarized/compacted over a long session"
+    },
+    "source_refs": [
+      "https://towardsdatascience.com/a-practical-guide-to-memory-for-autonomous-llm-agents/"
+    ]
+  },
+  {
+    "skill_id": "skill-027",
+    "skill_md": "Curate semantic memory or it becomes a junk drawer: the distilled facts an agent keeps long-term (semantic memory) need an explicit curation step deciding what's worth retaining; without it the store fills with low-value entries and retrieval quality collapses. Retrieval-augmented memory (RAG over interaction history) is powerful for deep history but retrieval quality becomes the bottleneck fast — if embeddings don't capture semantic intent you'll miss relevant memories and surface stale ones (e.g. 'what happened last Monday' often retrieves poorly).",
+    "source_kind": "correction",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "llm",
+      "when": "building a retrieval-backed long-term memory store for an agent"
+    },
+    "source_refs": [
+      "https://towardsdatascience.com/a-practical-guide-to-memory-for-autonomous-llm-agents/"
+    ]
+  },
+  {
+    "skill_id": "skill-028",
+    "skill_md": "Standard of code review (the senior principle): favor approving a change once it is in a state where it definitely improves the overall code health of the system, even if it isn't perfect. There is no 'perfect' code — only better code; seek continuous improvement, not perfection, and don't delay a net-positive change for days because it isn't flawless. Never check in a change that definitely worsens code health (except in a declared emergency). Mark non-essential polish with a 'Nit:' prefix so the author knows it's optional.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "code-review",
+      "language_or_domain": "software-engineering",
+      "when": "reviewing a pull/change request and deciding whether to approve"
+    },
+    "source_refs": [
+      "https://google.github.io/eng-practices/review/reviewer/standard.html"
+    ]
+  },
+  {
+    "skill_id": "skill-029",
+    "skill_md": "Code-review conflict principles: technical facts and data overrule opinions and personal preferences. On pure style, the style guide is the absolute authority; anything not in it should stay consistent with the existing code, and if there's no precedent, accept the author's choice. Software design is almost never pure style — weigh it on engineering principles, not personal opinion; if the author shows several approaches are equally valid, accept their preference. To resolve a stuck conflict, seek consensus, then escalate (tech lead / maintainer / manager) — but never let a change sit because reviewer and author can't agree.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "code-review",
+      "language_or_domain": "software-engineering",
+      "when": "a reviewer and author disagree on a change and need to resolve it"
+    },
+    "source_refs": [
+      "https://google.github.io/eng-practices/review/reviewer/standard.html"
+    ]
+  },
+  {
+    "skill_id": "skill-030",
+    "skill_md": "Secure code review — input validation checklist: validate inputs from all external sources; test user input for type, length, format, and range and enforce limits; prefer exact-match and allow-list approaches over deny/block lists; validate XML documents against their schemas; never build SQL statements dynamically from user input and never string-concatenate user input into commands; always validate on the SERVER side; keep a strong separation between data and commands and between data and client-side scripts; use contextual escaping when passing data to SQL, LDAP, OS, and third-party commands.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "reviewing code that accepts user or external input for injection/XSS risk"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-031",
+    "skill_md": "Secure code review — authentication & user management: ensure failure messages for invalid username OR password don't leak which was wrong; never log invalid passwords (they leak user/password combos); enforce appropriate password length/complexity; handle invalid login attempts with lockouts and rate limits; ensure 'forgot password' doesn't leak information or allow spamming; never send passwords in plain text via email; store passwords/usernames using hashing, salts, and encryption.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "reviewing authentication, login, or password-handling code"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-032",
+    "skill_md": "Secure code review — authorization: make authentication and authorization the FIRST logic executed for each request; deny access to pages and data by default; keep authorization checks granular (page and directory level); define clear roles; re-authenticate for requests that have side effects; and ensure authorization cannot be circumvented by parameter or cookie manipulation.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "reviewing access-control logic for an authenticated application"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-033",
+    "skill_md": "Secure code review — exception handling & logging: every method should have appropriate exceptions; error messages shown to users must NOT reveal sensitive information (stack traces, ids); the app should fail securely and release resources / roll back transactions on error; log all user and system actions and unusual activity (e.g. multiple login attempts) with enough detail to reconstruct events for audit — but make sure sensitive data (e.g. passwords) is NOT logged, and that important user-management events (e.g. password reset) ARE logged.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "reviewing error-handling and logging code for information leakage"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-034",
+    "skill_md": "Reduce attack surface during a change: ask whether the function is exposed to unauthenticated users (does it invoke a backend task — file write, SMS, CPU-intensive calc — an attacker could script to deny service?); store important data separately from trivial data (don't put public store-locations in the same DB partition as the username/password table); authenticate, rate-limit, size-cap, and content-type-restrict file uploads (check MIME/suffix, run virus scanning); store data server-side that shouldn't live on the client; and don't store PII/confidential data that's never actually used.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "assessing whether a code change widens the application's attack surface"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-035",
+    "skill_md": "OWASP secure-coding — input validation practices: conduct all input validation on a trusted (server-side) system; identify and classify all data sources as trusted vs untrusted and validate everything from untrusted sources; use a single centralized input-validation routine; specify a character set (e.g. UTF-8) for all inputs and encode to a common charset before validating (and validate AFTER UTF-8 decoding); reject on any validation failure; validate using an allow-list (not a deny-list) for expected types, and validate data range and length; use canonicalization to defeat obfuscation/encoding attacks; validate data from redirects.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "implementing input validation for untrusted data"
+    },
+    "source_refs": [
+      "https://owasp.org/www-project-secure-coding-practices-quick-reference-guide/stable-en/02-checklist/05-checklist"
+    ]
+  },
+  {
+    "skill_id": "skill-036",
+    "skill_md": "OWASP secure-coding — output encoding practices: do all output encoding on a trusted (server-side) system; use a standard, tested routine for each type of outbound encoding; specify the output character set (e.g. UTF-8); CONTEXTUALLY output-encode all data returned to the client from untrusted sources and ensure encoding is safe for every target system; contextually sanitize all untrusted-data output destined for SQL, XML, and LDAP queries, and sanitize untrusted-data output sent to operating-system commands.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "rendering or passing untrusted data into HTML, SQL, OS commands, or other sinks"
+    },
+    "source_refs": [
+      "https://owasp.org/www-project-secure-coding-practices-quick-reference-guide/stable-en/02-checklist/05-checklist"
+    ]
+  },
+  {
+    "skill_id": "skill-037",
+    "skill_md": "SQL optimization — index wisely: indexes let the database find rows without scanning the whole table. Create indexes on columns used often in WHERE, JOIN, or ORDER BY clauses (e.g. `CREATE INDEX idx_orders_customer_id ON orders(customer_id);`). But avoid too many indexes — they slow down INSERT/UPDATE/DELETE — and monitor index usage regularly to keep queries fast.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "data-cleaning",
+      "language_or_domain": "sql",
+      "when": "a frequently-filtered/joined column makes a query slow"
+    },
+    "source_refs": [
+      "https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"
+    ]
+  },
+  {
+    "skill_id": "skill-038",
+    "skill_md": "SQL optimization — write index-friendly WHERE clauses and avoid SELECT *. Don't apply functions or calculations to a column in WHERE (e.g. `WHERE YEAR(joining_date) = 2022` blocks index use); rewrite as a range: `WHERE joining_date >= '2022-01-01' AND joining_date < '2023-01-01'`. Select only the columns you need instead of `SELECT *` (less memory, faster, lets the optimizer skip columns). Filter rows with WHERE + LIMIT so you don't return thousands of rows when you need ten.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "data-cleaning",
+      "language_or_domain": "sql",
+      "when": "writing or tuning a SELECT query for performance"
+    },
+    "source_refs": [
+      "https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"
+    ]
+  },
+  {
+    "skill_id": "skill-039",
+    "skill_md": "SQL optimization — avoid the N+1 query problem: don't run one query to get a list and then a separate query per item. Fetch related data in a single JOIN instead. Poor: `SELECT * FROM users;` then `SELECT * FROM orders WHERE user_id = ?` per user. Better: `SELECT u.user_id, u.name, o.order_id, o.amount FROM users u JOIN orders o ON u.user_id = o.user_id;` — fewer DB calls, faster response, less load.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "data-cleaning",
+      "language_or_domain": "sql",
+      "when": "code loops over a result set issuing one query per row"
+    },
+    "source_refs": [
+      "https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"
+    ]
+  },
+  {
+    "skill_id": "skill-040",
+    "skill_md": "SQL optimization — EXISTS over IN, no leading-wildcard LIKE, and read the plan. For 'does a related record exist' checks, `WHERE EXISTS (SELECT 1 FROM orders WHERE orders.customer_id = customers.customer_id)` is often faster than `WHERE customer_id IN (SELECT ...)` because EXISTS stops at the first match. Never start a LIKE pattern with `%` (`LIKE '%john'` disables index use and forces a full scan; use `LIKE 'john%'`). Use EXPLAIN (MySQL/PostgreSQL) to see the execution plan and find the slow parts.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "data-cleaning",
+      "language_or_domain": "sql",
+      "when": "a subquery, LIKE search, or unexplained slow query needs tuning"
+    },
+    "source_refs": [
+      "https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"
+    ]
+  },
+  {
+    "skill_id": "skill-041",
+    "skill_md": "Git — undo changes safely by scope. Working directory: discard one file `git checkout -- [file]`; preview untracked cleanup `git clean -n`, then remove `git clean -f` (dirs: `git clean -fd`). Staged: unstage one `git reset [file]`, all `git reset`. Commits: prefer `git revert [commit]` to create an undo commit on shared history; `git reset --soft [commit]` keeps changes staged; `git reset --hard [commit]` discards them (destructive). Recover a lost commit via the reflog: `git reflog` then `git checkout [lost-commit-hash]`.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "git",
+      "when": "you need to undo, discard, or recover changes in a git repo"
+    },
+    "source_refs": [
+      "https://dev.to/zainaboyedeji/the-complete-git-commands-cheat-sheet-everything-you-need-to-know-4n9b"
+    ]
+  },
+  {
+    "skill_id": "skill-042",
+    "skill_md": "Git — stash and rebase recipes. Stash: `git stash` saves dirty work, `git stash list` lists, `git stash pop` applies+removes the top, `git stash apply` applies without removing, `git stash drop`/`clear` discard. Rebase: `git rebase [branch]` replays your commits onto another branch; `git rebase -i HEAD~[n]` for interactive rebase; if it goes wrong `git rebase --abort`, or after resolving conflicts `git rebase --continue`.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "git",
+      "when": "you need to set aside uncommitted work or reshape commit history"
+    },
+    "source_refs": [
+      "https://dev.to/zainaboyedeji/the-complete-git-commands-cheat-sheet-everything-you-need-to-know-4n9b"
+    ]
+  },
+  {
+    "skill_id": "skill-043",
+    "skill_md": "Git — repository maintenance and data recovery: check integrity with `git fsck`; clean up and compress objects with `git gc`; remove unreachable objects with `git prune`; verify packed objects with `git verify-pack -v .git/objects/pack/pack-*.idx`. To force-expire the reflog (e.g. before pruning to actually reclaim space): `git reflog expire --expire=now --all`. Note this makes lost-commit recovery via reflog impossible afterward.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "git",
+      "when": "a repo is bloated/corrupt or you need to garbage-collect or audit object integrity"
+    },
+    "source_refs": [
+      "https://dev.to/zainaboyedeji/the-complete-git-commands-cheat-sheet-everything-you-need-to-know-4n9b"
+    ]
+  },
+  {
+    "skill_id": "skill-044",
+    "skill_md": "Web-scraping request wrapper: don't call requests.get directly — write one `make_request` helper that (1) handles intermittent network exceptions, (2) sets a timeout so requests never hang forever, (3) picks a proxy from a rotating list, (4) detects when the target has blocked that proxy, and (5) returns the response content. Rotate evenly through a big list of IP:port proxies, cycling back to the top, so no single proxy makes a suspicious number of requests.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "web-scraping",
+      "language_or_domain": "python",
+      "when": "building the HTTP layer of a scraper that must survive blocks and transient failures"
+    },
+    "source_refs": [
+      "https://blog.hartleybrody.com/web-scraping-boilerplate/"
+    ]
+  },
+  {
+    "skill_id": "skill-045",
+    "skill_md": "Scrape via a work queue, not request-in-a-loop. Any time a scrape exceeds ~1000 URLs, push the work (URLs) onto a queue: it spreads the backlog across multiple parallel workers and persists what's left so you can pause/restart without losing your place. Using a Redis SET as the queue auto-dedupes (the same URL added twice appears once) so you never scrape a URL twice — at the cost of no FIFO/FILO ordering. Structure each unit of work as a single function taking one input, looking it up, and storing the result — that pattern splits trivially into workers. As a general rule, avoid writing loops that make a request in every iteration.",
+    "source_kind": "trajectory",
+    "applicability_condition": {
+      "task_type": "web-scraping",
+      "language_or_domain": "python",
+      "when": "a scrape spans more than ~1000 URLs and you want parallelism + resumability"
+    },
+    "source_refs": [
+      "https://blog.hartleybrody.com/web-scraping-boilerplate/"
+    ]
+  },
+  {
+    "skill_id": "skill-046",
+    "skill_md": "Scraper data storage with a BaseMixin + migrations: capture data as you go into a relational DB rather than dumping whole pages to parse later. Give every model a `BaseMixin` providing an `id`, plus `first_seen_at` and `last_seen_at` timestamps so you always know when a record was collected; subclass both the SQLAlchemy `declarative_base()` and the mixin and set `__tablename__`. As models evolve, use Alembic migrations (diff models.py against the DB to generate the change) instead of dropping and recreating the database.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "web-scraping",
+      "language_or_domain": "python",
+      "when": "persisting scraped records to a relational database that will evolve over time"
+    },
+    "source_refs": [
+      "https://blog.hartleybrody.com/web-scraping-boilerplate/"
+    ]
+  },
+  {
+    "skill_id": "skill-047",
+    "skill_md": "Pandas data cleaning — normalize text columns and convert types safely. Strip surrounding whitespace and fix casing in one pass: `df['Name'] = df['Name'].str.strip().str.title()` turns `' Alice '` into `'Alice'` and `'BOB'` into `'Bob'`. Because ~80% of data work is cleaning and real datasets (CSV exports, scraped pages, Excel imports) are always messy, do type conversion safely (e.g. coerce non-numeric junk like 'thirty' or 'N/A' to NaN rather than letting it raise) before any analysis.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "data-cleaning",
+      "language_or_domain": "python",
+      "when": "loading a messy real-world dataset into pandas with inconsistent casing/whitespace/types"
+    },
+    "source_refs": [
+      "https://medium.com/@hadiyolworld007/pandas-data-cleaning-cookbook-8-essential-techniques-for-real-world-messy-data-fa7c4bd88aa8"
+    ]
+  },
+  {
+    "skill_id": "skill-048",
+    "skill_md": "Incident runbook structure: a good runbook is actionable — clear, ordered steps that reduce MTTR and human error. Organize it as: (1) Summary of the situation (what the alert means), (2) Triage & severity assessment — help the responder discern what's happening, measure impact on external customers (in case comms are needed) and internal teams (in case escalation is needed); use a decision tree if there are more than a few triage steps, and note how steps differ per alert tag/severity, (3) Investigation steps in order, (4) Mitigation steps in order — first stop the situation getting worse, then recover. Mark up screenshots with numbered arrows for complicated steps.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "sre",
+      "when": "writing an incident-response runbook for an on-call responder"
+    },
+    "source_refs": [
+      "https://emmer.dev/blog/an-effective-incident-runbook-template/"
+    ]
+  },
+  {
+    "skill_id": "skill-049",
+    "skill_md": "Security-and-hardening skill: prevent the OWASP Top 10; apply solid auth patterns; manage secrets out of source and config; audit dependencies for known vulnerabilities; and enforce a three-tier boundary system (validate at every trust boundary). Invoke whenever handling user input, authentication, data storage, or external integrations.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "security",
+      "language_or_domain": "software-engineering",
+      "when": "handling user input, auth, data storage, or external integrations"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-050",
+    "skill_md": "Performance-optimization skill: measure FIRST — don't optimize on a hunch. Set Core Web Vitals targets, run profiling workflows, do bundle analysis, and detect anti-patterns. Invoke when performance requirements exist or you suspect a regression. (Pairs with a measurement-driven loop: profile, find the real bottleneck, change one thing, re-measure.)",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "performance",
+      "language_or_domain": "frontend",
+      "when": "performance requirements exist or you suspect a regression"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-051",
+    "skill_md": "CI/CD-and-automation skill: Shift Left (move tests/checks as early as possible), 'Faster is Safer' (small frequent deploys lower risk), use feature flags to decouple deploy from release, build quality-gate pipelines, and close failure feedback loops so breaks surface immediately. Invoke when setting up or modifying build and deploy pipelines.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "ci-cd",
+      "when": "setting up or modifying build and deploy pipelines"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-052",
+    "skill_md": "Deprecation-and-migration skill: adopt a code-as-liability mindset (every line is a maintenance cost). Distinguish compulsory deprecation (callers MUST migrate by a deadline) from advisory deprecation (callers SHOULD migrate); provide migration patterns; and actively remove zombie/dead code rather than leaving it. Invoke when removing old systems, migrating users, or sunsetting features.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "software-engineering",
+      "when": "removing an old system, migrating users, or sunsetting a feature"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-053",
+    "skill_md": "Shipping-and-launch skill: before deploying to production, run a pre-launch checklist; manage the feature-flag lifecycle; do staged rollouts (ramp traffic gradually); have rollback procedures ready; and set up monitoring before, not after, launch. Invoke when preparing to deploy to production.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "ops",
+      "language_or_domain": "software-engineering",
+      "when": "preparing to deploy a change to production"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-054",
+    "skill_md": "Documentation-and-ADR skill: capture architectural decisions as Architecture Decision Records (ADRs) that document the WHY, not just the what; keep API docs and inline documentation to a standard. Invoke when making an architectural decision, changing an API, or shipping a feature — so future readers (human or agent) understand the reasoning behind a choice.",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "writing",
+      "language_or_domain": "software-engineering",
+      "when": "making an architectural decision, changing an API, or shipping a feature"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  },
+  {
+    "skill_id": "skill-055",
+    "skill_md": "Context-engineering skill: feed agents the right information at the right time — use rules files, deliberate context packing (include only what the current task needs), and MCP integrations to pull live data. Invoke at the start of a session, when switching tasks, or when output quality drops (a signal the agent's context is stale, bloated, or missing the relevant facts).",
+    "source_kind": "distilled",
+    "applicability_condition": {
+      "task_type": "agent-orchestration",
+      "language_or_domain": "llm",
+      "when": "starting a session, switching tasks, or output quality is dropping"
+    },
+    "source_refs": [
+      "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"
+    ]
+  }
+]
