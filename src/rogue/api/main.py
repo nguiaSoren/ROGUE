@@ -181,6 +181,7 @@ async def _lifespan(_app: "FastAPI"):
             _PLATFORM["store"], _PLATFORM["queue"], _PLATFORM["engine"], worker_id="inprocess-1",
             secret_store=_PLATFORM.get("secret_store"),
             attestation_service=_PLATFORM.get("attestation_service"),
+            slack_delivery=_PLATFORM.get("slack_delivery"),
         )
         worker_task = asyncio.create_task(_worker.run_forever(poll_interval=2.0, stop_event=stop_event))
         logger.info("in-process scan worker started")
@@ -252,11 +253,13 @@ try:  # pragma: no cover - exercised at process start
     from rogue.api.v1 import attestation as _v1_attestation
     from rogue.api.v1 import deps as _v1_deps
     from rogue.api.v1 import scans as _v1_scans
+    from rogue.api.v1 import slack_events as _v1_slack_events
     from rogue.api.v1 import validate_benchmark as _v1_vb
 
     app.include_router(_v1_scans.router)
     app.include_router(_v1_vb.router)
     app.include_router(_v1_attestation.router)
+    app.include_router(_v1_slack_events.router)
 
     def _wire_platform() -> None:
         from rogue.platform.benchmark_service import DefaultBenchmarkService
@@ -344,6 +347,29 @@ try:  # pragma: no cover - exercised at process start
             secret_store=secret_store,
             integration_store=integration_store,
         )
+
+        # Surface-1 auto-fire: build the Slack delivery for the in-process worker when a bot token is
+        # configured (mirrors rogue.platform.worker.main). Gated — unset/empty token ⇒ None ⇒ the
+        # worker auto-posts nothing (behaves exactly as before). The in-process worker IS the current
+        # single-service production path (ROGUE_INPROCESS_WORKER=1), so the delivery must be wired here
+        # too, not only in the dedicated worker process.
+        from rogue.config import get_settings
+
+        slack_delivery = None
+        _slack_token = get_settings().slack_bot_token
+        if _slack_token and _slack_token.get_secret_value():
+            from rogue.integrations.slack import (
+                SlackSurface1Delivery,
+                make_slack_channel_sender,
+            )
+            from rogue.platform.snapshot_store import build_postgres_snapshot_store
+
+            slack_delivery = SlackSurface1Delivery(
+                agent_store=build_postgres_slack_agent_store(secret_store),
+                sender=make_slack_channel_sender(_slack_token.get_secret_value()),
+                snapshot_store=build_postgres_snapshot_store(),
+            )
+        _PLATFORM["slack_delivery"] = slack_delivery
 
     _wire_platform()
     logger.info("platform /v1 API wired (incl. MCP action tools)")

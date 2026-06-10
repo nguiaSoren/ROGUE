@@ -26,9 +26,12 @@ from .change_witness import (
     latest_agent_scan_entry,
     latest_change_witness,
 )
+from .delivery import SlackSurface1Delivery, make_slack_channel_sender
 from .diff_post import build_security_post, post_breach_diff
 from .harvest_hook import newly_landed_primitives
+from .inbound import handle_inbound_message
 from .policy import ensure_client_policy
+from .signing import verify_slack_signature
 from .registration import (
     RegisteredSlackAgent,
     SlackAgentTarget,
@@ -55,6 +58,8 @@ __all__ = [
     "ensure_client_policy",
     "build_security_post",
     "post_breach_diff",
+    "make_slack_channel_sender",
+    "SlackSurface1Delivery",
     "ChangeWitnessSummary",
     "latest_agent_scan_entry",
     "latest_change_witness",
@@ -64,4 +69,6 @@ __all__ = [
     "classify_inbound_family",
     "RedlineScore",
     "score_inbound",
+    "verify_slack_signature",
+    "handle_inbound_message",
 ]

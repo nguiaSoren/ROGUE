@@ -37,10 +37,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
+from rogue.diff.bootstrap import bootstrap_ci
 from rogue.governance.reaim import FAMILY_BREACH_TYPE
 from rogue.governance.rule_judge import calibration_for_breach_type
+from rogue.remediation import legit_corpus
 from rogue.schemas.attack_primitive import AttackFamily
-from rogue.schemas.remediation import MitigationCandidate, MitigationType
+from rogue.schemas.remediation import MitigationCandidate, MitigationType, OverBlockCheck
 
 from . import change_witness
 from .tripwire import classify_inbound_family
@@ -50,6 +52,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "RedlineScore",
+    "measure_over_block",
     "score_inbound",
 ]
 
@@ -78,8 +81,12 @@ class RedlineScore:
             ``None`` — NEVER fabricated (ADR-0011).
         calibration_status: ``"calibrated"`` / ``"uncalibrated"`` from the area-02 accessor,
             or ``"n/a"`` when nothing classified.
-        over_block: ``None`` in v1 — the measured over-block rate needs area-05's
-            legit-corpus run (same judge, never a new model); see :func:`score_inbound`.
+        over_block: the MEASURED over-block — the gate rule's false-positive rate on an
+            independent legitimate-traffic set (area-05 ``legit_corpus``): how often the
+            classifier would wrongly flag a should-answer message as this family. An
+            :class:`OverBlockCheck` when a family matched and the legit corpus is non-empty,
+            else ``None`` (no family → nothing to gate; empty corpus → no honest measurement).
+            See :func:`measure_over_block`.
         recommendation: the honest, render-ready recommendation line.
         rule: the deployable ``GUARDRAIL_RULE`` :class:`MitigationCandidate`, or ``None``.
     """
@@ -89,7 +96,7 @@ class RedlineScore:
     risk: str
     confidence: float | None
     calibration_status: str
-    over_block: dict | None
+    over_block: OverBlockCheck | None
     recommendation: str
     rule: MitigationCandidate | None
 
@@ -126,6 +133,70 @@ def _agent_family_breach_rate(
     return (n_breaches / n_trials) if n_trials > 0 else None
 
 
+def measure_over_block(
+    family: AttackFamily,
+    *,
+    classifier: Callable[[str], AttackFamily | None] | None = None,
+    legit_sets: list[str] | None = None,
+    legitimate_set_ref: str | None = None,
+) -> OverBlockCheck | None:
+    """MEASURE this gate rule's over-block — its false-positive rate on legitimate traffic.
+
+    A RedlineGuard rule says "flag inbound classified as ``family``." Its over-block is how
+    often that rule would WRONGLY flag *legitimate* traffic the agent SHOULD answer = the
+    classifier's false-positive rate on an INDEPENDENT legitimate-traffic set (area-05
+    ``legit_corpus``, ADR-0011 — authored should-answer messages, never derived from any
+    agent's behavior). Purely OFFLINE: re-run the same classifier over the legit set and
+    count how many it (wrongly) classifies as ``family``.
+
+    NOTE (honesty): this is the filter RULE's classifier false-flag rate on legit traffic —
+    distinct from area-05's agent-patch *judge* over-block (a judge FP on a patched config).
+    Hence ``judge_rubric_handle=None``: no judge ran here, just the inbound classifier.
+
+    Args:
+        family: the attack family the gate rule flags.
+        classifier: the family classifier to measure (defaults to the shared §6
+            :func:`classify_inbound_family`); pass the SAME ``matcher`` the rule was scored
+            with so the over-block reflects the rule being emitted.
+        legit_sets: an explicit legitimate-traffic message list (test injection). When
+            ``None``, the union of every authored ``legit_corpus`` set is loaded.
+        legitimate_set_ref: an explicit provenance ref; defaults to one derived from the
+            corpus rule ids (or ``"legit_traffic:injected"`` when ``legit_sets`` is given).
+
+    Returns:
+        An :class:`OverBlockCheck` with ``n_legit``, ``n_false_block``, ``over_block_rate``,
+        and a bootstrap CI over the per-message false-block outcomes — or ``None`` when the
+        legitimate-traffic set is empty (ADR-0011: no corpus, no fabricated rate).
+    """
+    if legit_sets is not None:
+        messages = list(legit_sets)
+        ref = legitimate_set_ref or "legit_traffic:injected"
+    else:
+        rule_ids = legit_corpus.available_rule_ids()
+        messages = [m for rid in rule_ids for m in legit_corpus.load_legit_set(rid)]
+        ref = legitimate_set_ref or ("legit_traffic:" + ",".join(rule_ids))
+
+    if not messages:
+        return None
+
+    clf = classifier or classify_inbound_family
+    # A false-block: a LEGITIMATE message the rule would (wrongly) flag as this attack family.
+    outcomes = [1 if clf(msg) == family else 0 for msg in messages]
+    n_legit = len(messages)
+    n_false_block = sum(outcomes)
+    ci_low, ci_high = bootstrap_ci(outcomes)
+
+    return OverBlockCheck(
+        legitimate_set_ref=ref,
+        n_legit=n_legit,
+        n_false_block=n_false_block,
+        over_block_rate=n_false_block / n_legit,
+        ci_low=ci_low,
+        ci_high=ci_high,
+        judge_rubric_handle=None,
+    )
+
+
 def score_inbound(
     org_id: str,
     agent_name: str,
@@ -133,6 +204,7 @@ def score_inbound(
     *,
     matcher: Callable[[str], AttackFamily | None] | None = None,
     attestation_service: "AttestationService | None" = None,
+    legit_sets: list[str] | None = None,
 ) -> RedlineScore:
     """Emit a deployable inbound gate RULE for ``message`` (ADR-0010: rule, never a block).
 
@@ -154,18 +226,24 @@ def score_inbound(
        empirical breach rate for the family (§6 prior, via :func:`latest_agent_scan_entry`) is
        folded into the recommendation as supplementary context — it never becomes the confidence.
 
-    ``over_block`` is ``None`` for v1: the measured over-block rate (does the gate block
-    *legitimate* traffic the agent should answer?) needs area-05's independent legit-corpus run,
-    scored by the SAME area-02 judge over-block FP mode — never a new model (ADR-0010/0011). That
-    is the calibrated upgrade; v1 refuses to fabricate the number.
+    ``over_block`` is MEASURED when a family matched: the gate rule's false-positive rate on
+    the INDEPENDENT area-05 ``legit_corpus`` legitimate-traffic set — how often the SAME
+    classifier (the ``matcher`` the rule was scored with) would wrongly flag a should-answer
+    message as this family (:func:`measure_over_block`). ``None`` when nothing classified
+    (nothing to gate) or when the legit corpus is empty (ADR-0011: no corpus, no fabricated
+    rate). This is the filter rule's classifier FP rate, distinct from area-05's agent-patch
+    *judge* over-block.
 
     Args:
         org_id: the tenant whose agent this is (for the optional empirical-prior lookup).
         agent_name: the registered Slack agent (for the optional empirical-prior lookup).
         message: the inbound message text to classify + gate.
         matcher: optional injected family classifier (the embedding retriever wires here).
+            Reused for the over-block measurement so it reflects the same rule being scored.
         attestation_service: optional area-03 service; when given, the agent's empirical
             breach rate for the family enriches the recommendation (supplementary only).
+        legit_sets: optional explicit legitimate-traffic set for the over-block measurement
+            (test injection). ``None`` → measure against the real ``legit_corpus``.
 
     Returns:
         A :class:`RedlineScore` carrying the gate rule + its calibrated-precision confidence.
@@ -247,13 +325,17 @@ def score_inbound(
         rationale=recommendation,
     )
 
+    # Measure the emitted rule's over-block with the SAME classifier the score used, so the
+    # FP rate reflects the rule being deployed (None when the legit corpus is empty).
+    over_block = measure_over_block(family, classifier=matcher, legit_sets=legit_sets)
+
     return RedlineScore(
         matched_family=family_value,
         breach_type=breach_value,
         risk=risk,
         confidence=confidence,
         calibration_status=calibration_status,
-        over_block=None,
+        over_block=over_block,
         recommendation=recommendation,
         rule=rule,
     )

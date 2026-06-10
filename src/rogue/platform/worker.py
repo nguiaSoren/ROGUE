@@ -48,6 +48,7 @@ class ScanWorker:
         worker_id: str = "worker-1",
         secret_store=None,
         attestation_service=None,
+        slack_delivery=None,
     ) -> None:
         self.store = store
         self.queue = queue
@@ -60,6 +61,11 @@ class ScanWorker:
         # import-coupled) and OPTIONAL: when None, scans run exactly as before with no attestation.
         # FAILED/CANCELED scans are NOT attested — there is no verdict to attest (honest completeness).
         self.attestation_service = attestation_service
+        # Optional Surface-1 auto-post: after a COMPLETED scan, post the §4 breach diff to the
+        # agent's Slack security channel. Injected (not import-coupled) and OPTIONAL — when None,
+        # scans run exactly as before with no Slack delivery. Best-effort by contract: a delivery
+        # hiccup is swallowed and can never fail or lose a completed scan (see _deliver_slack_surface1).
+        self._slack_delivery = slack_delivery
 
     async def run_once(self) -> bool:
         """Lease and process a single job. Returns False only when the queue was empty (nothing leased);
@@ -145,6 +151,12 @@ class ScanWorker:
         # open-web corpus); a true harvest cutoff replaces this when the harvest layer threads it through.
         self._attest_completed_scan(job, report)
 
+        # Surface-1 auto-fire: post the §4 breach diff to the agent's Slack security channel.
+        # Additive + gated + best-effort — a no-op for any non-Slack scan and for an unconfigured
+        # worker; a delivery failure is swallowed and can never affect the (already-finalized) scan
+        # or the ack below.
+        await self._deliver_slack_surface1(job, report)
+
         # Ack regardless of `finalized.status`: whether the scan finalized COMPLETED or was canceled
         # mid-run (in which case the guarded write above was a no-op and it stays CANCELED), the job is
         # done and must not be redelivered.
@@ -179,6 +191,25 @@ class ScanWorker:
             )
         except Exception as e:  # noqa: BLE001 — attestation is additive; never fail a completed scan.
             _log.warning("attestation append failed for scan %s (scan result preserved): %s", job.scan_id, e)
+
+    async def _deliver_slack_surface1(self, job, report) -> None:
+        """Auto-post a COMPLETED Surface-1 policy scan's breach diff to its Slack security channel.
+
+        Best-effort by contract: any failure here is logged and swallowed so a Slack hiccup can
+        never fail (or lose) the scan that just completed. No-op when no Slack delivery is wired,
+        and the delivery itself is a no-op for any scan without a `surface1_context`."""
+        if self._slack_delivery is None:
+            return
+        try:
+            await self._slack_delivery.deliver(
+                report.to_dict(), org_id=job.org_id, scan_id=job.scan_id
+            )
+        except Exception as e:  # noqa: BLE001 — auto-fire is additive; never fail a completed scan.
+            _log.warning(
+                "slack surface-1 delivery failed for scan %s (scan result preserved): %s",
+                job.scan_id,
+                e,
+            )
 
     async def run_forever(
         self,
@@ -240,7 +271,39 @@ def main() -> None:
     from rogue.attestation.service import AttestationService
 
     attestation_service = AttestationService(store._session_factory)
-    worker = ScanWorker(store, queue, engine, attestation_service=attestation_service)
+
+    # Surface-1 auto-fire: build the Slack delivery only when a bot token is configured. Lazy +
+    # guarded, mirroring the attestation wiring above — an unset/empty token leaves slack_delivery
+    # None, so the worker behaves exactly as before (no Slack post).
+    from rogue.config import get_settings
+
+    slack_delivery = None
+    token = get_settings().slack_bot_token
+    if token and token.get_secret_value():
+        from rogue.integrations.slack import (
+            SlackSurface1Delivery,
+            build_postgres_slack_agent_store,
+            make_slack_channel_sender,
+        )
+        from rogue.platform.secrets import build_postgres_secret_store
+        from rogue.platform.snapshot_store import build_postgres_snapshot_store
+
+        # Secret store (may be None when SECRET_ENCRYPTION_KEY isn't set) so a registration whose
+        # system prompt was encrypted can be resolved on lookup; None ⇒ inline-prompt fallback.
+        secret_store = build_postgres_secret_store()
+        slack_delivery = SlackSurface1Delivery(
+            agent_store=build_postgres_slack_agent_store(secret_store),
+            sender=make_slack_channel_sender(token.get_secret_value()),
+            snapshot_store=build_postgres_snapshot_store(),
+        )
+
+    worker = ScanWorker(
+        store,
+        queue,
+        engine,
+        attestation_service=attestation_service,
+        slack_delivery=slack_delivery,
+    )
     asyncio.run(worker.run_forever())
 
 
