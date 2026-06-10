@@ -16,7 +16,7 @@ ops scripts are gated behind money (CLAUDE.md costly-scripts discipline, applied
 time rather than dollars). Importing this module opens NO DB and runs nothing; all
 work happens inside ``main()`` only when a human invokes it.
 
-Two modes (``--mode``):
+Three modes (``--mode``):
 
   * ``stub`` (default — offline / CI / demo): a deterministic, seeded
     ``StubDecider`` exercises the WHOLE pipeline end-to-end with no humans. It
@@ -25,7 +25,13 @@ Two modes (``--mode``):
     wrongly DENYING a fraction of APPROVE-truth cases (``--false-deny-frac``). The
     coin per case is seeded on ``(seed, case_id)`` so the run is reproducible.
     This is what runs in tests/CI; it spends nothing and needs no DB.
-  * ``reviewers`` (the real exit-gate path): assign the corpus to real reviewers
+  * ``decisions`` (the EASIEST real-reviewer path): load an owner-exported
+    ``oversight_decisions.json`` — the file the static reviewer page
+    (``build_review_html.py``) downloads after a human clicks APPROVE/DENY through
+    every case — join each ``case_id`` to the on-disk corpus (which holds the
+    answer key the page NEVER saw), and score. This is how the browser clicks
+    become the headline false-approve number; no DB, no humans blocking in-process.
+  * ``reviewers`` (the queue-backed exit-gate path): assign the corpus to real reviewers
     via ``ReviewSession`` over the org-scoped platform queue, then score their
     decisions. This needs real reviewers + the platform DB; in a CLI run it would
     assign every case and block on each reviewer answering. The path is deliberately
@@ -50,7 +56,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Defensive `src/` insert so the script runs even without the editable install on
@@ -60,7 +68,11 @@ _SRC = str(Path(__file__).resolve().parents[2] / "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from rogue.oversight.case_corpus import GatedCase, load_corpus  # noqa: E402
+from rogue.oversight.case_corpus import (  # noqa: E402
+    GatedCase,
+    GatedDecision,
+    load_corpus,
+)
 from rogue.oversight.decider import (  # noqa: E402
     HumanDecider,
     InMemorySessionStore,
@@ -74,6 +86,7 @@ from rogue.oversight.scorer import OversightReport, score  # noqa: E402
 
 DEFAULT_STUB_SEED = 1729
 DEFAULT_STUB_REVIEWER = "stub-reviewer"
+DEFAULT_HUMAN_REVIEWER = "human-1"
 DEFAULT_ORG_ID = "demo-org"
 
 INDEPENDENCE_PASS_LINE = (
@@ -177,6 +190,74 @@ def collect_reviewer_decisions(cases: list[GatedCase], *, org_id: str, reviewer:
     )
 
 
+def load_decision_records(
+    path: str, cases: list[GatedCase], *, reviewer: str
+) -> list[GatedDecision]:
+    """Build ``GatedDecision``s from an owner-exported ``oversight_decisions.json``.
+
+    This is the bridge from the static reviewer page's browser clicks to the scorer
+    (build 07 §3). The exported file is a JSON list of facts-side records the page
+    knows about — ``{case_id, decision, deliberation_notes, decision_latency_s}`` —
+    with NO label (the page never saw the answer key). Each record is joined by
+    ``case_id`` to the on-disk corpus; the answer key is applied only here, at
+    scoring time, never on the page (ADR-0011 measurement-validity invariant).
+
+    Loud-rejects (mirroring ``case_corpus`` / ``scorer`` discipline): a malformed
+    record, an unknown ``decision``, a ``case_id`` not in the corpus, or a duplicate
+    ``case_id`` — any of which would silently distort the headline rate.
+    """
+    with open(path, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    if not isinstance(raw, list):
+        raise ValueError(
+            f"decisions file {path} must be a JSON list of decision records, "
+            f"got {type(raw).__name__}"
+        )
+
+    known_ids = {c.case_id for c in cases}
+    now = datetime.now(timezone.utc)
+    decisions: list[GatedDecision] = []
+    seen: set[str] = set()
+    for i, rec in enumerate(raw):
+        if not isinstance(rec, dict):
+            raise ValueError(f"decision #{i} is not a JSON object: {rec!r}")
+        try:
+            case_id = str(rec["case_id"])
+            decision = rec["decision"]
+        except KeyError as exc:
+            raise ValueError(
+                f"decision #{i} is missing required field {exc.args[0]!r} "
+                f"(need case_id + decision)"
+            ) from exc
+        if decision not in ("APPROVE", "DENY"):
+            raise ValueError(
+                f"decision #{i} (case {case_id!r}) has invalid decision {decision!r}; "
+                f"must be 'APPROVE' or 'DENY'"
+            )
+        if case_id not in known_ids:
+            raise ValueError(
+                f"decision #{i} references unknown case_id {case_id!r} "
+                f"(not in the corpus of {len(cases)} cases) — wrong corpus, or a "
+                f"hand-edited file"
+            )
+        if case_id in seen:
+            raise ValueError(f"duplicate case_id {case_id!r} in decisions file {path}")
+        seen.add(case_id)
+
+        latency = rec.get("decision_latency_s")
+        decisions.append(
+            GatedDecision(
+                case_id=case_id,
+                reviewer=reviewer,
+                decision=decision,
+                deliberation_notes=rec.get("deliberation_notes"),
+                decision_latency_s=float(latency) if latency is not None else None,
+                decided_at=now,
+            )
+        )
+    return decisions
+
+
 def print_report(report: OversightReport) -> None:
     """Print the headline line + the 2×2 confusion breakdown."""
     print()
@@ -208,9 +289,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--mode",
-        choices=("stub", "reviewers"),
+        choices=("stub", "decisions", "reviewers"),
         default="stub",
-        help="stub = offline/CI/demo (deterministic, no humans); reviewers = real path.",
+        help=(
+            "stub = offline/CI/demo (deterministic, no humans); decisions = score an "
+            "owner-exported oversight_decisions.json from the static reviewer page; "
+            "reviewers = queue-backed real path."
+        ),
+    )
+    parser.add_argument(
+        "--decisions",
+        default=None,
+        help="[decisions] path to the exported oversight_decisions.json to score.",
     )
     parser.add_argument(
         "--false-approve-frac",
@@ -237,10 +327,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--reviewer",
-        default=DEFAULT_STUB_REVIEWER,
-        help="Reviewer principal id the decisions are attributed to.",
+        default=None,
+        help=(
+            "Reviewer principal id the decisions are attributed to "
+            f"(default {DEFAULT_STUB_REVIEWER!r} for stub, {DEFAULT_HUMAN_REVIEWER!r} "
+            "for decisions/reviewers)."
+        ),
     )
     args = parser.parse_args(argv)
+
+    if args.reviewer is None:
+        args.reviewer = (
+            DEFAULT_STUB_REVIEWER if args.mode == "stub" else DEFAULT_HUMAN_REVIEWER
+        )
 
     if args.mode == "stub":
         for name, frac in (
@@ -249,6 +348,8 @@ def main(argv: list[str] | None = None) -> int:
         ):
             if not (0.0 <= frac <= 1.0):
                 parser.error(f"{name} must be in [0, 1], got {frac}")
+    if args.mode == "decisions" and not args.decisions:
+        parser.error("--mode decisions requires --decisions <oversight_decisions.json>")
 
     # 1) Load the corpus.
     cases = load_corpus(args.corpus)
@@ -287,6 +388,15 @@ def main(argv: list[str] | None = None) -> int:
             false_deny_frac=args.false_deny_frac,
             org_id=args.org_id,
             reviewer=args.reviewer,
+        )
+    elif args.mode == "decisions":
+        print(
+            f"mode=decisions (reviewer={args.reviewer!r}): scoring owner-exported "
+            f"clicks from {args.decisions!r} against the on-disk key — no humans "
+            "blocking, no money, no DB."
+        )
+        decisions = load_decision_records(
+            args.decisions, cases, reviewer=args.reviewer
         )
     else:
         print(
