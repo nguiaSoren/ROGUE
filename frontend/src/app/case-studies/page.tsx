@@ -29,7 +29,7 @@ export default function CaseStudiesIndex() {
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
             What a ROGUE engagement looks like.
           </h1>
-          <p className="text-base text-muted-foreground leading-relaxed">
+          <p className="text-[17px] text-foreground leading-relaxed">
             We are pre-first-customer, and we will not invent one. The two
             studies below are{" "}
             <span className="text-foreground font-medium">templates</span>, honest,

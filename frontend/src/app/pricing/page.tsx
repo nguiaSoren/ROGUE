@@ -174,7 +174,7 @@ export default function PricingPage() {
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             Priced to the depth you need.
           </h1>
-          <p className="text-base text-muted-foreground leading-relaxed">
+          <p className="text-[17px] text-foreground leading-relaxed">
             ROGUE is a continuous open-web red-team for your LLM deployments, 
             harvested live attacks, reproduced against your stack, scored, and
             shipped as a report. Start free, scale on Pro, go private on
@@ -357,7 +357,7 @@ export default function PricingPage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               See ROGUE run against your stack.
             </h2>
-            <p className="text-base text-muted-foreground leading-relaxed">
+            <p className="text-[17px] text-foreground leading-relaxed">
               Point us at an endpoint and we&apos;ll show you what the open web
               can already do to it.
             </p>

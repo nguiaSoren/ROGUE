@@ -32,7 +32,7 @@ export function Section({ eyebrow, title, lede, children, className, id }: Secti
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">{title}</h2>
           )}
           {lede && (
-            <p className="text-base text-muted-foreground leading-relaxed">{lede}</p>
+            <p className="text-[17px] text-foreground leading-relaxed">{lede}</p>
           )}
         </div>
       )}

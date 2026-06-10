@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Rocket, ClipboardCheck, FlaskConical, ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { COMMERCIAL } from "@/lib/flags";
 
 /**
@@ -29,7 +28,7 @@ export function EarlyAccessSection() {
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
           We&apos;re onboarding our first partners.
         </h2>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-[17px] text-foreground leading-relaxed">
           ROGUE is new and we&apos;re choosing the teams we build it with. No
           customer logos to show yet, just three honest ways to get on the
           engine early and shape where it goes.
