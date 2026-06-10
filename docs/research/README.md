@@ -26,3 +26,4 @@ The single home for **our own** research writeups (manuscripts, focused studies,
 - **Provenance + honesty:** every reported number traces to `breach_results` / `data/calibration/` / a named external benchmark; mark pending/unmeasured results as pending (do not quote a number we haven't collected).
 - [Oversight meaningfulness](oversight_meaningfulness.md) — Surface-2 human-gate: measuring a false-approve rate vs an independent key + the bias-laundering guard (novel; real number pending reviewers)
 - [Skill-pool leakage](skill_pool_leakage.md) — Surface-3: measured adversarial leakage on a privacy-contained agent-skill pool (10% [0-25%] first real run; canary ground truth; publishable)
+- [Verified-promotion](skill_pool_promotion.md) — Surface-3: do accumulated skills help? 0/4 cleared the gate on held-out tasks (the gate works; reproduces SkillProbe); +2 impl bugs caught

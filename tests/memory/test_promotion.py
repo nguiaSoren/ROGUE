@@ -119,6 +119,28 @@ def test_net_negative_skill_is_rejected(skill_factory):
     assert skill.status is SkillStatus.CANDIDATE
 
 
+def test_judge_object_with_grade_is_supported(skill_factory):
+    """The LIVE path: net_effect_judge() returns an OBJECT with .grade (not a bare callable).
+
+    Regression for the bug where evaluate_promotion called ``judge(...)`` directly — fine for
+    the callable test stubs, but TypeError on the real MemoryJudge. The gate must accept either.
+    """
+    from types import SimpleNamespace
+
+    class _ObjJudge:  # mimics MemoryJudge: a .grade_sync method, not __call__
+        def grade_sync(self, **_kw):
+            return SimpleNamespace(verdict="repair")
+
+    skill = _candidate(skill_factory)
+    v = evaluate_promotion(
+        skill, "team-a", _held_out(20),
+        runner=FakeRolloutRunner(["repair"]), judge=_ObjJudge(),
+        store=InMemoryVerificationStore(),
+    )
+    assert v.repairs == 20 and v.verdict is SkillVerificationVerdict.PASS
+    assert skill.status is SkillStatus.ACTIVE
+
+
 def test_neutrals_carry_no_signal(skill_factory):
     """All-neutral rollouts → empty decisive vector → CI (0,0) → not promoted."""
     skill = _candidate(skill_factory)
