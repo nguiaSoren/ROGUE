@@ -68,6 +68,15 @@ def get_attestation_service() -> Any:
     return _require("attestation_service")
 
 
+def get_attestation_service_optional() -> Any:
+    """Like `get_attestation_service` but returns None when the chain isn't wired.
+
+    For surfaces where a signed attestation is OPTIONAL evidence (e.g. the per-scan assurance
+    report's honest "unattested" path) rather than a hard dependency — the route degrades to an
+    unattested report instead of 503-ing when the chain service is absent."""
+    return _SERVICES.get("attestation_service")
+
+
 def get_scan_store() -> Any:
     """The durable ScanStore — used by the attestation replay route to resolve a
     `reproducibility_ref` (scan_id) back to the persisted report it reconstructs from."""
@@ -86,6 +95,7 @@ __all__ = [
     "get_scan_engine",
     "get_benchmark_service",
     "get_attestation_service",
+    "get_attestation_service_optional",
     "get_scan_store",
     "wire",
 ]

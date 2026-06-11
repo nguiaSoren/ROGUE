@@ -268,6 +268,65 @@ export type ScanReportJson = {
 export type ReportFormat = "json" | "html" | "pdf";
 
 // --------------------------------------------------------------------------
+// Assurance report, mirrors `render_json()` (src/rogue/governance/assurance.py:412).
+// "AI Red-Team Assurance Report" — posture summary + framework crosswalk coverage
+// over the corpus reproduced against one deployment. NOT a certification (see
+// `non_certification`, always present, surfaced as the page's lead banner).
+// --------------------------------------------------------------------------
+
+/** One titled framework ID, mirrors `frameworks_to_dict` (src/rogue/taxonomy/crosswalk.py:300). */
+export type FrameworkRef = { id: string; title: string };
+
+/** The `frameworks` object: titled OWASP/ATLAS lists + a coarse NIST prose tag. */
+export type FrameworkCoverage = {
+  owasp: FrameworkRef[];
+  atlas: FrameworkRef[];
+  nist: string;
+};
+
+/** Verifiable pointer at an already-signed attestation entry (assurance.py:124 `AttestationRef`). */
+export type AssuranceAttestation = {
+  org_id: string;
+  seq: number | null;
+  entry_hash: string;
+  signature: string;
+  corpus_as_of: string;
+  framing: string;
+};
+
+/** Mirrors `render_json()` (src/rogue/governance/assurance.py:412). */
+export type AssuranceReportJson = {
+  report_type: "ai_red_team_assurance";
+  /** The full non-certification disclaimer string; render PROMINENTLY at top. */
+  non_certification: string;
+  scope: {
+    customer_id: string;
+    config_id: string;
+    config_name: string;
+    target_model: string;
+    system_prompt_label: string;
+    tools: string[];
+    window_start: string | null;
+    window_end: string | null;
+  };
+  posture: {
+    corpus_as_of: string;
+    n_primitives: number;
+    n_trials: number;
+    n_breaching_primitives: number;
+    by_severity: { critical: number; high: number; medium: number; low: number };
+    by_verdict: Record<string, number>;
+    by_exfil_method: Record<string, number>;
+  };
+  families: string[];
+  frameworks: FrameworkCoverage;
+  /** Ready-made compact one-line framework summary. */
+  frameworks_line: string;
+  attestation: AssuranceAttestation | null;
+  threat_brief_ref: string | null;
+};
+
+// --------------------------------------------------------------------------
 // API surface, each takes the bearer `key` (server-resolved) as an argument.
 // --------------------------------------------------------------------------
 
@@ -308,6 +367,13 @@ export const platformApi = {
   getReport: (scanId: string, key?: string, format: ReportFormat = "json") =>
     apiV1<ScanReportJson>(
       `/v1/scans/${encodeURIComponent(scanId)}/report?format=${format}`,
+      key,
+    ),
+
+  /** GET /v1/scans/{id}/assurance?format=json, the per-scan AI Red-Team Assurance Report. */
+  getAssurance: (scanId: string, key?: string) =>
+    apiV1<AssuranceReportJson>(
+      `/v1/scans/${encodeURIComponent(scanId)}/assurance?format=json`,
       key,
     ),
 

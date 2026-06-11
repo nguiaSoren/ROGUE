@@ -30,6 +30,7 @@ from .breach_result import (
     BREACH_VERDICTS,
     FULL_BREACH_VERDICTS,
     BreachResult,
+    ExfiltrationMethod,
     JudgeVerdict,
 )
 from .deployment_config import (
@@ -78,6 +79,7 @@ __all__ = [
     # breach result
     "BreachResult",
     "JudgeVerdict",
+    "ExfiltrationMethod",
     "BREACH_VERDICTS",
     "FULL_BREACH_VERDICTS",
     # deployment config

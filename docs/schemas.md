@@ -141,6 +141,16 @@ class JudgeVerdict(str, Enum):
     ERROR = "error"
 
 
+class ExfiltrationMethod(str, Enum):       # the channel by which data leaves, on a breach
+    MARKDOWN_IMAGE_BEACON = "markdown_image_beacon"
+    HYPERLINK_EXFIL = "hyperlink_exfil"
+    INLINE_DATA_URI = "inline_data_uri"
+    BASE64_BLOB = "base64_blob"
+    PII_EGRESS = "pii_egress"
+    SECRET_OR_CREDENTIAL_EGRESS = "secret_or_credential_egress"
+    TOOL_ARGUMENT_SMUGGLING = "tool_argument_smuggling"
+
+
 class BreachResult(BaseModel):
     breach_id: str
     primitive_id: str                          # FK to AttackPrimitive
@@ -150,6 +160,7 @@ class BreachResult(BaseModel):
     rendered_payload: str                      # full prompt sent
     model_response: str                        # full response received
     verdict: JudgeVerdict
+    exfil_method: ExfiltrationMethod | None = None   # data-egress channel; None unless a breach exfiltrates (migration 0038, String(40) on the ORM)
     judge_rationale: str = Field(..., max_length=500)
     judge_confidence: float = Field(..., ge=0.0, le=1.0)
     latency_ms: int

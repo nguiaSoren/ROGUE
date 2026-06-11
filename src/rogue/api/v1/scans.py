@@ -15,7 +15,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from rogue.api.observability import RATE_LIMIT_SCANS, get_limiter
-from rogue.api.v1.deps import get_report_service, get_scan_service, require_principal
+from rogue.api.v1.deps import (
+    get_attestation_service_optional,
+    get_report_service,
+    get_scan_service,
+    require_principal,
+)
 from rogue.platform.schemas import ScanRecord, ScanSpec, ScanStatus, TargetSpec
 
 if TYPE_CHECKING:
@@ -216,6 +221,66 @@ async def get_scan_report(
         content=await report_service.build_pdf(scan_id),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="rogue-scan-{scan_id}.pdf"'},
+    )
+
+
+# ---------------------------------------------------------------------------------------------------
+# 6. GET /v1/scans/{scan_id}/assurance — the auditor-facing AI Red-Team Assurance Report.
+#
+# Mirrors the report route's tenancy + completed-readiness guards EXACTLY (same `not_found` /
+# `report_not_ready` envelopes). The report is a pure composition over the COMPLETED scan's data;
+# a sealed pool-attestation entry for the org is referenced as evidence when one exists (honest
+# "unattested" report otherwise — never fabricated, never re-signed).
+# ---------------------------------------------------------------------------------------------------
+@router.get("/scans/{scan_id}/assurance")
+async def get_scan_assurance(
+    scan_id: str,
+    principal: Principal = Depends(require_principal),
+    scan_service: ScanService = Depends(get_scan_service),
+    report_service: ReportService = Depends(get_report_service),
+    attestation_service: object | None = Depends(get_attestation_service_optional),
+    format: Literal["json", "md", "markdown"] = Query(default="json"),
+) -> Response:
+    # Resolve for tenancy + readiness first; never call the report layer for a non-completed scan.
+    record = await scan_service.get_scan(scan_id, org_id=principal.org_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=_envelope("not_found", f"scan not found: {scan_id}"),
+        )
+    if record.status != ScanStatus.COMPLETED:
+        status = record.status.value if isinstance(record.status, ScanStatus) else record.status
+        raise HTTPException(
+            status_code=404,
+            detail=_envelope(
+                "report_not_ready",
+                "report not available until scan completes",
+                status=status,
+            ),
+        )
+
+    # Reference the org's latest sealed attestation entry as evidence, when the chain is wired and
+    # has one. Absent → an honest `None` (the report renders an explicit "unattested" section). We
+    # never re-sign or rebuild the chain here — this is a read-only pointer.
+    attestation_ref = None
+    if attestation_service is not None:
+        from rogue.governance.assurance import AttestationRef  # lazy
+
+        head = attestation_service.head(principal.org_id)
+        if head is not None:
+            attestation_ref = AttestationRef.from_entry(head)
+
+    if format == "json":
+        return JSONResponse(
+            content=await report_service.build_assurance_json(
+                scan_id, attestation=attestation_ref
+            )
+        )
+    return Response(
+        content=await report_service.build_assurance_markdown(
+            scan_id, attestation=attestation_ref
+        ),
+        media_type="text/markdown",
     )
 
 

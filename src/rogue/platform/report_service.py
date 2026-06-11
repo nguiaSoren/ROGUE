@@ -27,6 +27,9 @@ from . import scoring
 from .interfaces import ReportService, ScanStore
 
 if TYPE_CHECKING:
+    from rogue.governance.assurance import AssuranceReport, AssuranceScope, AttestationRef
+    from rogue.platform.schemas import ScanRecord
+    from rogue.report import Finding as _FindingT
     from rogue.schemas.remediation import RemediationResult
 
 # Credential shapes that must never appear in a rendered artifact. The persisted payload should already
@@ -40,6 +43,67 @@ def _redact(s: str | None) -> str | None:
     if s is None:
         return None
     return _SECRET_RE.sub("[REDACTED]", s)
+
+
+def _coerce_severity(value: str):
+    """Map a stored finding-severity string to a `Severity`, or None if unmappable."""
+    from rogue.schemas import Severity  # noqa: PLC0415
+
+    try:
+        return Severity(value)
+    except ValueError:
+        return None
+
+
+def _distinct_families(findings: "list[_FindingT]") -> list[str]:
+    """The distinct raw `Finding.family` enum-value strings, in stable first-seen order.
+
+    The assurance builder coerces these to `AttackFamily` and drops any it can't map, so we pass the
+    raw stored value (e.g. ``dan_persona``), NOT the humanized `families_covered()` label.
+    """
+    seen: list[str] = []
+    for f in findings:
+        if f.family not in seen:
+            seen.append(f.family)
+    return seen
+
+
+def _scope_from_record(scan_id: str, record: "ScanRecord | None") -> "AssuranceScope":
+    """Build the `AssuranceScope` from the redacted `ScanRecord.target` snapshot.
+
+    A platform scan has no separate DeploymentConfig, so the scan itself is the unit under
+    assurance: `scan_id` is the config id, and a `provider/model`-style label is the config name.
+    The persisted target carries only a system-prompt LENGTH (the text is never stored), so the
+    label reflects presence honestly rather than inventing prompt text. The window is the scan's
+    own start→completion timestamps when present.
+    """
+    from rogue.governance.assurance import AssuranceScope  # noqa: PLC0415
+
+    if record is None:
+        return AssuranceScope(config_id=scan_id)
+
+    target = record.target or {}
+    provider = target.get("provider") or ""
+    model = target.get("model") or ""
+    endpoint = target.get("endpoint") or ""
+    target_model = model or endpoint or provider
+    config_name = "/".join(p for p in (provider or endpoint, model) if p) or scan_id
+
+    sys_prompt_len = target.get("system_prompt_len") or 0
+    system_prompt_label = (
+        f"custom ({sys_prompt_len} chars)" if sys_prompt_len else "default / none"
+    )
+
+    return AssuranceScope(
+        config_id=scan_id,
+        config_name=config_name,
+        target_model=target_model,
+        system_prompt_label=system_prompt_label,
+        tools=(),  # platform scans carry no tool inventory in the redacted snapshot
+        customer_id=record.org_id,
+        window_start=(record.started_at.date() if record.started_at else None),
+        window_end=(record.completed_at.date() if record.completed_at else None),
+    )
 
 
 def _explanation_for(finding: Finding, finding_dict: dict | None = None) -> str:
@@ -160,6 +224,92 @@ class DefaultReportService(ReportService):
             scan_id, mitigations=mitigations
         )
         return out
+
+    # --- assurance report (the auditor-facing posture artifact) ---------------------------------
+    #
+    # A PURE COMPOSITION over the same persisted `ScanReport` + `ScanRecord` the JSON/HTML/PDF
+    # renderers read — it adds no scan logic and queries nothing the report layer doesn't already
+    # own. The cross-org attestation pointer is the ONE thing the report layer can't resolve (it
+    # holds the store, not the attestation chain), so the route fetches the sealed entry and passes
+    # an `AttestationRef` (or None) in. The honest "unattested" path is `attestation=None`.
+
+    async def _build_assurance(
+        self, scan_id: str, *, attestation: "AttestationRef | None" = None
+    ) -> "AssuranceReport":
+        """Assemble the `AssuranceReport` from the COMPLETED scan's persisted report + record.
+
+        Posture is derived from the persisted findings (the only outcome data a platform scan
+        persists): `by_severity` counts breaching primitives per tier; `by_exfil_method` classifies
+        each breaching finding's example response through the same deterministic classifier the
+        reproduction layer uses (`classify_exfiltration_method`) so the channel breakdown is real
+        scan data, never fabricated. `by_verdict` is left empty — a platform `ScanReport` collapses
+        per-trial judge verdicts into n_breach/n_trials and does not retain the verdict strings, so
+        claiming a verdict split here would be invented; the assurance renderer omits the block when
+        it's empty. `families` are the distinct raw `Finding.family` enum-value strings (the builder
+        coerces + drops any it can't map). Scope is read off the redacted `ScanRecord.target`.
+        """
+        from rogue.governance.assurance import (  # noqa: PLC0415
+            PostureSummary,
+            build_assurance_report,
+        )
+        from rogue.reproduce.judge import classify_exfiltration_method  # noqa: PLC0415
+        from rogue.schemas import Severity  # noqa: PLC0415
+        from rogue.schemas.breach_result import JudgeVerdict  # noqa: PLC0415
+
+        record = await self.store.get(scan_id)
+        report = await self._load_report(scan_id)
+
+        # Posture — breaching-primitive counts by severity tier, and the exfiltration-channel
+        # breakdown classified from each breaching finding's example response.
+        by_severity: dict[Severity, int] = {}
+        by_exfil_method: dict[str, int] = {}
+        for f in report.findings:
+            if not f.breached:
+                continue
+            sev = _coerce_severity(f.severity)
+            if sev is not None:
+                by_severity[sev] = by_severity.get(sev, 0) + 1
+            method = classify_exfiltration_method(
+                f.example_response or "", verdict=JudgeVerdict.FULL_BREACH
+            )
+            if method is not None:
+                by_exfil_method[method.value] = by_exfil_method.get(method.value, 0) + 1
+
+        posture = PostureSummary(
+            n_primitives=len(report.findings),
+            n_trials=sum(f.n_trials for f in report.findings),
+            by_severity=by_severity,
+            by_verdict={},  # not retained on a platform ScanReport — honest empty, never invented
+            by_exfil_method=by_exfil_method,
+            corpus_as_of=(attestation.corpus_as_of if attestation else ""),
+        )
+
+        families = _distinct_families(report.findings)
+        scope = _scope_from_record(scan_id, record)
+
+        return build_assurance_report(
+            scope,
+            posture,
+            families,
+            attestation=attestation,
+            threat_brief_ref=f"scan:{scan_id}",
+        )
+
+    async def build_assurance_json(
+        self, scan_id: str, *, attestation: "AttestationRef | None" = None
+    ) -> dict:
+        """Render the per-scan AI Red-Team Assurance Report as the confirmed JSON contract."""
+        from rogue.governance.assurance import render_json  # noqa: PLC0415
+
+        return render_json(await self._build_assurance(scan_id, attestation=attestation))
+
+    async def build_assurance_markdown(
+        self, scan_id: str, *, attestation: "AttestationRef | None" = None
+    ) -> str:
+        """Render the per-scan AI Red-Team Assurance Report as auditor-facing markdown."""
+        from rogue.governance.assurance import render_markdown  # noqa: PLC0415
+
+        return render_markdown(await self._build_assurance(scan_id, attestation=attestation))
 
     async def build_executive_summary(
         self,
