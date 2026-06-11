@@ -224,13 +224,15 @@ def build() -> Path:
     F: list = [
         _masthead(),
         Spacer(1, 16),
-        Paragraph("Four findings from a solo open-web LLM red-team, the negatives included.", S["headline"]),
+        Paragraph("Six findings from a solo open-web LLM red-team, the negatives included.", S["headline"]),
         Spacer(1, 7),
         Paragraph(
             "Every result here is measured and reproducible. An LLM-as-judge calibrated against human "
             "labels and then generalized into a four-breach-type discipline; scheduling shown to be a "
             "capability lever, not just an optimization; a publication-grade null result that redirected "
-            "engineering; and the measure-before-build habit behind all of it.", S["abstract"]),
+            "engineering; the measure-before-build habit behind all of it; measured remediation that "
+            "refuses a fix it can&rsquo;t prove; and a grey-literature reproducibility audit showing a "
+            "source&rsquo;s claimed jailbreak success doesn&rsquo;t predict what reproduces.", S["abstract"]),
         Spacer(1, 4),
         Paragraph(
             "Soren Obounou Nguia &nbsp;·&nbsp; Seoul &nbsp;·&nbsp; nguiasoren@gmail.com "
@@ -395,6 +397,41 @@ def build() -> Path:
         "what makes &ldquo;does not over-block&rdquo; trustworthy. It flipped a would-be accept (heuristic 0% "
         "over-block) into a correct refusal (judge ~20%). A runtime guardrail asserts it blocks; this measures "
         "it, and says no when a patch does not hold or over-blocks.")]
+
+    # 06
+    F += [_finding("06", "reproduction",
+                   "The reproducibility gap: a source's claimed potency doesn't predict what reproduces.")]
+    F += [Paragraph(
+        "Of 17 harvested techniques whose source claimed " + b("~100% success") + ", only " + b("7") +
+        " reproduce at all, and their mean measured breach rate is " + b("13%") + ". Across the 56 "
+        "techniques that publish a number, claimed success and measured reproduction are "
+        + b("uncorrelated (Spearman -0.10, 95% CI [-0.37, +0.17])") + ", a claimed rate is not portable "
+        "signal, which is why ROGUE re-measures every technique against your model and system prompt, "
+        "not the source&rsquo;s.", S["body"])]
+    F += [Paragraph(
+        "The same pattern is a reproduction funnel. Across " + b("301 techniques from 19 open-web sources") +
+        " on a five-model panel, the &ldquo;works on at least one of five models&rdquo; rate (40%) is "
+        "inflated by the weakest target: on a " + b("frozen open-weight model only ~9% reproduce") + ", "
+        "and " + b("~4% on the most robust model") + ". Reproduction is whether the carrier mechanism "
+        "still bypasses alignment toward a neutral objective, scored by the calibrated under-counting "
+        "judge; paper-sourced techniques degrade more slowly than grey-literature ones.", S["body"])]
+    F += [Paragraph(
+        "A stronger-model re-extraction (Sonnet 4.6) of all 148 candidate sources confirmed the null is "
+        "not an extraction artifact, it recovered a claimed rate for only 1 of 94 unquantified sources, "
+        "so the small claimed-rate sample reflects that the open web rarely quantifies these claims, not "
+        "a weak extractor. The claimed values carry ~17% extraction noise, so the -0.10 reads as "
+        + b("no predictive signal") + ", not a precise estimate.", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("-0.10", "claimed vs measured (n=56)"),
+        ("100% → 13%", "claimed ~100%, mean measured"),
+        ("40 → 4%", "reproduce: best-of-5 to robust"),
+        ("$0", "on already-collected data"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "The honest version of &ldquo;we test real attacks&rdquo;: a success rate claimed in a paper or "
+        "forum is not portable to your deployment. The value is the re-measurement against your model, "
+        "system prompt, and tools under a judge calibrated to under-count, with a frozen open-weight "
+        "anchor so non-reproduction isn&rsquo;t confounded by silent vendor patching.")]
 
     # limitations
     F += [Spacer(1, 10)]
