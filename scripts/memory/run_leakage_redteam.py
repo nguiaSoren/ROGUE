@@ -84,18 +84,29 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="llama-3.1-8b-instant")
     ap.add_argument("--cohort", default="trusted-team")
+    ap.add_argument("--max-templates", type=int, default=4,
+                    help="templates per skill (Groq free-tier is rate-limited; fewer = faster)")
+    ap.add_argument("--control-sample", type=int, default=12,
+                    help="how many of the 35 controls to attack (for the false-positive floor)")
     args = ap.parse_args()
 
     key = os.environ["GROQ_API_KEY"]
-    templates = _load_pack()
+    templates = _load_pack()[: args.max_templates]
     attacker = GroqExtractionAttacker(key, args.model, templates)
-    print(f"firing {len(templates)} extraction templates at a {args.model} target per skill "
-          "(target HOLDS the confidential canary; marker-scored exact recovery)…")
+    from rogue.memory.leakage import _load_canaries, _load_controls  # noqa: E402
+    canaries = _load_canaries(None)
+    canary_ids = {c.skill_id for c in canaries}
+    controls = _load_controls(canary_ids, None)[: args.control_sample]
+    n_calls = (len(canaries) + len(controls)) * len(templates)
+    print(f"firing {len(templates)} templates x {len(canaries)} canaries + {len(controls)} controls "
+          f"= ~{n_calls} paced calls at a {args.model} target (~{n_calls * 1.5 / 60:.1f} min)…")
 
     result = measure_leakage(
         args.cohort,
         attacker=attacker,
         judge=None,  # marker-based exact/fragment recovery — the honest measure for random canaries
+        canaries=canaries,
+        controls=controls,
         pack_coverage="standard",
     )
 

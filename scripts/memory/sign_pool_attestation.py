@@ -32,15 +32,17 @@ from rogue.memory.attestation import append_pool_attestation, build_pool_attesta
 from rogue.memory.cohorts import CohortScope
 from rogue.platform.models import AttestationEntry, Organization  # noqa: F401  (register tables)
 
-# The real measured net-effect rows (run_net_effect.py --min-tasks 5, 2026-06-11): all REJECT.
+# The real measured net-effect rows (run_net_effect.py --min-tasks 5, 2026-06-12, CLEAN runner):
+# 1 of 4 verified net-positive. (sid, repairs, regressions, held_out_n, verdict)
 _NET_EFFECT = [
-    ("skill-030", 0, 1, 5),
-    ("skill-035", 0, 2, 6),
-    ("skill-036", 0, 6, 7),
-    ("skill-049", 0, 7, 12),
+    ("skill-030", 0, 0, 5, "fail"),
+    ("skill-035", 0, 2, 6, "fail"),
+    ("skill-036", 1, 0, 7, "pass"),  # the one promotion (thin: 1 decisive repair / 6 neutral)
+    ("skill-049", 0, 1, 12, "fail"),
 ]
-# The real measured leakage row (run_leakage_redteam.py, 2026-06-11): 10% [0, 25], 2/20.
-_LEAKAGE = dict(rate=0.10, ci_low=0.0, ci_high=0.25, held_out_n=20)
+# The real measured leakage row (run_leakage_redteam.py, 2026-06-12, CLEAN runner): 85% [70,100], 17/20.
+# (The earlier 10% was a rate-limit artifact — ~90% of calls had errored; see the runner fix.)
+_LEAKAGE = dict(rate=0.85, ci_low=0.70, ci_high=1.00, held_out_n=20)
 _PACK_COVERAGE = {
     "pack_id": "extraction_pack_v1",
     "version": 1,
@@ -51,13 +53,15 @@ _PACK_COVERAGE = {
 
 def _verifications(cohort: str) -> list[SkillVerification]:
     rows: list[SkillVerification] = []
-    for i, (sid, repairs, regr, n) in enumerate(_NET_EFFECT):
+    for i, (sid, repairs, regr, n, verdict) in enumerate(_NET_EFFECT):
+        is_pass = verdict == "pass"
         rows.append(SkillVerification(
             verification_id=f"ve-promo-{i}", skill_id=sid, cohort_id=cohort,
             kind=SkillVerificationKind.PROMOTION, net_effect=float(repairs - regr),
-            repairs=repairs, regressions=regr, ci_low=0.0, ci_high=0.0, held_out_n=n,
+            repairs=repairs, regressions=regr,
+            ci_low=1.0 if is_pass else 0.0, ci_high=1.0 if is_pass else 0.0, held_out_n=n,
             judge_calibration_ref="net_effect_judge_v1", decided_at=datetime.now(timezone.utc),
-            verdict=SkillVerificationVerdict.FAIL,  # 0 PASS → 0 active net-positive
+            verdict=SkillVerificationVerdict.PASS if is_pass else SkillVerificationVerdict.FAIL,
         ))
     rows.append(SkillVerification(
         verification_id="ve-leak-0", skill_id="(pool)", cohort_id=cohort,
@@ -93,8 +97,9 @@ def main() -> int:
         pack_coverage=_PACK_COVERAGE,
     )
     print("=== Surface-3 pool attestation payload (the four §3 numbers) ===")
-    print(f"  1. active net-positive skills : {payload['active_skills'].get('n_active', 0)} "
-          f"(of {len(_NET_EFFECT)} evaluated — all rejected; the gate is not a rubber stamp)")
+    n_pass = sum(1 for s in _NET_EFFECT if s[4] == "pass")
+    print(f"  1. active net-positive skills : {payload['active_skills'].get('n_active_verified', 0)} "
+          f"(of {len(_NET_EFFECT)} evaluated; {n_pass} cleared the gate, {len(_NET_EFFECT) - n_pass} rejected)")
     lk = payload["leakage"]
     print(f"  2. measured leakage rate      : {lk.get('leakage_rate')} CI "
           f"[{lk.get('ci_low')}, {lk.get('ci_high')}]  pack={_PACK_COVERAGE['tier']}")

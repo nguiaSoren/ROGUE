@@ -25,8 +25,8 @@ def groq_chat(
     *,
     max_tokens: int = 512,
     temperature: float = 0.7,
-    max_retries: int = 6,
-    base_pace_s: float = 0.35,
+    max_retries: int = 3,
+    base_pace_s: float = 1.5,
     error_tag: str = "call-error",
 ) -> str:
     """One chat completion, with retry/backoff on rate-limits + a small inter-call pace.
@@ -54,15 +54,15 @@ def groq_chat(
             if r.status_code == 429 or r.status_code >= 500:
                 last = f"http {r.status_code}"
                 retry_after = r.headers.get("retry-after")
-                wait = float(retry_after) if retry_after else min(2.0 ** attempt, 30.0)
+                wait = float(retry_after) if retry_after else min(2.0 ** attempt, 6.0)
                 time.sleep(wait)
                 continue
             data = r.json()
             if "choices" in data and data["choices"]:
                 return data["choices"][0]["message"]["content"]
             last = f"no-choices: {str(data)[:120]}"
-            time.sleep(min(2.0 ** attempt, 30.0))
+            time.sleep(min(2.0 ** attempt, 6.0))
         except Exception as exc:  # network blip etc.
             last = str(exc)
-            time.sleep(min(2.0 ** attempt, 30.0))
+            time.sleep(min(2.0 ** attempt, 6.0))
     return f"[{error_tag}: exhausted {max_retries} retries — {last}]"
