@@ -178,3 +178,8 @@ tests/fixtures/memory/_raw/*
 # Surface-3 held-out-task harvested-page cache — bulky + reproducible; local. Tasks + manifest committed.
 tests/fixtures/memory/_raw_tasks/*
 !tests/fixtures/memory/_raw_tasks/_index.json
+
+# §08 judge-calibration labelable case fixtures — committed so a labeler's labels tie to a fixed set
+# (the harvester's Groq capture is non-deterministic and can't be regenerated identically).
+!data/calibration/leakage_label_cases.json
+!data/calibration/net_effect_label_cases.json
