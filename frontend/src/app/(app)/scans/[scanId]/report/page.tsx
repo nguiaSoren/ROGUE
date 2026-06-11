@@ -85,6 +85,12 @@ export default async function ReportPage({
 
           {report && (
             <div className="flex items-center gap-2 font-mono text-xs">
+              <Link
+                href={`/scans/${encodeURIComponent(scanId)}/assurance`}
+                className="uppercase tracking-[0.15em] border border-rogue-green/40 text-rogue-green rounded-md px-3 py-1.5 hover:bg-rogue-green/10 transition-colors"
+              >
+                Assurance report
+              </Link>
               <a
                 href={exportHref(scanId, "html")}
                 target="_blank"

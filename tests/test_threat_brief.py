@@ -111,6 +111,7 @@ def _make_breached_primitive(
     rate: float = 1.0,
     n_trials: int = 5,
     n_configs: int = 2,
+    exfil_methods: tuple[str, ...] = (),
 ) -> BreachedPrimitive:
     configs = tuple(
         BreachedConfig(
@@ -135,6 +136,7 @@ def _make_breached_primitive(
         severity_tier=severity_from_score(score),
         max_any_breach_rate=rate,
         breached_configs=configs,
+        exfil_methods=exfil_methods,
     )
 
 
@@ -290,6 +292,135 @@ def test_write_outputs_creates_both_files(tmp_path: Path) -> None:
     assert md_path.read_text().startswith("# ROGUE Threat Brief")
     payload = json.loads(json_path.read_text())
     assert payload["target_date"] == "2026-05-27"
+
+
+# --------------------------------------------------------------------------- #
+# B2. exfil_method surfacing (migration 0038) — render-level, no DB
+# --------------------------------------------------------------------------- #
+
+
+def test_exfil_methods_render_in_markdown_full_block() -> None:
+    """A CRITICAL primitive (full block) with 2 distinct exfil methods renders
+    the compact 'Exfiltration channels:' line, comma-joined and sorted."""
+    diff = BreachDiff(
+        target_date=date(2026, 5, 27),
+        customer_id="acme",
+        new_critical=(
+            _make_breached_primitive(
+                family="tool_use_hijack",
+                vector="rag_document",
+                rate=1.0,
+                title="Exfil crit",
+                exfil_methods=("markdown_image_beacon", "hyperlink_exfil"),
+            ),
+        ),
+    )
+    builder = ThreatBriefBuilder(session=None)  # type: ignore[arg-type]
+    md = builder.render_markdown(diff)
+    assert "- Exfiltration channels: markdown_image_beacon, hyperlink_exfil" in md
+
+
+def test_exfil_methods_render_in_markdown_abbrev_block() -> None:
+    """A MEDIUM primitive (abbreviated one-liner) with exfil methods appends the
+    ' · Exfiltration channels: ...' fragment."""
+    diff = BreachDiff(
+        target_date=date(2026, 5, 27),
+        customer_id="acme",
+        new_medium=(
+            _make_breached_primitive(
+                title="Exfil medium",
+                exfil_methods=("pii_egress", "base64_blob"),
+            ),
+        ),
+    )
+    builder = ThreatBriefBuilder(session=None)  # type: ignore[arg-type]
+    md = builder.render_markdown(diff)
+    assert "· Exfiltration channels: pii_egress, base64_blob" in md
+
+
+def test_no_exfil_methods_renders_no_md_line() -> None:
+    """A primitive with no exfil methods renders neither the full-block line
+    nor the abbreviated fragment."""
+    diff = BreachDiff(
+        target_date=date(2026, 5, 27),
+        customer_id="acme",
+        new_critical=(
+            _make_breached_primitive(
+                family="tool_use_hijack",
+                vector="rag_document",
+                rate=1.0,
+                title="No exfil crit",
+                exfil_methods=(),
+            ),
+        ),
+    )
+    builder = ThreatBriefBuilder(session=None)  # type: ignore[arg-type]
+    md = builder.render_markdown(diff)
+    assert "Exfiltration channels" not in md
+
+
+def test_exfil_methods_in_json_array() -> None:
+    """JSON form carries an ``exfil_methods`` list per primitive."""
+    diff = BreachDiff(
+        target_date=date(2026, 5, 27),
+        customer_id="acme",
+        new_critical=(
+            _make_breached_primitive(
+                title="Exfil crit",
+                exfil_methods=("hyperlink_exfil", "markdown_image_beacon"),
+            ),
+        ),
+    )
+    builder = ThreatBriefBuilder(session=None)  # type: ignore[arg-type]
+    payload = builder.render_json(diff)
+    entry = payload["new_critical"][0]
+    assert entry["exfil_methods"] == ["hyperlink_exfil", "markdown_image_beacon"]
+    # Serializable end-to-end (plain strings, no enum leak).
+    assert json.loads(json.dumps(payload))["new_critical"][0]["exfil_methods"] == [
+        "hyperlink_exfil",
+        "markdown_image_beacon",
+    ]
+
+
+def test_no_exfil_methods_empty_json_array() -> None:
+    """A primitive with no exfil methods exposes an empty list, not null."""
+    diff = BreachDiff(
+        target_date=date(2026, 5, 27),
+        customer_id="acme",
+        new_critical=(_make_breached_primitive(title="No exfil", exfil_methods=()),),
+    )
+    builder = ThreatBriefBuilder(session=None)  # type: ignore[arg-type]
+    payload = builder.render_json(diff)
+    assert payload["new_critical"][0]["exfil_methods"] == []
+
+
+def test_fetch_exfil_methods_sorts_and_dedups() -> None:
+    """``_fetch_exfil_methods`` returns a sorted, de-duplicated tuple per
+    primitive regardless of row arrival order — so the brief is byte-stable
+    across runs. Uses a fake session that returns rows out of order with a dup."""
+    pid = "01EXFIL" + "0" * 19
+
+    class _Row:
+        def __init__(self, exfil_method: str) -> None:
+            self.primitive_id = pid
+            self.exfil_method = exfil_method
+
+    class _Result:
+        def all(self):  # noqa: ANN201 - test stub
+            return [
+                _Row("pii_egress"),
+                _Row("base64_blob"),
+                _Row("pii_egress"),  # duplicate
+                _Row("hyperlink_exfil"),
+            ]
+
+    class _Session:
+        def execute(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN201
+            return _Result()
+
+    builder = ThreatBriefBuilder(session=_Session())  # type: ignore[arg-type]
+    out = builder._fetch_exfil_methods("acme", date(2026, 5, 27))
+    assert out == {pid: ("base64_blob", "hyperlink_exfil", "pii_egress")}
 
 
 # --------------------------------------------------------------------------- #

@@ -62,6 +62,11 @@ from rogue.schemas import (
     Severity,
     severity_from_score,
 )
+from rogue.taxonomy import (
+    crosswalk_for_family,
+    format_frameworks_line,
+)
+from rogue.taxonomy.crosswalk import frameworks_to_dict
 
 logger = logging.getLogger("rogue.diff.threat_brief")
 
@@ -107,6 +112,10 @@ class BreachedPrimitive:
     severity_tier: Severity
     max_any_breach_rate: float
     breached_configs: tuple[BreachedConfig, ...]
+    # DISTINCT non-NULL exfiltration channels (`rogue.schemas.ExfiltrationMethod`
+    # values) observed across this primitive's breaching trials today, sorted for
+    # determinism. Default empty so old constructors / pure-render tests don't break.
+    exfil_methods: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -172,13 +181,21 @@ class ThreatBriefBuilder:
         new_ids = today_set - yesterday_set
         defended_ids = yesterday_set - today_set
 
+        # The breach_matrix view (§10.3) aggregates breach_results but does NOT
+        # expose `exfil_method` — so fetch the distinct channels per primitive in
+        # a secondary query straight off breach_results, keyed by primitive_id.
+        today_exfil = self._fetch_exfil_methods(customer_id, target_date)
+        yesterday_exfil = self._fetch_exfil_methods(customer_id, prior_date)
+
         # Group today's matrix rows by primitive so we can compute max
         # breach rate + list every config that breached.
         new_primitives = self._group_to_primitives(
             [r for r in today_rows if r.primitive_id in new_ids],
+            exfil_by_primitive=today_exfil,
         )
         defended_primitives = self._group_to_primitives(
             [r for r in yesterday_rows if r.primitive_id in defended_ids],
+            exfil_by_primitive=yesterday_exfil,
         )
 
         # Sort each tier descending by severity_score so the most-dangerous
@@ -307,6 +324,9 @@ class ThreatBriefBuilder:
     ) -> str:
         """Render one primitive block. Full vs abbreviated controlled by ``abbrev``."""
         src = (source_map or {}).get(p.primitive_id)
+        frameworks = format_frameworks_line(
+            crosswalk_for_family(p.family, p.vector)
+        )
         if abbrev:
             configs_str = ", ".join(c.config_name for c in p.breached_configs[:3])
             return (
@@ -315,6 +335,12 @@ class ThreatBriefBuilder:
                 f"severity {p.severity_score:.2f}) breached: {configs_str}"
                 + (f" + {len(p.breached_configs) - 3} more" if len(p.breached_configs) > 3 else "")
                 + (f" · source: [{src[0]}]({src[1]})" if src else "")
+                + (f" · Frameworks: {frameworks}" if frameworks else "")
+                + (
+                    f" · Exfiltration channels: {', '.join(p.exfil_methods)}"
+                    if p.exfil_methods
+                    else ""
+                )
             )
 
         out: list[str] = []
@@ -322,6 +348,10 @@ class ThreatBriefBuilder:
         out.append(f"- Family: `{p.family}` / Vector: `{p.vector}`")
         out.append(f"- Severity: **{p.severity_tier.value.upper()}** (score {p.severity_score:.3f})")
         out.append(f"- Max any-breach rate across configs: **{p.max_any_breach_rate:.0%}**")
+        if frameworks:
+            out.append(f"- Frameworks: {frameworks}")
+        if p.exfil_methods:
+            out.append(f"- Exfiltration channels: {', '.join(p.exfil_methods)}")
         if src:
             out.append(f"- Source: discovered via **{src[0]}** — [{src[1]}]({src[1]})")
         out.append("- Breached configs:")
@@ -385,7 +415,11 @@ class ThreatBriefBuilder:
                 "severity_score": p.severity_score,
                 "severity_tier": p.severity_tier.value,
                 "max_any_breach_rate": p.max_any_breach_rate,
+                "frameworks": frameworks_to_dict(
+                    crosswalk_for_family(p.family, p.vector)
+                ),
                 "source": {"source_type": src[0], "url": src[1]} if src else None,
+                "exfil_methods": list(p.exfil_methods),
                 "breached_configs": [
                     {
                         "config_id": c.config_id,
@@ -560,12 +594,51 @@ class ThreatBriefBuilder:
         ).all()
         return list(rows)
 
+    def _fetch_exfil_methods(
+        self,
+        customer_id: str,
+        target_date: date,
+    ) -> dict[str, tuple[str, ...]]:
+        """Map ``primitive_id`` → sorted tuple of DISTINCT non-NULL
+        ``exfil_method`` values observed across its breaching trials on
+        ``target_date`` for this customer.
+
+        Queried straight off ``breach_results`` (not the ``breach_matrix``
+        view, which doesn't carry ``exfil_method``). Restricted to breaching
+        verdicts so a NULL/non-breach trial never contributes a channel, and
+        to non-NULL methods only. Joined to ``deployment_configs`` for the
+        customer filter, mirroring ``_fetch_breach_matrix``'s join style.
+        """
+        sql = text(
+            """
+            SELECT DISTINCT br.primitive_id, br.exfil_method
+            FROM breach_results br
+            JOIN deployment_configs dc
+              ON dc.config_id = br.deployment_config_id
+            WHERE DATE(br.ran_at) = :target_date
+              AND dc.customer_id = :customer_id
+              AND br.exfil_method IS NOT NULL
+              AND br.verdict IN ('full_breach', 'partial_breach')
+            """
+        )
+        rows = self.session.execute(
+            sql,
+            {"target_date": target_date, "customer_id": customer_id},
+        ).all()
+        by_primitive: dict[str, list[str]] = {}
+        for r in rows:
+            by_primitive.setdefault(r.primitive_id, []).append(r.exfil_method)
+        return {pid: tuple(sorted(set(methods))) for pid, methods in by_primitive.items()}
+
     def _group_to_primitives(
-        self, rows: list[Any],
+        self,
+        rows: list[Any],
+        exfil_by_primitive: dict[str, tuple[str, ...]] | None = None,
     ) -> list[BreachedPrimitive]:
         """Aggregate matrix rows (one per config) into BreachedPrimitive
         records (one per primitive, with the list of breached configs).
         """
+        exfil_by_primitive = exfil_by_primitive or {}
         by_primitive: dict[str, list[Any]] = {}
         for r in rows:
             by_primitive.setdefault(r.primitive_id, []).append(r)
@@ -616,6 +689,7 @@ class ThreatBriefBuilder:
                     severity_tier=severity_from_score(severity_score),
                     max_any_breach_rate=max_rate,
                     breached_configs=configs,
+                    exfil_methods=exfil_by_primitive.get(pid, ()),
                 ),
             )
 

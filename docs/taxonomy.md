@@ -4,6 +4,8 @@ Extracted **verbatim** from ROGUE_PLAN.md §4.2 — frozen Day 0, do not revise 
 
 Slot variables (e.g. `{target_topic}`, `{poison_payload}`) follow the §4.3 vocabulary — see the slot table at the bottom of this file. Defaults live in `tests/fixtures/slot_defaults.json`. Examples below use slot templates rather than weaponized concrete topics; the reproduction layer substitutes them per `DeploymentConfig` at render time.
 
+The per-family `Reference` column below (e.g. `OWASP LLM01`) is made machine-readable and extended to **MITRE ATLAS** + **NIST AI RMF** by the framework crosswalk in `src/rogue/taxonomy/crosswalk.py` (`FAMILY_CROSSWALK` / `crosswalk_for_families`), which the threat brief and the assurance report render as framework-coverage tags. The crosswalk is a reporting-layer lookup over this frozen taxonomy — it never revises a family. See glossary §22.
+
 ## Family table
 
 | # | Family | Definition | Canonical example | Weight | Reference |

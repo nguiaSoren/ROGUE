@@ -289,6 +289,15 @@ class BreachResult(Base):
     judge_rationale: Mapped[str] = mapped_column(Text)
     judge_confidence: Mapped[float] = mapped_column(Float)
 
+    # Output-side exfiltration channel (`rogue.schemas.ExfiltrationMethod`),
+    # deterministically classified from `model_response` by the judge layer.
+    # NULL for non-egress breaches and non-breach verdicts. Stored as a String
+    # (not a PG enum) so the label vocabulary can extend without a migration,
+    # matching the `persona_used` / `refinement_type` convention on this table.
+    exfil_method: Mapped[Optional[str]] = mapped_column(
+        String(40), nullable=True, index=True
+    )
+
     latency_ms: Mapped[int] = mapped_column(Integer)
     tokens_in: Mapped[int] = mapped_column(Integer)
     tokens_out: Mapped[int] = mapped_column(Integer)

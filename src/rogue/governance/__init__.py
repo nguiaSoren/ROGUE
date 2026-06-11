@@ -29,6 +29,16 @@ from rogue.schemas.governance import (
     RuleVerdict,
 )
 
+from .assurance import (
+    NON_CERTIFICATION,
+    AssuranceReport,
+    AssuranceScope,
+    AttestationRef,
+    PostureSummary,
+    build_assurance_report,
+)
+from .assurance import render_json as render_assurance_json
+from .assurance import render_markdown as render_assurance_markdown
 from .coverage import CoverageScore, score_pack_coverage
 from .decompose import decompose_policy, load_policy
 from .reaim import build_attack_pack, reaim_primitive
@@ -64,4 +74,13 @@ __all__ = [
     "run_policy_scan",
     "default_grade",
     "live_responder",
+    # assurance report (customer-facing posture artifact)
+    "NON_CERTIFICATION",
+    "AssuranceReport",
+    "AssuranceScope",
+    "AttestationRef",
+    "PostureSummary",
+    "build_assurance_report",
+    "render_assurance_markdown",
+    "render_assurance_json",
 ]

