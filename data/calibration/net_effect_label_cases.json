@@ -1,0 +1,308 @@
+[
+  {
+    "case_id": "net-real-skill-030-task-001",
+    "task": "Review this code and report any security issue:\n\n```python\ndef get_item(conn, owner, item_name):\n    query = \"SELECT * FROM items WHERE owner = '\" + owner + \"' AND itemname = '\" + item_name + \"'\"\n    cur = conn.cursor()\n    cur.execute(query)\n    return cur.fetchall()\n```",
+    "expected_outcome": "Identifies SQL injection: user input (owner/item_name) is string-concatenated into the SQL query. Recommends parameterized queries / prepared statements (e.g. cur.execute with placeholders and a params tuple) instead of building the SQL string from input.",
+    "output_without_skill": "**Security Issue Report**\n\nThe provided code snippet is vulnerable to a SQL injection attack. Here's why:\n\n1. **Concatenation of user input**: The user input (`owner` and `item_name`) is directly concatenated with the SQL query using string concatenation (`+`). This allows an attacker to inject malicious SQL code by manipulating the input values.\n\n2. **Lack of parameterization**: The code does not use parameterized queries, which is a safer way to pass user input to SQL queries. Parameterization prevents SQL injection attacks by treating user input as literal values rather than part of the SQL code.\n\n**Recommendations**\n\nTo fix the security issue, use parameterized queries with the `?` placeholder:\n\n```python\ndef get_item(conn, owner, item_name):\n    query = \"SELECT * FROM items WHERE owner = ? AND itemname = ?\"\n    cur = conn.cursor()\n    cur.execute(query, (owner, item_name))\n    return cur.fetchall()\n```\n\nAlternatively, you can use an ORM (Object-Relational Mapping) library like SQLAlchemy, which provides a safer way to interact with the database.\n\n**Best Practices**\n\n1. **Use parameterized queries**: Always use parameterized queries to prevent SQL injection attacks.\n2. **Verify user input**: Validate and sanitize user input to prevent unexpected or malicious input.\n3. **Use a secure connection**: Use a secure connection to the database, such as SSL/TLS encryption.\n4. **Limit database privileges**: Limit database privileges to the minimum required by the application.\n5. **Keep dependencies up-to-date**: Keep your dependencies up-to-date to ensure you have the latest security patches.\n\n**Additional Advice**\n\nConsider using a more robust database driver or ORM library that provides additional security features, such as:\n\n* Connection pooling to improve performance\n* Automatic query parameterization\n* Support for secure connections (SSL/TLS encryption)\n* Built-in security features to prevent common web vulnerabilities (e.g., SQL injection, cross-site scripting (XSS))",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-030-task-002",
+    "task": "Review this code and report any security issue:\n\n```php\n$category = $_GET['category'];\n$query = \"SELECT item, price FROM product WHERE item_category = '$category' ORDER BY price\";\n$result = mysqli_query($conn, $query);\n```",
+    "expected_outcome": "Identifies SQL injection: the $_GET['category'] request parameter is interpolated directly into the SQL string. Recommends parameterized queries / prepared statements (mysqli/PDO bound parameters) rather than interpolating request input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-030-task-003",
+    "task": "Review this code and report any security issue:\n\n```python\nimport os\n\ndef ping_host(hostname):\n    os.system(\"nslookup \" + hostname)\n```",
+    "expected_outcome": "Identifies OS command injection: the hostname argument is concatenated into a shell command, so command separators (e.g. ';', '&&', '|') let an attacker run arbitrary commands. Recommends avoiding the shell (e.g. subprocess with an argument list / shell=False) and/or allow-list validation of the input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-030-task-004",
+    "task": "Review this code and report any security issue:\n\n```java\nString btype = request.getParameter(\"backuptype\");\nString cmd = \"cmd.exe /K \\\"c:\\\\util\\\\rmanDB.bat \" + btype + \"&&c:\\\\util\\\\cleanup.bat\\\"\";\nRuntime.getRuntime().exec(cmd);\n```",
+    "expected_outcome": "Identifies OS command injection: the 'backuptype' request parameter is concatenated into a command string passed to Runtime.exec, allowing injection of extra commands. Recommends passing arguments as an array / avoiding shell concatenation and validating input against an allow-list.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-030-task-014",
+    "task": "Review this code and report any security issue. If there is no real vulnerability, say so explicitly.\n\n```python\ndef get_user(conn, user_id: int):\n    cur = conn.cursor()\n    cur.execute(\"SELECT id, name, email FROM users WHERE id = %s\", (user_id,))\n    return cur.fetchone()\n```",
+    "expected_outcome": "Reports that the query is safe / not injectable: it uses a parameterized query (%s placeholder with a params tuple), which is the correct defense. Does NOT falsely claim SQL injection. (Regression = wrongly flagging this safe code as vulnerable.)",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-035-task-001",
+    "task": "Review this code and report any security issue:\n\n```python\ndef get_item(conn, owner, item_name):\n    query = \"SELECT * FROM items WHERE owner = '\" + owner + \"' AND itemname = '\" + item_name + \"'\"\n    cur = conn.cursor()\n    cur.execute(query)\n    return cur.fetchall()\n```",
+    "expected_outcome": "Identifies SQL injection: user input (owner/item_name) is string-concatenated into the SQL query. Recommends parameterized queries / prepared statements (e.g. cur.execute with placeholders and a params tuple) instead of building the SQL string from input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-035-task-002",
+    "task": "Review this code and report any security issue:\n\n```php\n$category = $_GET['category'];\n$query = \"SELECT item, price FROM product WHERE item_category = '$category' ORDER BY price\";\n$result = mysqli_query($conn, $query);\n```",
+    "expected_outcome": "Identifies SQL injection: the $_GET['category'] request parameter is interpolated directly into the SQL string. Recommends parameterized queries / prepared statements (mysqli/PDO bound parameters) rather than interpolating request input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-035-task-007",
+    "task": "Review this code and report any security issue:\n\n```python\nimport requests\n\ndef fetch_url(user_supplied_url):\n    # Fetch whatever URL the user asks for and return the body\n    resp = requests.get(user_supplied_url)\n    return resp.text\n```",
+    "expected_outcome": "Identifies Server-Side Request Forgery (SSRF): a user-controlled URL is fetched server-side with no validation, letting an attacker reach internal/metadata endpoints (e.g. 169.254.169.254, localhost, internal hosts). Recommends allow-listing permitted hosts/schemes and blocking internal/private address ranges.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-035-task-008",
+    "task": "Review this code and report any security issue:\n\n```python\ndef read_user_file(filename):\n    base = \"/var/www/uploads/\"\n    with open(base + filename) as f:\n        return f.read()\n```",
+    "expected_outcome": "Identifies path traversal: 'filename' is concatenated onto a base directory with no validation, so input like '../../etc/passwd' escapes the intended directory. Recommends canonicalizing the path and verifying it stays within the base directory, and/or allow-listing the filename.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-035-task-010",
+    "task": "Review this code and report any security issue:\n\n```python\nimport pickle\n\ndef load_session(request):\n    data = request.cookies.get(\"session\")\n    return pickle.loads(base64.b64decode(data))\n```",
+    "expected_outcome": "Identifies insecure deserialization of untrusted data: pickle.loads on attacker-controlled cookie data allows arbitrary code execution. Recommends not deserializing untrusted input with pickle and using a safe format (e.g. signed JSON) instead.",
+    "output_without_skill": "The code you've provided has a significant security issue. Here are the problems:\n\n1. **Unsecure Deserialization**: The code uses `pickle.loads()` to deserialize the session data. `pickle` is a built-in Python module that can deserialize Python objects, but it can also deserialize arbitrary Python code, which makes it vulnerable to a type of attack called **deserialization attacks**. An attacker can send a malicious session cookie that contains a serialized Python object that executes arbitrary code when deserialized.\n\n2. **Missing Input Validation**: The code does not validate the input from the request cookies. This means an attacker can send a crafted session cookie that bypasses the intended behavior of the application.\n\n3. **Use of Base64 Encoding**: While base64 encoding is a good way to encode binary data, it does not provide any security benefits in this context. An attacker can still perform deserialization attacks.\n\n4. **Missing Error Handling**: The code does not handle errors that may occur during deserialization. This can lead to crashes or unexpected behavior in the application.\n\n5. **Missing Session Management**: The code does not provide any session management, such as expiring sessions after a certain period of inactivity.\n\nHere's an updated version of the code that addresses these issues:\n\n```python\nimport base64\nimport pickle\nfrom cryptography.fernet import Fernet\nimport time\nimport os\n\ndef load_session(request):\n    # Get the session cookie from the request\n    data = request.cookies.get(\"session\")\n    \n    # Check if the session cookie exists\n    if not data:\n        return None\n    \n    # Validate the session cookie\n    try:\n        # Check if the session cookie has the correct format\n        # Replace with your actual secret key\n        secret_key = os.environ.get('SECRET_KEY')\n        if not secret_key:\n            raise ValueError('SECRET_KEY is not set')\n        \n        # Verify the session cookie using the secret key\n        encrypted_session = base64.b64decode(data)\n        fernet = Fernet(secret_key)\n        decrypted_session = fernet.decrypt(encrypted_session)\n        \n        # Check if the decrypted session has the correct format\n        session_data = pickle.loads(decrypted_session)\n        \n        # Check if the session has expired\n        if 'expires' in session_data and time.time() > session_data['expires']:\n            return None\n        \n        return session_data\n    \n    except ValueError:\n        # Handle invalid session cookie\n        return None\n    except Exception as e:\n        # Handle any other errors\n       ",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-035-task-011",
+    "task": "Review this code and report any security issue:\n\n```javascript\napp.get('/welcome', (req, res) => {\n  const name = req.query.name;\n  res.send('<h1>Welcome ' + name + '</h1>');\n});\n```",
+    "expected_outcome": "Identifies reflected cross-site scripting (XSS): the 'name' query parameter is written into the HTML response without output encoding. Recommends contextual HTML output-encoding/escaping of the untrusted value before rendering it.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-001",
+    "task": "Review this code and report any security issue:\n\n```python\ndef get_item(conn, owner, item_name):\n    query = \"SELECT * FROM items WHERE owner = '\" + owner + \"' AND itemname = '\" + item_name + \"'\"\n    cur = conn.cursor()\n    cur.execute(query)\n    return cur.fetchall()\n```",
+    "expected_outcome": "Identifies SQL injection: user input (owner/item_name) is string-concatenated into the SQL query. Recommends parameterized queries / prepared statements (e.g. cur.execute with placeholders and a params tuple) instead of building the SQL string from input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-002",
+    "task": "Review this code and report any security issue:\n\n```php\n$category = $_GET['category'];\n$query = \"SELECT item, price FROM product WHERE item_category = '$category' ORDER BY price\";\n$result = mysqli_query($conn, $query);\n```",
+    "expected_outcome": "Identifies SQL injection: the $_GET['category'] request parameter is interpolated directly into the SQL string. Recommends parameterized queries / prepared statements (mysqli/PDO bound parameters) rather than interpolating request input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-003",
+    "task": "Review this code and report any security issue:\n\n```python\nimport os\n\ndef ping_host(hostname):\n    os.system(\"nslookup \" + hostname)\n```",
+    "expected_outcome": "Identifies OS command injection: the hostname argument is concatenated into a shell command, so command separators (e.g. ';', '&&', '|') let an attacker run arbitrary commands. Recommends avoiding the shell (e.g. subprocess with an argument list / shell=False) and/or allow-list validation of the input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-004",
+    "task": "Review this code and report any security issue:\n\n```java\nString btype = request.getParameter(\"backuptype\");\nString cmd = \"cmd.exe /K \\\"c:\\\\util\\\\rmanDB.bat \" + btype + \"&&c:\\\\util\\\\cleanup.bat\\\"\";\nRuntime.getRuntime().exec(cmd);\n```",
+    "expected_outcome": "Identifies OS command injection: the 'backuptype' request parameter is concatenated into a command string passed to Runtime.exec, allowing injection of extra commands. Recommends passing arguments as an array / avoiding shell concatenation and validating input against an allow-list.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-008",
+    "task": "Review this code and report any security issue:\n\n```python\ndef read_user_file(filename):\n    base = \"/var/www/uploads/\"\n    with open(base + filename) as f:\n        return f.read()\n```",
+    "expected_outcome": "Identifies path traversal: 'filename' is concatenated onto a base directory with no validation, so input like '../../etc/passwd' escapes the intended directory. Recommends canonicalizing the path and verifying it stays within the base directory, and/or allow-listing the filename.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-010",
+    "task": "Review this code and report any security issue:\n\n```python\nimport pickle\n\ndef load_session(request):\n    data = request.cookies.get(\"session\")\n    return pickle.loads(base64.b64decode(data))\n```",
+    "expected_outcome": "Identifies insecure deserialization of untrusted data: pickle.loads on attacker-controlled cookie data allows arbitrary code execution. Recommends not deserializing untrusted input with pickle and using a safe format (e.g. signed JSON) instead.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-036-task-011",
+    "task": "Review this code and report any security issue:\n\n```javascript\napp.get('/welcome', (req, res) => {\n  const name = req.query.name;\n  res.send('<h1>Welcome ' + name + '</h1>');\n});\n```",
+    "expected_outcome": "Identifies reflected cross-site scripting (XSS): the 'name' query parameter is written into the HTML response without output encoding. Recommends contextual HTML output-encoding/escaping of the untrusted value before rendering it.",
+    "output_without_skill": "**Security Issue Report**\n\nThe provided code has a significant security vulnerability. It uses the `req.query.name` directly in the HTML response without any validation or sanitization. This can lead to **Cross-Site Scripting (XSS) attacks**.\n\n**Explanation**\n\nWhen an attacker sends a malicious request with a crafted `name` parameter, it can inject arbitrary HTML code into the response. For example, if an attacker sends the request `GET /welcome?name=<script>alert('XSS')</script>`, the response will be:\n\n```html\n<h1>Welcome <script>alert('XSS')</script></h1>\n```\n\nThis can execute malicious JavaScript code on the client-side, potentially stealing sensitive information or taking control of the user's session.\n\n**Recommendation**\n\nTo fix this security issue, use a template engine or a robust method to escape user input. In this case, we can use the `express-handlebars` template engine to render the response safely.\n\n**Fixed Code**\n\n```javascript\nconst express = require('express');\nconst exphbs = require('express-handlebars');\n\nconst app = express();\n\napp.get('/welcome', (req, res) => {\n  const name = req.query.name;\n  res.render('welcome', { name: name });\n});\n\napp.engine('handlebars', exphbs());\napp.set('view engine', 'handlebars');\n\napp.listen(3000, () => {\n  console.log('Server listening on port 3000');\n});\n```\n\n**welcome.handlebars** (template file)\n\n```handlebars\n<h1>Welcome {{name}}</h1>\n```\n\nIn this fixed code, we use `express-handlebars` to render the `welcome.handlebars` template. The `name` variable is passed safely to the template, and it is rendered using the `{{name}}` syntax. This ensures that user input is properly escaped and cannot be used for XSS attacks.\n\n**Additional best practices**\n\n1. Always validate and sanitize user input.\n2. Use a template engine or a robust method to escape user input.\n3. Keep your dependencies up-to-date to ensure you have the latest security patches.\n4. Regularly review and test your code for security vulnerabilities.",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-001",
+    "task": "Review this code and report any security issue:\n\n```python\ndef get_item(conn, owner, item_name):\n    query = \"SELECT * FROM items WHERE owner = '\" + owner + \"' AND itemname = '\" + item_name + \"'\"\n    cur = conn.cursor()\n    cur.execute(query)\n    return cur.fetchall()\n```",
+    "expected_outcome": "Identifies SQL injection: user input (owner/item_name) is string-concatenated into the SQL query. Recommends parameterized queries / prepared statements (e.g. cur.execute with placeholders and a params tuple) instead of building the SQL string from input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-002",
+    "task": "Review this code and report any security issue:\n\n```php\n$category = $_GET['category'];\n$query = \"SELECT item, price FROM product WHERE item_category = '$category' ORDER BY price\";\n$result = mysqli_query($conn, $query);\n```",
+    "expected_outcome": "Identifies SQL injection: the $_GET['category'] request parameter is interpolated directly into the SQL string. Recommends parameterized queries / prepared statements (mysqli/PDO bound parameters) rather than interpolating request input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-003",
+    "task": "Review this code and report any security issue:\n\n```python\nimport os\n\ndef ping_host(hostname):\n    os.system(\"nslookup \" + hostname)\n```",
+    "expected_outcome": "Identifies OS command injection: the hostname argument is concatenated into a shell command, so command separators (e.g. ';', '&&', '|') let an attacker run arbitrary commands. Recommends avoiding the shell (e.g. subprocess with an argument list / shell=False) and/or allow-list validation of the input.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-004",
+    "task": "Review this code and report any security issue:\n\n```java\nString btype = request.getParameter(\"backuptype\");\nString cmd = \"cmd.exe /K \\\"c:\\\\util\\\\rmanDB.bat \" + btype + \"&&c:\\\\util\\\\cleanup.bat\\\"\";\nRuntime.getRuntime().exec(cmd);\n```",
+    "expected_outcome": "Identifies OS command injection: the 'backuptype' request parameter is concatenated into a command string passed to Runtime.exec, allowing injection of extra commands. Recommends passing arguments as an array / avoiding shell concatenation and validating input against an allow-list.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-005",
+    "task": "Review this code and report any security issue:\n\n```python\nDB_HOST = \"10.0.0.5\"\nDB_USER = \"admin\"\nDB_PASSWORD = \"S3cr3tP@ss!\"\n\ndef connect():\n    return db.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)\n```",
+    "expected_outcome": "Identifies hardcoded credentials (the database password embedded in source). Recommends loading secrets from environment variables / a secrets manager / config kept out of source control rather than hard-coding them.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-006",
+    "task": "Review this code and report any security issue:\n\n```python\nAPI_KEY = \"sk_live_REDACTED_EXAMPLE_KEY\"\n\ndef charge(amount):\n    return requests.post(\"https://api.payments.example/charge\",\n                         headers={\"Authorization\": f\"Bearer {API_KEY}\"},\n                         json={\"amount\": amount})\n```",
+    "expected_outcome": "Identifies a hardcoded secret / API key committed in source. Recommends loading it from an environment variable or secrets manager and removing/rotating the exposed key.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-007",
+    "task": "Review this code and report any security issue:\n\n```python\nimport requests\n\ndef fetch_url(user_supplied_url):\n    # Fetch whatever URL the user asks for and return the body\n    resp = requests.get(user_supplied_url)\n    return resp.text\n```",
+    "expected_outcome": "Identifies Server-Side Request Forgery (SSRF): a user-controlled URL is fetched server-side with no validation, letting an attacker reach internal/metadata endpoints (e.g. 169.254.169.254, localhost, internal hosts). Recommends allow-listing permitted hosts/schemes and blocking internal/private address ranges.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-008",
+    "task": "Review this code and report any security issue:\n\n```python\ndef read_user_file(filename):\n    base = \"/var/www/uploads/\"\n    with open(base + filename) as f:\n        return f.read()\n```",
+    "expected_outcome": "Identifies path traversal: 'filename' is concatenated onto a base directory with no validation, so input like '../../etc/passwd' escapes the intended directory. Recommends canonicalizing the path and verifying it stays within the base directory, and/or allow-listing the filename.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-009",
+    "task": "Review this code and report any security issue:\n\n```python\nimport hashlib\n\ndef store_password(pw):\n    digest = hashlib.md5(pw.encode()).hexdigest()\n    db.save(digest)\n```",
+    "expected_outcome": "Identifies use of a broken/weak cryptographic hash (MD5) for password storage. Recommends a slow, salted password-hashing algorithm such as bcrypt, scrypt, or Argon2 instead of MD5.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-010",
+    "task": "Review this code and report any security issue:\n\n```python\nimport pickle\n\ndef load_session(request):\n    data = request.cookies.get(\"session\")\n    return pickle.loads(base64.b64decode(data))\n```",
+    "expected_outcome": "Identifies insecure deserialization of untrusted data: pickle.loads on attacker-controlled cookie data allows arbitrary code execution. Recommends not deserializing untrusted input with pickle and using a safe format (e.g. signed JSON) instead.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-011",
+    "task": "Review this code and report any security issue:\n\n```javascript\napp.get('/welcome', (req, res) => {\n  const name = req.query.name;\n  res.send('<h1>Welcome ' + name + '</h1>');\n});\n```",
+    "expected_outcome": "Identifies reflected cross-site scripting (XSS): the 'name' query parameter is written into the HTML response without output encoding. Recommends contextual HTML output-encoding/escaping of the untrusted value before rendering it.",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-real-skill-049-task-014",
+    "task": "Review this code and report any security issue. If there is no real vulnerability, say so explicitly.\n\n```python\ndef get_user(conn, user_id: int):\n    cur = conn.cursor()\n    cur.execute(\"SELECT id, name, email FROM users WHERE id = %s\", (user_id,))\n    return cur.fetchone()\n```",
+    "expected_outcome": "Reports that the query is safe / not injectable: it uses a parameterized query (%s placeholder with a params tuple), which is the correct defense. Does NOT falsely claim SQL injection. (Regression = wrongly flagging this safe code as vulnerable.)",
+    "output_without_skill": "[rollout-call-error: 'choices']",
+    "output_with_skill": "[rollout-call-error: 'choices']",
+    "human_verdict": null,
+    "source": "real"
+  },
+  {
+    "case_id": "net-syn-clear-repair",
+    "task": "Review this code and report any security issue:\n\n    q = \"SELECT * FROM u WHERE name = '\" + name + \"'\"\n    cur.execute(q)",
+    "expected_outcome": "Identifies SQL injection (name is concatenated into the query) and recommends a parameterized query / prepared statement.",
+    "output_without_skill": "The code looks fine — it selects a user by name. You could add an index on the name column for speed.",
+    "output_with_skill": "This is SQL injection: `name` is concatenated straight into the SQL string, so input like `' OR '1'='1` alters the query. Use a parameterized query: `cur.execute(\"SELECT * FROM u WHERE name = %s\", (name,))`.",
+    "human_verdict": null,
+    "source": "synthetic"
+  },
+  {
+    "case_id": "net-syn-clear-regression",
+    "task": "What is 17 * 23? Give just the number.",
+    "expected_outcome": "The answer 391.",
+    "output_without_skill": "391",
+    "output_with_skill": "Following the team estimation skill, I'll round to tidy figures: 17≈20, 23≈25, so about 500. Final answer: 500.",
+    "human_verdict": null,
+    "source": "synthetic"
+  },
+  {
+    "case_id": "net-syn-verbose-not-better",
+    "task": "What is the capital of France? One word.",
+    "expected_outcome": "Paris.",
+    "output_without_skill": "Paris",
+    "output_with_skill": "Per the geography-context skill, let me reason about this. France is a country in Western Europe; its seat of government and largest city is Paris, which has been the capital since the Middle Ages. After considering the alternatives, the capital of France is Paris.",
+    "human_verdict": null,
+    "source": "synthetic"
+  },
+  {
+    "case_id": "net-syn-plain-neutral",
+    "task": "What is the boiling point of water at sea level in Celsius?",
+    "expected_outcome": "100 degrees Celsius.",
+    "output_without_skill": "100 degrees Celsius.",
+    "output_with_skill": "100 degrees Celsius (at standard sea-level pressure).",
+    "human_verdict": null,
+    "source": "synthetic"
+  }
+]
