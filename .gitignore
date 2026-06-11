@@ -183,3 +183,4 @@ tests/fixtures/memory/_raw_tasks/*
 # (the harvester's Groq capture is non-deterministic and can't be regenerated identically).
 !data/calibration/leakage_label_cases.json
 !data/calibration/net_effect_label_cases.json
+!data/calibration/net_effect_synthetic_cases.json
