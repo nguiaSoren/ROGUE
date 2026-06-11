@@ -85,12 +85,39 @@ So the paper-vs-community contrast runs on **two axes**: binary reproduction (30
 - **Surprise (also publishable):** community attacks reproduce *as well as* paper attacks → overturns the expectation, equally a finding.
 - **Underpowered:** if the N≥5-with-augmentation-off coverage audit guts the usable n → lead with C1 binary on whatever survives, report C2 as descriptive, flag the top-up run needed.
 
+## Results — first run (2026-06-12, $0, collected data)
+
+`scripts/research/reproducibility_gap.py` over 301 baseline primitives / 10,244 baseline rows / 5-model panel. All three claims came back as hypothesized.
+
+**C1 — the reproduction collapse (the spine, unambiguous).** Carrier reproduction at τ=0.4 falls sharply as the target gets harder, with non-overlapping CIs:
+
+| set | n | reproduces on ≥1 of 5 models | on frozen Llama-8B anchor | on robust Claude-Haiku |
+|---|---|---|---|---|
+| ALL | 301 | 0.405 [0.352, 0.462] | 0.090 [0.060, 0.123] | 0.037 [0.017, 0.060] |
+| arxiv | 79 | 0.519 [0.405, 0.620] | 0.139 [0.076, 0.215] | 0.089 [0.025, 0.152] |
+| grey-lit | 222 | 0.365 [0.302, 0.428] | 0.072 [0.041, 0.108] | 0.018 [0.005, 0.041] |
+
+So a technique's "works on at least one of five models" rate (40.5%) collapses ~4.5× to the frozen open-weight anchor (9.0%) and ~11× to the robust model (3.7%) — the "best-of-5" figure is inflated by the weakest target; the fixed-target numbers are the honest carrier-viability rates. Robust to threshold: any-model reproduction is 56.5% at τ=0.2 and 31.2% at τ=0.6.
+
+**Source heterogeneity (directionally clean, widens on hard targets).** arxiv-sourced techniques reproduce better than grey-literature ones at every stage, and the gap *grows* as the target hardens: ~1.4× on best-of-5, ~1.9× on the Llama anchor, **~5× on the robust model (8.9% vs 1.8%)**. The gap approaches significance only at the robust anchor (CIs [2.5,15.2] vs [0.5,4.1] just touch); a larger arxiv n (currently 79) would confirm it. Stratification is clean — 0 primitives carry both an arxiv and a community source.
+
+**C2 — the ⚑ null holds (n=56).** Claimed potency does **not** predict measured reproduction: Spearman(claimed, measured pooled) = **−0.098, 95% CI [−0.374, +0.171]** (includes 0, slightly negative); max-rate variant −0.137. The CI rules out any correlation stronger than ρ≈0.17 — claimed numbers are not portable signal. Holds in both strata (arxiv-claimed +0.10, community-claimed −0.18, both CIs include 0). **The money shot:** of the 17 techniques claiming ~100% success, only **7 reproduce at τ=0.4** and their **mean measured breach rate is 13.3%**.
+
+**C3 — family ordering ⊥ claimed ordering (descriptive, underpowered).** Spearman between the measured-reproduction family ordering and the mean-claimed-potency ordering = **−0.044 [−0.73, +0.55]** over the 12 families carrying claims — i.e. no relationship, but the CI is wide (only 12 families). Extremes illustrate it: `training_data_extraction` reproduces 100% (claimed 0.98), while `chain_of_thought_hijack` reproduces **0%** despite a mean claim of 0.955, and `system_prompt_leak` (claimed 1.000) reproduces 0.370.
+
+**Result-specific caveats (beyond the design risks above):**
+- **Temperature is not pinned** — baseline rows span 0.7–1.1 and the breach rate pools across them. Acceptable for binary "does the carrier ever bypass," but a pinned-temperature confirmation run would harden C1.
+- The **source gap is only borderline-significant** (clean direction, overlapping-at-the-edges CIs); state it as "consistent and growing on hard targets," not "established," pending more arxiv primitives.
+- **C2's null** rules out a *strong* claimed→measured correlation at n=56, not a weak one.
+
+**⚑ Publishable.** The reproduction collapse + the "claims 100%, delivers 13%" null + the conservative-judge/open-weight-anchor method are a clean, mostly-negative result on the open-web grey literature, computed entirely on collected data. Results JSON: `data/research/reproducibility_gap_results.json`.
+
 ## Execution status
 
 - [x] Scope + scoop check (5-agent fan-out, 2026-06-12) — reframe locked, prior art mapped.
 - [x] Corpus sizing on live Neon — 459 / 369 / 56 / 11,098, source-type + claimed-rate distributions captured (above).
 - [x] **Coverage audit (2026-06-12):** 291/301 baseline primitives ≥5 trials, 56/56 claimed ≥5, Llama anchor 298 prims, both contrast axes powered → **no paid top-up needed for the core**.
-- [ ] Build the analysis harness (Wilson CI per cell, source-type strata, Spearman + bootstrap, the three figures) — reuse `diff/bootstrap.py`, `verdict_projection.py`, the breach-matrix snapshot loader.
+- [x] **Build the analysis harness (2026-06-12)** — `scripts/research/reproducibility_gap.py` (bootstrap CI on fractions via `diff/bootstrap.py`; self-contained Spearman + paired-bootstrap CI; source strata; τ sweep). First run complete, results above + `data/research/reproducibility_gap_results.json`. Remaining: render the three figures.
 - [ ] (Optional) claimed-ASR extraction re-pass to grow the C2 sample.
 - [ ] Write up against `judge_calibration_paper.md` + `coverage_validity_study.md`; do not reinvent the judge-credibility numbers.
 - [ ] Sign-off (Soren).
