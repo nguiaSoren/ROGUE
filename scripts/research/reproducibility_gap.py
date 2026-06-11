@@ -233,6 +233,37 @@ if len(both) >= 3:
 out["C3_families"] = [{"family": f, "n": n, "repro": rr, "mean_claim": mc, "n_claim": nc}
                       for f, n, rr, mc, nc in fam_rows]
 
+# ============================================ temperature robustness (C1)
+# Baseline rows span T=0.7..1.1 (not pinned). Confirm C1 is not a temperature
+# artifact by recomputing the ALL-set funnel on temperature subsets.
+print("\n================ temperature robustness — ALL-set funnel at tau=0.4 ================")
+print(f"{'temp subset':14s} {'n_prims':>8s} {'>=1 model':>10s} {'Llama-8B':>10s} {'Cl-Haiku':>10s}")
+
+def funnel_for(pred):
+    cells = defaultdict(lambda: [0, 0]); pl = set()
+    for r in rows:
+        if not pred(r["temperature"]):
+            continue
+        k = (r["primitive_id"], r["cfg"]); cells[k][0] += 1
+        if r["verdict"] in BREACH:
+            cells[k][1] += 1
+        pl.add(r["primitive_id"])
+    def rate(only=None):
+        fl = []
+        for pid in pl:
+            rs = {cfg: (b / t if t else 0.0) for (p2, cfg), (t, b) in cells.items() if p2 == pid}
+            fl.append((rs.get(only, 0.0) if only else (max(rs.values()) if rs else 0.0)) >= TAU_PRIMARY)
+        return sum(fl) / len(fl) if fl else 0.0
+    return len(pl), rate(), rate(LLAMA), rate(ROBUST)
+
+out["C1_temp_robustness"] = {}
+for label, pred in [("all (0.7-1.1)", lambda t: True),
+                    ("T=0.70 only", lambda t: t is not None and abs(t - 0.7) < 0.01),
+                    ("T>=0.80", lambda t: t is not None and t >= 0.79)]:
+    n, a, l, rr = funnel_for(pred)
+    print(f"{label:14s} {n:>8d} {a:>10.3f} {l:>10.3f} {rr:>10.3f}")
+    out["C1_temp_robustness"][label] = {"n": n, "any": a, "llama": l, "robust": rr}
+
 # ---------------------------------------------------------------- dump
 dest = ROOT / "data" / "research"
 dest.mkdir(parents=True, exist_ok=True)

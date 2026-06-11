@@ -106,9 +106,9 @@ So a technique's "works on at least one of five models" rate (40.5%) collapses ~
 **C3 — family ordering ⊥ claimed ordering (descriptive, underpowered).** Spearman between the measured-reproduction family ordering and the mean-claimed-potency ordering = **−0.044 [−0.73, +0.55]** over the 12 families carrying claims — i.e. no relationship, but the CI is wide (only 12 families). Extremes illustrate it: `training_data_extraction` reproduces 100% (claimed 0.98), while `chain_of_thought_hijack` reproduces **0%** despite a mean claim of 0.955, and `system_prompt_leak` (claimed 1.000) reproduces 0.370.
 
 **Result-specific caveats (beyond the design risks above):**
-- **Temperature is not pinned** — baseline rows span 0.7–1.1 and the breach rate pools across them. Acceptable for binary "does the carrier ever bypass," but a pinned-temperature confirmation run would harden C1.
+- **Temperature — checked, not a confound (2026-06-12).** Baseline rows span T=0.7–1.1 (not pinned per cell, so a single-temperature subset can't keep N≥5), but the breach rate is near-flat across the band (9.1% at T=0.7 → 12.7% at T=1.1, lowest temp most conservative). Recomputing the ALL-set funnel on temperature subsets confirms the collapse is not a temperature artifact: pooled 40.5/9.0/3.7%, **T=0.70-only 36.5/8.6/2.7%, T≥0.80 38.0/7.0/3.2%** (any-model / Llama-anchor / robust). The headline funnel shape and magnitude are stable; the unpinned-temperature pooling does not bias C1.
 - The **source gap is only borderline-significant** (clean direction, overlapping-at-the-edges CIs); state it as "consistent and growing on hard targets," not "established," pending more arxiv primitives.
-- **C2's null** rules out a *strong* claimed→measured correlation at n=56, not a weak one.
+- **C2's null** rules out a *strong* claimed→measured correlation at n=56, not a weak one. Growing n is **not cheaply available**: of 245 null-claimed baseline primitives only 1 has a parseable percentage in `notes`, and there is no `raw_documents` table — a larger claimed set needs a paid LLM re-extraction over `fetch_cache`/`snapshot_captures` (build + spend + DB write, approval-gated). Given the null already stands with a CI excluding ρ>0.17, this is deferred unless a reviewer demands a tighter interval.
 
 **⚑ Publishable.** The reproduction collapse + the "claims 100%, delivers 13%" null + the conservative-judge/open-weight-anchor method are a clean, mostly-negative result on the open-web grey literature, computed entirely on collected data. Results JSON: `data/research/reproducibility_gap_results.json`.
 
@@ -118,6 +118,7 @@ So a technique's "works on at least one of five models" rate (40.5%) collapses ~
 - [x] Corpus sizing on live Neon — 459 / 369 / 56 / 11,098, source-type + claimed-rate distributions captured (above).
 - [x] **Coverage audit (2026-06-12):** 291/301 baseline primitives ≥5 trials, 56/56 claimed ≥5, Llama anchor 298 prims, both contrast axes powered → **no paid top-up needed for the core**.
 - [x] **Build the analysis harness (2026-06-12)** — `scripts/research/reproducibility_gap.py` (bootstrap CI on fractions via `diff/bootstrap.py`; self-contained Spearman + paired-bootstrap CI; source strata; τ sweep). First run complete, results above + `data/research/reproducibility_gap_results.json`. Remaining: render the three figures.
-- [ ] (Optional) claimed-ASR extraction re-pass to grow the C2 sample.
+- [x] **Temperature-robustness confirmation (2026-06-12)** — funnel stable across T=0.7-only / T≥0.8 / pooled; C1 is not a temperature artifact (results above).
+- [~] (Optional) claimed-ASR extraction re-pass to grow the C2 sample — **$0 path dead** (1/245 primitives have a notes %); paid LLM re-extraction deferred (null already CI-bounded).
 - [ ] Write up against `judge_calibration_paper.md` + `coverage_validity_study.md`; do not reinvent the judge-credibility numbers.
 - [ ] Sign-off (Soren).
