@@ -23,7 +23,7 @@ import {
 export const metadata = {
   title: "Research, ROGUE",
   description:
-    "The methods and measured results behind ROGUE, a solo research build of a continuous open-web LLM red-team. Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, measure-before-build discipline, and measured remediation. Including the negative results.",
+    "The methods and measured results behind ROGUE, a solo research build of a continuous open-web LLM red-team. Judge calibration against human-labeled benchmarks, scheduling as a capability lever, a publication-grade null result, measure-before-build discipline, measured remediation, and a grey-literature reproducibility audit (claimed jailbreak success doesn't predict what reproduces). Including the negative results.",
 };
 
 /**
@@ -582,96 +582,6 @@ export default function ResearchPage() {
                 over-blocks. <span className="text-rogue-green">⚑</span>
               </NovelNote>
             </FindingCard>
-          </div>
-        </Section>
-
-        {/* 5. MEASURED REMEDIATION -------------------------------------- */}
-        <Section
-          eyebrow="finding 05"
-          title="Measured remediation: generate a fix, prove it closes the breach without over-blocking, and refuse to ship one that doesn't."
-        >
-          <div className="max-w-3xl space-y-6">
-            <div className="flex gap-4">
-              <ShieldCheck
-                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <p className="text-base text-muted-foreground leading-relaxed">
-                A breach drives a loop: generate a candidate mitigation from the
-                transcripts, re-test it against the same attack family (does the
-                breach rate drop, CI-confidently?), re-test against an
-                independent legitimate-traffic set (does it{" "}
-                <em>over-block</em> what the agent should still answer?), and{" "}
-                <span className="text-foreground font-medium">
-                  accept only if the drop is statistically real and over-block ≈ 0
-                </span>
-                , else emit an architecture recommendation. ROGUE generates and
-                verifies; the client deploys, ROGUE never sits in the request
-                path (ADR-0010).
-              </p>
-            </div>
-
-            <p className="text-base text-muted-foreground leading-relaxed">
-              The result is two-sided, both verdicts measured by the calibrated
-              judge. The{" "}
-              <span className="text-foreground font-medium">positive</span>, RD04
-              (reveal the verbatim system prompt) on a permissive Llama-3.1-8B: a
-              generated system-prompt patch closed the breach{" "}
-              <span className="text-foreground font-medium">3.0% → 0.0%</span> at{" "}
-              <span className="text-foreground font-medium">0% over-block</span>{" "}
-              → <span className="text-foreground font-medium">accepted</span>{" "}
-              (verified by re-scan). The{" "}
-              <span className="text-foreground font-medium">negative</span>, RA06
-              (a directive medical / financial instruction) on Mistral-Small: the
-              generated patch did <span className="text-foreground font-medium">not</span>{" "}
-              hold, post-mitigation breach{" "}
-              <span className="text-foreground font-medium">
-                20.8% → ~25%
-              </span>{" "}
-              (CIs overlapping), so the loop refused it and emitted an
-              architecture recommendation, a prompt tweak can&rsquo;t fix an
-              instruction-override attack that drives an unauthorized action. It
-              closes what&rsquo;s closable and refuses what isn&rsquo;t.
-            </p>
-
-            <p className="text-base text-muted-foreground leading-relaxed">
-              &ldquo;Without over-blocking&rdquo; is a measured claim, not an
-              asserted one. The over-block detector was scored against a 50-case
-              independent designed set: the LLM judge-FP-mode (same model family
-              as the breach judge) ships at{" "}
-              <span className="text-foreground font-medium">
-                98% agreement, 0% over-flag
-              </span>
-              , driving an{" "}
-              <span className="text-foreground font-medium">88%</span> heuristic
-              first pass to zero false over-flags (hedged-but-helpful answers
-              correctly cleared).
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <Metric value="3.0 → 0.0%" label="RD04 breach, accepted" accent="green" />
-              <Metric value="20.8 → ~25%" label="RA06 patch, refused" accent="red" />
-              <Metric value="98% / 0%" label="over-block judge agree / over-flag" accent="green" />
-              <Metric value="88%" label="heuristic baseline" accent="green" />
-            </div>
-
-            <MethodNote>
-              Method, generate → re-test vs attack family (CI-confident breach
-              drop) → re-test vs independent legitimate set (over-block);
-              breach scored by the calibrated per-rule judge, over-block by an
-              LLM FP-mode judge calibrated on a 50-case designed set; accept iff
-              real drop and over-block ≈ 0, else architecture recommendation.
-            </MethodNote>
-
-            <NovelNote>
-              &ldquo;We generated a patch, <em>measured</em> that it doesn&rsquo;t
-              hold, and recommended the design change instead of asserting
-              &lsquo;fixed&rsquo;&rdquo; is exactly the assurance a runtime
-              guardrail (which asserts it blocks, unmeasured) can&rsquo;t give.
-              Honest caveats: the positive&rsquo;s base rate is modest, a
-              confident full-closure, not a high-drama one; a v2 capability.
-            </NovelNote>
           </div>
         </Section>
 
