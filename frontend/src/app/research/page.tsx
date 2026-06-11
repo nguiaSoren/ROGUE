@@ -744,6 +744,12 @@ export default function ResearchPage() {
               objective (system-prompt disclosure), not the original harmful
               payload; the panel is anchored by a frozen open-weight model so
               non-reproduction isn&rsquo;t confounded by silent vendor patching.
+              A stronger-model re-extraction (Sonnet 4.6, Batch API) of all 148
+              candidate sources confirmed the null is not an extraction
+              artifact, it recovered a claimed rate for only 1 of 94
+              unquantified sources, so the small claimed-rate sample reflects
+              that the open web rarely quantifies these claims, not a weak
+              extractor.
             </MethodNote>
 
             <NovelNote>
@@ -757,8 +763,11 @@ export default function ResearchPage() {
               under-count. Honest caveats, &ldquo;reproduction&rdquo; means the
               delivery mechanism still bypasses toward a neutral goal (harmful
               payloads are deliberately not reproduced); the paper-vs-forum gap is
-              directional (borderline-significant); temperatures were not pinned in
-              this collected-data pass. <span className="text-rogue-green">⚑</span>
+              directional (borderline-significant); temperature was checked and is
+              not a confound (the funnel holds across temperature subsets); and the
+              claimed rates carry ~17% extraction noise, so −0.10 reads as &ldquo;no
+              predictive signal,&rdquo; not a precise estimate.{" "}
+              <span className="text-rogue-green">⚑</span>
             </NovelNote>
           </div>
         </Section>
