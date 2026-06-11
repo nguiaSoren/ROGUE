@@ -156,8 +156,11 @@ def _assert_no_prediction(payload: list[dict[str, Any]]) -> None:
 
 def _render_html(payload: list[dict[str, Any]], *, judge: str) -> str:
     cfg = _JUDGE_CONFIG[judge]
-    cases_json = json.dumps(payload, ensure_ascii=False, indent=2)
-    verdicts_json = json.dumps(cfg["verdicts"])
+    # Embed inside a <script> block — escape '<' to < so a case value containing
+    # '</script>' / '<script>' (e.g. an XSS code-review task) can't terminate the block.
+    # JS parses < back to '<' in the string literals, so the data is unchanged.
+    cases_json = json.dumps(payload, ensure_ascii=False, indent=2).replace("<", "\\u003c")
+    verdicts_json = json.dumps(cfg["verdicts"]).replace("<", "\\u003c")
     n = len(payload)
     title = html.escape(cfg["title"])
     question = html.escape(cfg["question"])
