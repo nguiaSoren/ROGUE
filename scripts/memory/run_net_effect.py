@@ -27,12 +27,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 import dotenv
 import httpx
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _groq import groq_chat  # noqa: E402  (robust retry/backoff Groq helper)
 
 from rogue.db.models import Skill, SkillSourceKind, SkillStatus
 from rogue.memory.judges import net_effect_judge
@@ -116,23 +120,10 @@ class GroqRolloutRunner:
         self._client = httpx.Client(timeout=30)
 
     def _ask(self, system: str, user: str) -> str:
-        try:
-            r = self._client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self._key}"},
-                json={
-                    "model": self._model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "max_tokens": 512,
-                    "temperature": 0.7,
-                },
-            )
-            return r.json()["choices"][0]["message"]["content"]
-        except Exception as exc:  # never let one bad call sink the run
-            return f"[rollout-call-error: {exc}]"
+        return groq_chat(
+            self._client, self._key, self._model, system, user,
+            max_tokens=512, temperature=0.7, error_tag="rollout-call-error",
+        )
 
     def _with_system(self, skill: Skill) -> str:
         return (
