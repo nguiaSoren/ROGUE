@@ -345,6 +345,61 @@ export function BreachRejudgeFig() {
 // Fig 5, The null result (mini forest plot), OR axis ~0.5 to 2, line at OR=1
 // --------------------------------------------------------------------------
 
+export function ReproductionFunnelFig() {
+  // Carrier reproduction at tau=0.4, from scripts/research/reproducibility_gap.py
+  // (301 baseline primitives, 10,244 baseline rows). See
+  // docs/research/reproducibility_gap_study.md.
+  const stages: { label: string; arxiv: number; grey: number }[] = [
+    { label: "≥1 of 5 models", arxiv: 0.519, grey: 0.365 },
+    { label: "frozen Llama-8B", arxiv: 0.139, grey: 0.072 },
+    { label: "robust Claude-Haiku", arxiv: 0.089, grey: 0.018 },
+  ];
+  const AXIS_MAX = 0.55;
+  const w = (r: number) => `${(r / AXIS_MAX) * 100}%`;
+
+  return (
+    <Figure caption="Carrier reproduction at τ=0.4 across 301 baseline primitives. The 'best of 5 models' rate is inflated by the weakest target; on a fixed, frozen open-weight model only ~9% reproduce, and ~4% on the most robust model. Paper-sourced techniques degrade more slowly than grey-literature ones.">
+      <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
+        Carrier reproduction as the target hardens →
+      </figcaption>
+      <div className="space-y-4">
+        {stages.map((s) => (
+          <div key={s.label} className="space-y-1.5">
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {s.label}
+            </span>
+            {([
+              { name: "arxiv", v: s.arxiv, cls: "bg-rogue-green" },
+              { name: "grey-lit", v: s.grey, cls: "bg-muted-foreground/70" },
+            ] as const).map((b) => (
+              <div
+                key={b.name}
+                className="grid grid-cols-[4.5rem_1fr_2.75rem] items-center gap-2"
+                role="img"
+                aria-label={`${b.name}, ${s.label}: ${Math.round(b.v * 100)} percent reproduce`}
+              >
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
+                  {b.name}
+                </span>
+                <div className="relative h-3.5 rounded-sm bg-foreground/[0.06]">
+                  <div
+                    className={`absolute inset-y-0 left-0 rounded-sm ${b.cls}`}
+                    style={{ width: w(b.v) }}
+                    aria-hidden
+                  />
+                </div>
+                <span className="text-right font-mono text-[11px] text-foreground">
+                  {Math.round(b.v * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Figure>
+  );
+}
+
 export function NullResultForestFig() {
   const rows: { label: string; or: number }[] = [
     { label: "authority_frame", or: 1.05 },

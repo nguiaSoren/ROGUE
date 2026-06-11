@@ -16,6 +16,7 @@ import {
   FalsePositiveModesFig,
   BreachRejudgeFig,
   NullResultForestFig,
+  ReproductionFunnelFig,
   MethodNote,
 } from "@/components/research-figures";
 
@@ -53,8 +54,8 @@ export default function ResearchPage() {
         </Section>
 
         {/* AT A GLANCE -------------------------------------------------- */}
-        <Section eyebrow="at a glance" title="Five findings, in about a minute.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <Section eyebrow="at a glance" title="Six findings, in about a minute.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <GlanceCard
               href="#finding-01"
               eyebrow="01 · judge"
@@ -85,6 +86,13 @@ export default function ResearchPage() {
               eyebrow="05 · remediation"
               headline="0% → 20%"
               desc="The calibrated over-block judge caught an over-block a marker heuristic scored 0%, flipping a would-be accept into a correct refusal."
+              accent="red"
+            />
+            <GlanceCard
+              href="#finding-06"
+              eyebrow="06 · reproduction"
+              headline="100% → 13%"
+              desc="A source's claimed success rate doesn't predict what reproduces against your deployment (ρ ≈ −0.10). ROGUE re-measures every technique."
               accent="red"
             />
           </div>
@@ -663,6 +671,94 @@ export default function ResearchPage() {
               guardrail (which asserts it blocks, unmeasured) can&rsquo;t give.
               Honest caveats: the positive&rsquo;s base rate is modest, a
               confident full-closure, not a high-drama one; a v2 capability.
+            </NovelNote>
+          </div>
+        </Section>
+
+        {/* 6. REPRODUCIBILITY ------------------------------------------- */}
+        <Section
+          id="finding-06"
+          eyebrow="finding 06"
+          title="Claimed potency doesn't predict what reproduces against your deployment."
+        >
+          <div className="max-w-3xl space-y-6">
+            <div className="flex gap-4">
+              <Scale
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-[17px] text-foreground leading-relaxed">
+                Of 17 harvested techniques whose source claimed{" "}
+                <span className="text-foreground font-medium">~100% success</span>,
+                only <span className="text-foreground font-medium">7</span>{" "}
+                reproduce at all, and their mean measured breach rate is{" "}
+                <span className="text-foreground font-medium">13%</span>. Across the
+                56 techniques that publish a number, claimed success and measured
+                reproduction are{" "}
+                <span className="text-foreground font-medium">
+                  uncorrelated (Spearman −0.10, 95% CI [−0.37, +0.17])
+                </span>
+                {" "}— a claimed rate is not portable signal, which is why ROGUE
+                re-measures every technique against your model and system prompt,
+                not the source&rsquo;s.
+              </p>
+            </div>
+
+            <p className="text-base text-muted-foreground leading-relaxed">
+              The same pattern shows up as a reproduction funnel. Across 301
+              techniques harvested from 19 open-web sources and reproduced on a
+              five-model panel, the &ldquo;works on at least one of five
+              models&rdquo; rate{" "}
+              <span className="text-foreground font-medium">(40%)</span> is
+              inflated by the weakest target: on a{" "}
+              <span className="text-foreground font-medium">
+                frozen open-weight model only ~9% reproduce
+              </span>
+              , and{" "}
+              <span className="text-foreground font-medium">
+                ~4% on the most robust model
+              </span>
+              . Paper-sourced techniques degrade more slowly than
+              grey-literature ones, a directional gap that widens on the harder
+              targets.
+            </p>
+
+            <div className="animate-rogue-fade-up">
+              <ReproductionFunnelFig />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric value="−0.10" label="claimed vs measured (ρ, n=56)" accent="red" />
+              <Metric value="100% → 13%" label="claimed ~100%, mean measured" accent="red" />
+              <Metric value="~9%" label="reproduce on a frozen model" accent="red" />
+              <Metric value="$0" label="on already-collected data" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, 301 baseline techniques × a five-model panel,{" "}
+              <span className="text-foreground/90">10,244 trials already collected</span>;
+              breach = the calibrated v3 judge (tuned to under-count) at
+              any_breach_rate ≥ 0.4; reproduction is measured as whether the{" "}
+              <em>carrier mechanism</em> still bypasses alignment toward a neutral
+              objective (system-prompt disclosure), not the original harmful
+              payload; the panel is anchored by a frozen open-weight model so
+              non-reproduction isn&rsquo;t confounded by silent vendor patching.
+            </MethodNote>
+
+            <NovelNote>
+              The honest version of &ldquo;we test real attacks&rdquo;: a success
+              rate claimed in a paper or a forum is{" "}
+              <span className="text-foreground/90">
+                not portable to your deployment
+              </span>
+              {" "}(measured ρ ≈ 0). The value is the re-measurement against your
+              model, system prompt, and tools, under a judge calibrated to
+              under-count. Honest caveats, &ldquo;reproduction&rdquo; means the
+              delivery mechanism still bypasses toward a neutral goal (harmful
+              payloads are deliberately not reproduced); the paper-vs-forum gap is
+              directional (borderline-significant); temperatures were not pinned in
+              this collected-data pass. <span className="text-rogue-green">⚑</span>
             </NovelNote>
           </div>
         </Section>
