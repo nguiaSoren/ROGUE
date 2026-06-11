@@ -16,12 +16,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 import dotenv
 import httpx
 
-from rogue.memory.leakage import ScrubbedSkill, measure_leakage
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _groq import groq_chat  # noqa: E402  (robust retry/backoff Groq helper)
+
+from rogue.memory.leakage import ScrubbedSkill, measure_leakage  # noqa: E402
 
 _PACK = Path("benchmark/memory_leakage/extraction_pack_v1.json")
 
@@ -59,23 +63,10 @@ class GroqExtractionAttacker:
         return base
 
     def _ask(self, system: str, user: str) -> str:
-        try:
-            r = self._client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self._key}"},
-                json={
-                    "model": self._model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "max_tokens": 320,
-                    "temperature": 0.8,
-                },
-            )
-            return r.json()["choices"][0]["message"]["content"]
-        except Exception as exc:  # never let one bad call sink the run
-            return f"[attack-call-error: {exc}]"
+        return groq_chat(
+            self._client, self._key, self._model, system, user,
+            max_tokens=320, temperature=0.8, error_tag="attack-call-error",
+        )
 
     def attack(self, scrubbed_skill: ScrubbedSkill) -> list[str]:
         system = self._system_for(scrubbed_skill)
