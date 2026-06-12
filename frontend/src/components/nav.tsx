@@ -84,6 +84,12 @@ export function Nav() {
           </span>
           <LivePill count={count} dbUp={dbUp} />
           <Link
+            href="/try"
+            className="inline-flex items-center gap-1.5 rounded border border-rogue-green/60 px-3 py-1 text-rogue-green transition-colors hover:bg-rogue-green/10"
+          >
+            ▶ try
+          </Link>
+          <Link
             href="/scans"
             className="hidden sm:inline-block rounded border border-rogue-green/50 px-3 py-1 text-rogue-green transition-colors hover:bg-rogue-green/10"
           >
@@ -120,6 +126,8 @@ export function Nav() {
           className="md:hidden border-t border-border bg-background/95 font-mono"
         >
           <div className="max-w-7xl mx-auto px-6 py-2 flex flex-col text-xs uppercase tracking-widest">
+            <MobileLink href="/try" active={pathname === "/try"} onClick={closeMenu}>▶ try the demo</MobileLink>
+            <div className="my-1 border-t border-border" />
             <MobileLink href="/feed" active={pathname === "/feed"} onClick={closeMenu}>/feed</MobileLink>
             <MobileLink href="/matrix" active={pathname === "/matrix"} onClick={closeMenu}>/matrix</MobileLink>
             <MobileLink href="/analytics" active={pathname === "/analytics"} onClick={closeMenu}>/analytics</MobileLink>
