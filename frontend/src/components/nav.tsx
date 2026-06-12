@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useSseFeed } from "@/components/sse-feed-provider";
-import { COMMERCIAL } from "@/lib/flags";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -78,12 +77,8 @@ export function Nav() {
             <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
             <NavLink href="/research" active={pathname === "/research"}>research</NavLink>
           </span>
-          {/* Commercial links */}
           <span className="hidden md:flex items-center gap-5">
             <NavLink href="/product" active={pathname === "/product"}>product</NavLink>
-            {COMMERCIAL && <NavLink href="/pricing" active={pathname === "/pricing"}>pricing</NavLink>}
-            {COMMERCIAL && <NavLink href="/enterprise" active={pathname === "/enterprise"}>enterprise</NavLink>}
-            {COMMERCIAL && <NavLink href="/security" active={pathname === "/security"}>security</NavLink>}
             <NavLink href="/resources" active={pathname === "/resources"}>resources</NavLink>
             <NavLink href="/about" active={pathname === "/about"}>about</NavLink>
           </span>
@@ -95,10 +90,10 @@ export function Nav() {
             dashboard
           </Link>
           <Link
-            href={COMMERCIAL ? "/request-demo" : "/early-access"}
+            href="/early-access"
             className="rounded bg-rogue-green px-3 py-1 font-semibold text-[#050508] transition-opacity hover:opacity-90"
           >
-            {COMMERCIAL ? "request demo" : "early access"}
+            early access
           </Link>
           {/* Hamburger, only below md, where the inline link groups are hidden */}
           <button
@@ -132,19 +127,16 @@ export function Nav() {
             <MobileLink href="/research" active={pathname === "/research"} onClick={closeMenu}>research</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/product" active={pathname === "/product"} onClick={closeMenu}>product</MobileLink>
-            {COMMERCIAL && <MobileLink href="/pricing" active={pathname === "/pricing"} onClick={closeMenu}>pricing</MobileLink>}
-            {COMMERCIAL && <MobileLink href="/enterprise" active={pathname === "/enterprise"} onClick={closeMenu}>enterprise</MobileLink>}
-            {COMMERCIAL && <MobileLink href="/security" active={pathname === "/security"} onClick={closeMenu}>security</MobileLink>}
             <MobileLink href="/resources" active={pathname === "/resources"} onClick={closeMenu}>resources</MobileLink>
             <MobileLink href="/about" active={pathname === "/about"} onClick={closeMenu}>about</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/scans" active={pathname === "/scans"} onClick={closeMenu}>dashboard</MobileLink>
             <Link
-              href={COMMERCIAL ? "/request-demo" : "/early-access"}
+              href="/early-access"
               onClick={closeMenu}
               className="mt-2 mb-1 rounded bg-rogue-green px-3 py-3 text-center font-semibold text-[#050508] transition-opacity hover:opacity-90"
             >
-              {COMMERCIAL ? "request demo" : "early access"}
+              early access
             </Link>
           </div>
         </nav>

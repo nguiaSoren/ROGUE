@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Rocket, ClipboardCheck, FlaskConical, ArrowRight } from "lucide-react";
-import { COMMERCIAL } from "@/lib/flags";
 
 /**
  * EarlyAccessSection, the honest social-proof replacement.
@@ -11,14 +10,11 @@ import { COMMERCIAL } from "@/lib/flags";
  * max-w-7xl-aware so it can be dropped in as a top-level homepage section.
  * Server component.
  *
- * The honest "what's being built" content is shown in both modes. The sales
- * CTAs branch on COMMERCIAL: in commercial mode the cards route to
- * /request-demo ("Start a pilot", "Partner with us"); in the default
- * hiring/research mode the pilot+partner sales asks are dropped and every
- * card routes to /early-access or /research instead.
+ * The honest "what's being built" content: the pilot+partner sales asks are
+ * dropped and every card routes to /early-access, /research, or /matrix.
  */
 export function EarlyAccessSection() {
-  const tracks = COMMERCIAL ? TRACKS : RESEARCH_TRACKS;
+  const tracks = RESEARCH_TRACKS;
   return (
     <section className="max-w-7xl mx-auto px-6">
       <div className="max-w-3xl space-y-4">
@@ -76,10 +72,10 @@ export function EarlyAccessSection() {
         </Link>{" "}
         or{" "}
         <Link
-          href={COMMERCIAL ? "/request-demo" : "/research"}
+          href="/research"
           className="text-rogue-green underline-offset-4 hover:underline"
         >
-          {COMMERCIAL ? "just reach out" : "read the research"}
+          read the research
         </Link>{" "}
 , we read every one.
       </p>
@@ -89,7 +85,10 @@ export function EarlyAccessSection() {
 
 // ---------------------------------------------------------------------------
 
-const TRACKS: ReadonlyArray<{
+// The honest "what's being built" content: the pilot+partner *sales* asks are
+// dropped, every card routes to the research surface, the early-access tracks,
+// or the live matrix instead of any /request-demo sales surface.
+const RESEARCH_TRACKS: ReadonlyArray<{
   icon: React.ComponentType<{
     className?: string;
     strokeWidth?: number;
@@ -101,36 +100,6 @@ const TRACKS: ReadonlyArray<{
   cta: string;
   href: string;
 }> = [
-  {
-    icon: Rocket,
-    name: "Early Access Program",
-    forWhom: "For teams who want ROGUE on their stack now.",
-    gist: "Hands-on onboarding, the full repertoire and adaptive-ladder scans, a direct line to the founder, and real influence over the roadmap.",
-    cta: "Apply for early access",
-    href: "/request-demo",
-  },
-  {
-    icon: ClipboardCheck,
-    name: "Pilot Program",
-    forWhom: "For orgs evaluating their AI security posture before committing.",
-    gist: "A scoped, time-boxed pilot on your real deployment, an executive risk report, and concrete remediation guidance.",
-    cta: "Start a pilot",
-    href: "/request-demo",
-  },
-  {
-    icon: FlaskConical,
-    name: "Research Partners",
-    forWhom: "For academic, red-team, and model-risk researchers.",
-    gist: "Access to the harvested corpus and benchmark infra, co-authorship on findings, and the MCP server for live threat-DB queries.",
-    cta: "Partner with us",
-    href: "/request-demo",
-  },
-];
-
-// Non-commercial (default) variant: same honest "what's being built" content,
-// but the pilot+partner *sales* asks are dropped, every card routes to the
-// research surface or the early-access tracks instead of /request-demo.
-const RESEARCH_TRACKS: typeof TRACKS = [
   {
     icon: FlaskConical,
     name: "The research",

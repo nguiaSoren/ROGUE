@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { NewsletterSignup } from "@/components/marketing/newsletter-signup";
-import { COMMERCIAL } from "@/lib/flags";
 
 /**
  * Global marketing footer. Server component, hosts the (client) newsletter
@@ -15,7 +14,6 @@ type FooterLink = { label: string; href: string; external?: boolean };
 
 const PRODUCT: FooterLink[] = [
   { label: "Overview", href: "/" },
-  ...(COMMERCIAL ? [{ label: "Pricing", href: "/pricing" }] : []),
   { label: "Live feed", href: "/feed" },
   { label: "Breach matrix", href: "/matrix" },
   { label: "Threat brief", href: "/brief" },
@@ -23,24 +21,12 @@ const PRODUCT: FooterLink[] = [
 
 const COMPANY: FooterLink[] = [
   { label: "About", href: "/about" },
-  // Enterprise + Security are commercial-pitch pages, gated like /pricing so a
-  // footer link never points at a page that 404s in honest hiring mode.
-  ...(COMMERCIAL
-    ? [
-        { label: "Enterprise", href: "/enterprise" },
-        { label: "Security", href: "/security" },
-      ]
-    : []),
   { label: "Case studies", href: "/case-studies" },
 ];
 
 const DEVELOPERS: FooterLink[] = [
   { label: "Resources", href: "/resources" },
   { label: "Sample report", href: "/sample-report.html", external: true },
-  // Points at /enterprise → only show when that page is reachable.
-  ...(COMMERCIAL
-    ? [{ label: "MCP server · IDE", href: "/enterprise" }]
-    : []),
 ];
 
 export function Footer() {
