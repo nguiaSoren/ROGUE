@@ -173,37 +173,52 @@ export default async function Home() {
           className="!px-0 animate-rogue-fade-up"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+            <Link
+              href="/product#live-scan"
+              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
+            >
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
                 the model · offense
               </p>
-              <p className="text-lg font-bold mt-1">Reproduce real jailbreaks.</p>
+              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
+                Reproduce real jailbreaks.
+              </p>
               <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                 Open-web attacks replayed against your exact model, system
                 prompt, and tools, ranked worst-first.
               </p>
-            </div>
-            <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+            </Link>
+            <Link
+              href="/product#human-gate"
+              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
+            >
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
                 the human gate · oversight
               </p>
-              <p className="text-lg font-bold mt-1">Measure the sign-off.</p>
+              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
+                Measure the sign-off.
+              </p>
               <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                 When a risky action escalates to a person, a false-approve rate
                 against an independent key, so &ldquo;a human approved it&rdquo;
                 is a measured control, not an assumption.
               </p>
-            </div>
-            <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+            </Link>
+            <Link
+              href="/product#skill-pool"
+              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
+            >
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
                 the agent&rsquo;s memory · assurance
               </p>
-              <p className="text-lg font-bold mt-1">Audit the skill pool.</p>
+              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
+                Audit the skill pool.
+              </p>
               <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                 Shared agent skills, checked for leakage, whether they actually
                 help, and dangerous combinations, before they spread.
               </p>
-            </div>
+            </Link>
           </div>
           <div className="mt-6">
             <Link
