@@ -30,5 +30,5 @@ This reproduces the SkillProbe result the spec cites (the large majority of accu
 
 ## Honest caveats
 - **n: 4 skills, weak agent, small held-out sets (5–12 tasks).** A stronger agent, better skill↔task matching, or larger held-out sets could promote some skills; 1/4 is this configuration, not a universal claim. The point demonstrated is the GATE (it measures + rejects), not "these specific skills are bad".
-- The net-effect judge's REGRESSION calls weren't independently calibrated this run (the judge exists; a labeled calibration set is the next refinement, per ADR-0011).
+- **The net-effect judge is now calibrated (2026-06-12):** SHIP gate at **100% agreement** vs an independently-labeled, deliberately-hard 20-case set (verbose-neutral traps + subtle/false-flag regressions) — `data/calibration/net_effect_report.json`. So the **1-of-4 number is claim-grade** (carries measured judge precision). Caveat: n=20, 0 disagreements → the CI is degenerate at [100%,100%]; a larger set would give an informative interval.
 - ⚑ Possibly publishable alongside the leakage finding: a measured verified-promotion gate on a real harvested skill pool, plus the two implementation traps.
