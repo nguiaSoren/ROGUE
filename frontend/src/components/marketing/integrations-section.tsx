@@ -71,6 +71,8 @@ interface Group {
   detail: string
   /** Named tools shown as chips. */
   tools: string[]
+  /** Live, keyless endpoint surfaced as a chip (the MCP/IDE tile only). */
+  endpoint?: string
   /** Where clicking the tile goes. Omitted = inert (e.g. a Coming-soon tile). */
   href?: string
 }
@@ -81,8 +83,9 @@ const GROUPS: Group[] = [
     title: "Your IDE",
     availability: "now",
     detail:
-      "One-click setup in Claude Desktop, Cursor, Windsurf, and VS Code. ROGUE acts as a connector, so an AI agent inside your editor can launch and read back a whole scan without leaving your work.",
+      "Add one config block in Claude Desktop, Cursor, Windsurf, or VS Code. Connect keyless and your editor's AI agent queries ROGUE's live threat DB on the spot, add an account to launch full scans without leaving your work.",
     tools: ["Claude Desktop", "Cursor", "Windsurf", "VS Code"],
+    endpoint: "https://rogue-private.onrender.com/mcp",
     href: "/product#mcp",
   },
   {
@@ -117,7 +120,7 @@ const GROUPS: Group[] = [
 /*  Card                                                               */
 /* ------------------------------------------------------------------ */
 
-function IntegrationCard({ icon: Icon, title, availability, detail, tools, href }: Group) {
+function IntegrationCard({ icon: Icon, title, availability, detail, tools, endpoint, href }: Group) {
   const cardClass =
     "rogue-card flex flex-col rounded-xl border border-border bg-card/40 p-6 backdrop-blur-sm"
   const inner = (
@@ -152,6 +155,21 @@ function IntegrationCard({ icon: Icon, title, availability, detail, tools, href 
           </li>
         ))}
       </ul>
+
+      {/* Live, keyless endpoint, the "this is real and connectable now" proof.
+          Display-only (the card itself links to the full copy-paste config at
+          /product#mcp), so no interactive element nests inside the card anchor. */}
+      {endpoint && (
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-rogue-green/30 bg-rogue-green/[0.04] px-2.5 py-2">
+          <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-rogue-green">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
+            live · keyless
+          </span>
+          <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/80">
+            {endpoint}
+          </code>
+        </div>
+      )}
     </>
   )
 
