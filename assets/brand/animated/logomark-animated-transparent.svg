@@ -1,0 +1,28 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ROGUE animated mark">
+  <!-- expanding ping rings from the breach cell -->
+  <circle cx="428.0" cy="282.0" r="60" fill="none" stroke="#ff003c" stroke-width="6">
+    <animate attributeName="r" values="58;150" dur="2.4s" repeatCount="indefinite" keyTimes="0;1" calcMode="spline" keySplines="0.2 0.6 0.3 1"/>
+    <animate attributeName="opacity" values="0.55;0" dur="2.4s" repeatCount="indefinite" keyTimes="0;1"/>
+    <animate attributeName="stroke-width" values="7;2" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="428.0" cy="282.0" r="60" fill="none" stroke="#ff003c" stroke-width="6">
+    <animate attributeName="r" values="58;150" dur="2.4s" begin="1.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.2 0.6 0.3 1"/>
+    <animate attributeName="opacity" values="0.55;0" dur="2.4s" begin="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-width" values="7;2" dur="2.4s" begin="1.2s" repeatCount="indefinite"/>
+  </circle>
+  <!-- the 8 non-breach cells (static) -->
+  <g>
+    <rect x="76" y="76" width="120" height="120" rx="22" fill="#0e2a1e"/>
+    <rect x="222" y="76" width="120" height="120" rx="22" fill="#00ff88" opacity="0.82"/>
+    <rect x="368" y="76" width="120" height="120" rx="22" fill="#0e2a1e"/>
+    <rect x="76" y="222" width="120" height="120" rx="22" fill="#0e2a1e"/>
+    <rect x="222" y="222" width="120" height="120" rx="22" fill="#00ff88"/>
+    <rect x="76" y="368" width="120" height="120" rx="22" fill="#00ff88" opacity="0.82"/>
+    <rect x="222" y="368" width="120" height="120" rx="22" fill="#0e2a1e"/>
+    <rect x="368" y="368" width="120" height="120" rx="22" fill="#0e2a1e"/>
+  </g>
+  <!-- breach cell: subtle heartbeat pulse in brightness -->
+  <rect x="368" y="222" width="120" height="120" rx="22" fill="#ff003c">
+    <animate attributeName="opacity" values="1;0.55;1" dur="2.4s" repeatCount="indefinite" keyTimes="0;0.15;1"/>
+  </rect>
+</svg>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
@@ -58,13 +59,16 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between font-mono">
-        <Link
-          href="/"
-          className="text-sm font-bold tracking-tight flex items-center gap-2 group"
-        >
-          <span className="inline-block w-2 h-2 rounded-full bg-rogue-green animate-rogue-pulse-green" />
-          <span className="text-rogue-green group-hover:rogue-glitch">ROGUE</span>
-          <span className="text-muted-foreground hidden sm:inline">
+        <Link href="/" className="flex items-center gap-2.5 group" aria-label="ROGUE home">
+          <Image
+            src="/logo-horizontal.svg"
+            alt="ROGUE"
+            width={102}
+            height={20}
+            priority
+            className="h-5 w-auto"
+          />
+          <span className="text-sm text-muted-foreground hidden sm:inline">
             · open-web threat intel
           </span>
         </Link>

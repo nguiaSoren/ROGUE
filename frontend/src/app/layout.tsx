@@ -18,9 +18,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://rogue-eosin.vercel.app"),
   title: "ROGUE · Open-web LLM Threat Intelligence",
   description:
     "Continuous red-team for production LLM deployments. Harvests new jailbreaks from the open web, reproduces them against your deployment configuration, ships a daily diff of which attacks now bypass your guardrails.",
+  openGraph: {
+    title: "ROGUE · Open-web LLM Threat Intelligence",
+    description:
+      "Continuous red-team for production LLM deployments — the model, the human gate, and the agent's memory, measured and signed.",
+    url: "/",
+    siteName: "ROGUE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ROGUE · Open-web LLM Threat Intelligence",
+    description:
+      "Continuous red-team for production LLM deployments — the model, the human gate, and the agent's memory, measured and signed.",
+  },
 };
 
 export const viewport: Viewport = {
