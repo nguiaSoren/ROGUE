@@ -6,6 +6,7 @@ import { DashboardPreview } from "@/components/marketing/preview/dashboard-previ
 import { FindingsPreview } from "@/components/marketing/preview/findings-preview";
 import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
+import { McpConnect } from "@/components/marketing/mcp-connect";
 import { OversightPreview } from "@/components/marketing/preview/oversight-preview";
 import { SkillPoolPreview } from "@/components/marketing/preview/skill-pool-preview";
 
@@ -84,7 +85,13 @@ export default function ProductPage() {
           lede="ROGUE exposes its own MCP server, so Claude Desktop, Cursor, and Windsurf query the live threat DB directly. Ask in natural language; get primitives, the breach matrix, and threat briefs back as tools. No other red-team does this."
           className="animate-rogue-fade-up"
         >
-          <McpPreview className="mx-auto max-w-4xl" />
+          <div className="mx-auto max-w-4xl space-y-6">
+            <McpPreview />
+            <p className="text-center font-mono text-[11px] uppercase tracking-[0.18em] text-rogue-green">
+              ↓ this server is live — connect to it right now
+            </p>
+            <McpConnect />
+          </div>
         </Section>
 
         {/* 6. v2 ASSURANCE SURFACES ---------------------------------- */}
