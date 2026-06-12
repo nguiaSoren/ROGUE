@@ -224,23 +224,80 @@ def build() -> Path:
     F: list = [
         _masthead(),
         Spacer(1, 16),
-        Paragraph("Six findings from a solo open-web LLM red-team, the negatives included.", S["headline"]),
+        Paragraph("Seven findings from a solo open-web LLM red-team, the negatives included.", S["headline"]),
         Spacer(1, 7),
         Paragraph(
-            "Every result here is measured and reproducible. An LLM-as-judge calibrated against human "
-            "labels and then generalized into a four-breach-type discipline; scheduling shown to be a "
-            "capability lever, not just an optimization; a publication-grade null result that redirected "
-            "engineering; the measure-before-build habit behind all of it; measured remediation that "
-            "refuses a fix it can&rsquo;t prove; and a grey-literature reproducibility audit showing a "
-            "source&rsquo;s claimed jailbreak success doesn&rsquo;t predict what reproduces.", S["abstract"]),
+            "Every result here is measured and reproducible. A grey-literature reproducibility audit showing "
+            "a source&rsquo;s claimed jailbreak success doesn&rsquo;t predict what reproduces against your "
+            "deployment; scheduling shown to be a capability lever, not just an optimization; an LLM-as-judge "
+            "calibrated against human labels and then generalized into a four-breach-type discipline; a "
+            "publication-grade null result that redirected engineering; measured remediation that refuses a "
+            "fix it can&rsquo;t prove; shared agent-skill pools treated as an assurance surface to audit and "
+            "sign before sharing; and the measure-before-build habit behind all of it.", S["abstract"]),
         Spacer(1, 4),
         Paragraph(
             "Soren Obounou Nguia &nbsp;·&nbsp; Seoul &nbsp;·&nbsp; nguiasoren@gmail.com "
             "&nbsp;·&nbsp; live evidence at /matrix, /analytics, /about", S["meta"]),
     ]
 
-    # 01
-    F += [_finding("01", "judge",
+    # 01 — reproduction (lead)
+    F += [_finding("01", "reproduction",
+                   "Claimed potency doesn&rsquo;t predict what reproduces against your deployment.")]
+    F += [Paragraph(
+        "Of 17 harvested techniques whose source claimed " + b("~100% success") + ", only " + b("7") +
+        " reproduce at all, and their mean measured breach rate is " + b("13%") + ". Across the 56 "
+        "techniques that publish a number, claimed success and measured reproduction are "
+        + b("uncorrelated (Spearman -0.10, 95% CI [-0.37, +0.17])") + ", a claimed rate is not portable "
+        "signal, which is why ROGUE re-measures every technique against your model and system prompt, "
+        "not the source&rsquo;s.", S["body"])]
+    F += [Paragraph(
+        "The same pattern is a reproduction funnel. Across " + b("301 techniques from 19 open-web sources") +
+        " on a five-model panel, the &ldquo;works on at least one of five models&rdquo; rate (40%) is "
+        "inflated by the weakest target: on a " + b("frozen open-weight model only ~9% reproduce") + ", "
+        "and " + b("~4% on the most robust model") + ". Reproduction is whether the carrier mechanism "
+        "still bypasses alignment toward a neutral objective, scored by the calibrated under-counting "
+        "judge; paper-sourced techniques degrade more slowly than grey-literature ones.", S["body"])]
+    F += [Paragraph(
+        "A stronger-model re-extraction (Sonnet 4.6) of all 148 candidate sources confirmed the null is "
+        "not an extraction artifact, it recovered a claimed rate for only 1 of 94 unquantified sources, "
+        "so the small claimed-rate sample reflects that the open web rarely quantifies these claims, not "
+        "a weak extractor. The claimed values carry ~17% extraction noise, so the -0.10 reads as "
+        + b("no predictive signal") + ", not a precise estimate.", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("-0.10", "claimed vs measured (n=56)"),
+        ("100% → 13%", "claimed ~100%, mean measured"),
+        ("40 → 4%", "reproduce: best-of-5 to robust"),
+        ("$0", "on already-collected data"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "The honest version of &ldquo;we test real attacks&rdquo;: a success rate claimed in a paper or "
+        "forum is not portable to your deployment. The value is the re-measurement against your model, "
+        "system prompt, and tools under a judge calibrated to under-count, with a frozen open-weight "
+        "anchor so non-reproduction isn&rsquo;t confounded by silent vendor patching.")]
+
+    # 02 — scheduling
+    F += [_finding("02", "scheduling", "Scheduling as a capability lever, not just an optimization.")]
+    F += [Paragraph(
+        "A within-tier greedy reorder was replaced with a " + b("target-conditioned cross-tier scheduler") +
+        ": a static, explainable blend (0.5 global, 0.3 vendor, 0.2 family breach-rate; Laplace-smoothed; "
+        "deliberately no ML and no bandit, so it stays reproducible). A single-variable controlled "
+        "experiment (same ladder, attacks, corpus, judge, and target on Claude Haiku across AdvBench and "
+        "JailbreakBench, with only the order changed) beat the production baseline on every axis: "
+        + b("median winner-rank 22 → 11 to 13.5") + ", " + b("attack-success-rate 50% → 60%") +
+        ", and " + b("cost-per-success $1.25 → $0.74 (41% cheaper)") + ".", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("22 → 11", "median winner-rank"),
+        ("50 → 60%", "attack-success-rate"),
+        ("41% cheaper", "cost per success"),
+    ]), Spacer(1, 6)]
+    F += [_note(
+        "The mechanism is the interesting part: a lower rank <i>caused</i> a higher success rate. The old "
+        "order exhausted the per-scan budget cap before reaching the winning technique, so reordering "
+        "improved coverage, cost, and latency at once with zero new attacks. The reproducibility invariant "
+        "is &ldquo;reorder, never exclude&rdquo;: same ladder, different order, full reachability preserved.")]
+
+    # 03 — judge calibration
+    F += [_finding("03", "judge",
                    "Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it.")]
     F += [Paragraph(
         "Every breach verdict is an LLM judgment, so the judge is the load-bearing weakness. It was "
@@ -312,29 +369,8 @@ def build() -> Path:
         "contribution is the rigor and the measured cross-type result, not a new mechanism. These are "
         "descriptive measurements, not validated generalizations.")]
 
-    # 02
-    F += [_finding("02", "scheduling", "Scheduling as a capability lever, not just an optimization.")]
-    F += [Paragraph(
-        "A within-tier greedy reorder was replaced with a " + b("target-conditioned cross-tier scheduler") +
-        ": a static, explainable blend (0.5 global, 0.3 vendor, 0.2 family breach-rate; Laplace-smoothed; "
-        "deliberately no ML and no bandit, so it stays reproducible). A single-variable controlled "
-        "experiment (same ladder, attacks, corpus, judge, and target on Claude Haiku across AdvBench and "
-        "JailbreakBench, with only the order changed) beat the production baseline on every axis: "
-        + b("median winner-rank 22 → 11 to 13.5") + ", " + b("attack-success-rate 50% → 60%") +
-        ", and " + b("cost-per-success $1.25 → $0.74 (41% cheaper)") + ".", S["body"])]
-    F += [Spacer(1, 4), _chips([
-        ("22 → 11", "median winner-rank"),
-        ("50 → 60%", "attack-success-rate"),
-        ("41% cheaper", "cost per success"),
-    ]), Spacer(1, 6)]
-    F += [_note(
-        "The mechanism is the interesting part: a lower rank <i>caused</i> a higher success rate. The old "
-        "order exhausted the per-scan budget cap before reaching the winning technique, so reordering "
-        "improved coverage, cost, and latency at once with zero new attacks. The reproducibility invariant "
-        "is &ldquo;reorder, never exclude&rdquo;: same ladder, different order, full reachability preserved.")]
-
-    # 03
-    F += [_finding("03", "null result", "A publication-grade null result: grammar-component predictive power.")]
+    # 04 — null result
+    F += [_finding("04", "null result", "A publication-grade null result: grammar-component predictive power.")]
     F += [Paragraph(
         "Before building a grammar/AST attack-composition engine, a " + b("$0 observational study over "
         "1,540 (primitive × target) cells") + " tested whether grammar-structure nodes predict breach "
@@ -353,23 +389,7 @@ def build() -> Path:
         "A cheap, rigorous falsification that redirected engineering away from a months-long build: "
         "a successful negative result.")]
 
-    # 04
-    F += [_finding("04", "discipline", "Measure-before-build discipline.")]
-    F += [Paragraph(
-        "$0 measurements from existing telemetry were used repeatedly to <i>invert</i> &ldquo;build "
-        "it&rdquo; decisions, each parked with an explicit trigger to revisit:", S["body"])]
-    F += [ListFlowable([
-        ListItem(Paragraph(b("Per-model ladder routing.") + " The spread was a model main effect, not a "
-                           "family×model interaction, so it was not worth the rewrite.", S["li"]),
-                 leftIndent=14, value="circle"),
-        ListItem(Paragraph(b("LLM renderer-synthesis.") + " The synthesis-grade backlog stayed flat at 7 "
-                           "across two widening harvests, so it was parked.", S["li"]),
-                 leftIndent=14, value="circle"),
-        ListItem(Paragraph(b("HF jailbreak-dataset bulk-import.") + " It measured 0 new attack families, so "
-                           "it was declined.", S["li"]), leftIndent=14, value="circle"),
-    ], bulletType="bullet", bulletColor=GREEN, bulletFontSize=6, spaceAfter=6)]
-
-    # 05
+    # 05 — remediation
     F += [_finding("05", "remediation",
                    "Measured remediation: prove a fix closes the breach without over-blocking, or refuse to ship it.")]
     F += [Paragraph(
@@ -398,40 +418,53 @@ def build() -> Path:
         "over-block) into a correct refusal (judge ~20%). A runtime guardrail asserts it blocks; this measures "
         "it, and says no when a patch does not hold or over-blocks.")]
 
-    # 06
-    F += [_finding("06", "reproduction",
-                   "The reproducibility gap: a source's claimed potency doesn't predict what reproduces.")]
+    # 06 — skill pools (new)
+    F += [_finding("06", "skill pools",
+                   "Shared skill pools are an assurance surface, not a free upgrade.")]
     F += [Paragraph(
-        "Of 17 harvested techniques whose source claimed " + b("~100% success") + ", only " + b("7") +
-        " reproduce at all, and their mean measured breach rate is " + b("13%") + ". Across the 56 "
-        "techniques that publish a number, claimed success and measured reproduction are "
-        + b("uncorrelated (Spearman -0.10, 95% CI [-0.37, +0.17])") + ", a claimed rate is not portable "
-        "signal, which is why ROGUE re-measures every technique against your model and system prompt, "
-        "not the source&rsquo;s.", S["body"])]
+        "Agents increasingly accumulate and " + b("share skills and memory") + " across a fleet. Pooling "
+        "them is an unaudited surface: a skill distilled from private work can leak it, a popular skill can "
+        "quietly make the agent worse, two benign skills can combine into something harmful. ROGUE treats a "
+        "pool as a red-team target, measures each risk, and emits a " + b("signed, tamper-evident "
+        "attestation") + " for the pool before it ships.", S["body"])]
     F += [Paragraph(
-        "The same pattern is a reproduction funnel. Across " + b("301 techniques from 19 open-web sources") +
-        " on a five-model panel, the &ldquo;works on at least one of five models&rdquo; rate (40%) is "
-        "inflated by the weakest target: on a " + b("frozen open-weight model only ~9% reproduce") + ", "
-        "and " + b("~4% on the most robust model") + ". Reproduction is whether the carrier mechanism "
-        "still bypasses alignment toward a neutral objective, scored by the calibrated under-counting "
-        "judge; paper-sourced techniques degrade more slowly than grey-literature ones.", S["body"])]
-    F += [Paragraph(
-        "A stronger-model re-extraction (Sonnet 4.6) of all 148 candidate sources confirmed the null is "
-        "not an extraction artifact, it recovered a claimed rate for only 1 of 94 unquantified sources, "
-        "so the small claimed-rate sample reflects that the open web rarely quantifies these claims, not "
-        "a weak extractor. The claimed values carry ~17% extraction noise, so the -0.10 reads as "
-        + b("no predictive signal") + ", not a precise estimate.", S["body"])]
+        "A first measurement. Against a " + b("deliberately weak agent") + " (Llama-3.1-8B) holding a planted "
+        "secret, a standard extraction pack recovered it on " + b("17 of 20") + " skills, with "
+        + b("zero false positives on the 12 controls") + ", despite an explicit &ldquo;never reveal&rdquo; "
+        "instruction, instruction-following is not containment. And of four candidate skills with enough "
+        "held-out tasks to measure, only " + b("one earned promotion") + " under a verified-net-effect gate; "
+        "the rest were neutral or worse. Accumulated skills are not free upgrades.", S["body"])]
     F += [Spacer(1, 4), _chips([
-        ("-0.10", "claimed vs measured (n=56)"),
-        ("100% → 13%", "claimed ~100%, mean measured"),
-        ("40 → 4%", "reproduce: best-of-5 to robust"),
-        ("$0", "on already-collected data"),
+        ("17 / 20", "canary leak · weak target"),
+        ("0 / 12", "control false positives"),
+        ("1 of 4", "skills earn promotion"),
+        ("signed", "tamper-evident attestation"),
     ]), Spacer(1, 6)]
     F += [_note(
-        "The honest version of &ldquo;we test real attacks&rdquo;: a success rate claimed in a paper or "
-        "forum is not portable to your deployment. The value is the re-measurement against your model, "
-        "system prompt, and tools under a judge calibrated to under-count, with a frozen open-weight "
-        "anchor so non-reproduction isn&rsquo;t confounded by silent vendor patching.")]
+        "The under-discussed part is the <i>surface</i>, not the number. That a weak model leaks a secret it "
+        "was told to hold is expected, it is the known extraction / prompt-injection mechanism; the "
+        "contribution is treating shared skill and memory pools as something to audit before sharing, "
+        "leakage, verified promotion, dangerous combinations, signed. Honest caveats: this is a first "
+        "measurement on a <i>weak</i> target with a small n and a standard pack, so the leak rate is "
+        "illustrative of the surface, not a hardened &ldquo;agent pools leak 85%&rdquo; claim; the "
+        "verified-promotion sample is n=4 (one promotion rests on a single decisive case); single trust "
+        "domain, cross-team isolation is roadmap.")]
+
+    # 07 — discipline
+    F += [_finding("07", "discipline", "Measure-before-build discipline.")]
+    F += [Paragraph(
+        "$0 measurements from existing telemetry were used repeatedly to <i>invert</i> &ldquo;build "
+        "it&rdquo; decisions, each parked with an explicit trigger to revisit:", S["body"])]
+    F += [ListFlowable([
+        ListItem(Paragraph(b("Per-model ladder routing.") + " The spread was a model main effect, not a "
+                           "family×model interaction, so it was not worth the rewrite.", S["li"]),
+                 leftIndent=14, value="circle"),
+        ListItem(Paragraph(b("LLM renderer-synthesis.") + " The synthesis-grade backlog stayed flat at 7 "
+                           "across two widening harvests, so it was parked.", S["li"]),
+                 leftIndent=14, value="circle"),
+        ListItem(Paragraph(b("HF jailbreak-dataset bulk-import.") + " It measured 0 new attack families, so "
+                           "it was declined.", S["li"]), leftIndent=14, value="circle"),
+    ], bulletType="bullet", bulletColor=GREEN, bulletFontSize=6, spaceAfter=6)]
 
     # limitations
     F += [Spacer(1, 10)]
