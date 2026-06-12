@@ -54,8 +54,8 @@ export default function ResearchPage() {
         </Section>
 
         {/* AT A GLANCE -------------------------------------------------- */}
-        <Section eyebrow="at a glance" title="Six findings, in about a minute.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <Section eyebrow="at a glance" title="Seven findings, in about a minute.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
             <GlanceCard
               href="#finding-01"
               eyebrow="01 · judge"
@@ -93,6 +93,13 @@ export default function ResearchPage() {
               eyebrow="06 · reproduction"
               headline="100% → 13%"
               desc="A source's claimed success rate doesn't predict what reproduces against your deployment (ρ ≈ −0.10). ROGUE re-measures every technique."
+              accent="red"
+            />
+            <GlanceCard
+              href="#finding-07"
+              eyebrow="07 · skill pools"
+              headline="audit before sharing"
+              desc="Shared agent-skill pools are an unaudited surface, leakage, useless skills, dangerous combinations. ROGUE measures and signs each pool before it ships."
               accent="red"
             />
           </div>
@@ -677,6 +684,99 @@ export default function ResearchPage() {
               not a confound (the funnel holds across temperature subsets); and the
               claimed rates carry ~17% extraction noise, so −0.10 reads as &ldquo;no
               predictive signal,&rdquo; not a precise estimate.{" "}
+              <span className="text-rogue-green">⚑</span>
+            </NovelNote>
+          </div>
+        </Section>
+
+        {/* 7. SKILL POOLS ----------------------------------------------- */}
+        <Section
+          id="finding-07"
+          eyebrow="finding 07"
+          title="Shared skill pools are an assurance surface, not a free upgrade."
+        >
+          <div className="max-w-3xl space-y-6">
+            <div className="flex gap-4">
+              <ShieldCheck
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-[17px] text-foreground leading-relaxed">
+                Agents increasingly accumulate and{" "}
+                <span className="text-foreground font-medium">
+                  share skills and memory
+                </span>{" "}
+                across a fleet. Pooling them is an unaudited surface: a skill
+                distilled from private work can leak it, a popular skill can
+                quietly make the agent worse, two benign skills can combine into
+                something harmful. ROGUE treats a pool as a red-team target, it
+                measures each risk and emits a{" "}
+                <span className="text-foreground font-medium">
+                  signed, tamper-evident attestation
+                </span>{" "}
+                for the pool before it ships.
+              </p>
+            </div>
+
+            <p className="text-base text-muted-foreground leading-relaxed">
+              A first measurement. Against a{" "}
+              <span className="text-foreground font-medium">
+                deliberately weak agent
+              </span>{" "}
+              (Llama-3.1-8B) holding a planted secret, a standard extraction pack
+              recovered it on{" "}
+              <span className="text-foreground font-medium">17 of 20</span> skills,
+              with{" "}
+              <span className="text-foreground font-medium">
+                zero false positives
+              </span>{" "}
+              on the 12 controls, despite an explicit &ldquo;never reveal&rdquo;
+              instruction, instruction-following is not containment. And of four
+              candidate skills with enough held-out tasks to measure, only{" "}
+              <span className="text-foreground font-medium">one</span> earned
+              promotion under a verified-net-effect gate; the rest were neutral or
+              worse. Accumulated skills are not free upgrades.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric value="17 / 20" label="canary leak · weak target" accent="red" />
+              <Metric value="0 / 12" label="control false positives" accent="green" />
+              <Metric value="1 of 4" label="skills earn promotion" accent="red" />
+              <Metric value="signed" label="tamper-evident attestation" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, the pool is 55 real harvested agent-skills + 20 planted
+              canaries (single trust domain). Leakage is{" "}
+              <span className="text-foreground/90">
+                marker-based exact recovery
+              </span>{" "}
+              (deterministic ground truth, not a judge estimate); the target is a
+              deliberately weak open model, the pack is standard (4 templates),
+              n = 20. Verified-promotion runs each skill with vs without injection
+              over a held-out set, graded by a net-effect judge calibrated to human
+              labels (100% agreement on a 20-case set built to be hard, ship gate);
+              a skill promotes only if its repair-fraction CI clears 0.5.
+            </MethodNote>
+
+            <NovelNote>
+              The under-discussed part is the{" "}
+              <span className="text-foreground/90">surface</span>, not the number.
+              That a weak model leaks a secret it was told to hold is expected, it
+              is the known extraction / prompt-injection mechanism; the contribution
+              is treating{" "}
+              <span className="text-foreground/90">
+                shared skill and memory pools
+              </span>{" "}
+              as something to audit before sharing, leakage, verified promotion,
+              dangerous combinations, signed, rather than &ldquo;faster coding.&rdquo;
+              Honest caveats, this is a first measurement on a{" "}
+              <span className="text-foreground/90">weak</span> target with a small n
+              and a standard pack, so 85% is illustrative of the surface, not a
+              hardened &ldquo;agent pools leak 85%&rdquo; claim; the
+              verified-promotion sample is n = 4 (one promotion rests on a single
+              decisive case); single trust domain, cross-team isolation is roadmap.{" "}
               <span className="text-rogue-green">⚑</span>
             </NovelNote>
           </div>
