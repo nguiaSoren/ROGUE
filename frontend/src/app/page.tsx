@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { COMMERCIAL } from "@/lib/flags";
 import { AugmentationShowcase } from "@/components/augmentation-showcase";
 import { CinematicHero } from "@/components/cinematic-hero";
 import { HowRogueThinks } from "@/components/how-rogue-thinks";
@@ -125,8 +124,7 @@ export default async function Home() {
         </section>
 
         {/* 4b. USE CASES, who uses ROGUE (problem/solution personas).
-            Replaces the lighter "one engine, five teams" strip; the full
-            5-persona breadth still lives on /enterprise. ---------------- */}
+            Replaces the lighter "one engine, five teams" strip. ---------- */}
         <UseCasesSection className="!px-0 animate-rogue-fade-up" />
 
         {/* 4c. WORKFLOW WALKTHROUGH, the concrete end-to-end story
@@ -303,9 +301,8 @@ export default async function Home() {
             See ROGUE break your stack.
           </h2>
           <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            {COMMERCIAL
-              ? "Point us at an endpoint and get a scored security report back. Book a walkthrough, or run a scan yourself right now."
-              : "Point it at an endpoint and get a scored security report back. Read the research, or run a scan yourself right now."}
+            Point it at an endpoint and get a scored security report back. Read
+            the research, or run a scan yourself right now.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center">
             <Link
@@ -318,10 +315,10 @@ export default async function Home() {
           </div>
           <div className="mt-4 flex flex-col sm:flex-row gap-x-6 gap-y-2 justify-center font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
             <Link
-              href={COMMERCIAL ? "/pricing" : "/research"}
+              href="/research"
               className="transition-colors hover:text-rogue-green"
             >
-              {COMMERCIAL ? "View pricing" : "Read the research"}
+              Read the research
             </Link>
           </div>
         </section>

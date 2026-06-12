@@ -191,13 +191,6 @@ export default function ProductPage() {
               >
                 early access
               </Link>
-              , or see deployment options on{" "}
-              <Link
-                href="/enterprise"
-                className="text-rogue-green hover:underline underline-offset-4"
-              >
-                Enterprise
-              </Link>
               .
             </p>
             <CtaRow />

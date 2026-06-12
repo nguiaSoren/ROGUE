@@ -281,10 +281,10 @@ export default function DeckPage() {
             </div>
             <div className="mt-8">
               <Link
-                href="/enterprise"
+                href="/early-access"
                 className="inline-flex items-center gap-2 font-mono text-sm font-bold tracking-[0.12em] uppercase text-rogue-green hover:underline"
               >
-                Enterprise &amp; private deployment <ArrowRight className="h-4 w-4" />
+                Run ROGUE on your stack <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </Section>

@@ -27,9 +27,9 @@ export const metadata = {
 };
 
 /**
- * /research, the research-forward surface. Ungated (no COMMERCIAL gate): a
+ * /research, the research-forward surface. Ungated: a
  * scholarly, scannable account of the methods and the measured results,
- * including the negative ones. No demo/pricing/pilot CTAs by design, the only
+ * including the negative ones. No sales CTAs by design, the only
  * outbound links are to the live-evidence routes (/matrix, /analytics, /feed).
  * All numbers are verbatim from the operator's brief; do not invent figures.
  * Server component, matching the /about dark "rogue" aesthetic.

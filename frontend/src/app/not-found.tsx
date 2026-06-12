@@ -2,9 +2,8 @@ import Link from "next/link";
 
 /**
  * Custom 404. Renders for any unmatched URL and for explicit `notFound()` calls
- * (e.g. the commercial-gated /pricing, /enterprise, /security when
- * NEXT_PUBLIC_SHOW_COMMERCIAL is off). Server component, in the site's dark
- * terminal aesthetic, inside the normal Nav/Footer chrome.
+ * (e.g. the permanently non-commercial /security route). Server component, in
+ * the site's dark terminal aesthetic, inside the normal Nav/Footer chrome.
  */
 export const metadata = {
   title: "404, ROGUE",
