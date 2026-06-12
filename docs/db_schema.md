@@ -2,14 +2,14 @@
 
 Engineering reference for ROGUE's Postgres schema — the current table set, which migration
 owns each table, and which subsystem it serves. Lets a reader see the whole schema without
-reading all 29 migration files.
+reading all 38 migration files.
 
 - **Stack:** Postgres 17 + pgvector (Docker container `rogue-postgres`, image
   `pgvector/pgvector:pg17`; Neon in prod). One service, no Redis/ES/Kafka.
 - **ORM:** core domain tables in `src/rogue/db/models.py`; the SaaS platform tables in
   `src/rogue/platform/models.py` (both subclass the same `Base`).
 - **Migrations:** `src/rogue/db/migrations/versions/` (hand-written; alembic linear chain
-  `0001 → 0029`). Apply with `uv run alembic upgrade head`.
+  `0001 → 0038`). Apply with `uv run alembic upgrade head`.
 - **Pydantic = wire format** (`src/rogue/schemas/`); **SQLAlchemy = storage**. Enums are
   imported into the ORM, never duplicated. ORM class names collide with Pydantic names
   (`AttackPrimitive`, `BreachResult`, `DeploymentConfig`, `SourceProvenance`) — alias when
@@ -60,6 +60,21 @@ reading all 29 migration files.
 > 0022 creates the eight core platform tables; `secrets` and `integrations` are split into
 > their own follow-up migrations (0023, 0024).
 
+### v2 surfaces (`src/rogue/{attestation,instrument,oversight,memory}` + Slack)
+
+| Table | ORM class | Created in | Subsystem |
+|---|---|---|---|
+| `attestation_entries` | `AttestationEntry` | 0031 | Per-org append-only hash-chained attestation record (ADR-0012); enforced by a DB-side append-only trigger. |
+| `mitigations` | `Mitigation` | 0032 | Persisted measured-remediation outcomes (Surface 1b) — generated patch artifact + pre/post breach rate + over-block rate + bootstrap CI + accepted/rejected candidates, linked to a breach. |
+| `slack_registered_agents` | `SlackRegisteredAgent` | 0033 | Per-org self-registered Slack agent targets (Surface 1) — base_url/model/system-prompt-ref + declared tools + forbidden topics + sandbox/security channel ids. |
+| `snapshot_captures` | `SnapshotCapture` | 0034 | Per-org capture blobs (content-type + bytes) referenced by `snapshot_ref` from decisions/diffs (pointer, not inline blob). |
+| `gated_cases` | `GatedCase` | 0036 | Surface 2 human-gate answer key — the designed-label `case_corpus` (designed_label + rationale + provenance + source_refs), the independent ground truth (ADR-0011). |
+| `review_sessions` | `ReviewSession` | 0036 | Surface 2 — a human reviewer's assigned/decided/expired session over gated cases. |
+| `gated_decisions` | `GatedDecision` | 0036 | Surface 2 — per-case human APPROVE/DENY decision + deliberation notes + latency + snapshot pointer. |
+| `skills` | `Skill` | 0037 | Surface 3 agent-memory `SkillPool` — cohort/trust-domain-scoped skill (skill_md + pgvector embedding + applicability condition + lifecycle timestamps). |
+| `skill_edges` | `SkillEdge` | 0037 | Surface 3 — directed edges between skills (combination risk graph; risk_score + evidence breach ref). |
+| `skill_verifications` | `SkillVerification` | 0037 | Surface 3 — verified-promotion record (net_effect + repairs/regressions + leakage rate + held-out n + bootstrap CI), the signed assurance per cohort. |
+
 ## Views (not tables)
 
 | Object | Created in | Subsystem |
@@ -83,6 +98,10 @@ reading all 29 migration files.
 | 0020 | Adds `harvest_run_id` to `attack_strategies` — technique provenance for campaign metrics. |
 | 0023 | Hardens `secrets`. |
 | 0025 | Adaptive-prioritization columns — vendor/family + winner segmentation on `ladder_attempts` (the contextual blend's vendor/family scopes; see `docs/scheduling.md`). |
+| 0030 | Reconciles CHECK-constraint vocabularies with the ORM (`bright_data_cost_log.product` `serp_api`→`serp`; adds the missing `source_provenances` source_type / bright_data_product CHECKs) + adds missing platform indexes (`scan_jobs.org_id`, `scan_runs.project_id`). Non-destructive. |
+| 0034 | Adds `slack_registered_agents.client_policy` (JSON) — the per-agent client policy snapshot (alongside the new `snapshot_captures` table). |
+| 0035 | Adds `slack_registered_agents.target_api_key_ref` — pointer to the target's stored API key. |
+| 0038 | Adds `breach_results.exfil_method` (`String(40)`, nullable) — output-side exfiltration-method label (`rogue.schemas.ExfiltrationMethod`: markdown-image beacon, hyperlink/data-URI/base64 exfil, PII/secret egress, tool-arg smuggling) deterministically classified from the model response; an extra label ON a breach, not a verdict axis. |
 
-Head is **0029**. Confirm the live chain with `uv run alembic heads` /
+Head is **0038**. Confirm the live chain with `uv run alembic heads` /
 `uv run alembic history`.

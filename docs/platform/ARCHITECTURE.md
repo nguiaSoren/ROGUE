@@ -2,7 +2,7 @@
 
 > The design that turns ROGUE from a **security tool** (`client.scan()`) into a **security platform** — one backend reachable from the SDK, a public REST API, the dashboard, and MCP, all hitting the **same scan engine**. This document is the spine: the core principle, the system diagram, the internal service contracts, the canonical vocabulary, and the index of the per-team detail docs. Everything else under `docs/platform/` elaborates one box of the diagram.
 
-Status: **BUILT (local).** The platform shipped — `DefaultScanService` / `DefaultScanEngine` (wraps `rogue.scan.run_scan`) / `DefaultReportService` / `PostgresJobQueue` + `ScanWorker`, the multi-tenant tables (migration 0022), the `/v1` API (scans / validate / benchmark / report), a Fernet secret store (0023) and per-org integration store (0024), and the MCP action tools. Live URLs: frontend `https://rogue-eosin.vercel.app`, API `https://rogue-api-mr5w.onrender.com`. This document remains the design spine; per-box detail docs note where the shipped shape differs from the original spec. Local-only design docs.
+Status: **BUILT (local).** The platform shipped — `DefaultScanService` / `DefaultScanEngine` (wraps `rogue.scan.run_scan`) / `DefaultReportService` / `PostgresJobQueue` + `ScanWorker`, the multi-tenant tables (migration 0022), the `/v1` API (scans / validate / benchmark / report), a Fernet secret store (0023) and per-org integration store (0024), and the MCP action tools. Live URLs: frontend `https://rogue-eosin.vercel.app`, API `https://rogue-private.onrender.com`. This document remains the design spine; per-box detail docs note where the shipped shape differs from the original spec. Local-only design docs.
 
 ---
 
