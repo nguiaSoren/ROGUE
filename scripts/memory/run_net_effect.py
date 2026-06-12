@@ -122,7 +122,7 @@ class GroqRolloutRunner:
     def _ask(self, system: str, user: str) -> str:
         return groq_chat(
             self._client, self._key, self._model, system, user,
-            max_tokens=512, temperature=0.7, error_tag="rollout-call-error",
+            max_tokens=180, temperature=0.7, error_tag="rollout-call-error",
         )
 
     def _with_system(self, skill: Skill) -> str:
