@@ -94,7 +94,7 @@ Copy the printed `rk_live_…` key and give it to the customer. If you lose it, 
 
 ## Step 4 — verify end to end
 
-Drive one scan all the way through with the key from Step 3. Set `API` to your web service URL (e.g. `https://rogue-api-mr5w.onrender.com`).
+Drive one scan all the way through with the key from Step 3. Set `API` to your web service URL (e.g. `https://rogue-private.onrender.com`).
 
 ```bash
 # 1) Enqueue — returns 202 with {"scan_id","status":"queued"} and a Location header.

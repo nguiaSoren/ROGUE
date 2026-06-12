@@ -16,7 +16,7 @@ The existing `/api/*` routes (`/api/livez`, `/api/health`, `/api/attacks`, `/api
 
 ## 2. Base URL and versioning
 
-- Production base URL: `https://rogue-api-mr5w.onrender.com` (the Render service from §1). All public product routes live under the `/v1` prefix: `https://rogue-api-mr5w.onrender.com/v1/...`.
+- Production base URL: `https://rogue-private.onrender.com` (the Render service from §1). All public product routes live under the `/v1` prefix: `https://rogue-private.onrender.com/v1/...`.
 - `/v1` is the contract boundary. Within `v1` we only make **additive** changes — new optional fields, new endpoints, new enum members are non-breaking and ship without a version bump. A breaking change (removing a field, changing a status meaning, renaming a path) is a new prefix (`/v2`) mounted beside `/v1`; the two coexist until `/v1` is sunset on an announced date. `ScanStatus` and the IDs in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §5 are part of the `/v1` contract — they cannot change under it.
 - The `/api/*` dashboard routes and the `/mcp` mount are **not** versioned and are out of scope for `/v1` guarantees.
 

@@ -35,7 +35,7 @@ the cross-cutting substrate (schemas/db/core/adapters) and the product surfaces
 | Package | Role | Layer / role | Arch doc |
 |---|---|---|---|
 | `schemas/` | **Pydantic wire format** — the single source for every enum (`AttackFamily`, `AttackVector`, `Severity`, `JudgeVerdict`, `SourceType`, `BrightDataProduct`) + request/response models | substrate (wire) | `docs/schemas.md` |
-| `db/` | **SQLAlchemy storage** — `models.py` + `migrations/versions/` (Alembic, 0001→0031) + session | substrate (storage) | `docs/db_schema.md`, `docs/schemas.md` |
+| `db/` | **SQLAlchemy storage** — `models.py` + `migrations/versions/` (Alembic, 0001→0038) + session | substrate (storage) | `docs/db_schema.md`, `docs/schemas.md` |
 | `core/` | **Provider-abstraction substrate** — `CanonicalMessage`, `InvocationResult`, `TargetAdapter`, `AdapterRegistry`, content blocks, errors | substrate | `src/rogue/core/ARCHITECTURE.md`, ADR-0004 |
 | `adapters/` | **Concrete provider adapters** (OpenAI / Anthropic / Gemini / Groq / OpenRouter / CustomHTTP) + `model_specs` + conformance suite. Nothing above this boundary imports a provider SDK type | substrate | ADR-0004 |
 | `harvest/` | **Layer 1 — Harvest.** Bright Data client, `sources/` plugins (11), discovery agent, ε-greedy yield bandit | L1 | `docs/sources.md`, `docs/research/bandit_for_humans.md` |
@@ -78,7 +78,7 @@ frontend/src/
 - **Pipeline + subsystems:** `architecture.md`, `judge.md`, `scheduling.md`, `escalation_ladder.md`, `db_schema.md`, `retrieval.md`, `sources.md`, `taxonomy.md`, `schemas.md`, `budget.md`, `bandit_for_humans.md`
 - **Product:** `platform/` (api · benchmark · dashboard · integrations · orchestration · reports · tenancy), `mcp/` (ARCHITECTURE + CONTRACT), `deployment.md`, `company_onboarding.md`
 - **Onboarding / marketing:** `PROJECT_STRUCTURE.md` (this file), `ONEPAGER.md`, `BRIGHT_DATA_CASE_STUDY.md`, `SDK.md`, `marketing/` (site / video / brand-kit planning notes)
-- **Decisions:** `adr/` (0001–0008 + README index)
+- **Decisions:** `adr/` (0001–0008 + README index). The v2-surface ADRs referenced above — **ADR-0009** (skill pool stays in Postgres), **ADR-0010** (generate-and-verify, not a runtime guardrail), **ADR-0011** (independence invariant for ground truth), **ADR-0012** (per-org append-only attestation) — live in `docs/v2/adr/` (v2-local, gitignored).
 - **Calibration / research:** `judge_fp_taxonomy.md`, `grammar_efficacy.md`, `outbound_package.md`
 - **Local-only (gitignored):** `RESEARCH_TODO.md`, `paper_figures.md`, `adaptive_orchestration_*.md`, `scheduler_allocation_study.md`, `3b_v2_renderer_design.md`
 
