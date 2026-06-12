@@ -40,7 +40,7 @@ export function IntegrationsSection({ className }: { className?: string }) {
 
       <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-3">
         <Link
-          href="/request-demo"
+          href="/early-access"
           className="inline-flex items-center gap-1.5 font-mono text-sm text-rogue-green transition-colors hover:text-rogue-green/80"
         >
           Get ROGUE set up on your stack
@@ -109,7 +109,7 @@ const GROUPS: Group[] = [
     detail:
       "A REST /v1 API and a Python SDK for anything bespoke, wire ROGUE into your own pipelines, dashboards, and CI.",
     tools: ["REST /v1", "Python SDK"],
-    href: "/enterprise",
+    href: "/early-access",
   },
 ]
 

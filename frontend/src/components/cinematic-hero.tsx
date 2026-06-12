@@ -100,6 +100,23 @@ export function CinematicHero({
           </span>
         </p>
 
+        {/* v2 breadth, the model is just one of three assured surfaces */}
+        <p
+          className="text-sm md:text-base text-muted-foreground max-w-2xl leading-relaxed animate-rogue-reveal"
+          style={{ animationDelay: "0.32s" }}
+        >
+          The model is just the first surface, ROGUE now also measures the{" "}
+          <span className="text-foreground">human gate</span> and the{" "}
+          <span className="text-foreground">agent&rsquo;s memory</span>, and signs
+          every result.{" "}
+          <Link
+            href="/product"
+            className="text-rogue-green hover:underline underline-offset-4"
+          >
+            See all three &rarr;
+          </Link>
+        </p>
+
         {/* Hero stat trio, the "this is alive" proof */}
         <div
           className="grid grid-cols-3 gap-3 md:gap-6 max-w-2xl animate-rogue-reveal"
