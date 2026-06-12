@@ -58,9 +58,10 @@ export default function ResearchPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
             <GlanceCard
               href="#finding-01"
-              eyebrow="01 · judge"
-              headline="70.3 → 89.3%"
-              desc="Calibrated an LLM-judge to human labels, then generalized it across four breach types."
+              eyebrow="01 · reproduction"
+              headline="100% → 13%"
+              desc="A source's claimed success rate doesn't predict what reproduces against your deployment (ρ ≈ −0.10). ROGUE re-measures every technique."
+              accent="red"
             />
             <GlanceCard
               href="#finding-02"
@@ -70,16 +71,16 @@ export default function ResearchPage() {
             />
             <GlanceCard
               href="#finding-03"
-              eyebrow="03 · null result"
-              headline="0 of 4 survive"
-              desc="Grammar structure does not predict breach beyond attack family. A clean negative result."
-              accent="red"
+              eyebrow="03 · judge"
+              headline="70.3 → 89.3%"
+              desc="Calibrated an LLM-judge to human labels, then generalized it across four breach types."
             />
             <GlanceCard
               href="#finding-04"
-              eyebrow="04 · discipline"
-              headline="measure first"
-              desc="$0 telemetry measurements inverted three build decisions before any code was written."
+              eyebrow="04 · null result"
+              headline="0 of 4 survive"
+              desc="Grammar structure does not predict breach beyond attack family. A clean negative result."
+              accent="red"
             />
             <GlanceCard
               href="#finding-05"
@@ -90,29 +91,197 @@ export default function ResearchPage() {
             />
             <GlanceCard
               href="#finding-06"
-              eyebrow="06 · reproduction"
-              headline="100% → 13%"
-              desc="A source's claimed success rate doesn't predict what reproduces against your deployment (ρ ≈ −0.10). ROGUE re-measures every technique."
-              accent="red"
-            />
-            <GlanceCard
-              href="#finding-07"
-              eyebrow="07 · skill pools"
+              eyebrow="06 · skill pools"
               headline="audit before sharing"
               desc="Shared agent-skill pools are an unaudited surface, leakage, useless skills, dangerous combinations. ROGUE measures and signs each pool before it ships."
               accent="red"
             />
+            <GlanceCard
+              href="#finding-07"
+              eyebrow="07 · discipline"
+              headline="measure first"
+              desc="$0 telemetry measurements inverted three build decisions before any code was written."
+            />
           </div>
         </Section>
 
-        {/* 1. JUDGE CALIBRATION ----------------------------------------- */}
+        {/* 1. REPRODUCIBILITY (LEAD) ------------------------------------ */}
         <Section
           id="finding-01"
-          className="scroll-mt-24"
           eyebrow="finding 01"
-          title="Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it."
+          title="Claimed potency doesn't predict what reproduces against your deployment."
         >
           <div className="max-w-3xl space-y-6">
+            <div className="flex gap-4">
+              <Scale
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-[17px] text-foreground leading-relaxed">
+                Of 17 harvested techniques whose source claimed{" "}
+                <span className="text-foreground font-medium">~100% success</span>,
+                only <span className="text-foreground font-medium">7</span>{" "}
+                reproduce at all, and their mean measured breach rate is{" "}
+                <span className="text-foreground font-medium">13%</span>. Across the
+                56 techniques that publish a number, claimed success and measured
+                reproduction are{" "}
+                <span className="text-foreground font-medium">
+                  uncorrelated (Spearman −0.10, 95% CI [−0.37, +0.17])
+                </span>
+                {" "}— a claimed rate is not portable signal, which is why ROGUE
+                re-measures every technique against your model and system prompt,
+                not the source&rsquo;s.
+              </p>
+            </div>
+
+            <p className="text-base text-muted-foreground leading-relaxed">
+              The same pattern shows up as a reproduction funnel. Across 301
+              techniques harvested from 19 open-web sources and reproduced on a
+              five-model panel, the &ldquo;works on at least one of five
+              models&rdquo; rate{" "}
+              <span className="text-foreground font-medium">(40%)</span> is
+              inflated by the weakest target: on a{" "}
+              <span className="text-foreground font-medium">
+                frozen open-weight model only ~9% reproduce
+              </span>
+              , and{" "}
+              <span className="text-foreground font-medium">
+                ~4% on the most robust model
+              </span>
+              . Paper-sourced techniques degrade more slowly than
+              grey-literature ones, a directional gap that widens on the harder
+              targets.
+            </p>
+
+            <div className="animate-rogue-fade-up">
+              <ReproductionFunnelFig />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric value="−0.10" label="claimed vs measured (ρ, n=56)" accent="red" />
+              <Metric value="100% → 13%" label="claimed ~100%, mean measured" accent="red" />
+              <Metric value="~9%" label="reproduce on a frozen model" accent="red" />
+              <Metric value="$0" label="on already-collected data" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, 301 baseline techniques × a five-model panel,{" "}
+              <span className="text-foreground/90">10,244 trials already collected</span>;
+              breach = the calibrated v3 judge (tuned to under-count) at
+              any_breach_rate ≥ 0.4; reproduction is measured as whether the{" "}
+              <em>carrier mechanism</em> still bypasses alignment toward a neutral
+              objective (system-prompt disclosure), not the original harmful
+              payload; the panel is anchored by a frozen open-weight model so
+              non-reproduction isn&rsquo;t confounded by silent vendor patching.
+              A stronger-model re-extraction (Sonnet 4.6, Batch API) of all 148
+              candidate sources confirmed the null is not an extraction
+              artifact, it recovered a claimed rate for only 1 of 94
+              unquantified sources, so the small claimed-rate sample reflects
+              that the open web rarely quantifies these claims, not a weak
+              extractor.
+            </MethodNote>
+
+            <NovelNote>
+              The honest version of &ldquo;we test real attacks&rdquo;: a success
+              rate claimed in a paper or a forum is{" "}
+              <span className="text-foreground/90">
+                not portable to your deployment
+              </span>
+              {" "}(measured ρ ≈ 0). The value is the re-measurement against your
+              model, system prompt, and tools, under a judge calibrated to
+              under-count. Honest caveats, &ldquo;reproduction&rdquo; means the
+              delivery mechanism still bypasses toward a neutral goal (harmful
+              payloads are deliberately not reproduced); the paper-vs-forum gap is
+              directional (borderline-significant); temperature was checked and is
+              not a confound (the funnel holds across temperature subsets); and the
+              claimed rates carry ~17% extraction noise, so −0.10 reads as &ldquo;no
+              predictive signal,&rdquo; not a precise estimate.{" "}
+              <span className="text-rogue-green">⚑</span>
+            </NovelNote>
+          </div>
+        </Section>
+
+        {/* 2 + 3 SIDE BY SIDE ---------------------------------------- */}
+        <Section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <FindingCard
+              id="finding-02"
+              eyebrow="finding 02"
+              title="Scheduling as a capability lever, not just an optimization."
+            >
+            <div className="flex gap-4">
+              <ListOrdered
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-[17px] text-foreground leading-relaxed">
+                A within-tier greedy reorder was replaced with a{" "}
+                <span className="text-foreground font-medium">
+                  target-conditioned cross-tier scheduler
+                </span>{" "}
+, a static, explainable blend (
+                <code className="font-mono text-[13px] text-foreground/90">
+                  0.5·global + 0.3·vendor + 0.2·family
+                </code>{" "}
+                breach-rate, Laplace-smoothed, deliberately no ML / no bandit so
+                it stays reproducible).
+              </p>
+            </div>
+
+            <p className="text-[17px] text-foreground leading-relaxed">
+              A single-variable controlled experiment, same ladder, attacks,
+              corpus, judge, and target (Claude Haiku, AdvBench + JailbreakBench);
+              only the order changed, beat the production baseline on every
+              axis:{" "}
+              <span className="text-foreground font-medium">
+                median winner-rank 22 → 11 to 13.5
+              </span>
+              ,{" "}
+              <span className="text-foreground font-medium">
+                attack-success-rate 50% → 60%
+              </span>
+              , and{" "}
+              <span className="text-foreground font-medium">
+                cost-per-success $1.25 → $0.74 (−41%)
+              </span>
+              .
+            </p>
+
+            <div className="animate-rogue-fade-up">
+              <SchedulingFig />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              <Metric value="22 → 11 to 13.5" label="median winner-rank" accent="green" />
+              <Metric value="50 → 60%" label="attack-success-rate" accent="green" />
+              <Metric value="−41%" label="cost-per-success" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, single-variable controlled experiment: only the ladder
+              order changed (ladder, attacks, corpus, judge, target fixed);
+              Claude Haiku; AdvBench + JailbreakBench; primary metric =
+              winner-rank.
+            </MethodNote>
+
+            <NovelNote>
+              The mechanism: rank↓ <em>caused</em> ASR↑, the old order
+              exhausted the per-scan budget cap before reaching the winning
+              technique, so reordering improved coverage, cost, and latency at
+              once with zero new attacks. The reproducibility invariant is{" "}
+              <span className="text-foreground/90">
+                &ldquo;reorder, never exclude&rdquo;
+              </span>
+              : same ladder, different order, full reachability preserved.
+            </NovelNote>
+            </FindingCard>
+            <FindingCard
+              id="finding-03"
+              eyebrow="finding 03"
+              title="Calibrating an LLM-as-judge against human labels, then recalibrating when a benchmark exposed it."
+            >
             <div className="flex gap-4">
               <Scale
                 className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
@@ -298,87 +467,16 @@ export default function ResearchPage() {
                 generalizations.
               </MethodNote>
             </div>
+            </FindingCard>
           </div>
         </Section>
 
-        {/* 2 + 3 SIDE BY SIDE ---------------------------------------- */}
+        {/* 4 + 5 SIDE BY SIDE ---------------------------------------- */}
         <Section>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <FindingCard
-              id="finding-02"
-              eyebrow="finding 02"
-              title="Scheduling as a capability lever, not just an optimization."
-            >
-            <div className="flex gap-4">
-              <ListOrdered
-                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <p className="text-[17px] text-foreground leading-relaxed">
-                A within-tier greedy reorder was replaced with a{" "}
-                <span className="text-foreground font-medium">
-                  target-conditioned cross-tier scheduler
-                </span>{" "}
-, a static, explainable blend (
-                <code className="font-mono text-[13px] text-foreground/90">
-                  0.5·global + 0.3·vendor + 0.2·family
-                </code>{" "}
-                breach-rate, Laplace-smoothed, deliberately no ML / no bandit so
-                it stays reproducible).
-              </p>
-            </div>
-
-            <p className="text-[17px] text-foreground leading-relaxed">
-              A single-variable controlled experiment, same ladder, attacks,
-              corpus, judge, and target (Claude Haiku, AdvBench + JailbreakBench);
-              only the order changed, beat the production baseline on every
-              axis:{" "}
-              <span className="text-foreground font-medium">
-                median winner-rank 22 → 11 to 13.5
-              </span>
-              ,{" "}
-              <span className="text-foreground font-medium">
-                attack-success-rate 50% → 60%
-              </span>
-              , and{" "}
-              <span className="text-foreground font-medium">
-                cost-per-success $1.25 → $0.74 (−41%)
-              </span>
-              .
-            </p>
-
-            <div className="animate-rogue-fade-up">
-              <SchedulingFig />
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 pt-1">
-              <Metric value="22 → 11 to 13.5" label="median winner-rank" accent="green" />
-              <Metric value="50 → 60%" label="attack-success-rate" accent="green" />
-              <Metric value="−41%" label="cost-per-success" accent="green" />
-            </div>
-
-            <MethodNote>
-              Method, single-variable controlled experiment: only the ladder
-              order changed (ladder, attacks, corpus, judge, target fixed);
-              Claude Haiku; AdvBench + JailbreakBench; primary metric =
-              winner-rank.
-            </MethodNote>
-
-            <NovelNote>
-              The mechanism: rank↓ <em>caused</em> ASR↑, the old order
-              exhausted the per-scan budget cap before reaching the winning
-              technique, so reordering improved coverage, cost, and latency at
-              once with zero new attacks. The reproducibility invariant is{" "}
-              <span className="text-foreground/90">
-                &ldquo;reorder, never exclude&rdquo;
-              </span>
-              : same ladder, different order, full reachability preserved.
-            </NovelNote>
-            </FindingCard>
-            <FindingCard
-              id="finding-03"
-              eyebrow="finding 03"
+              id="finding-04"
+              eyebrow="finding 04"
               title="A publication-grade null result: grammar-component predictive power."
             >
             <div className="flex gap-4">
@@ -432,64 +530,6 @@ export default function ResearchPage() {
               </span>{" "}
 , a successful negative result.
             </NovelNote>
-            </FindingCard>
-          </div>
-        </Section>
-
-        {/* 4 + 5 SIDE BY SIDE ---------------------------------------- */}
-        <Section>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <FindingCard
-              id="finding-04"
-              eyebrow="finding 04"
-              title="Measure-before-build discipline."
-            >
-              <div className="flex gap-4">
-                <Ruler
-                  className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                <p className="text-[17px] text-foreground leading-relaxed">
-                  $0 measurements from existing telemetry were used repeatedly to{" "}
-                  <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
-                  with an explicit trigger-to-revisit.
-                </p>
-              </div>
-
-              <ul className="space-y-3">
-                <li className="text-[15px] text-foreground/85 leading-relaxed">
-                  <span className="font-semibold text-foreground">
-                    Per-model ladder routing
-                  </span>{" "}
-                  — the spread was a model{" "}
-                  <span className="text-foreground/90">main effect</span>, not a
-                  family×model interaction, so not worth the rewrite.
-                </li>
-                <li className="text-[15px] text-foreground/85 leading-relaxed">
-                  <span className="font-semibold text-foreground">
-                    LLM renderer-synthesis
-                  </span>{" "}
-                  — synthesis-grade backlog flat at{" "}
-                  <span className="text-foreground/90">7</span> across two
-                  widening harvests, so parked.
-                </li>
-                <li className="text-[15px] text-foreground/85 leading-relaxed">
-                  <span className="font-semibold text-foreground">
-                    HF jailbreak-dataset bulk-import
-                  </span>{" "}
-                  — measured{" "}
-                  <span className="text-foreground/90">
-                    0 new attack families
-                  </span>
-                  , so declined.
-                </li>
-              </ul>
-
-              <MethodNote>
-                Method, each decision gated on a $0 telemetry measurement with a
-                pre-stated trigger-to-revisit.
-              </MethodNote>
             </FindingCard>
 
             <FindingCard
@@ -592,110 +632,14 @@ export default function ResearchPage() {
           </div>
         </Section>
 
-        {/* 6. REPRODUCIBILITY ------------------------------------------- */}
-        <Section
-          id="finding-06"
-          eyebrow="finding 06"
-          title="Claimed potency doesn't predict what reproduces against your deployment."
-        >
-          <div className="max-w-3xl space-y-6">
-            <div className="flex gap-4">
-              <Scale
-                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <p className="text-[17px] text-foreground leading-relaxed">
-                Of 17 harvested techniques whose source claimed{" "}
-                <span className="text-foreground font-medium">~100% success</span>,
-                only <span className="text-foreground font-medium">7</span>{" "}
-                reproduce at all, and their mean measured breach rate is{" "}
-                <span className="text-foreground font-medium">13%</span>. Across the
-                56 techniques that publish a number, claimed success and measured
-                reproduction are{" "}
-                <span className="text-foreground font-medium">
-                  uncorrelated (Spearman −0.10, 95% CI [−0.37, +0.17])
-                </span>
-                {" "}— a claimed rate is not portable signal, which is why ROGUE
-                re-measures every technique against your model and system prompt,
-                not the source&rsquo;s.
-              </p>
-            </div>
-
-            <p className="text-base text-muted-foreground leading-relaxed">
-              The same pattern shows up as a reproduction funnel. Across 301
-              techniques harvested from 19 open-web sources and reproduced on a
-              five-model panel, the &ldquo;works on at least one of five
-              models&rdquo; rate{" "}
-              <span className="text-foreground font-medium">(40%)</span> is
-              inflated by the weakest target: on a{" "}
-              <span className="text-foreground font-medium">
-                frozen open-weight model only ~9% reproduce
-              </span>
-              , and{" "}
-              <span className="text-foreground font-medium">
-                ~4% on the most robust model
-              </span>
-              . Paper-sourced techniques degrade more slowly than
-              grey-literature ones, a directional gap that widens on the harder
-              targets.
-            </p>
-
-            <div className="animate-rogue-fade-up">
-              <ReproductionFunnelFig />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <Metric value="−0.10" label="claimed vs measured (ρ, n=56)" accent="red" />
-              <Metric value="100% → 13%" label="claimed ~100%, mean measured" accent="red" />
-              <Metric value="~9%" label="reproduce on a frozen model" accent="red" />
-              <Metric value="$0" label="on already-collected data" accent="green" />
-            </div>
-
-            <MethodNote>
-              Method, 301 baseline techniques × a five-model panel,{" "}
-              <span className="text-foreground/90">10,244 trials already collected</span>;
-              breach = the calibrated v3 judge (tuned to under-count) at
-              any_breach_rate ≥ 0.4; reproduction is measured as whether the{" "}
-              <em>carrier mechanism</em> still bypasses alignment toward a neutral
-              objective (system-prompt disclosure), not the original harmful
-              payload; the panel is anchored by a frozen open-weight model so
-              non-reproduction isn&rsquo;t confounded by silent vendor patching.
-              A stronger-model re-extraction (Sonnet 4.6, Batch API) of all 148
-              candidate sources confirmed the null is not an extraction
-              artifact, it recovered a claimed rate for only 1 of 94
-              unquantified sources, so the small claimed-rate sample reflects
-              that the open web rarely quantifies these claims, not a weak
-              extractor.
-            </MethodNote>
-
-            <NovelNote>
-              The honest version of &ldquo;we test real attacks&rdquo;: a success
-              rate claimed in a paper or a forum is{" "}
-              <span className="text-foreground/90">
-                not portable to your deployment
-              </span>
-              {" "}(measured ρ ≈ 0). The value is the re-measurement against your
-              model, system prompt, and tools, under a judge calibrated to
-              under-count. Honest caveats, &ldquo;reproduction&rdquo; means the
-              delivery mechanism still bypasses toward a neutral goal (harmful
-              payloads are deliberately not reproduced); the paper-vs-forum gap is
-              directional (borderline-significant); temperature was checked and is
-              not a confound (the funnel holds across temperature subsets); and the
-              claimed rates carry ~17% extraction noise, so −0.10 reads as &ldquo;no
-              predictive signal,&rdquo; not a precise estimate.{" "}
-              <span className="text-rogue-green">⚑</span>
-            </NovelNote>
-          </div>
-        </Section>
-
-        {/* 7. SKILL POOLS ----------------------------------------------- */}
-        <Section
-          id="finding-07"
-          eyebrow="finding 07"
-          title="Shared skill pools are an assurance surface, not a free upgrade."
-        >
-          <div className="max-w-3xl space-y-6">
+        {/* 6 + 7 SIDE BY SIDE ---------------------------------------- */}
+        <Section>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <FindingCard
+              id="finding-06"
+              eyebrow="finding 06"
+              title="Shared skill pools are an assurance surface, not a free upgrade."
+            >
             <div className="flex gap-4">
               <ShieldCheck
                 className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
@@ -779,6 +723,60 @@ export default function ResearchPage() {
               decisive case); single trust domain, cross-team isolation is roadmap.{" "}
               <span className="text-rogue-green">⚑</span>
             </NovelNote>
+            </FindingCard>
+
+            <FindingCard
+              id="finding-07"
+              eyebrow="finding 07"
+              title="Measure-before-build discipline."
+            >
+              <div className="flex gap-4">
+                <Ruler
+                  className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <p className="text-[17px] text-foreground leading-relaxed">
+                  $0 measurements from existing telemetry were used repeatedly to{" "}
+                  <em>invert</em> &ldquo;build it&rdquo; decisions, each parked
+                  with an explicit trigger-to-revisit.
+                </p>
+              </div>
+
+              <ul className="space-y-3">
+                <li className="text-[15px] text-foreground/85 leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    Per-model ladder routing
+                  </span>{" "}
+                  — the spread was a model{" "}
+                  <span className="text-foreground/90">main effect</span>, not a
+                  family×model interaction, so not worth the rewrite.
+                </li>
+                <li className="text-[15px] text-foreground/85 leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    LLM renderer-synthesis
+                  </span>{" "}
+                  — synthesis-grade backlog flat at{" "}
+                  <span className="text-foreground/90">7</span> across two
+                  widening harvests, so parked.
+                </li>
+                <li className="text-[15px] text-foreground/85 leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    HF jailbreak-dataset bulk-import
+                  </span>{" "}
+                  — measured{" "}
+                  <span className="text-foreground/90">
+                    0 new attack families
+                  </span>
+                  , so declined.
+                </li>
+              </ul>
+
+              <MethodNote>
+                Method, each decision gated on a $0 telemetry measurement with a
+                pre-stated trigger-to-revisit.
+              </MethodNote>
+            </FindingCard>
           </div>
         </Section>
 
