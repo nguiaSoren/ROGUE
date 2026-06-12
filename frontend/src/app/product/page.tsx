@@ -6,6 +6,8 @@ import { DashboardPreview } from "@/components/marketing/preview/dashboard-previ
 import { FindingsPreview } from "@/components/marketing/preview/findings-preview";
 import { ReportPreview } from "@/components/marketing/preview/report-preview";
 import { McpPreview } from "@/components/marketing/preview/mcp-preview";
+import { OversightPreview } from "@/components/marketing/preview/oversight-preview";
+import { SkillPoolPreview } from "@/components/marketing/preview/skill-pool-preview";
 
 export const metadata = {
   title: "Product, ROGUE",
@@ -140,6 +142,26 @@ export default function ProductPage() {
             </span>
             .
           </p>
+        </Section>
+
+        {/* 6a. OVERSIGHT / HUMAN GATE -------------------------------- */}
+        <Section
+          eyebrow="the human gate"
+          title="Is the sign-off meaningful, or a rubber stamp?"
+          lede="When a risky action escalates to a person, ROGUE scores their decision against a provably-independent answer key and reports a measured false-approve rate, so &ldquo;a human approved it&rdquo; becomes a control you can audit."
+          className="animate-rogue-fade-up"
+        >
+          <OversightPreview className="mx-auto max-w-4xl" />
+        </Section>
+
+        {/* 6b. SKILL POOL AUDIT -------------------------------------- */}
+        <Section
+          eyebrow="the agent's memory"
+          title="Audit the skill pool before it spreads."
+          lede="Shared agent-skill pools are an unaudited surface. ROGUE red-teams the pool for extraction leakage, verifies each skill actually helps before it promotes, and quarantines dangerous skill combinations."
+          className="animate-rogue-fade-up"
+        >
+          <SkillPoolPreview className="mx-auto max-w-4xl" />
         </Section>
 
         {/* 7. CLOSING ------------------------------------------------ */}
