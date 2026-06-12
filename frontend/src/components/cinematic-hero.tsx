@@ -152,10 +152,10 @@ export function CinematicHero({
           style={{ animationDelay: "0.45s" }}
         >
           <Link
-            href="/scans/new"
+            href="/try"
             className="px-6 py-3 rounded-md bg-rogue-green text-black font-mono text-sm font-bold tracking-[0.15em] uppercase hover:bg-rogue-green/90 transition-all shadow-[0_0_32px_var(--rogue-green-dim)] hover:shadow-[0_0_48px_var(--rogue-green-dim)] hover:-translate-y-0.5"
           >
-            Run a scan →
+            Watch a scan run →
           </Link>
           <a
             href="/sample-report.html"

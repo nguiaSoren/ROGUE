@@ -301,15 +301,15 @@ export default async function Home() {
             See ROGUE break your stack.
           </h2>
           <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Point it at an endpoint and get a scored security report back. Read
-            the research, or run a scan yourself right now.
+            Watch ROGUE run a scan right now, no signup, then read the research or
+            request access to scan your own model.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center">
             <Link
-              href="/scans/new"
+              href="/try"
               className="inline-flex items-center justify-center rounded-lg px-6 py-3 bg-rogue-green text-black font-mono text-sm font-bold tracking-[0.15em] uppercase transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rogue-green/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              Run a free scan
+              Run the demo scan
             </Link>
             <CtaRow />
           </div>
