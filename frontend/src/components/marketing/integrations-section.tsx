@@ -71,8 +71,15 @@ interface Group {
   detail: string
   /** Named tools shown as chips. */
   tools: string[]
-  /** Live, keyless endpoint surfaced as a chip (the MCP/IDE tile only). */
-  endpoint?: string
+  /**
+   * Concrete proof artifact under the tools. `live: true` means a genuinely
+   * public, reachable endpoint (rendered with a green pulse) — only the MCP
+   * server and the REST API qualify, both verified live. Slack/Jira are
+   * per-customer (you wire your own workspace), so their proof is a SAMPLE of
+   * the delivered message with `live` omitted (no pulse), never a fabricated
+   * public URL. The SDK has no proof: it is not publicly installable yet.
+   */
+  proof?: { badge: string; value: string; live?: boolean }
   /** Where clicking the tile goes. Omitted = inert (e.g. a Coming-soon tile). */
   href?: string
 }
@@ -85,7 +92,11 @@ const GROUPS: Group[] = [
     detail:
       "Add one config block in Claude Desktop, Cursor, Windsurf, or VS Code. Connect keyless and your editor's AI agent queries ROGUE's live threat DB on the spot, add an account to launch full scans without leaving your work.",
     tools: ["Claude Desktop", "Cursor", "Windsurf", "VS Code"],
-    endpoint: "https://rogue-private.onrender.com/mcp",
+    proof: {
+      badge: "live · keyless",
+      value: "https://rogue-private.onrender.com/mcp",
+      live: true,
+    },
     href: "/product#mcp",
   },
   {
@@ -93,8 +104,12 @@ const GROUPS: Group[] = [
     title: "Your chat & tracker",
     availability: "now",
     detail:
-      "Daily threat briefs and breach alerts land in Slack. Every critical finding is auto-filed as a Jira ticket, your team triages where it already works.",
+      "Daily threat briefs and breach alerts post to your own Slack workspace; every critical finding is auto-filed to your Jira project, deduped so a re-scan updates the same ticket. Your team triages where it already works.",
     tools: ["Slack", "Jira"],
+    proof: {
+      badge: "lands in your channel",
+      value: "ROGUE · score 68 · 4/14 breached · top: Crescendo (CRITICAL) · View report ↗",
+    },
     href: "/product",
   },
   {
@@ -110,8 +125,13 @@ const GROUPS: Group[] = [
     title: "API & SDK",
     availability: "now",
     detail:
-      "A REST /v1 API and a Python SDK for anything bespoke, wire ROGUE into your own pipelines, dashboards, and CI.",
+      "A documented REST /v1 API, live now with a public OpenAPI spec; an API key authorizes the calls. A Python SDK speaks the same v1 contract for wiring ROGUE into your pipelines, dashboards, and CI.",
     tools: ["REST /v1", "Python SDK"],
+    proof: {
+      badge: "live · OpenAPI",
+      value: "https://rogue-private.onrender.com/v1",
+      live: true,
+    },
     href: "/early-access",
   },
 ]
@@ -120,7 +140,7 @@ const GROUPS: Group[] = [
 /*  Card                                                               */
 /* ------------------------------------------------------------------ */
 
-function IntegrationCard({ icon: Icon, title, availability, detail, tools, endpoint, href }: Group) {
+function IntegrationCard({ icon: Icon, title, availability, detail, tools, proof, href }: Group) {
   const cardClass =
     "rogue-card flex flex-col rounded-xl border border-border bg-card/40 p-6 backdrop-blur-sm"
   const inner = (
@@ -156,17 +176,32 @@ function IntegrationCard({ icon: Icon, title, availability, detail, tools, endpo
         ))}
       </ul>
 
-      {/* Live, keyless endpoint, the "this is real and connectable now" proof.
-          Display-only (the card itself links to the full copy-paste config at
-          /product#mcp), so no interactive element nests inside the card anchor. */}
-      {endpoint && (
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-rogue-green/30 bg-rogue-green/[0.04] px-2.5 py-2">
-          <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-rogue-green">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
-            live · keyless
+      {/* Concrete proof artifact. Display-only (the card itself is the link), so
+          nothing interactive nests inside the anchor. A green pulse + green band
+          is reserved for genuinely-live public endpoints (proof.live); per-customer
+          samples (Slack/Jira) render flat, so we never imply a public URL. */}
+      {proof && (
+        <div
+          className={cn(
+            "mt-4 flex items-center gap-2 rounded-md border px-2.5 py-2",
+            proof.live
+              ? "border-rogue-green/30 bg-rogue-green/[0.04]"
+              : "border-border bg-background/60"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em]",
+              proof.live ? "text-rogue-green" : "text-muted-foreground"
+            )}
+          >
+            {proof.live && (
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
+            )}
+            {proof.badge}
           </span>
           <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/80">
-            {endpoint}
+            {proof.value}
           </code>
         </div>
       )}
