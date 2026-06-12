@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Section } from "@/components/marketing/section";
 import { ScanReplay } from "@/components/marketing/scan-replay";
+import { McpConnect } from "@/components/marketing/mcp-connect";
 
 export const metadata = {
   title: "Try ROGUE",
@@ -56,7 +57,17 @@ export default function TryPage() {
           <ScanReplay className="mx-auto max-w-4xl" />
         </Section>
 
-        {/* 3. CLOSING ------------------------------------------------ */}
+        {/* 3. CONNECT FOR REAL (live MCP, not a replay) -------------- */}
+        <Section
+          eyebrow="this one's live, not a replay"
+          title="Or query the real threat DB from your own IDE."
+          lede="The replay above is recorded. This is not, ROGUE&rsquo;s MCP server is live right now, read-only and keyless. Paste the config into Claude Desktop, Cursor, or Windsurf and ask it about the threats breaking models like yours. No signup, free."
+          className="animate-rogue-fade-up"
+        >
+          <McpConnect className="mx-auto max-w-3xl" />
+        </Section>
+
+        {/* 4. CLOSING ------------------------------------------------ */}
         <Section className="animate-rogue-fade-up">
           <p className="text-[15px] text-muted-foreground leading-relaxed max-w-3xl mx-auto text-center">
             This was one recorded run. The same engine harvests live jailbreaks
