@@ -165,6 +165,56 @@ export default async function Home() {
           </div>
         </Section>
 
+        {/* 5c. BEYOND THE MODEL, the three v2 assurance surfaces ------ */}
+        <Section
+          eyebrow="beyond the model"
+          title="Not just the model. Three surfaces, all signed."
+          lede="Red-teaming the model is one surface. ROGUE also measures the human who approves a risky action and the skill pool your agents share, and signs every result against a provably-independent answer key."
+          className="!px-0 animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+                the model · offense
+              </p>
+              <p className="text-lg font-bold mt-1">Reproduce real jailbreaks.</p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                Open-web attacks replayed against your exact model, system
+                prompt, and tools, ranked worst-first.
+              </p>
+            </div>
+            <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+                the human gate · oversight
+              </p>
+              <p className="text-lg font-bold mt-1">Measure the sign-off.</p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                When a risky action escalates to a person, a false-approve rate
+                against an independent key, so &ldquo;a human approved it&rdquo;
+                is a measured control, not an assumption.
+              </p>
+            </div>
+            <div className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+                the agent&rsquo;s memory · assurance
+              </p>
+              <p className="text-lg font-bold mt-1">Audit the skill pool.</p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                Shared agent skills, checked for leakage, whether they actually
+                help, and dangerous combinations, before they spread.
+              </p>
+            </div>
+          </div>
+          <div className="mt-6">
+            <Link
+              href="/product"
+              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-opacity hover:opacity-80"
+            >
+              See all three on the product tour &rarr;
+            </Link>
+          </div>
+        </Section>
+
         {/* 6. HOW ROGUE THINKS ------------------------------------------ */}
         <HowRogueThinks
           nSources={19}
