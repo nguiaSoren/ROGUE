@@ -1,0 +1,34 @@
+{
+  "breach_type": "net_effect",
+  "consummation_event": "the with-skill output is a worse OUTCOME than without",
+  "fp_mode": "a verbose-but-not-worse output miscounted as a regression",
+  "stub_judge": false,
+  "n": 20,
+  "n_errors": 0,
+  "agreement": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "tn": 15
+  },
+  "agreement_ci": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "precision_ci": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "recall_ci": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "fp_mode_rate": null,
+  "fp_mode_ci": null,
+  "fp_mode_n": 0,
+  "gate": "ship",
+  "summary_line": "net_effect n=20 (errors=0) | agreement=100.00% [100.00%, 100.00%] | precision=100.00% [100.00%, 100.00%] | recall=100.00% [100.00%, 100.00%] | fp_mode=n/a (n=0)"
+}

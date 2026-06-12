@@ -184,3 +184,4 @@ tests/fixtures/memory/_raw_tasks/*
 !data/calibration/leakage_label_cases.json
 !data/calibration/net_effect_label_cases.json
 !data/calibration/net_effect_synthetic_cases.json
+!data/calibration/net_effect_report.json
