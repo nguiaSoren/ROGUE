@@ -83,7 +83,66 @@ export default function ProductPage() {
           <McpPreview className="mx-auto max-w-4xl" />
         </Section>
 
-        {/* 6. CLOSING ------------------------------------------------ */}
+        {/* 6. v2 ASSURANCE SURFACES ---------------------------------- */}
+        <Section
+          eyebrow="beyond the model"
+          title="Three surfaces where AI systems fail. ROGUE measures and signs all three."
+          lede="Red-teaming the model is one surface. ROGUE also measures the two that usually go unaudited, the human who approves a risky action and the skill pool your agents share, and emits a signed, tamper-evident attestation for each, scored against an answer key provably independent of what it&rsquo;s grading."
+          className="animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
+            <div className="rogue-card border border-border rounded-xl p-6 bg-card/40 backdrop-blur-sm space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rogue-green">
+                the model · offense
+              </p>
+              <h3 className="text-lg font-semibold tracking-tight">
+                Reproduce real jailbreaks.
+              </h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">
+                Open-web jailbreaks reproduced against your exact model ×
+                system-prompt × tools, ranked worst-first, the scan above.
+              </p>
+            </div>
+            <div className="rogue-card border border-border rounded-xl p-6 bg-card/40 backdrop-blur-sm space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rogue-green">
+                the human gate · oversight
+              </p>
+              <h3 className="text-lg font-semibold tracking-tight">
+                Is the sign-off meaningful?
+              </h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">
+                When a risky action escalates to a person, ROGUE measures whether
+                that oversight is <span className="text-foreground">meaningful</span>,
+                a false-approve rate against an independent answer key, so &ldquo;a
+                human approved it&rdquo; becomes a measured control, not an
+                assumption.
+              </p>
+            </div>
+            <div className="rogue-card border border-border rounded-xl p-6 bg-card/40 backdrop-blur-sm space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rogue-green">
+                the agent&rsquo;s memory · assurance
+              </p>
+              <h3 className="text-lg font-semibold tracking-tight">
+                Audit the skill pool.
+              </h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">
+                Shared agent-skill pools are an unaudited surface. ROGUE red-teams
+                the pool for leakage, verifies each skill actually helps before it
+                spreads, flags dangerous skill combinations, and signs the result.
+              </p>
+            </div>
+          </div>
+          <p className="text-[15px] text-muted-foreground leading-relaxed max-w-3xl mx-auto text-center pt-6">
+            Every result is signed into a tamper-evident hash chain and scored
+            against a provably-independent key,{" "}
+            <span className="text-foreground">
+              threat-informed assurance, not a safety guarantee
+            </span>
+            .
+          </p>
+        </Section>
+
+        {/* 7. CLOSING ------------------------------------------------ */}
         <Section className="animate-rogue-fade-up">
           <div className="rogue-card border border-border rounded-xl p-8 md:p-12 bg-card/40 backdrop-blur-sm space-y-6">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight max-w-2xl">
