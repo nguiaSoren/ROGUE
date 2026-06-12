@@ -38,13 +38,19 @@ export function IntegrationsSection({ className }: { className?: string }) {
         ))}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-3">
         <Link
-          href="/product"
+          href="/request-demo"
           className="inline-flex items-center gap-1.5 font-mono text-sm text-rogue-green transition-colors hover:text-rogue-green/80"
         >
-          View the product tour
+          Get ROGUE set up on your stack
           <ArrowRight className="h-4 w-4" />
+        </Link>
+        <Link
+          href="/product"
+          className="inline-flex items-center gap-1.5 font-mono text-sm text-muted-foreground transition-colors hover:text-rogue-green"
+        >
+          View the product tour
         </Link>
       </div>
     </Section>
@@ -65,6 +71,8 @@ interface Group {
   detail: string
   /** Named tools shown as chips. */
   tools: string[]
+  /** Where clicking the tile goes. Omitted = inert (e.g. a Coming-soon tile). */
+  href?: string
 }
 
 const GROUPS: Group[] = [
@@ -75,6 +83,7 @@ const GROUPS: Group[] = [
     detail:
       "One-click setup in Claude Desktop, Cursor, Windsurf, and VS Code. ROGUE acts as a connector, so an AI agent inside your editor can launch and read back a whole scan without leaving your work.",
     tools: ["Claude Desktop", "Cursor", "Windsurf", "VS Code"],
+    href: "/product#mcp",
   },
   {
     icon: MessageSquare,
@@ -83,6 +92,7 @@ const GROUPS: Group[] = [
     detail:
       "Daily threat briefs and breach alerts land in Slack. Every critical finding is auto-filed as a Jira ticket, your team triages where it already works.",
     tools: ["Slack", "Jira"],
+    href: "/product",
   },
   {
     icon: ShieldCheck,
@@ -99,6 +109,7 @@ const GROUPS: Group[] = [
     detail:
       "A REST /v1 API and a Python SDK for anything bespoke, wire ROGUE into your own pipelines, dashboards, and CI.",
     tools: ["REST /v1", "Python SDK"],
+    href: "/enterprise",
   },
 ]
 
@@ -106,9 +117,11 @@ const GROUPS: Group[] = [
 /*  Card                                                               */
 /* ------------------------------------------------------------------ */
 
-function IntegrationCard({ icon: Icon, title, availability, detail, tools }: Group) {
-  return (
-    <div className="rogue-card flex flex-col rounded-xl border border-border bg-card/40 p-6 backdrop-blur-sm">
+function IntegrationCard({ icon: Icon, title, availability, detail, tools, href }: Group) {
+  const cardClass =
+    "rogue-card flex flex-col rounded-xl border border-border bg-card/40 p-6 backdrop-blur-sm"
+  const inner = (
+    <>
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background/60 text-rogue-green">
           <Icon className="h-5 w-5" />
@@ -116,8 +129,11 @@ function IntegrationCard({ icon: Icon, title, availability, detail, tools }: Gro
         <AvailabilityBadge availability={availability} />
       </div>
 
-      <h3 className="mt-4 text-lg font-semibold tracking-tight text-foreground">
+      <h3 className="mt-4 flex items-center gap-1.5 text-lg font-semibold tracking-tight text-foreground group-hover:text-rogue-green transition-colors">
         {title}
+        {href && (
+          <ArrowRight className="h-4 w-4 opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+        )}
       </h3>
       <p className="mt-1.5 flex-1 text-sm leading-relaxed text-muted-foreground">
         {detail}
@@ -136,8 +152,22 @@ function IntegrationCard({ icon: Icon, title, availability, detail, tools }: Gro
           </li>
         ))}
       </ul>
-    </div>
+    </>
   )
+
+  // Linked tiles (everything real) jump to the relevant next step; the
+  // Coming-soon tile (no href) stays inert, so nothing dead-ends or overpromises.
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={cn(cardClass, "group block transition-colors hover:border-rogue-green/40")}
+      >
+        {inner}
+      </Link>
+    )
+  }
+  return <div className={cardClass}>{inner}</div>
 }
 
 function AvailabilityBadge({ availability }: { availability: Availability }) {

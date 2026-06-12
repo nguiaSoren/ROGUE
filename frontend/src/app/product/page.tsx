@@ -78,6 +78,7 @@ export default function ProductPage() {
 
         {/* 5. MCP ---------------------------------------------------- */}
         <Section
+          id="mcp"
           eyebrow="the signature move"
           title="Red-team from inside your IDE."
           lede="ROGUE exposes its own MCP server, so Claude Desktop, Cursor, and Windsurf query the live threat DB directly. Ask in natural language; get primitives, the breach matrix, and threat briefs back as tools. No other red-team does this."
