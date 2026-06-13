@@ -80,6 +80,15 @@ async def _run_arm(*, quota: int, run_id: str, limit: int, max_spend: float) -> 
 def run(args: argparse.Namespace) -> None:
     """Run both arms (quota=0 then quota=1), then analyze. Spends money."""
     stamp = f"abq_{int(time.time())}"
+    sq = getattr(args, "single_quota", None)
+    if sq is not None:
+        asyncio.run(
+            _run_arm(quota=sq, run_id=f"{stamp}_q{sq}", limit=args.limit,
+                     max_spend=args.max_spend)
+        )
+        print(f"\n>>> single arm (quota={sq}) done. comparison (run-prefix {stamp}):")
+        analyze(argparse.Namespace(run_prefix=stamp))
+        return
     asyncio.run(
         _run_arm(quota=0, run_id=f"{stamp}_q0", limit=args.limit, max_spend=args.max_spend)
     )
@@ -155,6 +164,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="--primitive-limit for each arm (default 12)")
     pr.add_argument("--max-spend", type=float, default=8.0,
                     help="--escalate-max-spend per arm (default $8)")
+    pr.add_argument("--single-quota", type=int, default=None,
+                    help="run ONE arm at this quota (skip the q0/q1 pair). "
+                         "Use when the baseline already exists and you want the "
+                         "full budget on one treatment arm, e.g. --single-quota 3")
     pr.set_defaults(func=run)
 
     pa = sub.add_parser("analyze", help="print the comparison from ladder_attempts (FREE)")

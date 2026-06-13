@@ -28,8 +28,37 @@ _ROOT = Path(__file__).resolve().parents[2]
 _CAL = _ROOT / "data" / "calibration"
 _OUT = _ROOT / "docs" / "research" / "figs"
 
-GREEN, INK, MUTED, RED = "#1f9d55", "#14161b", "#8a9098", "#c0392b"
-plt.rcParams.update({"font.size": 10, "axes.edgecolor": "#d8ddd9", "figure.dpi": 150})
+# Okabe–Ito colorblind-safe palette. Recurring series are fixed across all three figs:
+#   agreement = green, recall = blue, false-positive-mode = vermillion.
+GREEN = "#009E73"   # agreement
+BLUE = "#0072B2"    # recall
+RED = "#D55E00"     # false-positive mode (lower is better)
+ORANGE = "#E69F00"  # extra
+SKY = "#56B4E9"     # extra
+GREY = "#999999"    # reference lines / muted annotation
+INK = "#14161b"     # text
+
+plt.rcParams.update({
+    "font.size": 10,
+    "font.family": "serif",
+    "font.serif": ["STIXGeneral", "DejaVu Serif"],
+    "mathtext.fontset": "stix",
+    "figure.dpi": 150,
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+    "axes.edgecolor": "#444444",
+    "axes.linewidth": 0.8,
+    "axes.axisbelow": True,
+})
+
+
+def _style(ax) -> None:
+    """Shared clean style: hide top/right spines, light horizontal gridlines behind data."""
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(length=3, color="#444444")
+    ax.yaxis.grid(True, color="#999999", alpha=0.25, lw=0.6, zorder=0)
+    ax.xaxis.grid(False)
+    ax.set_axisbelow(True)
 
 
 def _load(name: str) -> dict:
@@ -61,66 +90,71 @@ def main() -> None:
         {"label": "Fabricated-value\n(fabrication)", "agreement": _pct(fabricated["agreement_ci"][0]),
          "recall": _pct(fabricated["recall_ci"][0]), "fp_mode": _pct(fabricated["fp_mode_rate"])},
     ]
-    fig, ax = plt.subplots(figsize=(8.2, 4.3))
+    fig, ax = plt.subplots(figsize=(8.2, 4.6), constrained_layout=True)
     x = range(len(cls))
-    w = 0.27
-    ax.bar([i - w for i in x], [c["agreement"] for c in cls], w, label="Agreement", color=GREEN)
-    ax.bar(list(x), [c["recall"] for c in cls], w, label="Recall", color=INK)
-    ax.bar([i + w for i in x], [(c["fp_mode"] or 0) for c in cls], w, label="FP-mode (lower=better)", color=RED)
+    w = 0.26
+    ax.bar([i - w for i in x], [c["agreement"] for c in cls], w, label="Agreement", color=GREEN, zorder=3)
+    ax.bar(list(x), [c["recall"] for c in cls], w, label="Recall", color=BLUE, zorder=3)
+    ax.bar([i + w for i in x], [(c["fp_mode"] or 0) for c in cls], w,
+           label="False-positive mode (lower is better)", color=RED, zorder=3)
     ax.set_xticks(list(x))
     ax.set_xticklabels([c["label"] for c in cls])
-    ax.set_ylim(0, 108)
-    ax.set_ylabel("%")
-    ax.set_title("One consummation-gate template, calibrated across four breach classes", fontweight="bold")
-    ax.legend(frameon=False, fontsize=8, loc="lower center", ncol=3)
-    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_ylim(0, 112)
+    ax.set_yticks(range(0, 101, 20))
+    ax.set_ylabel("Percent")
+    # value labels offset clearly above each bar; FP-mode labelled only where it exists
     for i, c in enumerate(cls):
-        ax.text(i - w, c["agreement"] + 1, f"{c['agreement']:.1f}", ha="center", fontsize=7)
-    fig.tight_layout()
-    fig.savefig(_OUT / "judge_F1_generalization.png")
+        ax.text(i - w, c["agreement"] + 1.5, f"{c['agreement']:.1f}", ha="center", va="bottom", fontsize=7, color=GREEN)
+        ax.text(i, c["recall"] + 1.5, f"{c['recall']:.1f}", ha="center", va="bottom", fontsize=7, color=BLUE)
+        if c["fp_mode"]:
+            ax.text(i + w, c["fp_mode"] + 1.5, f"{c['fp_mode']:.2f}", ha="center", va="bottom", fontsize=7, color=RED)
+    _style(ax)
+    # legend ABOVE the axes, never over the bars
+    ax.legend(frameon=False, fontsize=8.5, loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=3)
+    fig.savefig(_OUT / "judge_F1_generalization.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 
     # ---- F2: unauthorized-action FP-mode descent (v1 → v2 → v3) --------------
-    fig, ax = plt.subplots(figsize=(6.2, 4.0))
-    stages = ["v1\n(REFINE)", "v2\n(rubric, SHIP)", "v3\n(tool-trace)"]
+    fig, ax = plt.subplots(figsize=(6.6, 4.4), constrained_layout=True)
+    stages = ["v1\n(REFINE)", "v2\n(rubric, SHIP)", "v3\n(trace, SHIP)"]
     fp = [UNAUTH_V1["fp_mode"], UNAUTH_V2["fp_mode"], _pct(unauth["fp_mode_rate"])]
     agr = [UNAUTH_V1["agreement"], UNAUTH_V2["agreement"], _pct(unauth["agreement_ci"][0])]
-    ax.plot(stages, fp, "-o", color=RED, label="FP-mode (lower=better)")
-    ax.plot(stages, agr, "-o", color=GREEN, label="Agreement")
-    for i, v in enumerate(fp):
-        ax.text(i, v + 1.6, f"{v:.2f}%", ha="center", color=RED, fontsize=8)
+    # The ship gate is FP-mode CI-upper <= 10% (calibrate_over_block.py), not a point
+    # threshold, so a fixed horizontal line on these point estimates would misread
+    # (v1's point is under 10% yet REFINEs because its CI-upper crosses it). The verdict
+    # therefore lives on the x-axis labels, and the gate is stated precisely in the caption.
+    ax.plot(stages, agr, "-o", color=GREEN, lw=1.8, ms=6, label="Agreement", zorder=3)
+    ax.plot(stages, fp, "-o", color=RED, lw=1.8, ms=6, label="False-positive mode (lower is better)", zorder=3)
     for i, v in enumerate(agr):
-        ax.text(i, v - 4, f"{v:.2f}%", ha="center", color=GREEN, fontsize=8)
-    ax.axhline(15, ls="--", lw=0.8, color=MUTED)
-    ax.text(2.02, 15, "FP-mode ship ceiling", va="center", fontsize=7, color=MUTED)
-    ax.set_ylim(0, 105)
-    ax.set_ylabel("%")
-    ax.set_title("Diagnose → rubric refinement → tool-trace\n(unauthorized-action: FP-mode 9.38 → 6.25 → 3.12%)", fontweight="bold")
-    ax.legend(frameon=False, fontsize=8)
-    ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
-    fig.savefig(_OUT / "judge_F2_refine_to_ship.png")
+        ax.text(i, v + 2.4, f"{v:.2f}%", ha="center", va="bottom", color=GREEN, fontsize=8)
+    for i, v in enumerate(fp):
+        ax.text(i, v + 2.2, f"{v:.2f}%", ha="center", va="bottom", color=RED, fontsize=8)
+    ax.set_ylim(0, 108)
+    ax.set_yticks(range(0, 101, 20))
+    ax.set_ylabel("Percent")
+    _style(ax)
+    ax.legend(frameon=False, fontsize=8.5, loc="center right", bbox_to_anchor=(1.0, 0.5))
+    fig.savefig(_OUT / "judge_F2_refine_to_ship.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 
     # ---- F3: the tool-trace resolution (text-only proxy → tool-trace) --------
-    fig, ax = plt.subplots(figsize=(6.6, 4.0))
+    fig, ax = plt.subplots(figsize=(6.8, 4.4), constrained_layout=True)
     bars = [
         ("Info-disclosure\n(content)", _pct(infodisc["fp_mode_rate"]), GREEN),
         ("Unauth-action\n(text-only, v2)", UNAUTH_V2["fp_mode"], RED),
         ("Unauth-action\n(tool-trace, v3)", _pct(unauth["fp_mode_rate"]), GREEN),
     ]
     x = range(len(bars))
-    ax.bar(list(x), [b[1] for b in bars], 0.55, color=[b[2] for b in bars])
+    ax.bar(list(x), [b[1] for b in bars], 0.55, color=[b[2] for b in bars], zorder=3)
     for i, b in enumerate(bars):
-        ax.text(i, b[1] + 0.2, f"{b[1]:.2f}%", ha="center", fontsize=8)
+        ax.text(i, b[1] + 0.12, f"{b[1]:.2f}%", ha="center", va="bottom", fontsize=8.5, color=INK)
     ax.set_xticks(list(x))
     ax.set_xticklabels([b[0] for b in bars])
-    ax.set_ylabel("FP-mode %")
+    ax.set_ylabel("False-positive-mode rate (%)")
     ax.set_ylim(0, 8)
-    ax.set_title("Action consummation was a text-only-proxy artifact\n(the tool-trace makes 'executed' a fact: 6.25% → 3.12%)", fontweight="bold")
-    ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
-    fig.savefig(_OUT / "judge_F3_type_dependent.png")
+    ax.set_yticks(range(0, 9, 2))
+    _style(ax)
+    fig.savefig(_OUT / "judge_F3_type_dependent.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 
     print(f"wrote 3 figures → {_OUT}/judge_F{{1,2,3}}_*.png")
