@@ -7,7 +7,7 @@ ROGUE's findings are written up as papers and posts. This is the index: each one
 ## Papers
 
 ### P1 — Allocation Is a Capability-Growth Mechanism
-*Telemetry and Scheduling in a Self-Growing LLM Red-Team.* In a self-growing red-team, evaluation **allocation** is a capability-growth lever, not an efficiency layer: a greedy first-breach ladder starves harvested candidates (reachability 7%), and starvation-aware ordering + a candidate quota convert them into graduated capabilities — **8 of 20 starved candidates graduate vs 0 of 20** under the greedy baseline (Fisher exact *p* = 0.003), backed by a 9,192-trial allocation-bias result.
+*Telemetry and Scheduling in a Self-Growing LLM Red-Team.* In a self-growing red-team, evaluation **allocation** is a capability-growth lever, not an efficiency layer: a greedy first-breach ladder starves harvested candidates (reachability 7%), and starvation-aware ordering + a candidate quota convert them into graduated capabilities — **8 of 20 starved candidates graduate vs 0 of 20** under the greedy baseline (Fisher exact *p* = 0.003), backed by a 10,872-trial allocation-bias result.
 - **Venue:** arXiv `cs.CR` (×`cs.LG`) · *preprint — posting soon*
 - **Reproduce:** frozen results in `data/research/scheduler_results.json` (the causal 8/20, reachability, cost-per-graduation, and allocation-bias matrix); regenerate via `scripts/reproduce/candidate_quota_ab.py` + the `ladder_attempts` telemetry log.
 

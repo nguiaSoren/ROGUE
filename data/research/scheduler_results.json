@@ -34,6 +34,6 @@
       {"model": "anthropic/claude-opus-4-8",          "ladder_win_share": 0.0,   "unbiased_breach_rate": 0.0047, "n_trials": 428}
     ],
     "headline": "gpt-5.4-nano wins 62% of ladders but breaches only 11%; mistral-small wins 12% of ladders yet is the most vulnerable model at 49% — winner-attribution is near-inverted from true vulnerability",
-    "note": "the paper quotes a balanced ~9,192-trial snapshot at submission; counts here reflect the current matrix (~10.9k trials including a partial Opus column), with the same rates and the same rank inversion"
+    "note": "snapshot 2026-06-14: the per-model counts above sum to 10,872 across the six-model panel (the five primary targets are balanced at ~2,090 each; the Claude Opus column is a partial 428). Rates and the rank inversion are stable as the matrix grows."
   }
 }
