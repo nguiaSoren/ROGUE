@@ -9,7 +9,7 @@ ROGUE's findings are written up as papers and posts. This is the index: each one
 ### P1 — Allocation Is a Capability-Growth Mechanism
 *Telemetry and Scheduling in a Self-Growing LLM Red-Team.* In a self-growing red-team, evaluation **allocation** is a capability-growth lever, not an efficiency layer: a greedy first-breach ladder starves harvested candidates (reachability 7%), and starvation-aware ordering + a candidate quota convert them into graduated capabilities — **8 of 20 starved candidates graduate vs 0 of 20** under the greedy baseline (Fisher exact *p* = 0.003), backed by a 9,192-trial allocation-bias result.
 - **Venue:** arXiv `cs.CR` (×`cs.LG`) · *preprint — posting soon*
-- **Reproduce:** `scripts/reproduce/candidate_quota_ab.py` + the `ladder_attempts` telemetry log.
+- **Reproduce:** frozen results in `data/research/scheduler_results.json` (the causal 8/20, reachability, cost-per-graduation, and allocation-bias matrix); regenerate via `scripts/reproduce/candidate_quota_ab.py` + the `ladder_attempts` telemetry log.
 
 ### P2 — Consummation-Gated Breach Judges
 *One template, calibrated across breach classes.* Every breach number is an LLM verdict, so the judge is the load-bearing component. One **consummation-gate** template ("engagement ≠ breach; consummation = breach") instantiates calibrated judges across breach classes, with a self-diagnosing REFINE/SHIP harness validated against independent human labels (JBB 89.3% after a diagnosed recalibration from 70.3%; info-disclosure 97.3%).

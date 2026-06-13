@@ -1,0 +1,39 @@
+{
+  "paper": "P1 — Allocation Is a Capability-Growth Mechanism",
+  "provenance": "Derived from the ladder_attempts reward log on Neon (run ids below) and the frozen figure data docs/research/figs/data/{F2_reachability.csv, F5_allocation.csv, metrics.json}. Rates were frozen at paper submission (2026-06-13); the live corpus has since grown, so some absolute trial counts here exceed the paper's submission snapshot while the rates and the rank inversion are unchanged. cost_per_graduation = escalation_spend / graduations.",
+  "causal_capstone": {
+    "description": "Starved harvested candidates that graduate once made reachable, vs the greedy/starved baseline.",
+    "growth": {"run_id": "abq_1781308343", "K": 20, "quota": 20, "candidates_reached": 20, "graduated": 8, "rate": 0.40},
+    "greedy_baseline": {"candidates_reached": 20, "graduated": 0, "note": "the established greedy-starvation baseline; candidate-tier reachability ~0.067"},
+    "fisher_exact_p_two_sided": 0.0033,
+    "fisher_exact_p_one_sided": 0.0016,
+    "matched_small_n_arm": {"run_id": "sweep_starv_q3_1780462736", "K": 3, "quota": 3, "graduated": 3, "greedy_graduated": 0, "note": "the original 3/3-vs-0/3 existence proof; superseded as the headline by the N=20 result above"}
+  },
+  "reachability_by_tier": {
+    "metric": "executed / eligible, by escalation-ladder tier",
+    "greedy":  {"image": 0.4,  "coj": 0.1667, "structured": 0.125, "audio": 0.125, "planner": 0.0673},
+    "growth":  {"image": 1.0,  "coj": 1.0,    "structured": 1.0,   "audio": 1.0,   "planner": 0.9846},
+    "headline": "the candidate-bearing planner tier rises from 0.067 to 0.985 — the starvation is in the orchestration, not the candidates"
+  },
+  "cost_per_graduation_usd": {
+    "by_K": [
+      {"K": 3,  "run_id": "sweep_starv_q3_1780462736", "escalation_spend_usd": 25.1,  "graduations": 3, "cost_per_graduation_usd": 8.37},
+      {"K": 5,  "run_id": "sweep_K5_q5_1780477935",    "escalation_spend_usd": 28.06, "graduations": 4, "cost_per_graduation_usd": 7.01},
+      {"K": 20, "run_id": "abq_1781308343",            "escalation_spend_usd": 11.5,  "graduations": 8, "cost_per_graduation_usd": 1.44}
+    ],
+    "headline": "cost-per-graduation falls as the evaluation quota K rises — allocation is an economically inverted growth lever"
+  },
+  "allocation_bias": {
+    "description": "Ladder win-share (greedy, first-breach short-circuit) vs unbiased per-model breach rate from the full reproduction matrix; the two orderings are near-inverted, so short-circuit winner counts cannot support per-model conclusions.",
+    "per_model": [
+      {"model": "openai/gpt-5.4-nano",               "ladder_win_share": 0.625, "unbiased_breach_rate": 0.1088, "n_trials": 2113},
+      {"model": "mistralai/mistral-small-2603",       "ladder_win_share": 0.125, "unbiased_breach_rate": 0.4856, "n_trials": 2080},
+      {"model": "meta-llama/llama-3.1-8b-instruct",   "ladder_win_share": 0.25,  "unbiased_breach_rate": 0.1618, "n_trials": 2034},
+      {"model": "google/gemini-3.1-flash-lite",       "ladder_win_share": 0.0,   "unbiased_breach_rate": 0.2801, "n_trials": 2103},
+      {"model": "anthropic/claude-haiku-4-5",         "ladder_win_share": 0.0,   "unbiased_breach_rate": 0.0539, "n_trials": 2114},
+      {"model": "anthropic/claude-opus-4-8",          "ladder_win_share": 0.0,   "unbiased_breach_rate": 0.0047, "n_trials": 428}
+    ],
+    "headline": "gpt-5.4-nano wins 62% of ladders but breaches only 11%; mistral-small wins 12% of ladders yet is the most vulnerable model at 49% — winner-attribution is near-inverted from true vulnerability",
+    "note": "the paper quotes a balanced ~9,192-trial snapshot at submission; counts here reflect the current matrix (~10.9k trials including a partial Opus column), with the same rates and the same rank inversion"
+  }
+}
