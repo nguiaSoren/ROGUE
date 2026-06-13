@@ -84,6 +84,7 @@ data/calibration/*
 !data/research/
 data/research/*
 !data/research/reproducibility_gap_results.json
+!data/research/scheduler_results.json
 !data/research/skill_leak_curve_2026-06-13_REDO.log
 !data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md
 
@@ -148,6 +149,20 @@ video/
 # Content-marketing / demo-video tooling — not part of the red-team product
 scripts/youtube_research.py
 scripts/assemble_video.sh
+scripts/build_trailer_clips.sh
+scripts/build_trailer_cut.sh
+scripts/make_trailer_captions.py
+scripts/trailer/
+assets/trailer/
+
+# Local working artifacts + review UIs — not for the public repo
+.claude/
+/19_leakage_labels.json
+/19_net_effect_labels.json
+/oversight_decisions.json
+/leakage_label.html
+/net_effect_label.html
+/oversight_review.html
 
 # Local-only research/working docs (WIP; not for the public repo)
 docs/research/adaptive_orchestration_systems.md
