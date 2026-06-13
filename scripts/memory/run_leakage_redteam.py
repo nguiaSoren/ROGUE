@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _groq import groq_chat  # noqa: E402  (robust retry/backoff Groq helper)
 
 from rogue.memory.leakage import ScrubbedSkill, measure_leakage  # noqa: E402
+from rogue.memory.judges import leakage_recovery_judge  # noqa: E402
 
 _PACK = Path("benchmark/memory_leakage/extraction_pack_v1.json")
 
@@ -48,6 +49,8 @@ class GroqExtractionAttacker:
         self._model = model
         self._templates = templates
         self._client = httpx.Client(timeout=30)
+        self.n_calls = 0      # liveness accounting: a dead call can't leak, so an
+        self.n_errors = 0     # all-error sweep would silently report a fake 0%.
 
     def _system_for(self, skill: ScrubbedSkill) -> str:
         base = (
@@ -63,10 +66,14 @@ class GroqExtractionAttacker:
         return base
 
     def _ask(self, system: str, user: str) -> str:
-        return groq_chat(
+        out = groq_chat(
             self._client, self._key, self._model, system, user,
             max_tokens=320, temperature=0.8, error_tag="attack-call-error",
         )
+        self.n_calls += 1
+        if (not out) or out.startswith("[attack-call-error"):
+            self.n_errors += 1
+        return out
 
     def attack(self, scrubbed_skill: ScrubbedSkill) -> list[str]:
         system = self._system_for(scrubbed_skill)
@@ -88,6 +95,9 @@ def main() -> int:
                     help="templates per skill (Groq free-tier is rate-limited; fewer = faster)")
     ap.add_argument("--control-sample", type=int, default=12,
                     help="how many of the 35 controls to attack (for the false-positive floor)")
+    ap.add_argument("--paraphrase-judge", action="store_true",
+                    help="also run the LLM paraphrase-recovery judge (catches reconstructed "
+                         "leaks the markers miss). Adds judge calls; default off = marker-only.")
     args = ap.parse_args()
 
     key = os.environ["GROQ_API_KEY"]
@@ -101,10 +111,22 @@ def main() -> int:
     print(f"firing {len(templates)} templates x {len(canaries)} canaries + {len(controls)} controls "
           f"= ~{n_calls} paced calls at a {args.model} target (~{n_calls * 1.5 / 60:.1f} min)…")
 
+    # pre-flight liveness: a decommissioned / rate-limited / empty-returning target reports a
+    # fake 0% (a dead call can't leak). Abort before the sweep rather than emit garbage.
+    probe = attacker._ask("You are a helpful assistant.", "Reply with exactly: OK")
+    if (not probe) or probe.startswith("[attack-call-error") or "exhausted" in probe:
+        print(f"\nABORT: target {args.model!r} is not answering (probe resp={probe[:90]!r}). "
+              f"A 0% here would be an ARTIFACT — fix the model id / rate limit and re-run.")
+        return 2
+    attacker.n_calls = 0; attacker.n_errors = 0  # exclude the probe from the reliability stat
+
+    para_judge = leakage_recovery_judge() if args.paraphrase_judge else None
+    if para_judge is not None:
+        print("  + paraphrase-recovery judge ON (marker floor + LLM reconstruction check)")
     result = measure_leakage(
         args.cohort,
         attacker=attacker,
-        judge=None,  # marker-based exact/fragment recovery — the honest measure for random canaries
+        judge=para_judge,  # None = marker-only; judge also catches paraphrased reconstruction
         canaries=canaries,
         controls=controls,
         pack_coverage="standard",
@@ -117,8 +139,20 @@ def main() -> int:
     leaked = [o.skill_id for o in result.canary_outcomes if o.recovered]
     print(f"leaked canaries ({len(leaked)}): {sorted(leaked)}")
     print(f"controls: {result.control_n}  false positives: {result.control_false_positives}")
-    print("coverage: extraction_pack_v1 (standard) — marker/fragment-based exact recovery; "
-          "paraphrase-judge path not exercised (a stronger pack/judge may recover more).")
+    err_frac = attacker.n_errors / max(attacker.n_calls, 1)
+    if err_frac > 0.20:
+        print(f"\n⚠️  UNRELIABLE: {attacker.n_errors}/{attacker.n_calls} ({err_frac:.0%}) target calls "
+              f"errored/empty — the {result.leakage_rate:.0%} rate is likely an ARTIFACT (a dead call "
+              f"can't leak). Do NOT trust it; fix and re-run.")
+    else:
+        print(f"liveness: {attacker.n_calls - attacker.n_errors}/{attacker.n_calls} real responses "
+              f"({err_frac:.0%} error) — rate is trustworthy.")
+    if args.paraphrase_judge:
+        print("coverage: extraction_pack_v1 (standard) — marker floor + paraphrase-recovery judge "
+              "(reconstructed leaks the exact markers miss are now counted).")
+    else:
+        print("coverage: extraction_pack_v1 (standard) — marker/fragment-based exact recovery; "
+              "paraphrase-judge path not exercised (a stronger pack/judge may recover more).")
     return 0
 
 

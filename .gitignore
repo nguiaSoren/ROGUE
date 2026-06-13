@@ -147,6 +147,9 @@ docs/research/figs/
 scripts/paper_figs.py
 scripts/export_paper_data.py
 docs/research/RESEARCH_TODO.md
+# arXiv/workshop submission packages — papers live on arXiv; the repo links to
+# them (see PAPERS.md) rather than shipping the LaTeX sources + internal plan.
+docs/research/publishing/
 # contingent roadmap (build-if-trigger), not implemented system
 docs/3b_v2_renderer_design.md
 .vercel

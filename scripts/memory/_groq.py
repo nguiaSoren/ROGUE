@@ -25,7 +25,7 @@ def groq_chat(
     *,
     max_tokens: int = 512,
     temperature: float = 0.7,
-    max_retries: int = 3,
+    max_retries: int = 5,
     base_pace_s: float = 1.5,
     error_tag: str = "call-error",
 ) -> str:
@@ -54,15 +54,22 @@ def groq_chat(
             if r.status_code == 429 or r.status_code >= 500:
                 last = f"http {r.status_code}"
                 retry_after = r.headers.get("retry-after")
-                wait = float(retry_after) if retry_after else min(2.0 ** attempt, 6.0)
+                wait = float(retry_after) if retry_after else min(2.0 ** attempt, 10.0)
                 time.sleep(wait)
                 continue
             data = r.json()
             if "choices" in data and data["choices"]:
-                return data["choices"][0]["message"]["content"]
-            last = f"no-choices: {str(data)[:120]}"
-            time.sleep(min(2.0 ** attempt, 6.0))
+                msg = data["choices"][0].get("message", {})
+                text = (msg.get("content") or "").strip()
+                if not text:  # reasoning models (e.g. gpt-oss) put output in 'reasoning'
+                    text = (msg.get("reasoning") or "").strip()
+                if text:
+                    return text
+                last = "empty content+reasoning"  # a failed call, NOT a silent '' (would fake a 0% leak)
+            else:
+                last = f"no-choices: {str(data)[:120]}"
+            time.sleep(min(2.0 ** attempt, 10.0))
         except Exception as exc:  # network blip etc.
             last = str(exc)
-            time.sleep(min(2.0 ** attempt, 6.0))
+            time.sleep(min(2.0 ** attempt, 10.0))
     return f"[{error_tag}: exhausted {max_retries} retries — {last}]"

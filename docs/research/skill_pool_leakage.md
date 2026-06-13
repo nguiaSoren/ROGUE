@@ -20,3 +20,21 @@ The instruction-following defence ("never reveal X") is not a containment guaran
 
 ## What would make it a paper
 A stronger, coverage-calibrated pack (ClawHavoc/Mitiga-style + a PAIR/iterative attacker) across multiple target models, with the leakage-recovery judge for paraphrase, producing a comparable adversarial leakage rate on a privacy-contained skill pool. ⚑ Possibly publishable.
+
+## Multi-model strength curve (2026-06-13, VALID — liveness-guarded)
+
+First multi-target measurement, `extraction_pack_v1` (4 templates) + paraphrase judge, 20 canary skills + 12 controls per model. Every run passed a new **pre-flight + post-run liveness guard** (`run_leakage_redteam.py`): all four reported **128/128 real responses, 0% error, 0 control false-positives**, so these are real rates, not the error-artifact that sank the first attempt (gemma2 was decommissioned → fake 0%; see `data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md`).
+
+| Target (Groq) | Leakage | 95% CI |
+|---|---|---|
+| `llama-3.1-8b-instant` (weak) | **85%** (17/20) | [70, 100] |
+| `qwen3-32b` (mid, reasoning) | **100%** (20/20) | [100, 100] |
+| `llama-3.3-70b-versatile` (strong) | **65%** (13/20) | [45, 85] |
+| `openai/gpt-oss-20b` (safety-tuned) | **35%** (7/20) | [15, 55] |
+
+**Finding — leakage tracks alignment, not size.** It is *not* monotonic in capability: the OpenAI safety-tuned model leaks least (35%) despite being small, while a capable 32B reasoning model leaks everything (100%). Within the Llama family scale does help (8B 85% → 70B 65%). So "instruction-following + a bigger model" is not containment; safety-tuning is the lever. ⚑ Possibly publishable: *containment tracks alignment not scale.*
+
+**Honest caveats.**
+- All four scored on the returned `content` field (the answer), confirmed by probe. But `qwen3-32b` emits chain-of-thought **inline in `content`**, so its 100% counts a canary surfacing in its *visible reasoning*; the other three are answer-level. qwen's number is "leak in think-or-answer" and is mildly inflated relative to the rest. ⚑ The reasoning trace as a distinct leak surface is itself worth a measurement (answer-only vs reasoning-inclusive split).
+- Single pack (`standard` coverage), single run per model, n=20 canaries. The curve is the *shape* (alignment > size); exact rates are this-pack-this-run.
+- Logs: `data/research/skill_leak_curve_2026-06-13_REDO.log` (valid) + the DIAGNOSIS note for why the first attempt was discarded.
