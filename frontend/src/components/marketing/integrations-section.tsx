@@ -90,7 +90,7 @@ const GROUPS: Group[] = [
     title: "Your IDE",
     availability: "now",
     detail:
-      "Add one config block in Claude Desktop, Cursor, Windsurf, or VS Code. Connect keyless and your editor's AI agent queries ROGUE's live threat DB on the spot, add an account to launch full scans without leaving your work.",
+      "Add one config block in Claude Desktop, Cursor, Windsurf, or VS Code. Connect keyless and your editor's AI agent queries ROGUE's live threat DB on the spot; add an account for the full scan dashboard, reports, and the key-authorized /v1 API.",
     tools: ["Claude Desktop", "Cursor", "Windsurf", "VS Code"],
     proof: {
       badge: "live · keyless",

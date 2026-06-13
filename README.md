@@ -37,7 +37,7 @@ https://rogue-private.onrender.com/mcp/
 The [dashboard home](https://rogue-eosin.vercel.app) has one-click **Add to Cursor** / **Add to VS Code** buttons; for Claude Desktop, add it as a custom connector. It exposes ~19 tools — read-only corpus/breach queries plus scan / report / benchmark actions. Full tool list + local install: [MCP integration](#mcp-integration) below.
 
 ### Submit an endpoint, get a report — hosted API
-`POST /v1/scans` with a target → ROGUE queues it, runs the scan on the same engine behind the dashboard and MCP, and returns a scored report as **JSON, HTML, or a CISO-ready PDF**. The full loop — *submit an endpoint → receive a report* — is proven end-to-end on the live host.
+`POST /v1/scans` with a target → ROGUE queues it for the same scan engine behind the dashboard and MCP, returning a scored report as **JSON, HTML, or a CISO-ready PDF** on completion. The hosted `/v1` API is **live and key-authorized today** (private beta), but the background worker that drains the scan queue isn't deployed yet, so a queued scan does not complete on the host. For a graded report today, run it locally (below) or point the SDK at your own target — the identical engine, the identical report.
 
 ### Run it locally
 ```bash
