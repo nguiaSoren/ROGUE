@@ -1,7 +1,9 @@
-![ROGUE — The Red-Team That Never Sleeps](assets/cover.png)
+<p align="center">
+  <img src="assets/brand/brand-svg/logo-stacked.svg" alt="ROGUE" width="300">
+</p>
 
-# ROGUE — Open-web LLM Threat Intelligence Agent
-### _The Red-Team That Never Sleeps._
+<h1 align="center">ROGUE — Open-web LLM Threat Intelligence Agent</h1>
+<p align="center"><b><i>The Red-Team That Never Sleeps.</i></b></p>
 
 ROGUE is an autonomous red-team for production LLMs. It continuously discovers brand-new jailbreaks and prompt-injection attacks from the open web, replays each one against **your** deployment (model × system prompt × tools), and ships a daily threat brief you can also query from your IDE — and the daily open-web harvest runs on just **$0.05–$0.30 of Bright Data**.
 
@@ -46,7 +48,18 @@ alembic upgrade head && python scripts/ops/seed_demo_data.py
 uvicorn rogue.api.main:app --reload
 ```
 
-*(A same-contract Python SDK, built against the frozen `v1` API, is in private beta — not yet on PyPI.)*
+*(ROGUE also ships a **Python SDK** (`from rogue import Client`) and a `rogue` CLI — install editable from this repo with `pip install -e .` (not yet on PyPI). See [`docs/SDK.md`](docs/SDK.md).)*
+
+## Integrations
+
+ROGUE meets your team where it already works:
+
+| Surface | Status | What you get |
+|---|---|---|
+| **Your IDE** — MCP | ✅ **Available now** · keyless | One config block in Claude Desktop / Cursor / Windsurf / VS Code; the editor's agent queries the live threat DB on the spot. Add an account to launch full scans without leaving your work. `https://rogue-private.onrender.com/mcp` |
+| **Your chat & tracker** — Slack + Jira | ✅ **Available now** | Daily threat briefs + breach alerts post to your Slack workspace; every critical finding is auto-filed to your Jira project, deduped so a re-scan updates the same ticket. |
+| **API & SDK** — REST `/v1` + Python | ✅ **Available now** | A documented `/v1` REST API (live OpenAPI spec, API-key authorized) at `https://rogue-private.onrender.com/v1`; the Python SDK speaks the same v1 contract (`from rogue import Client`; `pip install -e .` from this repo — see [`docs/SDK.md`](docs/SDK.md)). |
+| **Security tooling** — SOAR / SIEM | 🔜 **Coming soon** | Splunk / Palo Alto Cortex connectors to pipe findings into your existing security stack. On the roadmap, not available today. |
 
 ## What ROGUE does
 

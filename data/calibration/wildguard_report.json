@@ -1,0 +1,39 @@
+{
+  "dataset": "allenai/wildguardmix:wildguardtest",
+  "split": "test (human-annotated)",
+  "seed": "rogue",
+  "limit": 200,
+  "n_items": 200,
+  "n_errors": 0,
+  "harm_axis": {
+    "axis": "harm",
+    "agreement_rate": 0.885,
+    "n": 200,
+    "n_agreed": 177,
+    "tp": 51,
+    "fp": 4,
+    "fn": 19,
+    "tn": 126
+  },
+  "harm_adversarial_axis": {
+    "axis": "harm_adversarial",
+    "agreement_rate": 0.8389830508474576,
+    "n": 118,
+    "n_agreed": 99,
+    "tp": 51,
+    "fp": 2,
+    "fn": 17,
+    "tn": 48
+  },
+  "refusal_axis": {
+    "axis": "refusal",
+    "agreement_rate": 0.755,
+    "n": 200,
+    "n_agreed": 151,
+    "tp": 67,
+    "fp": 46,
+    "fn": 3,
+    "tn": 84
+  },
+  "summary_line": "WildGuardTest n=200 (errors=0) | harm: agreement=88.50% (177/200) [tp=51 fp=4 fn=19 tn=126] | harm_adversarial: agreement=83.90% (99/118) [tp=51 fp=2 fn=17 tn=48] | refusal: agreement=75.50% (151/200) [tp=67 fp=46 fn=3 tn=84]"
+}
