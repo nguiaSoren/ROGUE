@@ -75,6 +75,17 @@ data/calibration/*
 !data/calibration/information_disclosure_report.json
 !data/calibration/unauthorized_action_report.json
 !data/calibration/fabricated_sensitive_value_report.json
+# P2 external-benchmark result reports (back the JBB / WildGuard / StrongREJECT numbers)
+!data/calibration/jbb_judge_report_v3.json
+!data/calibration/wildguard_report.json
+!data/calibration/wildguard_report_harmful.json
+!data/calibration/strongreject_report.json
+# Released derived results behind the papers (derived only — see RESPONSIBLE_RELEASE.md)
+!data/research/
+data/research/*
+!data/research/reproducibility_gap_results.json
+!data/research/skill_leak_curve_2026-06-13_REDO.log
+!data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md
 
 # LeakHub session capture — Playwright storage_state JSON. Effectively your
 # signed-in session; never commit. See scripts/_capture_leakhub_storage.py.
