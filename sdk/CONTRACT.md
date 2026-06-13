@@ -8,9 +8,9 @@ Status of each endpoint against the *currently deployed* API (`https://rogue-pri
 
 | Area | Endpoint | Server today |
 |---|---|---|
-| Auth | `POST /v1/auth/token`, `POST /v1/auth/refresh` | ❌ not built (API is unauthenticated) — contract-only |
-| Deployments | `POST/GET/PATCH/DELETE /v1/deployments` | ❌ not built (API is read-only) — contract-only |
-| Scans | `POST /v1/scans`, `GET /v1/scans/{id}`, cancel | ❌ not built (scan = offline `reproduce_once.py`) — contract-only |
+| Auth | `POST /v1/auth/token`, `POST /v1/auth/refresh` | ❌ token endpoints not built — but the hosted API **is** key-authenticated today (`rk_live_` bearer), not unauthenticated. |
+| Deployments | `POST/GET/PATCH/DELETE /v1/deployments` | ❌ `/v1/deployments` not built — (the hosted API is no longer read-only; it ships `/v1/scans`, `/v1/validate`, `/v1/benchmark`, `/v1/attestation/*`). |
+| Scans | `POST /v1/scans`, `GET /v1/scans/{id}`, cancel | ⚠️ **live + key-auth'd, but queues only** — the endpoints are deployed and enqueue a job; no hosted worker drains the queue yet, so a scan does not complete on the host. A real graded scan = offline `reproduce_once.py` (Mode 1). |
 | Reports | `GET /v1/reports/{id}`, `GET /v1/scans/{id}/report` | ⚠️ partial — `/api/brief` returns the diff today; needs per-scan shaping |
 
 `MockTransport` implements **all** of the above so the SDK is fully usable and testable offline today.

@@ -22,7 +22,7 @@
 
 - **Online-learning spend allocation.** An ε-greedy bandit allocates metered Bright Data spend by novel-attacks-per-dollar. The entire daily open-web harvest runs on $0.05–$0.30; the top query arm yields ~7,100 novel attacks per dollar versus ~0 for the worst.
 
-- **Productized — one engine, four surfaces.** ScanService → a Postgres job queue (SKIP LOCKED) → worker → engine → ReportService, fronted by a Python SDK (324 tests, MockTransport backend), a `/v1` REST API, the dashboard, and the MCP server — all returning the identical report. Customer keys are Fernet-encrypted at rest. Verified live end-to-end: submit endpoint → JSON + HTML + a reportlab CISO-grade PDF.
+- **Productized — one engine, four surfaces.** ScanService → a Postgres job queue (SKIP LOCKED) → worker → engine → ReportService, fronted by a Python SDK (324 tests, MockTransport backend), a `/v1` REST API, the dashboard, and the MCP server — all returning the identical report. Customer keys are Fernet-encrypted at rest. The local pipeline produces the full report today — JSON + HTML + a reportlab CISO-grade PDF; the hosted `/v1` API is live and key-authorized (private beta), with end-to-end scan execution (the queue worker) still rolling out.
 
 - **Production reliability, learned the hard way.** Operated as a live service through a serverless-DB outage that I diagnosed and fixed — un-gating startup from migrations, adding a DB-free liveness probe, hardening the connection pool, and closing a streaming connection leak — then distilled into a reusable resilience playbook.
 

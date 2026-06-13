@@ -264,7 +264,7 @@ export default function DeckPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <DeployCard
                 title="Hosted"
-                desc="The fastest path. We run the scans against your registered endpoint and serve the dashboard."
+                desc="The fastest path. We run the scans against your registered endpoint and serve the dashboard — hosted execution in private beta."
               />
               <DeployCard
                 title="Private"
