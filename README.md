@@ -2,11 +2,11 @@
   <img src="assets/brand/brand-svg/logo-stacked.svg" alt="ROGUE" width="300">
 </p>
 
-<h1 align="center">ROGUE — Open-web LLM Threat Intelligence Agent</h1>
+<h1 align="center">ROGUE — Red-team every way a high-stakes AI agent can fail</h1>
 <p align="center"><b><i>The Red-Team That Never Sleeps.</i></b></p>
 <p align="center"><sub>Powered end-to-end by 5 Bright Data products · built for the Bright Data real-time AI-agents hackathon (results pending)</sub></p>
 
-ROGUE is an autonomous red-team for production LLMs. It continuously discovers brand-new jailbreaks and prompt-injection attacks from the open web, replays each one against **your** deployment (model × system prompt × tools), and ships a daily threat brief you can also query from your IDE — and the daily open-web harvest runs on just **$0.05–$0.30 of Bright Data**.
+ROGUE measures **every place a high-stakes AI agent can go wrong** — whether the **model** can be broken, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe — each against an independent, continuously-refreshed standard, with a reproducible **signed** record. And it closes the loop: it doesn't just find the break, it **generates and verifies the fix** (you own the runtime — ROGUE never sits in your request path). The continuous open-web harvest behind the model surface runs on just **$0.05–$0.30 of Bright Data** a day.
 
 > ### 🥇 The first continuous open-web red-team you can query over MCP.
 > ROGUE harvests new jailbreaks **through Bright Data's MCP**, reproduces each one against **your** config, and serves the results **back through its own MCP server** — so you can ask Claude / Cursor *"which live attacks breach my config?"* from your editor. A two-way MCP loop — harvest *and* distribution — that no other red-team tool closes.
