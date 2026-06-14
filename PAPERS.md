@@ -17,7 +17,7 @@ ROGUE's findings are written up as papers and posts. This is the index: each one
 - **Reproduce:** `scripts/calibration/run_calibration.py`, `eval_wildguard.py`, `second_grader_pass.py`, `eval_jbb_judge.py`. See [`docs/judge-calibration.md`](docs/judge-calibration.md).
 
 ### P3 — Claimed Potency Does Not Predict Reproduction
-*A Carrier-Mechanism Audit of Open-Web Jailbreaks in Deployment Context.* Most grey-literature-claimed jailbreaks do not survive as working *carriers* under conservative judging in deployment context: reproduction collapses 40.5% → 9.0% → 3.7% as the target hardens, and a source's claimed rate carries no usable signal (Spearman −0.10, *n* = 56; of 17 techniques claiming ~100%, only seven reproduce at all, and reproduction averaged across all 17 is 13.3%) — in tension with the closest community-corpus study (Shen et al.'s "Do Anything Now"), a disagreement we trace to the judge.
+*A Carrier-Mechanism Audit of Open-Web Jailbreaks in Deployment Context.* Most grey-literature-claimed jailbreaks do not survive as working *carriers* under conservative judging in deployment context: reproduction collapses 40.5% → 9.0% → 3.7% as the target hardens, and a source's claimed rate carries no usable signal (Spearman −0.10, *n* = 56; of 17 techniques claiming ~100%, only seven reproduce at all, and reproduction averaged across all 17 is 13.3%) — in tension with the closest comparable community-corpus study, a disagreement we trace to the judge.
 - **Venue:** arXiv `cs.CR` · **lead paper for the endorsement ask** · *preprint — posting soon*
 - **Reproduce:** `scripts/research/reproducibility_gap.py` + `reproducibility_gap_figs.py`; frozen results in `data/research/reproducibility_gap_results.json`.
 
