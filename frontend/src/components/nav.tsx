@@ -69,7 +69,7 @@ export function Nav() {
             className="h-5 w-auto"
           />
           <span className="text-sm text-muted-foreground hidden sm:inline">
-            · open-web threat intel
+            · ai-agent assurance
           </span>
         </Link>
         <nav className="flex items-center gap-3 md:gap-5 text-xs uppercase tracking-widest">

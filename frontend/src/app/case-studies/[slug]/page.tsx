@@ -124,7 +124,7 @@ export default async function CaseStudyDetail({
             </p>
           </ReportSection>
 
-          <ReportSection eyebrow="03 · Findings" title="What ROGUE reproduced">
+          <ReportSection eyebrow="03 · Findings" title="What ROGUE measured">
             <Findings cs={cs} />
           </ReportSection>
 
@@ -155,8 +155,12 @@ export default async function CaseStudyDetail({
             Want a report like this for your stack?
           </h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Point ROGUE at your endpoint and get this exact framework filled in
-            with real, measured results for your model, prompt, and tools.
+            Point ROGUE at your agent and get this exact framework filled in with
+            real, measured results across all three surfaces, whether the model
+            can be broken, whether the human oversight is meaningful, and whether
+            the accumulated knowledge is safe, with a signed, reproducible
+            record. ROGUE even generates and re-tests the fix; you own and deploy
+            the runtime.
           </p>
           <Link
             href="/request-demo"

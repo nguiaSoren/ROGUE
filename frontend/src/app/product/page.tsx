@@ -13,7 +13,7 @@ import { SkillPoolPreview } from "@/components/marketing/preview/skill-pool-prev
 export const metadata = {
   title: "Product, ROGUE",
   description:
-    "See exactly what ROGUE does to your stack: a live walkthrough of the scan dashboard, ranked findings, the CISO-ready report, and the MCP server your IDE queries directly.",
+    "ROGUE measures every place a high-stakes AI agent can go wrong, the model, the human oversight, and the shared skill pool, each scored against an independent standard and emitted as a signed, tamper-evident record.",
 };
 
 /**
@@ -33,14 +33,20 @@ export default function ProductPage() {
               the product
             </p>
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-              See exactly what ROGUE does to your stack.
+              See every place your AI agent can go wrong — and the signed proof
+              it was checked.
             </h1>
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-              Point ROGUE at a deployment and it harvests live open-web
-              jailbreaks, reproduces them against your exact model ×
-              system-prompt × tools, and ranks what breaks. Here is the whole
-              loop, the dashboard, the findings, the report, and the MCP server
-              your IDE talks to, shown with real example data.
+              ROGUE measures the three surfaces where a high-stakes AI system
+              fails: the <span className="text-foreground">model</span> can be
+              broken, the{" "}
+              <span className="text-foreground">human oversight</span> may be a
+              rubber stamp, and the{" "}
+              <span className="text-foreground">knowledge your agents share</span>{" "}
+              can leak. Each is scored against an independent standard,
+              reproducibly, and emits a signed, tamper-evident record. One
+              engine, one buyer. Here is the whole loop, shown with real example
+              data.
             </p>
             <CtaRow className="pt-2" />
           </div>
@@ -50,8 +56,8 @@ export default function ProductPage() {
         <Section
           id="live-scan"
           eyebrow="live scans"
-          title="Run a scan, watch it live."
-          lede="Kick off a scan and watch breaches surface in real time, every attack on the ladder, every panel response, scored as it lands."
+          title="Watch a scan run."
+          lede="This is the dashboard you get, every attack on the ladder, every panel response, scored as it lands. Scans run today via the SDK or a scoped pilot; hosted execution is in private beta."
           className="animate-rogue-fade-up"
         >
           <DashboardPreview className="mx-auto max-w-4xl" />
@@ -134,6 +140,9 @@ export default function ProductPage() {
                 human approved it&rdquo; becomes a measured control, not an
                 assumption.
               </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                research-validated · early access
+              </p>
             </Link>
             <Link
               href="#skill-pool"
@@ -149,6 +158,9 @@ export default function ProductPage() {
                 Shared agent-skill pools are an unaudited surface. ROGUE red-teams
                 the pool for leakage, verifies each skill actually helps before it
                 spreads, flags dangerous skill combinations, and signs the result.
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                research-validated · early access
               </p>
             </Link>
           </div>
@@ -182,6 +194,50 @@ export default function ProductPage() {
           className="animate-rogue-fade-up"
         >
           <SkillPoolPreview className="mx-auto max-w-4xl" />
+        </Section>
+
+        {/* 6c. SURFACE 1b — ASSURANCE-NATIVE REMEDIATION ------------- */}
+        <Section
+          id="remediation"
+          eyebrow="surface 1b · remediation"
+          title="We don't just find it, we fix it, and prove the fix."
+          lede="A finding you can&rsquo;t close is a ticket, not a control. ROGUE generates a candidate mitigation and re-tests it against the same corpus to prove it actually closed the breach, without over-blocking."
+          className="animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-5xl mx-auto">
+            <div className="rogue-card border border-border rounded-xl p-6 bg-card/40 backdrop-blur-sm space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rogue-green">
+                generate the fix
+              </p>
+              <h3 className="text-lg font-semibold tracking-tight">
+                A candidate mitigation, not just a flag.
+              </h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">
+                For each breach, ROGUE proposes a concrete remedy, a
+                system-prompt patch, a tighter tool-permission scope, or
+                distilled fine-tuning data, targeted at the exact primitive that
+                broke through.
+              </p>
+            </div>
+            <div className="rogue-card border border-border rounded-xl p-6 bg-card/40 backdrop-blur-sm space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-rogue-green">
+                prove the fix
+              </p>
+              <h3 className="text-lg font-semibold tracking-tight">
+                Re-tested against the same corpus.
+              </h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">
+                The candidate is replayed against the same attack corpus and
+                scored by the same calibrated judge, proving it closed the breach
+                without over-blocking legitimate traffic.
+              </p>
+            </div>
+          </div>
+          <p className="text-[15px] text-muted-foreground leading-relaxed max-w-3xl mx-auto text-center pt-6">
+            ROGUE generates and verifies the fix;{" "}
+            <span className="text-foreground">you own the runtime</span>, it
+            never sits in your request path.
+          </p>
         </Section>
 
         {/* 7. CLOSING ------------------------------------------------ */}

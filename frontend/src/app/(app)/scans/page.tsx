@@ -43,8 +43,9 @@ export default async function ScansPage() {
             </p>
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Scans</h1>
             <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
-              Every red-team scan your org has launched, newest first. Click a row to
-              watch a running scan or open its report.
+              Every red-team scan your org has launched, newest first. Click a row to open
+              its report. Hosted execution is in private beta &mdash; scans run via the SDK
+              or a scoped pilot today.
             </p>
           </div>
           <Link
@@ -123,7 +124,8 @@ function EmptyState() {
       <p className="font-mono text-sm text-muted-foreground">No scans yet.</p>
       <p className="text-xs text-muted-foreground/70 max-w-sm mx-auto">
         Launch your first red-team scan against a model endpoint to see breaches,
-        a risk score, and a downloadable report here.
+        a risk score, and a downloadable report here. Hosted execution is in private
+        beta &mdash; scans run via the SDK or a scoped pilot today.
       </p>
       <Link
         href="/scans/new"

@@ -6,7 +6,7 @@ import { CASE_STUDIES } from "@/content/case-studies";
 export const metadata: Metadata = {
   title: "Case Studies, ROGUE",
   description:
-    "How a ROGUE engagement reads. Two illustrative templates, one seed-stage startup, one enterprise model-risk team, demonstrating the Problem → Deployment → Findings → Remediation → Outcome reporting framework.",
+    "How a ROGUE engagement reads. Illustrative templates, startup and enterprise, that measure the three places an agent can go wrong, model, human oversight, accumulated knowledge, and sign the record, through the Problem → Deployment → Findings → Remediation → Outcome framework.",
 };
 
 /**
@@ -30,15 +30,26 @@ export default function CaseStudiesIndex() {
             What a ROGUE engagement looks like.
           </h1>
           <p className="text-[17px] text-foreground leading-relaxed">
-            We are pre-first-customer, and we will not invent one. The two
-            studies below are{" "}
+            ROGUE measures the three places a high-stakes AI agent can go wrong,
+            whether the{" "}
+            <span className="text-foreground font-medium">model</span> can be
+            broken, whether the{" "}
+            <span className="text-foreground font-medium">human oversight</span>{" "}
+            is actually meaningful, and whether the accumulated{" "}
+            <span className="text-foreground font-medium">knowledge</span> is
+            safe, against an independent, reproducible standard, and signs the
+            record.
+          </p>
+          <p className="text-[17px] text-foreground leading-relaxed">
+            We are pre-first-customer, and we will not invent one. The studies
+            below are{" "}
             <span className="text-foreground font-medium">templates</span>, honest,
-            generic examples that show exactly how ROGUE reports a red-team
+            generic examples that show exactly how ROGUE reports an assurance
             engagement, section by section: Problem → Deployment → Findings →
             Remediation → Outcome. Every number in them is an illustrative
             placeholder, clearly marked. When we run our first real engagement,
-            its report will land here in this same shape, with real, measured
-            results.
+            its report will land here in this same shape, with real, measured,
+            signed results.
           </p>
 
           {/* Visible templates notice */}

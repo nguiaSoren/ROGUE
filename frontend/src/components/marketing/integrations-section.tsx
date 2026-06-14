@@ -104,7 +104,7 @@ const GROUPS: Group[] = [
     title: "Your chat & tracker",
     availability: "now",
     detail:
-      "Daily threat briefs and breach alerts post to your own Slack workspace; every critical finding is auto-filed to your Jira project, deduped so a re-scan updates the same ticket. Your team triages where it already works.",
+      "Slack alerts work today via an incoming webhook — the daily threat brief plus every CRITICAL/HIGH breach posts to your workspace. Connect Slack or Jira as a per-org integration and deliver findings through the MCP action tools; automatic fan-out on every scan completion is rolling out.",
     tools: ["Slack", "Jira"],
     proof: {
       badge: "lands in your channel",

@@ -127,9 +127,16 @@ new_methods.md
 assets/deck_slide_lines.md
 # rogue v2 spec — internal planning, local-only
 docs/v2/
+# Moat-building method notes (SERP queries, BD harvest recipe, harvest scripts) —
+# the corpus DATA stays committed (tests/runtime load it), but the prose that
+# documents HOW it was harvested is internal-only. Nothing in code/CI reads these.
+tests/fixtures/memory/HARVEST_NOTES.md
+tests/fixtures/oversight/HARVEST_NOTES.md
 
 # Dev-scratch scripts — not part of the runnable project
 scripts/_*
+# Unpublished paper teaser figure generator (the sibling research fig scripts are tracked)
+scripts/research/p3_teaser.py
 
 # Stray root npm files (accidental `npm install react-markdown` at repo root;
 # real frontend deps live in frontend/package.json)
@@ -139,6 +146,12 @@ scripts/_*
 # Internal marketing/positioning notes — not part of the public repo
 /marketing_claims.md
 /monetization_venues.md
+# Internal go-to-market + demo-production playbook (trailer/filming notes,
+# creative briefs, sitemap, positioning) — production process, not product.
+docs/marketing/
+# Founder's internal outbound/sales index (cold-email skeleton, prospect list,
+# pre-send checklist) — never public.
+docs/outbound_package.md
 
 # Personal / non-product files (must never reach the auto-deploying repo)
 *_CV.md

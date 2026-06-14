@@ -22,7 +22,7 @@ import {
 export const metadata = {
   title: "ROGUE, Pitch",
   description:
-    "ROGUE in ten slides: a continuous open-web red-team that finds the jailbreaks before your users do. Built on Bright Data, queryable over MCP.",
+    "ROGUE in ten slides: one engine that measures every way a high-stakes AI agent goes wrong — model, human oversight, accumulated knowledge — against an independent, signed standard, before your users do. Built on Bright Data, queryable over MCP.",
 };
 
 /**
@@ -45,14 +45,19 @@ export default function DeckPage() {
               01 / 10 · ROGUE
             </p>
             <h1 className="mt-6 text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-              Continuously red-team your AI
+              Measure every way a high-stakes
               <br />
-              <span className="text-rogue-green">before attackers do.</span>
+              <span className="text-rogue-green">AI agent goes wrong.</span>
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
-              A continuous open-web red-team for LLM deployments. Point it at an
-              endpoint, get a scored security report, and a daily diff of what
-              changed.
+              Three failure modes, one engine: the model can be broken, the
+              human gate can be meaningless, the skill memory can leak. ROGUE
+              measures each against an independent, continuously-refreshed
+              standard — reproducible, signed, one engine.
+            </p>
+            <p className="mt-4 text-sm text-muted-foreground max-w-2xl leading-relaxed">
+              The live path today is the SDK or a scoped pilot; hosted scanning
+              is in private beta.
             </p>
             <p className="mt-10 font-mono text-sm text-muted-foreground">
               Soren Obounou Nguia · Incheon ·{" "}
@@ -136,8 +141,8 @@ export default function DeckPage() {
         <Slide n={4}>
           <Section
             eyebrow="04 / 10 · the solution"
-            title="Point ROGUE at an endpoint. Get a scored report with remediation."
-            lede="No agents to install, no traffic to mirror. Give ROGUE your deployment config and it does the rest, continuously."
+            title="Wire ROGUE into your stack. Get a scored report with a verified fix."
+            lede="No agents to install, no traffic to mirror. Give ROGUE your deployment config and it does the rest, continuously. Today that runs over the SDK or a scoped pilot; hosted scanning is in private beta."
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StepCard
@@ -195,28 +200,32 @@ export default function DeckPage() {
         <Slide n={6}>
           <Section
             eyebrow="06 / 10 · the differentiator"
-            title="ROGUE exposes its own MCP server. Nobody else does this."
-            lede="ROGUE isn't just a dashboard, it's a live MCP server. Your assistant queries the threat DB directly, in the tool you already work in."
+            title="One independent, signed standard across all three surfaces."
+            lede="Anyone can run a checklist once. ROGUE measures the model, the human oversight gate, and the accumulated skill-memory against the same independent, continuously-refreshed open-web corpus — and emits a reproducible, signed record for every result. As the corpus grows, the standard re-tests itself; the moat is the standard, not a feature."
           >
             <div className="rogue-card border border-border rounded-xl p-6 md:p-8 bg-card/40 backdrop-blur-sm">
               <div className="flex items-start gap-4">
                 <div className="rounded-lg border border-rogue-green/40 bg-rogue-green/5 p-3 text-rogue-green shrink-0">
-                  <Plug className="h-6 w-6" />
+                  <ShieldAlert className="h-6 w-6" />
                 </div>
                 <div className="space-y-3">
                   <p className="text-lg font-bold">
-                    Claude Desktop · Cursor · Windsurf, connected in one click.
+                    Model broken · human gate meaningless · skill memory leaks —
+                    measured, scored, and signed.
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
-                    Ask &ldquo;what new attacks landed against my config this
-                    week?&rdquo; from inside your IDE and get an answer from the
-                    live threat database, no context-switching, no copy-paste.
-                    The same intelligence that powers the dashboard is available
-                    as a tool to your own agents.
+                    Each surface is graded against the same independent corpus
+                    that refreshes from the open web, so the standard is never
+                    your own marking your own homework, and never stale. Every
+                    result ships with a reproducible, signed record you can hand
+                    to an auditor. The model surface is mature today; the
+                    oversight and memory surfaces are measured and
+                    research-validated (signed, small-n), not yet turnkey.
                   </p>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    Producer and consumer of MCP, a defensible moat, not a
-                    feature checkbox.
+                  <p className="font-mono text-xs text-muted-foreground flex items-center gap-2">
+                    <Plug className="h-3.5 w-3.5" />
+                    Distributed over MCP too — Claude Desktop · Cursor ·
+                    Windsurf query the same signed standard from inside your IDE.
                   </p>
                 </div>
               </div>
@@ -340,11 +349,12 @@ export default function DeckPage() {
                 10 / 10 · let&apos;s talk
               </p>
               <h2 className="mt-5 text-3xl md:text-5xl font-bold tracking-tight">
-                Find the jailbreak before your users do.
+                Find every way a high-stakes agent goes wrong, before your users
+                do.
               </h2>
               <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Give us an endpoint. We&apos;ll show you exactly what breaks
-                through it, and what to fix.
+                Bring your stack. We&apos;ll show you exactly what breaks
+                through it — model, oversight, and memory — and what to fix.
               </p>
               <div className="mt-8 flex justify-center">
                 <CtaRow />

@@ -111,8 +111,8 @@ export default function NewScanPage() {
     <div className="mx-auto w-full max-w-lg px-4 sm:px-0">
       <h1 className="text-xl font-semibold">New scan</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Point ROGUE at a model and pick an attack pack. Scans run asynchronously, you&apos;ll watch
-        progress live on the next screen.
+        Point ROGUE at a model and pick an attack pack. Hosted execution is in private beta &mdash;
+        scans run via the SDK or a scoped pilot today; a queued scan waits for a worker.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">

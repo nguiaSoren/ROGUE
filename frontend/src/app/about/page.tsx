@@ -8,7 +8,7 @@ import { PROOF_POINTS } from "@/lib/proof";
 export const metadata = {
   title: "About, ROGUE",
   description:
-    "ROGUE is an autonomous open-web LLM red-team agent, built solo by Soren Nguia for the Bright Data × lablab.ai hackathon, now a hosted platform live in production. Mission: make LLM deployments secure by default.",
+    "ROGUE measures every place a high-stakes AI agent can go wrong, whether the model can be broken, whether human oversight is meaningful, and whether accumulated knowledge stays safe, against an independent, continuously-refreshed standard with a signed record. Built solo by Soren Nguia; live in production.",
 };
 
 /**
@@ -27,7 +27,7 @@ export default function AboutPage() {
         <Section
           eyebrow="about"
           title="Built to make LLM deployments secure by default."
-          lede="ROGUE is a continuous, autonomous red-team for large language models. It learns how real attackers break models from the open web, reproduces those attacks against your deployment, and tells you what's exploitable, before someone else finds out."
+          lede="ROGUE measures every place a high-stakes AI agent can go wrong, whether the model can be broken, whether the human oversight is meaningful, and whether the accumulated knowledge is safe, against an independent, continuously-refreshed standard, with a reproducible signed record. One engine, one buyer."
         />
 
         {/* 2. THE STORY --------------------------------------------------- */}
@@ -105,23 +105,45 @@ export default function AboutPage() {
               aria-hidden
             />
             <p className="mt-5 text-2xl md:text-3xl font-bold tracking-tight leading-snug">
-              To make LLM deployments secure by default, real-time, autonomous
-              threat intelligence enterprises can trust.
+              To make high-stakes AI deployments safe by default,
+              independent, continuous measurement of every way an agent goes
+              wrong, with a signed record enterprises can trust.
             </p>
           </div>
         </Section>
 
         {/* 4. HOW IT WORKS ------------------------------------------------ */}
-        <Section eyebrow="how it works" title="Harvest, reproduce, judge.">
+        <Section eyebrow="how it works" title="One engine, three surfaces.">
           <div className="max-w-3xl space-y-5">
             <p className="text-[17px] text-foreground leading-relaxed">
-              ROGUE harvests, reproduces, and judges LLM jailbreaks and
-              prompt-injection from the open web, {" "}
+              Surface one, the model. ROGUE harvests, reproduces, and judges
+              LLM jailbreaks and prompt-injection from the open web,{" "}
               <span className="text-foreground font-medium">
                 19 sources across 5 Bright Data products
-              </span>{" "}
-, then surfaces the vulnerabilities and exactly how to fix them
-              before attackers exploit them.
+              </span>
+              , then surfaces the vulnerabilities and exactly how to fix them
+              before attackers exploit them. This surface is mature and
+              scannable today.
+            </p>
+            <p className="text-[17px] text-foreground leading-relaxed">
+              The same engine measures the two surfaces around the model.{" "}
+              <span className="text-foreground font-medium">
+                The human gate
+              </span>
+              , whether a reviewer&rsquo;s sign-off is meaningful, measured as
+              a false-approve rate against an answer key provably independent of
+              what it grades (live, currently a single-reviewer reading). And{" "}
+              <span className="text-foreground font-medium">
+                the agent&rsquo;s memory
+              </span>
+              , whether a shared skill pool leaks its secrets under an
+              extraction red-team (research-validated against a weak open
+              model). Each result ships as a reproducible, signed record.
+            </p>
+            <p className="text-[17px] text-foreground leading-relaxed">
+              ROGUE measures and verifies the fix; you own the runtime. We
+              prove where an agent breaks and confirm the repair holds, without
+              taking control of your deployment.
             </p>
             <div className="flex items-start gap-3">
               <Radar
