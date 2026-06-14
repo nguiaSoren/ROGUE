@@ -108,10 +108,10 @@ One engine, one independent standard — same operation each time (fire inputs a
 
 ROGUE's findings are written up as papers and posts — **[PAPERS.md](PAPERS.md)** is the index, and each entry links to its preprint plus the code and data *in this repo* that reproduces it.
 
-- **Allocation Is a Capability-Growth Mechanism** — in a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003).
-- **Consummation-Gated Breach Judges** — one gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways.
-- **Claimed Potency Does Not Predict Reproduction** — most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.10).
-- **Scrubbing Is Not Containment** — canary leakage from shared agent skill pools tracks *alignment*, not model size.
+- **Allocation Is a Capability-Growth Mechanism** — in a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · *arXiv `cs.CR`×`cs.LG` — preprint posting soon*
+- **Consummation-Gated Breach Judges** — one gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · *arXiv `cs.CR`×`cs.CL` — preprint posting soon*
+- **Claimed Potency Does Not Predict Reproduction** — most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.10). · *arXiv `cs.CR` (lead paper) — preprint posting soon*
+- **Scrubbing Is Not Containment** — canary leakage from shared agent skill pools tracks *alignment*, not model size. · *workshop paper + Hugging Face blog — posting soon*
 
 ## Deep dives
 
