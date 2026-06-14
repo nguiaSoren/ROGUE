@@ -19,22 +19,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://rogue-eosin.vercel.app"),
-  title: "ROGUE · Open-web LLM Threat Intelligence",
+  title: "ROGUE · AI-Agent Assurance — model, oversight & memory, signed",
   description:
-    "Continuous red-team for production LLM deployments. Harvests new jailbreaks from the open web, reproduces them against your deployment configuration, ships a daily diff of which attacks now bypass your guardrails.",
+    "ROGUE measures every place a high-stakes AI agent can fail — whether the model can be broken, whether human oversight is meaningful, and whether its accumulated knowledge stays safe — against an independent standard, reproducible and signed.",
   openGraph: {
-    title: "ROGUE · Open-web LLM Threat Intelligence",
+    title: "ROGUE · AI-Agent Assurance — model, oversight & memory, signed",
     description:
-      "Continuous red-team for production LLM deployments — the model, the human gate, and the agent's memory, measured and signed.",
+      "Three signed measurements of a high-stakes AI agent: can the model be broken, is human oversight meaningful (false-approve rate), is its accumulated knowledge safe (skill-pool leakage). Independent, reproducible, signed.",
     url: "/",
     siteName: "ROGUE",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ROGUE · Open-web LLM Threat Intelligence",
+    title: "ROGUE · AI-Agent Assurance — model, oversight & memory, signed",
     description:
-      "Continuous red-team for production LLM deployments — the model, the human gate, and the agent's memory, measured and signed.",
+      "Three signed measurements of a high-stakes AI agent: can the model be broken, is human oversight meaningful (false-approve rate), is its accumulated knowledge safe (skill-pool leakage). Independent, reproducible, signed.",
   },
 };
 

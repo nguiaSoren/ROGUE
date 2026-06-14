@@ -28,6 +28,7 @@ export const revalidate = 300;
  *
  * Reading order:
  *   1. CINEMATIC HERO, rotating-word headline (states the offer), stat trio, CTA.
+ *  1b. THREE SURFACES, the v2 breadth (model / human gate / agent memory).
  *   2. SOURCES MARQUEE, 19 sources × 5 BD products.
  *   3. AHA MOMENT, "freshest threats" ticker + mini-matrix side-by-side.
  *   4. USE CASES, who uses ROGUE (problem/solution personas).
@@ -90,6 +91,72 @@ export default async function Home() {
           nBreaches={health?.n_breaches ?? null}
           nConfigs={health?.n_configs ?? null}
         />
+
+        {/* 1b. THREE SURFACES, the v2 breadth lands before the narrow
+            model demo so visitors see the full standard first. --------- */}
+        <Section
+          eyebrow="beyond the model"
+          title="Three surfaces where a high-stakes agent goes wrong — one engine, every result signed."
+          lede="Red-teaming the model is one surface. ROGUE also measures the human who approves a risky action and the skill pool your agents share, and signs every result against a provably-independent answer key."
+          className="!px-0 animate-rogue-fade-up"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Link
+              href="/product#live-scan"
+              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+                the model · offense
+              </p>
+              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
+                Reproduce real jailbreaks.
+              </p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                Open-web attacks replayed against your exact model, system
+                prompt, and tools, ranked worst-first.
+              </p>
+            </Link>
+            <Link
+              href="/product#human-gate"
+              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+                the human gate · oversight
+              </p>
+              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
+                Measure the sign-off.
+              </p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                When a risky action escalates to a person, a false-approve rate
+                against an independent key, so &ldquo;a human approved it&rdquo;
+                is a measured control, not an assumption.
+              </p>
+            </Link>
+            <Link
+              href="/product#skill-pool"
+              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+                the agent&rsquo;s memory · assurance
+              </p>
+              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
+                Audit the skill pool.
+              </p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                Shared agent skills, checked for leakage, whether they actually
+                help, and dangerous combinations, before they spread.
+              </p>
+            </Link>
+          </div>
+          <div className="mt-6">
+            <Link
+              href="/product"
+              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-opacity hover:opacity-80"
+            >
+              See all three on the product tour &rarr;
+            </Link>
+          </div>
+        </Section>
 
         {/* 2. BRIGHT DATA SPOTLIGHT ------------------------------------ */}
         <SourcesMarquee bandit={bandit} />
@@ -159,71 +226,6 @@ export default async function Home() {
               className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-opacity hover:opacity-80"
             >
               Take the full product tour &rarr;
-            </Link>
-          </div>
-        </Section>
-
-        {/* 5c. BEYOND THE MODEL, the three v2 assurance surfaces ------ */}
-        <Section
-          eyebrow="beyond the model"
-          title="Not just the model. Three surfaces, all signed."
-          lede="Red-teaming the model is one surface. ROGUE also measures the human who approves a risky action and the skill pool your agents share, and signs every result against a provably-independent answer key."
-          className="!px-0 animate-rogue-fade-up"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link
-              href="/product#live-scan"
-              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
-            >
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-                the model · offense
-              </p>
-              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
-                Reproduce real jailbreaks.
-              </p>
-              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                Open-web attacks replayed against your exact model, system
-                prompt, and tools, ranked worst-first.
-              </p>
-            </Link>
-            <Link
-              href="/product#human-gate"
-              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
-            >
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-                the human gate · oversight
-              </p>
-              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
-                Measure the sign-off.
-              </p>
-              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                When a risky action escalates to a person, a false-approve rate
-                against an independent key, so &ldquo;a human approved it&rdquo;
-                is a measured control, not an assumption.
-              </p>
-            </Link>
-            <Link
-              href="/product#skill-pool"
-              className="rogue-card border border-border rounded-xl p-5 bg-card/40 backdrop-blur-sm block group transition-colors hover:border-rogue-green/40"
-            >
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-                the agent&rsquo;s memory · assurance
-              </p>
-              <p className="text-lg font-bold mt-1 group-hover:text-rogue-green transition-colors">
-                Audit the skill pool.
-              </p>
-              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                Shared agent skills, checked for leakage, whether they actually
-                help, and dangerous combinations, before they spread.
-              </p>
-            </Link>
-          </div>
-          <div className="mt-6">
-            <Link
-              href="/product"
-              className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.15em] text-rogue-green transition-opacity hover:opacity-80"
-            >
-              See all three on the product tour &rarr;
             </Link>
           </div>
         </Section>
@@ -298,11 +300,13 @@ export default async function Home() {
             get started
           </p>
           <h2 className="mt-3 text-3xl md:text-4xl font-bold tracking-tight">
-            See ROGUE break your stack.
+            See where your agent goes wrong.
           </h2>
           <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Watch ROGUE run a scan right now, no signup, then read the research or
-            request access to scan your own model.
+            Watch ROGUE run a scan right now, no signup — the model that can be
+            broken, the human sign-off that may be rubber-stamped, the skills that
+            can leak — every result a signed, reproducible record. Then read the
+            research or request access for your own stack.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center">
             <Link

@@ -4,6 +4,7 @@
 
 <h1 align="center">ROGUE — Open-web LLM Threat Intelligence Agent</h1>
 <p align="center"><b><i>The Red-Team That Never Sleeps.</i></b></p>
+<p align="center"><sub>Powered end-to-end by 5 Bright Data products · built for the Bright Data real-time AI-agents hackathon (results pending)</sub></p>
 
 ROGUE is an autonomous red-team for production LLMs. It continuously discovers brand-new jailbreaks and prompt-injection attacks from the open web, replays each one against **your** deployment (model × system prompt × tools), and ships a daily threat brief you can also query from your IDE — and the daily open-web harvest runs on just **$0.05–$0.30 of Bright Data**.
 
@@ -22,6 +23,7 @@ ROGUE is an autonomous red-team for production LLMs. It continuously discovers b
 - **Dashboard:** https://rogue-eosin.vercel.app — live, deployed.
 - **Walkthrough:** a 25-second teaser plays inline below; the full 5-minute demo is [on YouTube](https://youtu.be/-luwKpfaf2M).
 - **Dataset:** [358 attack primitives across 15 families](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05), MIT-licensed and access-gated (defensive-research-only terms — see [`RESPONSIBLE_RELEASE.md`](RESPONSIBLE_RELEASE.md)).
+- **In Slack:** point a Slack incoming webhook at ROGUE and the daily threat brief + every new HIGH/CRITICAL breach post straight to your workspace (the platform integration also files findings to Jira). ROGUE comes to where your team already triages.
 
 https://github.com/user-attachments/assets/c61cd222-0e87-4cd3-b8cd-61636eb80dfd
 
@@ -48,7 +50,24 @@ alembic upgrade head && python scripts/ops/seed_demo_data.py
 uvicorn rogue.api.main:app --reload
 ```
 
-*(ROGUE also ships a **Python SDK** (`from rogue import Client`) and a `rogue` CLI — install editable from this repo with `pip install -e .` (not yet on PyPI). See [`docs/SDK.md`](docs/SDK.md).)*
+### Scan your own model — the SDK
+After cloning, run a **full scan offline with no API key** (a mocked target + judge, end to end → an HTML report):
+
+```bash
+pip install -e .                                       # the `rogue` SDK + CLI
+PYTHONPATH=src python3 examples/sdk_quickstart.py       # runs a scan, writes a report — no key
+```
+
+Against a real target it's three lines (plus a judge key — ROGUE grades every response; see [`docs/SDK.md`](docs/SDK.md)):
+
+```python
+from rogue import Client
+client = Client(endpoint="https://api.company.com/v1", api_key="sk-...")   # or Client(provider="openai")
+report = client.scan(pack="aggressive", budget=10.0)
+print(report.summary()); report.to_html("scan.html")
+```
+
+*(`pip install rogue` is not live yet — the package isn't on PyPI; install editable from this repo as above.)*
 
 ## Integrations
 
@@ -57,8 +76,8 @@ ROGUE meets your team where it already works:
 | Surface | Status | What you get |
 |---|---|---|
 | **Your IDE** — MCP | ✅ **Available now** · keyless | One config block in Claude Desktop / Cursor / Windsurf / VS Code; the editor's agent queries the live threat DB on the spot. Add an account to launch full scans without leaving your work. `https://rogue-private.onrender.com/mcp` |
-| **Your chat & tracker** — Slack + Jira | ✅ **Available now** | Daily threat briefs + breach alerts post to your Slack workspace; every critical finding is auto-filed to your Jira project, deduped so a re-scan updates the same ticket. |
-| **API & SDK** — REST `/v1` + Python | ✅ **Available now** | A documented `/v1` REST API (live OpenAPI spec, API-key authorized) at `https://rogue-private.onrender.com/v1`; the Python SDK speaks the same v1 contract (`from rogue import Client`; `pip install -e .` from this repo — see [`docs/SDK.md`](docs/SDK.md)). |
+| **Your chat & tracker** — Slack + Jira | ✅ Slack alerts now · ⏳ auto-fan-out rolling out | Point a Slack incoming webhook (`SLACK_WEBHOOK_URL`) at ROGUE and the daily threat brief + new CRITICAL/HIGH breaches post to your workspace automatically — **works today**. Or connect Slack + Jira as per-org integrations (Fernet-encrypted creds) and file findings via the MCP action tools (`send_slack_alert` / `create_jira_ticket`); automatic fan-out on every scan completion is rolling out with the hosted worker. [Setup](docs/platform/integrations/slack-github-jira.md) |
+| **API & SDK** — REST `/v1` + Python | ✅ live · ⏳ hosted scans rolling out | The `/v1` REST API + OpenAPI spec are live and key-authorized at `https://rogue-private.onrender.com/v1`. The **Python SDK runs real scans today** against your own target (`from rogue import Client`; `pip install -e .` — see [`docs/SDK.md`](docs/SDK.md)). *Hosted* scan execution (a `POST /v1/scans` that completes server-side) is rolling out. |
 | **Security tooling** — SOAR / SIEM | 🔜 **Coming soon** | Splunk / Palo Alto Cortex connectors to pipe findings into your existing security stack. On the roadmap, not available today. |
 
 ## What ROGUE does
@@ -72,6 +91,18 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 5. **Diff** — a separate judge model verdicts each trial; the daily diff ships to Slack, MCP, and the dashboard.
 
 > **New to the codebase?** [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) maps every directory to its pipeline layer and the architecture doc that explains it.
+
+## What ROGUE red-teams
+
+ROGUE measures **every place a high-stakes AI agent can go wrong** — whether the agent can be **broken**, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe — each against an independent, continuously-refreshed standard, and each backed by a result rather than a claim:
+
+- **The model.** Does a live jailbreak or prompt-injection break *your* deployment? The daily breach matrix replays open-web attacks against your model × system-prompt × tools, graded by a [human-calibrated judge](docs/judge-calibration.md). Finding: most *claimed* jailbreaks don't even reproduce — [Claimed Potency Does Not Predict Reproduction](PAPERS.md).
+- **The human gate.** When a person "approves" an AI action, does that approval mean anything? ROGUE measures a reviewer's **false-approve rate** against an independent answer key — the rubber-stamping failure mode regulators now care about ([oversight](PAPERS.md)).
+- **The agent's memory.** Does a shared agent skill-pool leak one user's secrets to the next? ROGUE plants canaries in scrubbed skills and measures recovery — 85% leaked on a weak model despite an explicit never-reveal instruction ([Scrubbing Is Not Containment](PAPERS.md)).
+
+…and it **closes the loop (assurance-native remediation).** Finding a breach is half the job. ROGUE *generates* a verified mitigation — a system-prompt patch, a tool-permission scope, distilled fine-tuning data — and **re-tests it against the same live corpus to prove it actually closed the breach without over-blocking** (measured with the same calibrated judge). ROGUE generates and verifies the fix; **you own the runtime — it never sits in your request path.**
+
+One engine, one independent standard — same operation each time (fire inputs at an AI decision-maker, capture what it does, score it against the standard, emit a reproducible signed record).
 
 ## Research
 

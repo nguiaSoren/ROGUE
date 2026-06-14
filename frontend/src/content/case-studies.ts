@@ -128,41 +128,101 @@ export const CASE_STUDIES: CaseStudy[] = [
     summary:
       "Illustrative framework: how a ROGUE engagement reads for a model-risk function governing many internal deployments against an audit obligation.",
     problem:
-      "A typical enterprise model-risk team governs a fleet of internal LLM deployments, a knowledge-base assistant, a code helper, a contract-summarizer, each on a different model and system prompt, each owned by a different product team. The model-risk function owes an auditor a defensible, repeatable answer to 'are these resistant to known prompt-injection and jailbreak techniques, and how do you know it stays true over time?' This template shows the shape of the program ROGUE would stand up; the numbers below are hypothetical placeholders, not a real result.",
+      "A typical enterprise model-risk team governs a fleet of internal agentic deployments, a knowledge-base assistant, a code helper, a contract-summarizer, each on a different model and system prompt, each with tools, a human approver in the loop for high-stakes actions, and a shared skill/memory pool the agents read and write. The model-risk function owes an auditor a defensible, repeatable answer to a question that spans more than the model alone: 'across every place this agent can go wrong, is the model resistant to known attacks, is the human oversight actually meaningful, and is the accumulated knowledge safe, and how do you know it stays true over time?' This template shows the shape of the program ROGUE would stand up across all three surfaces; the numbers below are hypothetical placeholders, not a real result.",
     deployment:
-      "DeploymentConfigs under test: several distinct deployments, each captured as model × system_prompt × tools, registered with ROGUE as separate configs. ROGUE replays the continuously-harvested open-web attack repertoire against every config on a schedule and produces a per-config breach matrix plus a dated threat-brief diff the model-risk team can attach to its evidence file.",
+      "DeploymentConfigs under test: several distinct deployments, each captured as model × system_prompt × tools, plus the human-approval gate and the shared skill/memory pool each one depends on, registered with ROGUE as separate configs. ROGUE measures all three surfaces against the same independent standard: it replays the continuously-harvested open-web attack repertoire against the MODEL, exercises the HUMAN-OVERSIGHT gate to measure how often a rubber-stamping approver waves through actions it should have blocked (false-approve rate), and probes the shared KNOWLEDGE pool for skill/memory leakage. Every cycle produces a per-config, per-surface breach matrix, a dated threat-brief diff, and a signed attestation the model-risk team can attach to its evidence file.",
     findings: [
       {
         severity: "critical",
-        title: "Indirect injection through retrieved documents",
+        title: "Model surface: indirect injection through retrieved documents",
         detail:
-          "For a retrieval-augmented deployment, a hypothetical poisoned document in the knowledge base carries instructions the assistant follows. This is the canonical enterprise RAG failure: the attacker never talks to the model directly, they plant the payload upstream.",
+          "For a retrieval-augmented deployment, a hypothetical poisoned document in the knowledge base carries instructions the assistant follows. This is the canonical enterprise RAG failure on the MODEL surface: the attacker never talks to the model directly, they plant the payload upstream.",
+      },
+      {
+        severity: "high",
+        title: "Human-oversight surface: rubber-stamping approval gate",
+        detail:
+          "The high-stakes actions route to a human approver, but when ROGUE exercises the gate with plausible-looking but unsafe requests, the approver waves a large share through, a measured false-approve rate (illustrative placeholder: ~33%). Oversight that exists on paper but does not actually catch unsafe actions is no oversight at all, and only measuring it surfaces the gap.",
+      },
+      {
+        severity: "high",
+        title: "Knowledge surface: leakage from the shared skill/memory pool",
+        detail:
+          "Agents read and write a shared, unaudited skill/memory pool. ROGUE plants canary skills and measures how often one tenant's accumulated knowledge leaks into another agent's context (illustrative placeholder: ~10% leakage). The accumulated knowledge is supposed to be safe; without a probe nobody is measuring whether it is.",
       },
       {
         severity: "high",
         title: "Uneven hardening across the fleet",
         detail:
-          "Identical attack families breach one team's deployment while a sibling deployment refuses cleanly. The value here is the matrix: it shows model-risk exactly which teams to prioritize rather than treating the fleet as uniform.",
+          "Identical attacks breach one team's deployment, on any of the three surfaces, while a sibling deployment holds. The value here is the matrix: it shows model-risk exactly which teams and which surface to prioritize rather than treating the fleet as uniform.",
       },
       {
         severity: "medium",
         title: "Drift between brief cycles",
         detail:
-          "Newly harvested techniques crack a config that was clean last cycle. The dated diff is the audit artifact, it demonstrates the program is live and catching regressions, not a one-time snapshot.",
+          "Newly harvested techniques crack a config that was clean last cycle, or a relaxed approval policy quietly raises the false-approve rate. The dated diff plus the signed attestation is the audit artifact: it demonstrates the program is live and catching regressions across all three surfaces, not a one-time snapshot.",
       },
     ],
     remediation: [
       "Sanitize and provenance-tag retrieved content; never let a retrieved document carry instruction-level authority over the assistant.",
-      "Adopt the strongest team's prompt and tool-gating pattern as a fleet baseline, then re-test the laggards against the same ROGUE configs.",
-      "Wire the dated threat-brief diff into the model-risk evidence file so each cycle's delta is an auditable record.",
-      "Subscribe the configs to continuous re-testing so newly harvested techniques are caught as they appear, not at the next manual review.",
+      "Harden the human-approval gate: surface the model's reasoning and the irreversible consequence to the approver, require explicit justification for high-stakes approvals, and re-measure the false-approve rate until it falls.",
+      "Isolate and audit the shared skill/memory pool per tenant; scope reads/writes so one agent's accumulated knowledge cannot leak into another's context.",
+      "Adopt the strongest team's prompt, tool-gating, approval, and memory-isolation pattern as a fleet baseline, then re-test the laggards against the same ROGUE configs.",
+      "Let ROGUE generate the candidate fix and re-test it against the same repertoire before you ship, assurance-native remediation: ROGUE proposes and verifies the fix, you own and deploy the runtime.",
+      "Wire the dated threat-brief diff and the signed attestation into the model-risk evidence file so each cycle's delta across all three surfaces is an auditable, tamper-evident record.",
     ],
     outcome:
-      "After baselining the fleet on the strongest pattern and sanitizing retrieval, the critical indirect-injection path is closed and the per-team breach matrix converges toward the baseline. In a real engagement this section would carry the measured per-config before/after rates and the cycle-over-cycle diff. The values below are illustrative placeholders.",
+      "After baselining the fleet on the strongest pattern, sanitizing retrieval, hardening the approval gate, and isolating the memory pool, the critical model-surface path is closed, the false-approve rate falls, skill-pool leakage drops, and the per-team, per-surface breach matrix converges toward the baseline. ROGUE generates each candidate fix and re-tests it against the same repertoire before the team deploys it, and emits a signed attestation of the verified result. In a real engagement this section would carry the measured per-config, per-surface before/after rates and the cycle-over-cycle diff. The values below are illustrative placeholders.",
     metrics: [
-      { value: "4+", label: "Configs governed" },
-      { value: "1", label: "Critical path closed" },
-      { value: "↻", label: "Continuous re-test" },
+      { value: "3", label: "Surfaces measured (illustrative)" },
+      { value: "~33%", label: "False-approve rate, before (illustrative)" },
+      { value: "✓ signed", label: "Verified-remediation attestation" },
+    ],
+  },
+  {
+    slug: "template-agent-fleet",
+    title: "Template, Agent-fleet assurance",
+    segment: "Enterprise",
+    isTemplate: true,
+    summary:
+      "Illustrative framework: how a ROGUE engagement reads when the unit of assurance is a high-stakes agent, measured across all three surfaces, with a signed record.",
+    problem:
+      "A team operates a high-stakes autonomous agent, picture one that can move money, file tickets, or change production config, with a human approver gating its irreversible actions and a shared skill/memory pool it draws on. The honest assurance question is not 'is the model jailbroken?' alone. It is: can the MODEL be broken, is the HUMAN OVERSIGHT actually meaningful, and is the accumulated KNOWLEDGE safe? Most testing covers only the first. This template shows how ROGUE measures every place the agent can go wrong as one engagement; the numbers below are hypothetical placeholders, not a real result.",
+    deployment:
+      "DeploymentConfig under test: one high-stakes agent captured as model × system_prompt × tools, plus its human-approval gate and the shared skill/memory pool it reads and writes. ROGUE points at the live setup and measures all three surfaces against the same independent, reproducible standard: it replays the harvested attack repertoire against the MODEL, exercises the HUMAN gate to measure false-approve rate, and plants canaries in the KNOWLEDGE pool to measure leakage, then signs the result.",
+    findings: [
+      {
+        severity: "high",
+        title: "Model surface, tool-coercion toward an irreversible action",
+        detail:
+          "A persona-priming or injection attack walks the agent toward calling a write-capable, irreversible tool without the policy check the prompt assumes. The class of failure that matters most when the tool can move money or change production.",
+      },
+      {
+        severity: "high",
+        title: "Human-oversight surface, the gate rubber-stamps",
+        detail:
+          "The irreversible action routes to a human approver, but ROGUE's plausible-but-unsafe requests get waved through at a measurable rate (illustrative placeholder: ~33% false-approve). The oversight exists, but measurement shows it is not actually catching unsafe actions.",
+      },
+      {
+        severity: "medium",
+        title: "Knowledge surface, skill/memory pool leakage",
+        detail:
+          "Canary skills planted in the shared pool surface in contexts where they should not (illustrative placeholder: ~10% leakage), accumulated knowledge crossing a boundary it should respect.",
+      },
+    ],
+    remediation: [
+      "Gate every irreversible tool behind a deterministic policy check outside the model; never let the model be the sole authority for an action that cannot be undone.",
+      "Harden the human gate so the approver sees the model's reasoning and the concrete irreversible consequence, then re-measure false-approve until it falls.",
+      "Isolate and audit the skill/memory pool per tenant so accumulated knowledge cannot leak across boundaries.",
+      "Let ROGUE generate and verify each candidate fix against the same repertoire before you deploy it, you own the runtime, ROGUE owns the proof.",
+      "Attach the signed, dated attestation to your assurance record so the verified state of all three surfaces is tamper-evident and re-checkable.",
+    ],
+    outcome:
+      "After deterministic gating, a hardened human gate, and an isolated memory pool, the tool-coercion path no longer reaches the irreversible tool, the false-approve rate falls, and skill-pool leakage drops. ROGUE generates each fix, re-tests it, and signs the verified result, while the client owns and deploys the runtime. In a real engagement this section would carry the measured per-surface before/after rates. The values below are illustrative placeholders.",
+    metrics: [
+      { value: "3", label: "Surfaces, one agent (illustrative)" },
+      { value: "~10%", label: "Knowledge-pool leakage, before (illustrative)" },
+      { value: "✓ signed", label: "Reproducible, signed record" },
     ],
   },
 ];

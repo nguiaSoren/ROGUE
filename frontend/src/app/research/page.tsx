@@ -8,8 +8,10 @@ import {
   ArrowRight,
   TriangleAlert,
   Download,
+  Gavel,
 } from "lucide-react";
 import { Section } from "@/components/marketing/section";
+import { OVERSIGHT } from "@/lib/proof";
 import {
   JudgeAgreementFig,
   SchedulingFig,
@@ -42,7 +44,7 @@ export default function ResearchPage() {
         <Section
           eyebrow="research"
           title="The methods, and the measured results."
-          lede="A solo research build, the methods and the measured results, including the negative ones."
+          lede="A solo research build, the methods and the measured results, including the negative ones. Eight findings across three surfaces — the model can be broken, the human gate can rubber-stamp, shared knowledge can leak — each measured against an independent standard, signed."
         >
           <a
             href="/rogue-research-brief.pdf"
@@ -54,8 +56,16 @@ export default function ResearchPage() {
         </Section>
 
         {/* AT A GLANCE -------------------------------------------------- */}
-        <Section eyebrow="at a glance" title="Seven findings, in about a minute.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+        <Section eyebrow="at a glance" title="Eight findings, in about a minute.">
+          <p className="-mt-2 mb-5 max-w-3xl text-[15px] text-muted-foreground leading-relaxed">
+            The findings group under three surfaces — the{" "}
+            <span className="text-foreground/90">model can be broken</span>, the{" "}
+            <span className="text-foreground/90">human gate can rubber-stamp</span>,
+            and <span className="text-foreground/90">shared knowledge can leak</span>{" "}
+            — each measured against an independent standard and signed, plus a
+            verified-remediation loop that refuses any fix it can&rsquo;t prove.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <GlanceCard
               href="#finding-01"
               eyebrow="01 · reproduction"
@@ -86,14 +96,14 @@ export default function ResearchPage() {
               href="#finding-05"
               eyebrow="05 · remediation"
               headline="0% → 20%"
-              desc="The calibrated over-block judge caught an over-block a marker heuristic scored 0%, flipping a would-be accept into a correct refusal."
+              desc="The calibrated over-block judge caught an over-block that a marker heuristic scored 0%, flipping a would-be accept into a correct refusal."
               accent="red"
             />
             <GlanceCard
               href="#finding-06"
               eyebrow="06 · skill pools"
               headline="audit before sharing"
-              desc="Shared agent-skill pools are an unaudited surface, leakage, useless skills, dangerous combinations. ROGUE measures and signs each pool before it ships."
+              desc="Shared agent-skill pools are an unaudited surface — leakage, useless skills, and dangerous combinations. ROGUE measures and signs each pool before it ships."
               accent="red"
             />
             <GlanceCard
@@ -101,6 +111,13 @@ export default function ResearchPage() {
               eyebrow="07 · discipline"
               headline="measure first"
               desc="$0 telemetry measurements inverted three build decisions before any code was written."
+            />
+            <GlanceCard
+              href="#finding-08"
+              eyebrow="08 · human gate"
+              headline={`${OVERSIGHT.falseApproveRate}% waved through`}
+              desc={`When a human approves a risky AI action, is that oversight meaningful? Measured against an independent answer key, a reviewer waved through ${OVERSIGHT.falseApproveRate}% of actions that should have been denied (CI [${OVERSIGHT.ciLow},${OVERSIGHT.ciHigh}], n=${OVERSIGHT.reviewers}) — the rubber-stamping failure mode regulators rely on, measured. Signed.`}
+              accent="red"
             />
           </div>
         </Section>
@@ -136,7 +153,7 @@ export default function ResearchPage() {
             </div>
 
             <p className="text-base text-muted-foreground leading-relaxed">
-              The same pattern shows up as a reproduction funnel. Across 301
+              The same pattern shows up as a reproduction funnel. Across 298
               techniques harvested from 19 open-web sources and reproduced on a
               five-model panel, the &ldquo;works on at least one of five
               models&rdquo; rate{" "}
@@ -166,7 +183,7 @@ export default function ResearchPage() {
             </div>
 
             <MethodNote>
-              Method, 301 baseline techniques × a five-model panel,{" "}
+              Method, 298 baseline techniques × a five-model panel,{" "}
               <span className="text-foreground/90">10,244 trials already collected</span>;
               breach = the calibrated v3 judge (tuned to under-count) at
               any_breach_rate ≥ 0.4; reproduction is measured as whether the{" "}
@@ -777,6 +794,99 @@ export default function ResearchPage() {
                 pre-stated trigger-to-revisit.
               </MethodNote>
             </FindingCard>
+          </div>
+        </Section>
+
+        {/* 8. HUMAN GATE ------------------------------------------------ */}
+        <Section
+          id="finding-08"
+          eyebrow="finding 08"
+          title="When a human approves a risky AI action, is that oversight meaningful? Measured."
+        >
+          <div className="max-w-3xl space-y-6">
+            <div className="flex gap-4">
+              <Gavel
+                className="h-6 w-6 text-rogue-green shrink-0 mt-0.5"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <p className="text-[17px] text-foreground leading-relaxed">
+                &ldquo;A human is in the loop&rdquo; is the control regulators and
+                safety cases lean on hardest, and it is almost never measured.
+                ROGUE measures it: against an{" "}
+                <span className="text-foreground font-medium">
+                  independent answer key
+                </span>{" "}
+                — a ground truth provably independent of what the reviewer sees —
+                a reviewer{" "}
+                <span className="text-foreground font-medium">
+                  waved through {OVERSIGHT.falseApproveRate}% of actions that
+                  should have been denied
+                </span>{" "}
+                (95% CI [{OVERSIGHT.ciLow}%, {OVERSIGHT.ciHigh}%]). The
+                rubber-stamping failure mode the oversight story relies on,
+                quantified — and{" "}
+                <span className="text-foreground font-medium">signed</span> with a
+                reproducible attestation.
+              </p>
+            </div>
+
+            <p className="text-base text-muted-foreground leading-relaxed">
+              The honest scope: this is{" "}
+              <span className="text-foreground font-medium">
+                n = {OVERSIGHT.reviewers} reviewer
+              </span>{" "}
+              — a directional measurement of a single human gate, not a
+              population estimate of how all reviewers behave. The contribution
+              isn&rsquo;t the rate itself but the apparatus around it: a{" "}
+              <span className="text-foreground/90">false-approve rate</span> is a
+              measurable property of an oversight gate, scored against a key the
+              reviewer cannot game, and the result carries a tamper-evident
+              signature like every other ROGUE surface. The number is a
+              first reading; the method generalizes to more reviewers.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric
+                value={`${OVERSIGHT.falseApproveRate}%`}
+                label="false-approve rate (vs answer key)"
+                accent="red"
+              />
+              <Metric
+                value={`[${OVERSIGHT.ciLow}, ${OVERSIGHT.ciHigh}]`}
+                label="95% CI"
+                accent="red"
+              />
+              <Metric
+                value={`n=${OVERSIGHT.reviewers}`}
+                label="reviewer (directional)"
+                accent="red"
+              />
+              <Metric value="signed" label="reproducible attestation" accent="green" />
+            </div>
+
+            <MethodNote>
+              Method, a single reviewer adjudicates a corpus of risky agent
+              actions; each verdict is scored against an answer key constructed
+              to be independent of the cues the reviewer sees, so an approval of
+              a should-deny action is an unambiguous false-approve; rate and 95%
+              CI are computed over that key, and the result is signed
+              (tamper-evident attestation). n = {OVERSIGHT.reviewers} —
+              directional, not a population.
+            </MethodNote>
+
+            <NovelNote>
+              The under-measured part is the{" "}
+              <span className="text-foreground/90">gate itself</span>. &ldquo;A
+              human approves it&rdquo; is treated as a guarantee; here it is a{" "}
+              <span className="text-foreground/90">measurable surface</span> with
+              a false-approve rate against an independent key — the same
+              independence discipline as the breach judge, turned on the human.
+              Honest caveat: a single reviewer (n = {OVERSIGHT.reviewers}) makes
+              this directional, not a claim about reviewers in general; the value
+              is the apparatus, a signed false-approve measurement of an
+              oversight gate. <span className="text-rogue-green">⚑</span>
+            </NovelNote>
           </div>
         </Section>
 

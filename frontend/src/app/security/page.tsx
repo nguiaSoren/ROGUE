@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
 
 export const metadata = {
-  title: "Security, ROGUE",
-  description:
-    "How ROGUE keeps your data safe: encrypted secrets, organization isolation, no stored model weights, audit logging, and least-privilege access. ROGUE is the attacker side, it tests your endpoint over the API.",
+  title: "Security · ROGUE",
+  description: "Security posture — coming soon.",
 };
 
 /**

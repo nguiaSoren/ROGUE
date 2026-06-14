@@ -46,7 +46,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground leading-relaxed">
-              Continuous red-team for production LLM deployments.
+              Independent assurance for high-stakes AI agents — model, oversight, and memory, measured and signed.
             </p>
             <Link
               href="/request-demo"

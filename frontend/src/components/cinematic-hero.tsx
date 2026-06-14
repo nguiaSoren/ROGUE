@@ -55,15 +55,15 @@ export function CinematicHero({
           className="text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem] font-bold tracking-tight leading-[0.95] max-w-5xl animate-rogue-reveal"
           style={{ animationDelay: "0.1s" }}
         >
-          <span className="block">Your LLM is being</span>
+          <span className="block">Find every way your AI agent</span>
           <span className="block">
             <span className="rogue-word-rotator-wrap inline-flex max-w-full h-[1.2em] overflow-hidden align-baseline mr-3 text-rogue-red leading-[1.2]">
               <span className="rogue-word-rotator">
-                <span className="block h-[1.2em] leading-[1.2]">jailbroken.</span>
-                <span className="block h-[1.2em] leading-[1.2]">prompt-injected.</span>
-                <span className="block h-[1.2em] leading-[1.2]">role-played.</span>
-                <span className="block h-[1.2em] leading-[1.2]">escalated.</span>
-                <span className="block h-[1.2em] leading-[1.2]">jailbroken.</span>
+                <span className="block h-[1.2em] leading-[1.2]">breaks.</span>
+                <span className="block h-[1.2em] leading-[1.2]">gets rubber-stamped.</span>
+                <span className="block h-[1.2em] leading-[1.2]">leaks a poisoned skill.</span>
+                <span className="block h-[1.2em] leading-[1.2]">goes wrong.</span>
+                <span className="block h-[1.2em] leading-[1.2]">breaks.</span>
               </span>
             </span>
           </span>
@@ -77,14 +77,20 @@ export function CinematicHero({
           className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed animate-rogue-reveal"
           style={{ animationDelay: "0.25s" }}
         >
-          Built on{" "}
+          One engine measures all three:{" "}
           <span className="text-foreground font-medium">
-            all 5 Bright Data products
+            whether the model can be broken
           </span>
-          . Harvests every new jailbreak from{" "}
-          <span className="text-foreground font-medium">19 open-web sources</span>,
-          reproduces each one against your stack, and ships a daily brief, 
-          on a budget the bandit auto-tunes for you.
+          ,{" "}
+          <span className="text-foreground font-medium">
+            whether the human sign-off is real
+          </span>
+          , and{" "}
+          <span className="text-foreground font-medium">
+            whether the skills your agents share are safe
+          </span>
+          , against an independent, continuously-refreshed standard. Every result
+          is a signed, reproducible record.
         </p>
 
         {/* Product value line, the "what you actually buy" one-liner */}
@@ -93,10 +99,11 @@ export function CinematicHero({
           style={{ animationDelay: "0.3s" }}
         >
           <span className="text-foreground font-medium">
-            Point ROGUE at your LLM endpoint.
+            Point ROGUE at your endpoint.
           </span>{" "}
           <span className="text-muted-foreground">
-            Get a report of which jailbreaks break it, and how to fix them.
+            Get a report of where it can go wrong across all three surfaces, and
+            how to fix it.
           </span>
         </p>
 
@@ -105,10 +112,11 @@ export function CinematicHero({
           className="text-sm md:text-base text-muted-foreground max-w-2xl leading-relaxed animate-rogue-reveal"
           style={{ animationDelay: "0.32s" }}
         >
-          The model is just the first surface, ROGUE now also measures the{" "}
-          <span className="text-foreground">human gate</span> and the{" "}
-          <span className="text-foreground">agent&rsquo;s memory</span>, and signs
-          every result.{" "}
+          Maturity is honest: the{" "}
+          <span className="text-foreground">model surface</span> is mature and
+          scannable today; the <span className="text-foreground">human gate</span>{" "}
+          (live) and the <span className="text-foreground">agent&rsquo;s memory</span>{" "}
+          (in research) are measured and research-validated, signed but small-n.{" "}
           <Link
             href="/product"
             className="text-rogue-green hover:underline underline-offset-4"

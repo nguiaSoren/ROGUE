@@ -50,6 +50,28 @@ export const EFFICIENCY = {
   judgeCostPerCallUsd: 0.0032, // README.md:242, caching + batch API
 } as const
 
+// Surface 2 — the human gate. Signed measurement of a reviewer's false-approve
+// rate against an answer key provably independent of what it grades.
+// HONEST CAVEAT: a single reviewer (n=1) — directional, not a population.
+export const OVERSIGHT = {
+  falseApproveRate: 33, // % — signed gate measurement, docs/research/oversight_meaningfulness.md
+  ciLow: 20,
+  ciHigh: 46, // bootstrap 95% CI [20%, 46%]
+  reviewers: 1, // single reviewer — directional only
+  source: "docs/research/oversight_meaningfulness.md",
+} as const
+
+// Surface 3 — the agent's memory. Signed measurement of canary leakage from a
+// scrubbed shared skill pool under an extraction red-team.
+// HONEST CAVEAT: weak open model, one standard pack, n=20 canaries.
+export const SKILL_POOL = {
+  leakageRate: 85, // % — canary recovered from 17 of 20 scrubbed skills (weak model)
+  ciLow: 70,
+  ciHigh: 100, // Wilson 95% CI [70%, 100%]
+  recovered: "17/20",
+  source: "docs/research/skill_pool_leakage.md",
+} as const
+
 /**
  * The strongest 4 proof points, ready to map directly into <StatCard>.
  * Every number traces to the consts above.

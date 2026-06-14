@@ -34,8 +34,8 @@ export default function ResourcesPage() {
         {/* 1. HERO --------------------------------------------------------- */}
         <Section
           eyebrow="resources"
-          title="Threat intel & research from ROGUE."
-          lede="ROGUE runs a continuous open-web red-team, harvesting jailbreaks and prompt-injection, reproducing them against real LLM deployments, and writing down what we learn. Here's what's published, and what's on the way."
+          title="Assurance research from ROGUE."
+          lede="ROGUE continuously measures the three ways a high-stakes AI agent goes wrong, the model can be broken, the human gate stops being meaningful, the shared skill pool turns unsafe, and writes down what it learns. One engine, reproducible and signed. Here's what's published, and what's on the way."
         />
 
         {/* 2. LIVE NOW, real artifacts ----------------------------------- */}
@@ -143,6 +143,7 @@ export default function ResourcesPage() {
 
         {/* 3. GATED, newsletter + threat-brief CTA ----------------------- */}
         <Section
+          id="subscribe"
           eyebrow="get the threat brief"
           title="Subscribe for future briefs and write-ups."
           lede="The threat brief, and deeper write-ups like the judge v3 recalibration, go out to subscribers. No spam, unsubscribe anytime."
@@ -188,7 +189,7 @@ export default function ResourcesPage() {
           <p className="mt-6 text-sm text-muted-foreground leading-relaxed">
             Want these when they drop?{" "}
             <Link
-              href="#"
+              href="#subscribe"
               className="text-rogue-green underline-offset-4 hover:underline"
             >
               Subscribe above
@@ -230,11 +231,11 @@ const COMING_SOON: ReadonlyArray<{
   {
     icon: BookOpen,
     kind: "Blog",
-    title: "The State of LLM Jailbreaks in 2026",
+    title: "The State of AI-Agent Assurance in 2026",
   },
   {
     icon: Video,
     kind: "Webinar",
-    title: "Live demo: blocking jailbreaks in real time",
+    title: "Live demo: probing the model, the human gate, and the skill pool",
   },
 ];
