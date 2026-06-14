@@ -36,70 +36,70 @@ const PANELS: Panel[] = [
     eyebrow: "01 · the problem",
     headline: (
       <>
-        Your AI is being{" "}
-        <span className="text-rogue-red">jailbroken</span> right now.
+        Your AI agent fails in{" "}
+        <span className="text-rogue-red">three places.</span>
       </>
     ),
     body: (
       <>
-        Every day, attackers and researchers publish new ways to make
-        ChatGPT, Claude, and Llama do things they shouldn&apos;t, on
-        Reddit, X, GitHub, arXiv. Most security teams don&apos;t find out
-        until a customer screenshots the breach.
+        Agents now book, pay, approve, and answer for you, and each one can be
+        jailbroken, its human sign-off can be a rubber stamp, and the skills it
+        shares can leak. Most teams measure none of it.
       </>
     ),
     tint: "rgba(255, 0, 60, 0.18)",
     side: <ProblemVisual />,
   },
   {
-    eyebrow: "02 · the harvest",
+    eyebrow: "02 · surface one — the model",
     headline: (
       <>
-        ROGUE watches the open web{" "}
+        Can it be broken? ROGUE watches the open web{" "}
         <span className="text-rogue-green">continuously.</span>
       </>
     ),
     body: (
       <>
-        All 5 Bright Data products, fanning out across 19 open-web sources.
-        A self-tuning bandit decides where to spend the next dollar so the
-        most-novel attacks get found first.
+        All 5 Bright Data products fan out across 19 open-web sources; a
+        self-tuning bandit spends the next dollar where the most-novel attacks
+        live, and replays every one against your exact stack.
       </>
     ),
     tint: "rgba(0, 255, 136, 0.15)",
     side: <HarvestVisual />,
   },
   {
-    eyebrow: "03 · the test",
+    eyebrow: "03 · surfaces two & three",
     headline: (
       <>
-        Every attack ran against{" "}
-        <span className="text-cyan-300">your exact stack.</span>
+        Is the human sign-off real? Does the shared memory{" "}
+        <span className="text-cyan-300">leak?</span>
       </>
     ),
     body: (
       <>
-        Every deployment config × 5 trials × 5 stress tests. Persona wraps,
-        multi-turn escalation, wording mutations, and an iterative
-        attacker that keeps refining until it breaks.
+        Beyond the model, ROGUE measures a reviewer&apos;s false-approve rate
+        against an answer key it can&apos;t see, and red-teams your agents&apos;
+        shared skill pool for canary leakage, the two surfaces no one else
+        checks.
       </>
     ),
     tint: "rgba(34, 211, 238, 0.16)",
     side: <TestVisual />,
   },
   {
-    eyebrow: "04 · the brief",
+    eyebrow: "04 · the proof",
     headline: (
       <>
-        And ships a brief your{" "}
-        <span className="text-yellow-300">CISO can read.</span>
+        One signed record, and the{" "}
+        <span className="text-yellow-300">verified fix.</span>
       </>
     ),
     body: (
       <>
-        Markdown, JSON, Slack, every finding carries 95% confidence
-        intervals. Plus an MCP server Claude Desktop can query directly,
-        so your assistant always knows what&apos;s breaching today.
+        Every result is reproducible and signed, across all three surfaces.
+        ROGUE doesn&apos;t just find the break, it generates and re-tests the
+        fix, and you own the runtime. Queryable from your IDE over MCP.
       </>
     ),
     tint: "rgba(251, 191, 36, 0.16)",
