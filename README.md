@@ -25,9 +25,7 @@ ROGUE measures **every place a high-stakes AI agent can go wrong** — whether t
 - **Dataset:** [358 attack primitives across 15 families](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05), MIT-licensed and access-gated (defensive-research-only terms — see [`RESPONSIBLE_RELEASE.md`](RESPONSIBLE_RELEASE.md)).
 - **In Slack:** point a Slack incoming webhook at ROGUE and the daily threat brief + every new HIGH/CRITICAL breach post straight to your workspace (the platform integration also files findings to Jira). ROGUE comes to where your team already triages.
 
-<p align="center">
-  <a href="https://youtu.be/pVOQYJvMC6w"><img src="assets/brand/png/trailer-poster.png" alt="Watch the ROGUE trailer" width="640"></a>
-</p>
+https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 
 ## Use it in 30 seconds
 
