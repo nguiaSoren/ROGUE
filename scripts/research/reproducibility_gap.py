@@ -38,6 +38,12 @@ TAU_PRIMARY = 0.4
 LLAMA = "acme-llama3-20260526"          # frozen open-weight patch anchor
 ROBUST = "acme-claudehaiku-20260526"    # most-robust panel model
 SEED = 20260524
+# Frozen analysis snapshot. The paper's numbers are computed on baseline trials
+# collected before this date (run dates 2026-05-26 .. 2026-06-03). A later
+# cost-calibration pilot (2026-06-12) wrote additional baseline rows; pinning the
+# cutoff here lets this script reproduce the published figures bit-for-bit
+# regardless of subsequent DB writes. Set SNAPSHOT="" to analyse the live DB.
+SNAPSHOT = "2026-06-12"                  # exclusive upper bound on b.ran_at
 
 # ---------------------------------------------------------------- data pull
 os.environ.update({k: v for k, v in dotenv_values(ROOT / ".env").items() if v})
@@ -48,9 +54,10 @@ SELECT b.primitive_id, b.deployment_config_id AS cfg, b.verdict::text AS verdict
        b.temperature, p.family::text AS family, p.claimed_success_rate AS claimed
 FROM breach_results b JOIN attack_primitives p ON p.primitive_id = b.primitive_id
 WHERE p.synthesized = false AND b.pair_iters_to_breach IS NULL
+  AND (:snapshot = '' OR b.ran_at < CAST(:snapshot AS timestamp))
 """
 with eng.connect() as c:
-    rows = [dict(r._mapping) for r in c.execute(text(BASE_SQL))]
+    rows = [dict(r._mapping) for r in c.execute(text(BASE_SQL), {"snapshot": SNAPSHOT})]
     # per-primitive source types (a primitive may carry several provenances)
     src_pairs = list(c.execute(text(
         "SELECT primitive_id, source_type FROM source_provenances")))
