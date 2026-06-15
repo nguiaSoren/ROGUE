@@ -1,14 +1,6 @@
-<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-  <rect width="32" height="32" rx="7" fill="#050508"/>
-  <g>
-    <rect x="5" y="5" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.28"/>
-    <rect x="13" y="5" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.82"/>
-    <rect x="21" y="5" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.28"/>
-    <rect x="5" y="13" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.28"/>
-    <rect x="13" y="13" width="6" height="6" rx="1.4" fill="#00ff88"/>
-    <rect x="21" y="13" width="6" height="6" rx="1.4" fill="#ff003c"/>
-    <rect x="5" y="21" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.82"/>
-    <rect x="13" y="21" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.28"/>
-    <rect x="21" y="21" width="6" height="6" rx="1.4" fill="#00ff88" opacity="0.28"/>
-  </g>
-</svg>
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ROGUE">
+<rect width="512" height="512" rx="96" fill="#0a0e0c"/>
+<rect x="96" y="96" width="100" height="100" rx="22" fill="#00ff88" opacity="0.9"/>
+<rect x="206" y="206" width="100" height="100" rx="22" fill="#00ff88"/>
+<rect x="96" y="316" width="100" height="100" rx="22" fill="#00ff88" opacity="0.9"/>
+<rect x="316" y="206" width="100" height="100" rx="22" fill="#ff003c"/></svg>

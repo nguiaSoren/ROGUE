@@ -63,7 +63,7 @@ export function Nav() {
           <Image
             src="/logo-horizontal.svg"
             alt="ROGUE"
-            width={102}
+            width={89}
             height={20}
             priority
             className="h-5 w-auto"
