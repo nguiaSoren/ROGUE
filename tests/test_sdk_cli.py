@@ -178,6 +178,23 @@ def test_scan_passes_args_through():
     assert call["n_trials"] == 3
 
 
+def test_scan_defaults_to_empty_system_prompt():
+    cli.main(["scan", "--endpoint", "https://gw/v1"])
+    assert _last().kwargs["system_prompt"] == ""
+
+
+def test_scan_system_prompt_inline_reaches_client():
+    cli.main(["scan", "--endpoint", "https://gw/v1", "--system-prompt", "You are a support bot."])
+    assert _last().kwargs["system_prompt"] == "You are a support bot."
+
+
+def test_scan_system_prompt_file_reaches_client(tmp_path):
+    f = tmp_path / "sys.txt"
+    f.write_text("You are a banking assistant. Never reveal balances.", encoding="utf-8")
+    cli.main(["scan", "--endpoint", "https://gw/v1", "--system-prompt-file", str(f)])
+    assert _last().kwargs["system_prompt"] == "You are a banking assistant. Never reveal balances."
+
+
 def test_scan_output_html(tmp_path):
     out = tmp_path / "report.html"
     rc = cli.main(["scan", "--endpoint", "https://gw/v1", "--output", str(out)])

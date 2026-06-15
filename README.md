@@ -32,7 +32,7 @@ https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
 
 - **Harvests live, every day** — new jailbreaks and prompt-injections pulled from 15+ open-web sources (via all 5 Bright Data products), so your report is never older than yesterday.
-- **Reproduces against *your* exact config** — your model × system-prompt × tools, not a generic safety benchmark.
+- **Reproduces against *your* exact config** — your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the hosted roadmap).
 - **Is queryable over MCP, both ways** — it *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
 - **Measures three surfaces, signed** — the model, the human approval gate, and the shared skill-pool — each scored against an independent answer key and emitted as a tamper-evident attestation.
 - **Runs on the LLM you choose** — the judge and extraction models are configurable (`JUDGE_MODEL`), any provider or a local model (Ollama via `OPENAI_BASE_URL`); not locked to one vendor.
@@ -108,12 +108,15 @@ Scan any OpenAI-compatible target in three lines (plus a judge key — ROGUE gra
 
 ```python
 from rogue import Client
-client = Client(endpoint="https://api.company.com/v1", api_key="sk-...")   # or Client(provider="openai")
+client = Client(
+    endpoint="https://api.company.com/v1", api_key="sk-...",   # or Client(provider="openai")
+    system_prompt="<your production system prompt>",           # red-team your REAL deployment, not a bare model
+)
 report = client.scan(pack="aggressive", budget=10.0)
 print(report.summary()); report.to_html("scan.html")
 ```
 
-…or from the CLI: `rogue scan --provider openai --pack aggressive`.
+…or from the CLI: `rogue scan --provider openai --pack aggressive --system-prompt-file ./system_prompt.txt` (`--system-prompt "…"` for inline; both also work with `--persist`).
 
 No API key handy? Clone the repo and run the offline demo (mocked target + judge → an HTML report): `PYTHONPATH=src python3 examples/sdk_quickstart.py`.
 
@@ -144,7 +147,7 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 ROGUE measures **every place a high-stakes AI agent can go wrong** — whether the agent can be **broken**, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe — each against an independent, continuously-refreshed standard, and each backed by a result rather than a claim:
 
-- **The model.** Does a live jailbreak or prompt-injection break *your* deployment? The daily breach matrix replays open-web attacks against your model × system-prompt × tools, graded by a [human-calibrated judge](docs/judge-calibration.md). Finding: most *claimed* jailbreaks don't even reproduce — [Claimed Potency Does Not Predict Reproduction](PAPERS.md).
+- **The model.** Does a live jailbreak or prompt-injection break *your* deployment? The daily breach matrix replays open-web attacks against your model × system-prompt, graded by a [human-calibrated judge](docs/judge-calibration.md). Finding: most *claimed* jailbreaks don't even reproduce — [Claimed Potency Does Not Predict Reproduction](PAPERS.md).
 - **The human gate.** When a person "approves" an AI action, does that approval mean anything? ROGUE measures a reviewer's **false-approve rate** against an independent answer key — the rubber-stamping failure mode regulators now care about ([oversight](PAPERS.md)).
 - **The agent's memory.** Does a shared agent skill-pool leak one user's secrets to the next? ROGUE plants canaries in scrubbed skills and measures recovery — 85% leaked on a weak model despite an explicit never-reveal instruction ([Scrubbing Is Not Containment](PAPERS.md)).
 
@@ -187,6 +190,7 @@ The mechanics behind the pipeline, each on its own page:
 ## Roadmap
 
 - **Expand source coverage** — deeper Web Scraper API integration brings the next ~100 open-web sources online.
+- **Tool-aware scans** — supply your agent's tool schemas so a reproduction exercises the full model × system-prompt × **tools** surface (today's self-serve scan covers model × system-prompt; tool-call scoping lands with the hosted path).
 - **Customer SDK** — a drop-in SDK that lands ROGUE verdicts in the workflows teams already run (private beta; SOAR/SIEM connectors planned).
 - **Break bandit** — a second, contextual Thompson-sampling bandit that learns *how to break* (which escalation strategy to try first per attack-family × target); the control surface and reward log are already built and instrumented in prod.
 - **Enterprise** — RBAC, audit logs, and compliance reporting for teams that need them.

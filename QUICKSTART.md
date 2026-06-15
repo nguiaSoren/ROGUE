@@ -55,12 +55,15 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ## 3. Run
 
-Three lines of Python — point the client at your endpoint, scan, print the summary, save the report:
+A few lines of Python — point the client at your endpoint, scan, print the summary, save the report. Pass your `system_prompt` so you red-team your *real* deployment, not a bare model:
 
 ```python
 from rogue import Client
 
-report = Client(endpoint="https://api.company.com/v1", api_key="sk-...").scan()
+report = Client(
+    endpoint="https://api.company.com/v1", api_key="sk-...",
+    system_prompt="<your production system prompt>",   # optional but recommended
+).scan()
 print(report.summary())
 report.to_html("report.html")
 ```
