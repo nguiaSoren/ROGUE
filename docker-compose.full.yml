@@ -28,9 +28,14 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       BRIGHTDATA_API_KEY: ${BRIGHTDATA_API_KEY}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      # SEED_DEMO=1 (default) ships the demo threat data so the dashboard isn't empty on first boot.
+      # Set SEED_DEMO=0 for a clean self-host: the DB starts empty, so every surface (/feed /matrix
+      # /analytics /brief) shows ONLY your own `rogue scan --persist` data — no demo rows to filter out.
+      SEED_DEMO: ${SEED_DEMO:-1}
     ports: ["8000:8000", "8001:8001"]
     command: >
-      sh -c "alembic upgrade head && python scripts/ops/seed_demo_data.py &&
+      sh -c "alembic upgrade head &&
+             { [ \"$$SEED_DEMO\" = \"0\" ] && echo '[rogue] SEED_DEMO=0 — clean self-host, skipping demo seed' || python scripts/ops/seed_demo_data.py; } &&
              uvicorn rogue.api.main:app --host 0.0.0.0 --port 8000"
 
   frontend:
