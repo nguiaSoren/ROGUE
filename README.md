@@ -85,9 +85,9 @@ Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix s
 **Want a dashboard that's *only* your data?** Bring the stack up with `SEED_DEMO=0` and the DB starts empty — then every surface (`/feed`, `/matrix`, `/analytics`, `/brief`) shows nothing but your own scans, no demo rows to filter past:
 
 ```bash
-SEED_DEMO=0 docker compose -f docker-compose.full.yml up
-rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
-# → http://localhost:3000 is now your deployment's threat board, end to end
+SEED_DEMO=0 docker compose -f docker-compose.full.yml up   # DB starts empty
+rogue scan https://api.company.com/v1 --model my-model --persist --config-name my-bot
+# → http://localhost:3000 — every surface is now 100% your data
 ```
 
 ### Scan your own model — the SDK
