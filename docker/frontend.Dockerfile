@@ -14,6 +14,15 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . ./
+
+# Self-host renders against a live LOCAL backend that's only up at RUNTIME (not during this image
+# build), so prerendering the API-backed dashboard pages here would bake in the "API unavailable"
+# placeholder and ISR would keep serving it. Flip those pages to force-dynamic (per-request render)
+# for the self-host image ONLY — Vercel builds skip this Dockerfile and keep ISR ("auto"). `dynamic`
+# must be a static string literal (Next 16 rejects an expression), so we rewrite the literal here.
+RUN sed -i 's/export const dynamic = "auto";/export const dynamic = "force-dynamic";/' \
+      src/app/matrix/page.tsx src/app/feed/page.tsx src/app/brief/page.tsx src/app/page.tsx
+
 RUN npm run build
 
 FROM node:20-alpine

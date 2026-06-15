@@ -22,6 +22,11 @@ import { resolveConfigLens } from "@/lib/config-lens";
  * Column headers carry the §10.7 PAIR avg-iters-to-breach so the matrix
  * and the augmentation A/B story stay tied together visually.
  */
+// "auto" = ISR on Vercel (revalidate below). The self-host docker image rewrites this exact line to
+// "force-dynamic" (docker/frontend.Dockerfile) so the page renders per-request against the live LOCAL
+// backend instead of serving a build-time-cached "API unavailable" placeholder. `dynamic` must be a
+// static string literal (Next 16 rejects an expression), hence the build-step rewrite.
+export const dynamic = "auto";
 export const revalidate = 300; // ISR, match REVALIDATE_SECONDS in lib/api.ts
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;

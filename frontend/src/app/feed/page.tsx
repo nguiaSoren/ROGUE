@@ -11,6 +11,8 @@ import { StubbornnessWidget } from "@/components/stubbornness-widget";
 // ISR, statically prerendered + revalidated every 5 min, matching /matrix and
 // REVALIDATE_SECONDS in lib/api.ts, so visitors get instant loads and new Neon
 // data surfaces within the window instead of paying the full round-trip.
+// "auto" = ISR on Vercel; the self-host docker build rewrites it to "force-dynamic" (docker/frontend.Dockerfile).
+export const dynamic = "auto";
 export const revalidate = 300;
 
 /**
