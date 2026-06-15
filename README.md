@@ -82,6 +82,14 @@ rogue scan https://api.company.com/v1 --model my-model --persist --config-name "
 
 Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix scoped to *your* deployment. (The judge LLM still costs API spend per scan; point `JUDGE_MODEL` at a local model to keep it ~$0.)
 
+**Want a dashboard that's *only* your data?** Bring the stack up with `SEED_DEMO=0` and the DB starts empty — then every surface (`/feed`, `/matrix`, `/analytics`, `/brief`) shows nothing but your own scans, no demo rows to filter past:
+
+```bash
+SEED_DEMO=0 docker compose -f docker-compose.full.yml up
+rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
+# → http://localhost:3000 is now your deployment's threat board, end to end
+```
+
 ### Scan your own model — the SDK
 Install from PyPI — the `rogue` CLI + Python SDK, no clone needed (Python 3.11+):
 

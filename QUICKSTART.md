@@ -33,6 +33,12 @@ rogue scan https://api.company.com/v1 --model my-model --persist --config-name "
 # → http://localhost:3000/matrix?config=my-bot
 ```
 
+For a board that's **only** your data (no demo rows), bring the stack up with `SEED_DEMO=0` so the DB starts empty — then `/feed`, `/matrix`, `/analytics`, and `/brief` all show nothing but your own scans:
+
+```bash
+SEED_DEMO=0 docker compose -f docker-compose.full.yml up
+```
+
 ## 2. Two credentials
 
 A scan calls **two** services, so you need **two** keys: your **target** model, and the **judge** that grades each response (this is what turns "the model said some words" into "this attack broke through" — there is no graded report without it). The default judge is `anthropic/claude-sonnet-4-6`, which reads `ANTHROPIC_API_KEY` specifically; if you don't hold Anthropic credits, repoint it with `JUDGE_MODEL` and set that provider's key instead. The CLI and SDK do **not** auto-load a `.env` file — export the vars in the shell you run from (or pass the target key as `api_key=` / `--api-key`):
