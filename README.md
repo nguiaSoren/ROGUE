@@ -16,7 +16,7 @@ ROGUE measures **every place a high-stakes AI agent can go wrong** — whether t
 [![Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-gated-yellow)](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05)
 [![Research](https://img.shields.io/badge/research-papers-blueviolet)](PAPERS.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11-blue)](pyproject.toml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 
 ## See it live
 
@@ -53,27 +53,18 @@ The [dashboard home](https://rogue-eosin.vercel.app) has one-click **Add to Curs
 ### Submit an endpoint, get a report — hosted API
 `POST /v1/scans` with a target → ROGUE queues it for the same scan engine behind the dashboard and MCP, returning a scored report as **JSON, HTML, or a CISO-ready PDF** on completion. The hosted `/v1` API is **live and key-authorized today** (private beta), but the background worker that drains the scan queue isn't deployed yet, so a queued scan does not complete on the host. For a graded report today, run it locally (below) or point the SDK at your own target — the identical engine, the identical report.
 
-### Run it locally
-```bash
-git clone https://github.com/nguiaSoren/ROGUE && cd ROGUE
-cp .env.example .env          # add your keys
-docker compose up -d && uv sync --extra dev
-alembic upgrade head && python scripts/ops/seed_demo_data.py
-uvicorn rogue.api.main:app --reload
-```
-
-### Run the dashboard locally
+### Run it locally — the full app (dashboard + API)
 Self-host the whole thing — Postgres + API + the Next.js dashboard — with one command. It migrates and seeds demo data on startup, so the breach matrix isn't empty:
 
 ```bash
 git clone https://github.com/nguiaSoren/ROGUE && cd ROGUE
-cp .env.example .env                              # demo data needs no keys
-docker compose -f docker-compose.full.yml up
+cp .env.example .env                                       # demo data needs no keys
+docker compose -f docker-compose.full.yml up -d            # detached: ~30s to migrate, seed, and start
 ```
 
-Then open **http://localhost:3000** — `/feed`, `/matrix`, `/analytics`, and `/brief` run against your own local instance, no account and no hosted site required.
+Open **http://localhost:3000** — `/feed`, `/matrix`, `/analytics`, and `/brief` run against your own local instance, no account and no hosted site required. (Follow startup with `docker compose -f docker-compose.full.yml logs -f`.)
 
-**Fill it with *your* model's data.** ROGUE scans a **model endpoint** (any OpenAI-compatible API URL — your gateway or a hosted provider), not local files. With the stack up, install the `rogue` CLI on the host and point it at your endpoint with `--persist` so each result is written into the same DB the dashboard reads:
+**Fill it with *your* model's data.** ROGUE scans a **model endpoint** (any OpenAI-compatible API URL — your gateway or a hosted provider), not local files. The stack runs detached, so stay in the same terminal: install the `rogue` CLI on the host and point it at your endpoint with `--persist` so each result is written into the same DB the dashboard reads:
 
 ```bash
 pip install rogue-live-redteam                            # the CLI, on the host (or: pip install -e . from this clone)
@@ -87,10 +78,24 @@ Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix s
 **Want a dashboard that's *only* your data?** Bring the stack up with `SEED_DEMO=0` and the DB starts empty — then every surface (`/feed`, `/matrix`, `/analytics`, `/brief`) shows nothing but your own scans, no demo rows to filter past:
 
 ```bash
-SEED_DEMO=0 docker compose -f docker-compose.full.yml up   # DB starts empty
+SEED_DEMO=0 docker compose -f docker-compose.full.yml up -d   # empty DB, detached
 rogue scan https://api.company.com/v1 --model my-model --persist --config-name my-bot
 # → http://localhost:3000 — every surface is now 100% your data
 ```
+
+<details><summary><b>Just the backend API, no dashboard (for development)</b></summary>
+
+Skip the frontend — bring up a plain Postgres and run the API with hot-reload:
+
+```bash
+git clone https://github.com/nguiaSoren/ROGUE && cd ROGUE
+cp .env.example .env          # add your keys
+docker compose up -d && uv sync --extra dev
+uv run alembic upgrade head && uv run python scripts/ops/seed_demo_data.py
+uv run uvicorn rogue.api.main:app --reload
+```
+
+</details>
 
 ### Scan your own model — the SDK
 Install from PyPI — the `rogue` CLI + Python SDK, no clone needed (Python 3.11+):
