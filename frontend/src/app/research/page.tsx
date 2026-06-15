@@ -153,7 +153,7 @@ export default function ResearchPage() {
             </div>
 
             <p className="text-base text-muted-foreground leading-relaxed">
-              The same pattern shows up as a reproduction funnel. Across 298
+              The same pattern shows up as a reproduction funnel. Across 301
               techniques harvested from 19 open-web sources and reproduced on a
               five-model panel, the &ldquo;works on at least one of five
               models&rdquo; rate{" "}
@@ -183,7 +183,7 @@ export default function ResearchPage() {
             </div>
 
             <MethodNote>
-              Method, 298 baseline techniques × a five-model panel,{" "}
+              Method, 301 baseline techniques × a five-model panel,{" "}
               <span className="text-foreground/90">10,244 trials already collected</span>;
               breach = the calibrated v3 judge (tuned to under-count) at
               any_breach_rate ≥ 0.4; reproduction is measured as whether the{" "}

@@ -32,14 +32,17 @@ from sqlalchemy import create_engine, text
 ROOT = Path(__file__).resolve().parents[2]
 BREACH = {"partial_breach", "full_breach"}          # same gold mapping as reproducibility_gap.py
 SEED = 20260524
+SNAPSHOT = "2026-06-12"                              # frozen-snapshot cutoff, same as reproducibility_gap.py
 
-# The P3 measured set: real (non-synthesized) baseline trials, PAIR-augmented rows excluded.
+# The P3 measured set: real (non-synthesized) baseline trials, PAIR-augmented rows excluded,
+# pinned to the same frozen snapshot the paper analyses (excludes the 2026-06-12 cost pilot).
 SQL = """
 SELECT b.breach_id, b.primitive_id, p.family::text AS family,
        b.rendered_payload, b.model_response, b.verdict::text AS verdict
 FROM breach_results b JOIN attack_primitives p ON p.primitive_id = b.primitive_id
 WHERE p.synthesized = false AND b.pair_iters_to_breach IS NULL
   AND b.model_response IS NOT NULL AND length(b.model_response) > 0
+  AND (:snapshot = '' OR b.ran_at < CAST(:snapshot AS timestamp))
 """
 
 
@@ -52,7 +55,7 @@ def _engine():
 
 def _rows():
     with _engine().connect() as c:
-        return [dict(r._mapping) for r in c.execute(text(SQL))]
+        return [dict(r._mapping) for r in c.execute(text(SQL), {"snapshot": SNAPSHOT})]
 
 
 def cmd_export(args):
