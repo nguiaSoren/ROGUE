@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/brand-svg/logo-stacked.svg" alt="ROGUE" width="300">
+  <img src="assets/brand/png/logo-stacked.png" alt="ROGUE" width="300">
 </p>
 
 <h1 align="center">ROGUE — Red-team every way a high-stakes AI agent can fail</h1>
