@@ -72,13 +72,11 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-import ulid
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from sqlalchemy import create_engine, insert, inspect, select  # noqa: E402
-from sqlalchemy.exc import OperationalError  # noqa: E402
+from sqlalchemy import create_engine, inspect, select  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from rogue.db.models import (  # noqa: E402
@@ -100,6 +98,10 @@ from rogue.reproduce.pair_orchestrator import (  # noqa: E402
     PairOrchestrator,
     build_step_orm_rows,
     new_breach_id,
+)
+from rogue.reproduce.persistence import (  # noqa: E402
+    build_breach_result_orm,
+    persist_breach_rows,
 )
 from rogue.reproduce.persona_wrap import PersonaWrapper  # noqa: E402
 from rogue.reproduce.target_panel import ModelResponse, TargetPanel  # noqa: E402
@@ -280,50 +282,6 @@ def _needs_media_carrier(primitive: AttackPrimitive) -> bool:
     return not base or not os.path.exists(base)
 
 
-def _build_breach_result_orm(
-    *,
-    primitive_id: str,
-    config_id: str,
-    rendered: RenderedAttack,
-    response: ModelResponse,
-    judge_result: JudgeResult,
-) -> BreachResultORM:
-    """Compose one BreachResult ORM row from (rendered, response, verdict).
-
-    `rendered_payload` is the concatenated user-turn content of
-    `rendered.messages` (system prompt excluded; it's already on
-    `deployment_configs.system_prompt`). Truncated at 50K chars to keep
-    row size sane.
-
-    `persona_used` mirrors `rendered.persona_used` (set when --persona is
-    passed; NULL otherwise) so the §10.7 A/B query GROUP BY persona_used
-    can compare wrapped-vs-unwrapped breach rates per (primitive, config).
-    """
-    user_turns = [
-        m["content"] for m in rendered.messages if m.get("role") == "user"
-    ]
-    rendered_payload = "\n\n---NEXT TURN---\n\n".join(user_turns)[:50_000]
-
-    return BreachResultORM(
-        breach_id=ulid.new().str,
-        primitive_id=primitive_id,
-        deployment_config_id=config_id,
-        trial_index=response.trial_index,
-        temperature=response.temperature,
-        rendered_payload=rendered_payload,
-        model_response=(response.content or "")[:50_000],
-        verdict=judge_result.verdict.value,
-        judge_rationale=judge_result.rationale[:2_000],
-        judge_confidence=judge_result.confidence,
-        latency_ms=response.latency_ms,
-        tokens_in=response.tokens_in,
-        tokens_out=response.tokens_out,
-        cost_usd=response.cost_usd,
-        ran_at=datetime.now(timezone.utc),
-        persona_used=rendered.persona_used,
-    )
-
-
 def _assert_schema_present(database_url: str) -> None:
     """Fail-fast preflight — same pattern as ``scripts/harvest/harvest_once.py``."""
     from sqlalchemy import create_engine as _ce
@@ -494,7 +452,7 @@ async def _run_judge_batch_phase(
                     confidence=0.0,
                 )
             rows.append(
-                _build_breach_result_orm(
+                build_breach_result_orm(
                     primitive_id=pid, config_id=cid,
                     rendered=rendered, response=resp, judge_result=vr,
                 )
@@ -506,57 +464,10 @@ async def _run_judge_batch_phase(
             elif vr.verdict is JudgeVerdict.ERROR:
                 stats.judge_call_errors += 1
 
-    persisted, persist_errors = _persist_breach_rows(database_url, rows)
+    persisted, persist_errors = persist_breach_rows(database_url, rows)
     stats.breach_results_persisted = persisted
     stats.persist_errors += persist_errors
     return stats
-
-
-def _persist_breach_rows(
-    database_url: str,
-    orm_rows: list[BreachResultORM],
-    *,
-    chunk: int = 200,
-    retries: int = 3,
-) -> tuple[int, int]:
-    """Persist breach-result rows on a FRESH connection, in chunks, with retry.
-
-    The batch path holds no DB connection during the long panel+batch wait, so
-    this opens a brand-new engine (``pool_pre_ping`` so a stale pooled conn is
-    detected + replaced) and commits in small chunks — a dropped connection
-    loses at most one chunk, not the whole sweep, and each chunk reconnects and
-    retries. Returns ``(persisted, failed)``.
-    """
-    if not orm_rows:
-        return 0, 0
-    cols = [c.name for c in BreachResultORM.__table__.columns]
-    dicts = [{c: getattr(r, c) for c in cols} for r in orm_rows]
-
-    engine = create_engine(database_url, pool_pre_ping=True)
-    persisted = failed = 0
-    try:
-        for i in range(0, len(dicts), chunk):
-            part = dicts[i : i + chunk]
-            for attempt in range(retries):
-                try:
-                    with engine.begin() as conn:
-                        conn.execute(insert(BreachResultORM.__table__), part)
-                    persisted += len(part)
-                    break
-                except OperationalError as exc:
-                    logger.warning(
-                        "persist chunk %d retry %d/%d (%s) — reconnecting",
-                        i // chunk, attempt + 1, retries, type(exc).__name__,
-                    )
-                    engine.dispose()
-                    engine = create_engine(database_url, pool_pre_ping=True)
-                    if attempt == retries - 1:
-                        failed += len(part)
-                        logger.error("persist chunk %d FAILED after %d retries", i // chunk, retries)
-    finally:
-        engine.dispose()
-    logger.info("batch persist: %d rows committed, %d failed", persisted, failed)
-    return persisted, failed
 
 
 def _build_pair_breach_result_orm(
@@ -568,7 +479,7 @@ def _build_pair_breach_result_orm(
 ) -> BreachResultORM:
     """Compose a BreachResult ORM row from a §10.7 PAIR cell outcome.
 
-    Differs from `_build_breach_result_orm` in that:
+    Differs from `build_breach_result_orm` in that:
       - rendered_payload = final iteration's payload (the refined prompt)
       - model_response = final iteration's target response
       - verdict = final iteration's verdict
@@ -949,7 +860,7 @@ async def run_reproduction(
                 cell_breached = False
                 for response, verdict_result in trials:
                     try:
-                        row = _build_breach_result_orm(
+                        row = build_breach_result_orm(
                             primitive_id=pid,
                             config_id=cid,
                             rendered=rendered,

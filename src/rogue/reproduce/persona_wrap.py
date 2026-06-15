@@ -351,7 +351,7 @@ class PersonaWrapper:
 
         System message and earlier user turns pass through unchanged.
         ``persona_used`` is set on the returned RenderedAttack; downstream
-        ``reproduce_once._build_breach_result_orm`` reads it onto BreachResult.
+        ``persistence.build_breach_result_orm`` reads it onto BreachResult.
         """
         last_user_idx = self._find_last_user_idx(rendered.messages)
         if last_user_idx is None:

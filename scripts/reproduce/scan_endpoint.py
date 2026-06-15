@@ -14,6 +14,17 @@ front for the same capability.)
 n_trials target calls + the same number of judge calls). Run it deliberately; never on a loop/timer.
 With ``--corpus fixtures`` it scans only the 3 golden primitives (cheap trial); ``--corpus db`` scans
 the top ``--limit`` canonical primitives from the database.
+
+Persist to the dashboard DB (opt-in):
+
+    uv run python scripts/reproduce/scan_endpoint.py https://api.company.com/v1 \
+        --model my-model --corpus db --n-trials 3 \
+        --persist --config-name "my-bot"
+
+With ``--persist`` every judged trial is written to ``breach_results`` and the deployment config is
+upserted, so ``/matrix``, ``/feed``, and ``/brief`` populate with YOUR data. The ``--config-name``
+value is slugified to form the stable ``config_id`` that becomes a durable dashboard column.
+``--database-url`` defaults to ``$DATABASE_URL`` or the local dev Postgres; override for Neon/prod.
 """
 
 from __future__ import annotations
@@ -77,6 +88,13 @@ def _load_from_db(database_url: str, limit: int) -> list[AttackPrimitive]:
     return [_orm_to_pydantic_primitive(o) for o in orms]
 
 
+def _slugify(name: str) -> str:
+    """Convert a human name to a stable config_id slug (lowercase, hyphens, max 80 chars)."""
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug[:80] or "endpoint-scan"
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="scan_endpoint",
@@ -91,10 +109,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--system-prompt", default="", help="system prompt the deployment runs with")
     p.add_argument("--output", default=None, help="write the Markdown report to this path")
     p.add_argument("--database-url", default=os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL))
+    p.add_argument(
+        "--persist",
+        action="store_true",
+        default=False,
+        help="write judged trial rows to the dashboard DB so /matrix /feed /brief show YOUR data",
+    )
+    p.add_argument(
+        "--config-name",
+        default=None,
+        metavar="NAME",
+        help=(
+            "human-readable label for this deployment (e.g. 'my-bot'). "
+            "Slugified to form a stable config_id dashboard column. "
+            "Required when --persist is set."
+        ),
+    )
     return p.parse_args(argv)
 
 
 async def _run(args: argparse.Namespace) -> EndpointScanReport:
+    if args.persist and not args.config_name:
+        raise SystemExit("--config-name NAME is required when --persist is set")
+
     if args.corpus == "fixtures":
         primitives = _load_fixtures(args.limit)
     else:
@@ -106,6 +143,10 @@ async def _run(args: argparse.Namespace) -> EndpointScanReport:
         "COSTLY: scanning %s with %d primitive(s) × %d trial(s) — real endpoint + judge calls",
         args.base_url, len(primitives), args.n_trials,
     )
+
+    # derive stable config_id from --config-name when persisting
+    config_id = _slugify(args.config_name) if args.config_name else "adhoc-endpoint-scan"
+
     return await scan_endpoint(
         args.base_url,
         args.model,
@@ -113,6 +154,10 @@ async def _run(args: argparse.Namespace) -> EndpointScanReport:
         api_key=api_key,
         system_prompt=args.system_prompt,
         n_trials=args.n_trials,
+        persist=args.persist,
+        database_url=args.database_url if args.persist else None,
+        config_id=config_id,
+        config_name=args.config_name,
     )
 
 

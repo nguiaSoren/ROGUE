@@ -73,6 +73,15 @@ docker compose -f docker-compose.full.yml up
 
 Then open **http://localhost:3000** — `/feed`, `/matrix`, `/analytics`, and `/brief` run against your own local instance, no account and no hosted site required.
 
+**Fill it with *your* model's data.** With the stack up, scan your endpoint and persist the results into the same DB the dashboard reads:
+
+```bash
+rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
+# (DATABASE_URL must point at the stack's Postgres — the local default already does)
+```
+
+Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix scoped to *your* deployment. (The judge LLM still costs API spend per scan; point `JUDGE_MODEL` at a local model to keep it ~$0.)
+
 ### Scan your own model — the SDK
 Install from PyPI — the `rogue` CLI + Python SDK, no clone needed (Python 3.11+):
 

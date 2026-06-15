@@ -26,6 +26,13 @@ That gives you both the Python SDK (`from rogue import Client`) and the `rogue` 
 docker compose -f docker-compose.full.yml up      # then open http://localhost:3000
 ```
 
+To fill it with **your** model's data, scan your endpoint with `--persist` and open the per-config view:
+
+```bash
+rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
+# → http://localhost:3000/matrix?config=my-bot
+```
+
 ## 2. Two credentials
 
 A scan calls **two** services, so you need **two** keys: your **target** model, and the **judge** that grades each response (this is what turns "the model said some words" into "this attack broke through" — there is no graded report without it). The default judge is `anthropic/claude-sonnet-4-6`, which reads `ANTHROPIC_API_KEY` specifically; if you don't hold Anthropic credits, repoint it with `JUDGE_MODEL` and set that provider's key instead. The CLI and SDK do **not** auto-load a `.env` file — export the vars in the shell you run from (or pass the target key as `api_key=` / `--api-key`):

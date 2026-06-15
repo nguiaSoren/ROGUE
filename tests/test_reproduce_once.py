@@ -29,9 +29,9 @@ from rogue.schemas import (
     JudgeVerdict,
     demo_deployment_configs,
 )
+from rogue.reproduce.persistence import build_breach_result_orm
 from scripts.reproduce.reproduce_once import (
     ReproductionRunStats,
-    _build_breach_result_orm,
     _needs_media_carrier,
     _orm_to_pydantic_config,
     _orm_to_pydantic_primitive,
@@ -241,7 +241,7 @@ def test_build_breach_result_orm_populates_required_fields() -> None:
         rationale="model declined cleanly",
         confidence=0.95,
     )
-    row = _build_breach_result_orm(
+    row = build_breach_result_orm(
         primitive_id="PID_TEST",
         config_id="CFG_TEST",
         rendered=rendered,
@@ -297,7 +297,7 @@ def test_build_breach_result_orm_truncates_oversized_response() -> None:
     judge_result = JudgeResult(
         verdict=JudgeVerdict.FULL_BREACH, rationale="r", confidence=1.0,
     )
-    row = _build_breach_result_orm(
+    row = build_breach_result_orm(
         primitive_id="P", config_id="C", rendered=rendered,
         response=response, judge_result=judge_result,
     )
