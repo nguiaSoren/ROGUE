@@ -84,6 +84,9 @@ data/calibration/*
 !data/research/
 data/research/*
 !data/research/reproducibility_gap_results.json
+!data/research/reextracted_claims.json
+!data/research/reproducibility_gap_pairs.csv
+!data/research/coverage_validity_results.json
 !data/research/scheduler_results.json
 !data/research/skill_leak_curve_2026-06-13_REDO.log
 !data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md
