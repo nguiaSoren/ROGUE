@@ -20,7 +20,7 @@ pip install -e .          # or: uv pip install -e .
 
 That gives you both the Python SDK (`from rogue import Client`) and the `rogue` command-line tool.
 
-**Want the dashboard, not the SDK?** Self-host the full threat-intel UI (Postgres + API + Next.js) with one command — it migrates + seeds demo data on startup, no keys needed:
+**Want the dashboard, not the SDK?** Self-host the full threat-intel UI (Postgres + API + Next.js) with one command — it migrates + seeds the attack corpus + demo configs on startup (the breach matrix fills once you run a scan), no keys needed:
 
 ```bash
 docker compose -f docker-compose.full.yml up      # then open http://localhost:3000
