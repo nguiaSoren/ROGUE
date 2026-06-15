@@ -20,6 +20,12 @@ pip install -e .          # or: uv pip install -e .
 
 That gives you both the Python SDK (`from rogue import Client`) and the `rogue` command-line tool.
 
+**Want the dashboard, not the SDK?** Self-host the full threat-intel UI (Postgres + API + Next.js) with one command — it migrates + seeds demo data on startup, no keys needed:
+
+```bash
+docker compose -f docker-compose.full.yml up      # then open http://localhost:3000
+```
+
 ## 2. Two credentials
 
 A scan calls **two** services, so you need **two** keys: your **target** model, and the **judge** that grades each response (this is what turns "the model said some words" into "this attack broke through" — there is no graded report without it). The default judge is `anthropic/claude-sonnet-4-6`, which reads `ANTHROPIC_API_KEY` specifically; if you don't hold Anthropic credits, repoint it with `JUDGE_MODEL` and set that provider's key instead. The CLI and SDK do **not** auto-load a `.env` file — export the vars in the shell you run from (or pass the target key as `api_key=` / `--api-key`):
