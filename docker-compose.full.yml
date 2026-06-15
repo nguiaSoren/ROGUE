@@ -28,7 +28,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       BRIGHTDATA_API_KEY: ${BRIGHTDATA_API_KEY}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
-      # SEED_DEMO=1 (default) ships the demo threat data so the dashboard isn't empty on first boot.
+      # SEED_DEMO=1 (default) loads the demo attack corpus + configs so /feed has data; the breach
+      # matrix stays empty until you run a scan (breaches are scan results, not seed data).
       # Set SEED_DEMO=0 for a clean self-host: the DB starts empty, so every surface (/feed /matrix
       # /analytics /brief) shows ONLY your own `rogue scan --persist` data — no demo rows to filter out.
       SEED_DEMO: ${SEED_DEMO:-1}
