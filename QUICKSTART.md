@@ -4,7 +4,13 @@ Point ROGUE at any OpenAI-compatible LLM endpoint and get back a report of which
 
 ## 1. Install
 
-ROGUE is not on PyPI yet (`pip install rogue` does not work today), so install it from the repo as an editable package:
+ROGUE is on PyPI (Python 3.11+) — the `rogue` CLI + Python SDK:
+
+```bash
+pip install rogue-live-redteam
+```
+
+For development (tests, the full repo, the offline examples), install editable from a clone instead:
 
 ```bash
 git clone https://github.com/nguiaSoren/ROGUE.git
