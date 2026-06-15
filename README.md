@@ -12,7 +12,7 @@ ROGUE measures **every place a high-stakes AI agent can go wrong** — whether t
 > ROGUE harvests new jailbreaks **through Bright Data's MCP**, reproduces each one against **your** config, and serves the results **back through its own MCP server** — so you can ask Claude / Cursor *"which live attacks breach my config?"* from your editor. A two-way MCP loop — harvest *and* distribution — that no other red-team tool closes.
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
-[![Video](https://img.shields.io/badge/%E2%96%B6%20demo-5%20min-red)](https://youtu.be/-luwKpfaf2M)
+[![Trailer](https://img.shields.io/badge/%E2%96%B6%20trailer-watch-red)](https://youtu.be/pVOQYJvMC6w)
 [![Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-gated-yellow)](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05)
 [![Research](https://img.shields.io/badge/research-papers-blueviolet)](PAPERS.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
@@ -21,11 +21,13 @@ ROGUE measures **every place a high-stakes AI agent can go wrong** — whether t
 ## See it live
 
 - **Dashboard:** https://rogue-eosin.vercel.app — live, deployed.
-- **Walkthrough:** a 25-second teaser plays inline below; the full 5-minute demo is [on YouTube](https://youtu.be/-luwKpfaf2M).
+- **Trailer:** [watch the 45-second trailer on YouTube](https://youtu.be/pVOQYJvMC6w) (preview below).
 - **Dataset:** [358 attack primitives across 15 families](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05), MIT-licensed and access-gated (defensive-research-only terms — see [`RESPONSIBLE_RELEASE.md`](RESPONSIBLE_RELEASE.md)).
 - **In Slack:** point a Slack incoming webhook at ROGUE and the daily threat brief + every new HIGH/CRITICAL breach post straight to your workspace (the platform integration also files findings to Jira). ROGUE comes to where your team already triages.
 
-https://github.com/user-attachments/assets/c61cd222-0e87-4cd3-b8cd-61636eb80dfd
+<p align="center">
+  <a href="https://youtu.be/pVOQYJvMC6w"><img src="assets/brand/png/trailer-poster.png" alt="Watch the ROGUE trailer" width="640"></a>
+</p>
 
 ## Use it in 30 seconds
 
