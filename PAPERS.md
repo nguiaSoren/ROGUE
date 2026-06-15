@@ -34,4 +34,4 @@ Measuring whether human oversight of an AI gate is *meaningful* — a false-appr
 
 ---
 
-*Built by [Soren Obounou Nguia](#). Every reported number traces to a script or a released data slice in this repo; citations in each paper are twice-verified against arXiv + a second index.*
+*Built by [Benaja Soren Obounou Lekogo Nguia](#). Every reported number traces to a script or a released data slice in this repo; citations in each paper are twice-verified against arXiv + a second index.*

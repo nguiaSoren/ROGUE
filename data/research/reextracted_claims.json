@@ -1,0 +1,2030 @@
+[
+  {
+    "primitive_id": "01KSKCE1F83HKK0B481K4PZZ5Q",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24535",
+    "title": "Jailbreak activation steering - adversarial latent direction exploitation",
+    "old_claimed_rate": null,
+    "new_claimed_rate": 0.05,
+    "stated_as": "\"attack success rates mostly below 5%\"",
+    "target_models": [
+      "three LLMs (unspecified)"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGZ33K8H395S2YX3X553K1",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24173",
+    "title": "Infilling Extraction from Diffusion Language Models",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The abstract states edge-conditioned masks \"extract up to three times more\" verbatim sequences than prefix-conditioned ones, but this is a relative improvement factor, not an explicit numeric success/attack-success rate (e.g., no percentage or fraction is given for the extraction rate itself).",
+    "target_models": [
+      "LLaDA-8B",
+      "Dream-7B"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQRHET32GCM687DFHMN2WD",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-data-exfiltration-vulnerabilities/",
+    "title": "Windsurf Cascade prompt injection via code file for data exfiltration",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique. The blog post is a qualitative vulnerability disclosure with proof-of-concept demonstrations (screenshots and videos), but provides no measured attack success rate or percentage.",
+    "target_models": [
+      "Windsurf Cascade"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQM92MF4NKMB0D4X26BT4J",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/security-keeps-google-antigravity-grounded/",
+    "title": "Remote Command Execution via Indirect Prompt Injection in IDE",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique. The blog post describes working exploits and demonstrates the attack with screenshots and videos, but provides no percentage or quantitative success rate.",
+    "target_models": [
+      "Gemini 3",
+      "Claude Sonnet 4.5"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCX1GXJ245573PTSP25P94",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.24069v1",
+    "title": "Tool Description Poisoning (TDP) via MCP metadata injection",
+    "old_claimed_rate": 0.98,
+    "new_claimed_rate": 0.997,
+    "stated_as": "\"GPT-4o, widely considered the SOTA for reasoning, achieved a 100% (nearly) ASR\" / Table II AVG. 0.997 / 0.998 for GPT-4o; overall \"the five most capable models executed the malicious payload in over 89% of cases\"; headline figure for TDP across all models is AVG 0.997 for top model GPT-4o, with average across all 8 models implicitly ~88%+. Using GPT-4o's reported AVG ASR of 0.997 as the headline representative figure.",
+    "target_models": [
+      "GPT-4o",
+      "Claude 3.7 Sonnet",
+      "Claude 4 Sonnet",
+      "Gemini 2.5 Pro-pre",
+      "DeepSeek V3",
+      "DeepSeek R1",
+      "QWQ 32B",
+      "Qwen3 32B"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQGESMQJ4GBZ69B7Q7V6AC",
+    "source_type": "blog",
+    "url": "https://www.promptarmor.com/resources/claude-cowork-exfiltrates-files",
+    "title": "Claude Cowork API-allowlist exfiltration via prompt injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated anywhere in the source for this technique. The article describes a demonstrated proof-of-concept attack chain and notes it was \"successfully manipulated\" on both Claude Haiku and Claude Opus 4.5, but provides no percentage or fraction representing a success rate.",
+    "target_models": [
+      "Claude Haiku",
+      "Claude Opus 4.5"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGSB5ABRXXCBJMS87GPYPB4",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED/raw/main/README.md",
+    "title": "OBLITERATUS guardrail removal via model weight surgery",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"OBLITERATED: 0% hard refusal \u2014 guardrails fully removed\" (i.e., 100% attack success / 0% refusal rate)",
+    "target_models": [
+      "google/gemma-4-E4B-it"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQR27R67A9PHPV1AANDZHA",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-spaiware-exploit-persistent-prompt-injection/",
+    "title": "SpAIware: Memory-persistent prompt injection via tool-invoke hijack",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for this technique in the source. The post is a qualitative disclosure/proof-of-concept demonstration with redacted technical details, describing that the attack works (\"You can see the prompt injection works and the create_memory tool is invoked\") but providing no measured success rate.",
+    "target_models": [
+      "Windsurf Cascade"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQS9027R43GQF1RXDRG683",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/amazon-q-developer-remote-code-execution/",
+    "title": "Amazon Q Developer RCE via Indirect Prompt Injection in Source Code Comments",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate or attack-success rate is stated for this technique anywhere in the source. The blog post is a qualitative vulnerability disclosure demonstrating proof-of-concept exploitation, with no percentage or fraction reported.",
+    "target_models": [
+      "Amazon Q Developer (VS Code Extension)",
+      "Claude 4"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHN32GBDMW436RWWCESCAQ2",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2509.13608",
+    "title": "Multimodal Bottleneck: Context-Blind Safety Filter Bypass via Unimodal Content",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source describes a \"Unimodal Bottleneck\" and quantifies that 144 content policy refusals are split equally (50% visual, 50% textual), but no explicit attack success rate or jailbreak bypass rate is stated for the technique. The paper has also been withdrawn by its authors.",
+    "target_models": [
+      "GPT-4o mini"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCWJSXYCTQ1128TXEWG38M",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.26154v1",
+    "title": "MemMorph: Tool Hijacking via Memory Poisoning",
+    "old_claimed_rate": 0.859,
+    "new_claimed_rate": 0.859,
+    "stated_as": "\"MemMorph achieves up to 85.9% attack success rate with only three injected records\"",
+    "target_models": [
+      "Llama-3-8B-Instruct",
+      "Llama-3-70B-Instruct",
+      "Qwen2.5-7B-Instruct",
+      "Qwen2.5-32B-Instruct",
+      "GPT-OSS-20B",
+      "GPT-o4-mini",
+      "GPT-4o",
+      "Claude-Sonnet-4.5",
+      "Claude-Haiku-4.5",
+      "Claude-Opus-4.1"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHGH03AAJ9C80M6ZT8Z8GW7",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED/raw/main/README.md",
+    "title": "OBLITERATUS: Model weight ablation for refusal suppression",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"OBLITERATED: 0% hard refusal \u2014 guardrails fully removed\" (i.e., 100% compliance / 0% refusal rate)",
+    "target_models": [
+      "google/gemma-4-E4B-it"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHN5WB6G7AN45ZSQRC9A1Q0",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2025/Apr/9/mcp-prompt-injection/",
+    "title": "Tool poisoning via malicious MCP server instructions",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for tool poisoning via malicious MCP server instructions; the blog post describes the attack technique qualitatively with examples but provides no measured rate.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWBWKZ8WKFHRKH0TGP1NHDH",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.29678",
+    "title": "Spurious Prompt Injection for Behavior Steering",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique in the source. The abstract describes qualitative findings (\"surprising efficacy,\" \"can steer models toward unintended behaviors\") and notes that spurious prompts can match or outperform baselines, but provides no specific percentage or fraction for the behavior-steering attack success rate.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHM9PHAB38T21RZKDGT080D",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24421",
+    "title": "Log-substrate prompt injection attacks against SOC LLM assistants",
+    "old_claimed_rate": 0.68,
+    "new_claimed_rate": 0.96,
+    "stated_as": "\"context manipulation reaches 96% injection success without defenses and 38% even with constrained output\"",
+    "target_models": [
+      "gpt-4o-mini"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCVC048WFHC9GWJS29616N",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.24659v1",
+    "title": "IterInject: Feedback-Guided Iterative Optimization for Indirect Prompt Injection",
+    "old_claimed_rate": 0.65,
+    "new_claimed_rate": 0.478,
+    "stated_as": "\"IterInject achieves the highest overall ASR on all models, with the largest gain on DeepSeek (47.8% vs. 32.9% for static prompts)\"",
+    "target_models": [
+      "GLM-5.1",
+      "MiniMax-M2.7",
+      "DeepSeek-V4-Flash",
+      "Qwen3.5-27B"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCVD0ADP6VWHR83PSX86ZV",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.17634v1",
+    "title": "Contextual Integrity Violation via Context Parameter Manipulation",
+    "old_claimed_rate": 0.967,
+    "new_claimed_rate": 0.967,
+    "stated_as": "\"The iterative attack succeeded in 96.7% of cases (vs. a 0.67% baseline for the unoptimized emails in Section 3 directly).\"",
+    "target_models": [
+      "claude-sonnet-4-6",
+      "gpt-5.4",
+      "gpt-5.2",
+      "gemini-3-pro"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B22DMKN1WM43FTE9DQHWZ",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/defcon-talk-copirate-365/",
+    "title": "HTML preview with font-src CSS exfiltration via indirect prompt injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique anywhere in the source. The post is a qualitative walkthrough and PoC demonstration; it describes the technique working across \"so many different applications that integrated Copilot\" but provides no percentage or fraction.",
+    "target_models": [
+      "M365 Copilot",
+      "Microsoft Word Desktop",
+      "Word Online",
+      "Excel Online"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQFSQBQH4QFC9S4PJB7Y1X",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Jan/30/moltbook/",
+    "title": "Moltbook skill-based prompt injection via fetched Markdown",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "The source describes the mechanism and its risks qualitatively (\"we better hope the owner of moltbook.com never rug pulls or has their site compromised\") but provides no explicit numeric attack-success or jailbreak rate for this technique.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQDKKKTZHHQYJ5FNHH0E7J",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Mar/18/",
+    "title": "GitHub README prompt injection to malware execution",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique; the source is a blog post summarizing the attack chain without reporting a measured attack-success rate.",
+    "target_models": [
+      "Snowflake Cortex Agent"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQNFSZF2N0CKJM8MZJAW5A",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/agenthopper-a-poc-ai-virus/",
+    "title": "AgentHopper: Self-propagating conditional prompt injection via source code",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate or attack-success rate is stated anywhere in the source for this technique; the post is a qualitative proof-of-concept demonstration and educational writeup.",
+    "target_models": [
+      "GitHub Copilot",
+      "Amazon Q Developer",
+      "AWS Kiro",
+      "Amp Code"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQGWQ1VM2N9MSG2MXVGN9R",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Jan/12/superhuman-ai-exfiltrates-emails/",
+    "title": "Email prompt injection to exfiltration via markdown image smuggling",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source. The post describes the attack qualitatively (\"manipulated Superhuman AI to submit content from dozens of other sensitive emails\") but provides no percentage or measured rate.",
+    "target_models": [
+      "Superhuman AI"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWBSRNMCSDREHT2A7V76KB9",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.29960",
+    "title": "MemPoison: Stealthy Backdoor Injection into Agent Long-Term Memory",
+    "old_claimed_rate": 0.95,
+    "new_claimed_rate": 0.95,
+    "stated_as": "\"MemPoison achieves attack success rates up to 0.95, outperforming existing baselines\"",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCEV1YXB73DM423AT6A3JE",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24173",
+    "title": "Infilling extraction from diffusion language models",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The abstract states edge-conditioned masks \"extract up to three times more verbatim sequences than prefix-conditioned ones,\" but no explicit numeric success/extraction rate (e.g., a percentage or fraction) is provided for this technique in the source.",
+    "target_models": [
+      "LLaDA-8B",
+      "Dream-7B"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B0P7XQ82SP97SKV336Q9X",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Mar/18/",
+    "title": "Prompt injection in GitHub README to execute arbitrary shell commands",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for this technique in the source. The post is a brief blog commentary describing the attack and noting it has been fixed, with no measured rate reported.",
+    "target_models": [
+      "Snowflake Cortex Agent"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMAJQTXQSD65BJRSJAHGJP",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24173",
+    "title": "Infilling-based Training Data Extraction from Diffusion Language Models",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source states that \"edge-conditioned masks extract up to three times more verbatim sequences than prefix-conditioned ones,\" but provides no explicit numeric success/extraction rate (e.g., percentage or fraction) for the infilling-based extraction technique itself.",
+    "target_models": [
+      "LLaDA-8B",
+      "Dream-7B"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQSMH1QRGXZ5S1MDY4K27W",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/amazon-q-developer-data-exfil-via-dns/",
+    "title": "Amazon Q Developer: Indirect prompt injection via code comments to DNS exfiltration",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated anywhere in the source. The post is a vulnerability disclosure blog demonstrating the technique with screenshots and a video, but provides no measured success percentage or ASR figure.",
+    "target_models": [
+      "Amazon Q Developer"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQG544HHT5ZPBM60ZJ32RZ",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Jan/14/claude-cowork-exfiltrates-files/",
+    "title": "Claude Cowork API allowlist bypass for file exfiltration",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate stated; the source is a brief link-blog post describing the attack technique qualitatively without any measured attack-success rate.",
+    "target_models": [
+      "Claude Cowork"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMAX8PBNDDS67PXQYXCHVM",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2510.05699",
+    "title": "Membership Inference Attacks on LLM Tokenizers",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source is an arXiv abstract page only; no explicit numeric success/attack-success rate is stated for the tokenizer-based membership inference attack technique. The abstract mentions \"extensive experiments on millions of Internet samples reveal the vulnerabilities\" but provides no specific percentage or ASR figure.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B3HK0JV2NEAH6H7NPEA2G",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/cline-vulnerable-to-data-exfiltration/",
+    "title": "Indirect prompt injection via untrusted markdown file to exfiltrate sensitive data through image rendering",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique anywhere in the source. The blog post describes the vulnerability and provides a proof-of-concept demonstration but presents no measured attack-success rate or percentage.",
+    "target_models": [
+      "Cline"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQD52WGRTCKGM2GM09Q1XR",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Mar/18/snowflake-cortex-ai/",
+    "title": "Prompt injection via GitHub README to agent command execution",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique; the source is a link blog post describing the attack chain qualitatively, noting it was \"now fixed,\" without providing any measured attack-success rate or jailbreak rate.",
+    "target_models": [
+      "Snowflake Cortex Agent"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQPX7W0HDEZGD05821780P",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/manus-ai-kill-chain-expose-port-vs-code-server-on-internet/",
+    "title": "Indirect prompt injection to tool-use hijack via untrusted document",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate or attack-success rate is stated for this technique anywhere in the source. The post is a qualitative end-to-end proof-of-concept demonstration with screenshots, not a quantitative evaluation.",
+    "target_models": [
+      "Manus"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQQCNZENE0TCFCF9GHA1K2",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/chatgpt-deep-research-connectors-data-spill-and-leaks/",
+    "title": "Deep Research Agent Data Exfiltration via Tool Prompt Injection",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique anywhere in the source. The post is a qualitative demonstration/proof-of-concept showing that data exfiltration via prompt injection in Deep Research agents is possible, without reporting a measured attack-success rate.",
+    "target_models": [
+      "ChatGPT"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQJA6EDJPHE37K28NGYAAX",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/agent-commander-your-agent-works-for-me-now/",
+    "title": "Agent Commander: Indirect Prompt Injection via Document Analysis for Agent Hijacking",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for the document-analysis indirect prompt injection technique. The blog post provides qualitative observations (e.g., \"compromised agents also follow instructions sometimes only partially\") and a speculative placeholder (\"An attack might only succeed ~50% (random number) correctly\") but no measured attack success rate for this specific technique.",
+    "target_models": [
+      "Kimi Claw",
+      "OpenClaw",
+      "NanoClaw"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKDED0693SWNAYZAVBPYJVH",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED/raw/main/README.md",
+    "title": "Model weight abliteration for refusal removal",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": 0.0,
+    "stated_as": "\"OBLITERATED: 0% hard refusal \u2014 guardrails fully removed\" and \"Hard refusal rate: 0% \u2014 Guardrails fully removed \u2705\"",
+    "target_models": [
+      "google/gemma-4-E4B-it"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGSABN1MA223XMK9Z54X0T8",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/gpt2-xl-OBLITERATED/raw/main/README.md",
+    "title": "OBLITERATUS activation engineering model abliteration",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated anywhere in the source; the README is a model card describing the abliteration method and usage instructions only.",
+    "target_models": [
+      "gpt2-xl"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKHC91250K1CYW0245FGXSX",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24497",
+    "title": "Adaptive Evolutionary Chain-of-Thought Jailbreak (AE-CoT)",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract only notes that AE-CoT \"consistently outperforming state-of-the-art jailbreak methods\" without providing a specific percentage or fraction.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKJ8GVPR6D0GD1693B0YYDS",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2022/Sep/12/prompt-injection/",
+    "title": "Prompt injection via direct instruction override",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated in the source. The blog post demonstrates the technique with qualitative examples (\"Haha pwned!!\") but provides no measured attack success rate or percentage.",
+    "target_models": [
+      "GPT-3"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQN0T6VPG6T4FQXJY1ZHM9",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/cross-agent-privilege-escalation-agents-that-free-each-other/",
+    "title": "Cross-Agent Privilege Escalation via Configuration File Rewrite",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated anywhere in the source for this technique. The post is a qualitative description and proof-of-concept demonstration with no measured percentage or fraction reported.",
+    "target_models": [
+      "GitHub Copilot",
+      "Claude Code"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT77FRR7GGP4X5BWJ9E40SE1",
+    "source_type": "blog",
+    "url": "https://adnanthekhan.com/posts/clinejection/",
+    "title": "Prompt injection via GitHub issue title to hijack code-execution agent",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique. The author qualitatively notes \"Claude happily executed the payload in all test attempts in a mirror of the Cline repository\" but provides no percentage or fraction.",
+    "target_models": [
+      "claude-opus-4-5-20251101"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCDYB216GP6QV3Y6HXEYKP",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24245",
+    "title": "Deep-research agent poisoning via user-generated content injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page) describes the attack and its evaluation on STORM, Co-STORM, and OmniThink but states no explicit numeric success/attack-success rate for this technique.",
+    "target_models": [
+      "STORM",
+      "Co-STORM",
+      "OmniThink"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCEJM044ZYJ7NJWJK6K1BQ",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25389",
+    "title": "Evo-Attacker: Memory-Augmented RL-based Tool Output Poisoning",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract only notes that \"Evo-Attacker consistently outperforms baselines\" without providing a specific percentage or fraction.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQMP0RKSDH1NXSJHMD7BA1",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/claude-abusing-network-access-and-anthropic-api-for-data-exfiltration/",
+    "title": "Claude Code Interpreter Data Exfiltration via Anthropic Files API",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique. The blog describes a proof-of-concept attack that \"worked at the very first try\" but also notes it \"could not get it working for a longer time again\" \u2014 no measured attack-success rate or percentage is provided.",
+    "target_models": [
+      "Claude"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQNTPDWS7N0QW2M166HT3C",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-dangers-lack-of-security-controls-for-mcp-server-tool-invocation/",
+    "title": "MCP Tool Invocation Hijack via Prompt Injection in Code Comments",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for this technique anywhere in the source. The blog post demonstrates the attack qualitatively (with a screenshot and video) and describes it as occurring without user confirmation, but provides no measured percentage or fraction.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCFBZWV88YSQ4G71WNNBVZ",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2510.05699",
+    "title": "Membership Inference Attacks on LLM Tokenizers",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page) describes the technique and states \"extensive experiments on millions of Internet samples reveal the vulnerabilities in the tokenizers of state-of-the-art LLMs,\" but provides no explicit numeric success/attack-success rate for the membership inference attack on tokenizers.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B50DVGNV1MES3K74Z8F0E",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-sneaking-invisible-instructions-for-prompt-injection/",
+    "title": "Invisible Unicode Tag Characters for Hidden Prompt Injection in Agentic Systems",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique; the post provides a qualitative demonstration and describes the vulnerability without reporting a measured attack-success rate or percentage.",
+    "target_models": [
+      "Claude Sonnet 3.7",
+      "Windsurf Cascade",
+      "SWE-1"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCF3B7T2BAPKEQZ845JHXN",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25871",
+    "title": "Hidden instruction injection in agentic coding assistants via external artifacts",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source is an arXiv abstract page only; no explicit numeric success/attack-success rate is stated for this technique. The abstract describes the attack vector and states the authors \"measure their prevalence\" but no specific rate figure is present in the available text.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B5P6GA5CQ3X865GG0WPSZ",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/amazon-q-developer-interprets-hidden-instructions/",
+    "title": "Invisible Unicode Tag character injection via code comments",
+    "old_claimed_rate": 0.7,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique. The source only qualitatively notes: \"Attacks are not as reliable as regular text, as the latest Claude models at times refuses to follow invisible instructions. However, it's clear that these instructions consistently influence the model's behavior and reliability of such attacks tends to improve over time.\"",
+    "target_models": [
+      "Amazon Q Developer (Anthropic Claude models)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCFP857ZSAKR469E8QSSFC",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2601.14340",
+    "title": "Turn-Based Structural Triggers (TST): Dialogue-Position Backdoors in Multi-Turn LLMs",
+    "old_claimed_rate": 0.9952,
+    "new_claimed_rate": 0.9952,
+    "stated_as": "\"TST achieves a 99.52% average ASR while largely preserving non-triggered utility\"",
+    "target_models": [
+      "four open-source LLM families"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCTS0AN8THKN12VNW0TMV2",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2601.01627v3",
+    "title": "Multi-turn medical ethics jailbreak via narrative escalation",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports median safety scores (e.g., 7.0\u20138.5 across strategies, declining from 9.5 to 5.5 across turns) rather than an explicit attack success rate or jailbreak success rate percentage for this specific technique (narrative escalation / Historical-Creative Dual Frame Dissociation). No numeric ASR or success fraction is stated for this primitive.",
+    "target_models": [
+      "Claude-3.5-Haiku",
+      "Claude-Sonnet-4",
+      "Claude-Opus-4.1",
+      "Gemini-2.5-Flash",
+      "Gemini-2.5-Pro",
+      "GPT-5",
+      "GPT-5-mini",
+      "Grok-4",
+      "GPT-OSS-20B",
+      "GPT-OSS-120B",
+      "Qwen3-8B",
+      "Qwen3-30B-A3B",
+      "Qwen3-32B",
+      "Qwen3-235B-A22B-2507",
+      "Kimi-K2",
+      "GLM-4.5",
+      "MedGemma-4B-IT",
+      "MedGemma-27B-IT",
+      "HuatuoGPT-o1-7B",
+      "HuatuoGPT-o1-72B",
+      "II-Medical-8B",
+      "II-Medical-32B-Preview"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKDDFKXQRW023ZKH22QJVE2",
+    "source_type": "blog",
+    "url": "https://www.lakera.ai/risk/indirect-prompt-injection",
+    "title": "Malicious instructions embedded in fetched web content",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique anywhere in the source. The page is a product marketing page describing how the attack works and how Lakera detects it, but provides no measured attack success rate.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCEDWPBC05AYVNR6CPREBF",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24941",
+    "title": "Memory-Induced Tool-Drift in LLM Agents",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports deflection scores raised by up to +3.6 points on a 1\u20135 scale, not a success/attack-success rate. No explicit percentage or fraction success rate is stated for this technique.",
+    "target_models": [
+      "seven frontier models (including those with extended reasoning)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCE16JCRXSHWM6RB5SPJTZ",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24421",
+    "title": "Log-substrate prompt injection attacks against SOC analyst LLMs",
+    "old_claimed_rate": 0.68,
+    "new_claimed_rate": 0.266,
+    "stated_as": "\"average injection success falls from 26.6% under naive prompting to 11.8% under our strongest defense\"",
+    "target_models": [
+      "gpt-4o-mini"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCFS663PPAHGQN3RMMQVT4",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2602.04653",
+    "title": "Chat template inference-time backdoor via supply chain poisoning",
+    "old_claimed_rate": 0.8,
+    "new_claimed_rate": 0.8,
+    "stated_as": "\"induce attacker-controlled URL emission with success rates exceeding 80%\"",
+    "target_models": [
+      "eighteen models"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCTZ7HR45DZRD11Q9B2FK9",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.26595v1",
+    "title": "Cordyceps: Covert Control Attacks via Data Poisoning with Semantic Hiding",
+    "old_claimed_rate": 0.93,
+    "new_claimed_rate": 0.93,
+    "stated_as": "\"maintaining up to 93% attack success rate after backdoor defenses and up to 98% after prompt injection defenses\"",
+    "target_models": [
+      "5 LLMs (across 55 models evaluated)"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHAKCMHRAFMDTTNT95WEDJS",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.14605",
+    "title": "Adaptive finetuning attack bypassing safety alignment robustness defenses",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page only) describes the unified adaptive attack as breaking \"defenses across all defense mechanisms\" and states \"current approaches do not provide robust security,\" but provides no explicit numeric success/attack-success rate for this technique.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B1CK7F3EKF4VJH0MKWQWB",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/breaking-opus-4.7-with-chatgpt/",
+    "title": "Adversarial Image Puzzle to Hijack Memory Tool and Persist False Memories",
+    "old_claimed_rate": 0.5,
+    "new_claimed_rate": 0.5,
+    "stated_as": "\"I repeated the test 10 times, and it invoked the memory tool with the fake information 5/10 times.\"",
+    "target_models": [
+      "Claude Opus 4.7"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCVB9X22EMZQADFN0G15BV",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24659",
+    "title": "IterInject: Feedback-Guided Iterative Indirect Prompt Injection Against LLM Agents",
+    "old_claimed_rate": 0.56,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the abstract or any part of the source markdown. The abstract mentions qualitative claims such as \"substantially outperforms static baselines\" and \"optimized payloads achieve full success on 5 of 9 targets\" for Claude Code specifically, but no single headline ASR figure is provided for the overall IterInject technique.",
+    "target_models": [
+      "AgentDojo",
+      "InjectAgent",
+      "Claude Code"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQP61NY6RKF1DEHS9PNR3C",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/cline-vulnerable-to-data-exfiltration/",
+    "title": "Cline markdown image rendering data exfiltration via prompt injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated anywhere in the source. The post is a vulnerability disclosure/demonstration blog post that describes the attack mechanism and provides a proof-of-concept, but does not report any measured success rate or percentage.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCK54SHJN3S79BSP5PWT3X",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25415",
+    "title": "Invisible font-mapping attack for prompt injection in LLM reviewers",
+    "old_claimed_rate": 0.35,
+    "new_claimed_rate": null,
+    "stated_as": "The abstract states \"Simple hidden instructions can promote low-scoring papers to acceptance-level ratings in a substantial fraction of cases, with effectiveness varying sharply across model families\" \u2014 no explicit numeric success rate is provided for this technique in the source.",
+    "target_models": [
+      "12 LLMs evaluated (specific models not named in abstract)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQJYC3JK5DX92XSPY46NDZ",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/data-exfiltration-mitigation-paper-by-openai/",
+    "title": "URL-based data exfiltration via LLM agent navigation",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for this technique anywhere in the source. The blog post describes the technique conceptually and notes \"Leakage of bits of information still seems straightforward, and that remains a risk for certain scenarios,\" but provides no measured percentage or fraction.",
+    "target_models": [
+      "ChatGPT"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMBAQB078HY5CTTHGYR0VN",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2602.04653",
+    "title": "Inference-Time Backdoor via Malicious Chat Template",
+    "old_claimed_rate": 0.8,
+    "new_claimed_rate": 0.8,
+    "stated_as": "\"induce attacker-controlled URL emission with success rates exceeding 80%\"",
+    "target_models": [
+      "eighteen models"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCW66PCFJX3QPTZVXRFY7Q",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.18133",
+    "title": "Exemplification-based indirect prompt injection for data exfiltration",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page) describes the exemplification technique and states that the paper evaluates its attack success rate and compares it to a prior fake-completion technique, but no explicit numeric success rate is provided in the available markdown, which only contains the abstract and metadata.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKD6NS4Z83Q34PAMYTPMA68",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25902",
+    "title": "Contrastive Decoding Diffing (CDD) for finetuning data recovery",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the abstract or any visible portion of the source. The abstract uses qualitative language such as \"near-perfect recovery across all single-dataset non-CoT variants\" and \"correctly identifying all four datasets in the mixed-dataset setting,\" but provides no explicit percentage or fraction for the technique's success rate.",
+    "target_models": [
+      "1B parameter model",
+      "32B parameter model"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKDD864503XEWXXJQ3SFHBH",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/May/26/",
+    "title": "Microsoft Copilot Cowork email-based data exfiltration via image rendering",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for this technique anywhere in the source; the post describes the vulnerability qualitatively (\"data can be exfiltrated when a user opens a compromised message sent by the agent\") without providing a measured rate.",
+    "target_models": [
+      "Microsoft Copilot Cowork"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCWZ7JEXRCP47GMYKPSBEH",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.25389v1",
+    "title": "Evo-Attacker: Memory-Augmented Tool-Output Perturbation via RL",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports performance degradation metrics (\u2193 values) across benchmarks and architectures, not an explicit attack success rate (ASR) as a fraction or percentage for Evo-Attacker. For example, the largest degradation reported is \u219332.5 on MAB.research (Chain architecture), but these are absolute performance drops in task metrics (Pass@1, RACE, SR, Score), not success rates of the attack itself.",
+    "target_models": [
+      "Qwen3-14B (victim)",
+      "Qwen3-8B (attacker)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHAF2Y8S4R2AR49TCGFCGEV",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2512.23995",
+    "title": "RepetitionCurse: MoE Router Imbalance DoS via Repetitive Token Patterns",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports a 3.063x increase in end-to-end inference latency on Mixtral-8x7B, but states no explicit success/attack-success rate (fraction or percentage) for the technique. The metric used is latency multiplier, not a jailbreak/bypass success rate.",
+    "target_models": [
+      "Mixtral-8x7B"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCE0F8V9GMGG2TFA5K89Q8",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24312",
+    "title": "MEntA: Query-Efficient Membership Inference Attack on RAG Systems via Entailment",
+    "old_claimed_rate": 0.991,
+    "new_claimed_rate": 0.991,
+    "stated_as": "\"MEntA achieves up to 0.991 AUC with only 5 queries\"",
+    "target_models": [
+      "NFCorpus",
+      "SCIDOCS",
+      "TREC-COVID"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCWJD4RC40CRS3GT3QK63R",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2512.06556v2",
+    "title": "Descriptor-driven tool poisoning via Model Context Protocol manipulation",
+    "old_claimed_rate": 0.36,
+    "new_claimed_rate": 0.36,
+    "stated_as": "\"descriptor manipulation can substantially alter tool-selection behavior, producing unsafe tool invocations in up to 36% of trials under baseline configurations\"",
+    "target_models": [
+      "GPT-5.3",
+      "DeepSeek-V3",
+      "LLaMA-3.5"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHAF4VH3SC411NK248XVFS0",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2601.14340",
+    "title": "Turn-Based Structural Trigger (TST) \u2014 Dialogue-Position Backdoors",
+    "old_claimed_rate": 0.9952,
+    "new_claimed_rate": 0.9952,
+    "stated_as": "\"TST achieves a 99.52% average ASR\"",
+    "target_models": [
+      "four open-source LLM families"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B2AWVP0NHP9YQ5SQ0KVBH",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/scary-agent-skills/",
+    "title": "Hidden Unicode Tag instructions in Agent Skills",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique anywhere in the source. The post is a qualitative demonstration with video/screenshots, noting reliability varies by model and that \"I also managed to invoke tools just via the description prompt injection, but that is not as reliable.\"",
+    "target_models": [
+      "Claude",
+      "Gemini",
+      "Grok",
+      "GitHub Copilot (Claude 4.5)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKHP5VZXW88EP4BM073AB10",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2510.26418",
+    "title": "Chain-of-Thought Hijacking via Extended Benign Reasoning",
+    "old_claimed_rate": 0.96,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"Across HarmBench, CoT Hijacking achieves attack success rates of 99%, 94%, 100%, and 94% on Gemini 2.5 Pro, ChatGPT o4 Mini, Grok 3 Mini, and Claude 4 Sonnet, respectively.\" \u2014 maximum value (100% on Grok 3 Mini) reported as headline range; 100% selected as maximum.",
+    "target_models": [
+      "Gemini 2.5 Pro",
+      "ChatGPT o4 Mini",
+      "Grok 3 Mini",
+      "Claude 4 Sonnet"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHA851GY7AZJGZXGD3N7744",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25871",
+    "title": "Prompt injection in agentic AI coding assistants via external artifacts",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page for 2605.25871) describes the technique and states the paper \"measure[s] their prevalence,\" but no explicit numeric success/attack-success rate is provided in the available markdown, which only contains the abstract and metadata.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT3AR4SM0TWZBQ9A34HGFQGY",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Jun/1/hackers-simply-asked-meta-ai/",
+    "title": "Meta AI account takeover via direct instruction to support bot",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate stated; the source is a link blog post describing the attack as having worked (\"It Worked\") but provides no measured attack-success rate or percentage.",
+    "target_models": [
+      "Meta AI support bot"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGYNM480K07T1DGG5CT4CP",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25389",
+    "title": "Evo-Attacker: Memory-Augmented RL for Long-Horizon Tool Attacks on LLM-MAS",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source is an arXiv abstract page only; no explicit numeric success/attack-success rate is stated for Evo-Attacker. The abstract only notes it \"consistently outperforms baselines\" without providing a specific figure.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHNAHARQBY79MCNV1DAEDGA",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED/raw/main/README.md",
+    "title": "OBLITERATUS: Surgical Guardrail Removal via Model Weight Abliteration",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"OBLITERATED: 0% hard refusal \u2014 guardrails fully removed\" (i.e., 100% compliance / 0% refusal rate)",
+    "target_models": [
+      "google/gemma-4-E4B-it"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT3AR4TZ0RFZTXB7SFA2XJZQ",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2022/Sep/12/prompt-injection/",
+    "title": "Direct instruction override via prompt injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated in the source. The blog post demonstrates the technique with qualitative examples (e.g., \"Haha pwned!!\") but provides no measured attack-success rate or percentage.",
+    "target_models": [
+      "GPT-3"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMB70S6K0D5ZWDKBJ36WR2",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2601.14340",
+    "title": "Turn-Based Structural Triggers (TST): Backdoor via Dialogue Turn Index",
+    "old_claimed_rate": 0.9952,
+    "new_claimed_rate": 0.9952,
+    "stated_as": "\"Across four open-source LLM families, TST achieves a 99.52% average ASR\"",
+    "target_models": [
+      "four open-source LLM families"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQFCZX5A46WYF84Z06D0W2",
+    "source_type": "blog",
+    "url": "https://adnanthekhan.com/posts/clinejection/",
+    "title": "Clinejection: GitHub issue title prompt injection against AI-powered issue triager",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique. The source describes the attack qualitatively: \"Claude happily executed the payload in all test attempts in a mirror of the Cline repository using my own API key.\" This is a qualitative statement of consistent success in testing but no percentage or fraction is given.",
+    "target_models": [
+      "claude-opus-4-5-20251101"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMAQ5Q8ZAK1ZKA8M5BA6AJ",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25871",
+    "title": "Hidden instructions in external artifacts hijacking agentic coding assistants",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page for 2605.25871) only describes the attack vector and states the paper \"measure[s] their prevalence,\" but no explicit numeric success/attack-success rate is provided in the available markdown.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQJNA6GG7XQZ05XRG133NW",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/scary-agent-skills/",
+    "title": "Invisible Unicode Tag Instructions in Agent Skills",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique anywhere in the source. The post is a qualitative demonstration with notes on reliability (e.g., \"reliability can be improved\", Anthropic appears to have added mitigations on Feb 10 2026), but no percentage or fraction is given.",
+    "target_models": [
+      "Claude",
+      "Gemini",
+      "Grok",
+      "GitHub Copilot (Claude 4.5)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMAX8ZN1Q5EHRK417VH1YQ",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2508.12538",
+    "title": "Tool Poisoning Attack via MCP Tool Description Manipulation",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source is an arXiv abstract page only; no explicit numeric success/attack-success rate for the Tool Poisoning Attack (TPA) technique is stated in the available markdown. The abstract mentions \"quantitative analysis of the efficacy of each attack\" but no specific figures are provided in the abstract text.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHAEDE5QQ913HSXYJ3AQ2YR",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2508.12538",
+    "title": "Tool Poisoning Attacks (TPA) against Model Context Protocol agents",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arxiv abstract page) describes the MCPXKIT framework and states it \"conduct[s] a quantitative analysis of the efficacy of each attack\" but provides no explicit numeric success/attack-success rate for Tool Poisoning Attacks or any specific technique in the visible markdown.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCX36C1WSEGNTP3KXG53VF",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2507.06850v6",
+    "title": "Direct Prompt Injection Attack via LLM Agent Terminal Tool",
+    "old_claimed_rate": 0.944,
+    "new_claimed_rate": 0.944,
+    "stated_as": "\"94.4 % of models succumb to Direct Prompt Injection\"",
+    "target_models": [
+      "18 state-of-the-art LLMs (unnamed in excerpt)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQHR2SDH7MJCZRMW9FR6VY",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/breaking-opus-4.7-with-chatgpt/",
+    "title": "Adversarial Image with Embedded Social Engineering to Hijack Memory Tool",
+    "old_claimed_rate": 0.5,
+    "new_claimed_rate": 0.5,
+    "stated_as": "\"I repeated the test 10 times, and it invoked the memory tool with the fake information 5/10 times.\"",
+    "target_models": [
+      "Claude Opus 4.7"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQQNXXTQR6NXDKTFRH4MWG",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-sneaking-invisible-instructions-for-prompt-injection/",
+    "title": "Invisible Unicode Tag characters for hidden prompt injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique. The source provides a qualitative demonstration and describes the vulnerability, but does not report a measured attack-success rate or jailbreak percentage.",
+    "target_models": [
+      "Claude Sonnet 3.7",
+      "SWE-1"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B5FD9EPRYF2SSDP9ZYYG8",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-spaiware-exploit-persistent-prompt-injection/",
+    "title": "SpAIware: Memory-Persistent Indirect Prompt Injection via Auto-Invoked Tool",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique; the post is a qualitative proof-of-concept disclosure describing the attack mechanism and showing redacted screenshots, but provides no percentage or measured attack-success rate.",
+    "target_models": [
+      "Windsurf Cascade"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKJA3TFDRDXYXWTNK5GTT96",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED/raw/main/README.md",
+    "title": "Model weight abliteration to remove refusal guardrails",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"OBLITERATED: 0% hard refusal \u2014 guardrails fully removed\" (i.e., 100% of refusals removed; 0% hard refusal rate)",
+    "target_models": [
+      "google/gemma-4-E4B-it"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCV72E7J1KXVQ9KZSF8QXB",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.22005",
+    "title": "LM-Head SVD Analysis for Training Data and Sensitive Vocabulary Extraction",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique; the paper describes qualitative findings and introduces metrics (VCS, WPS) but reports no percentage-based attack success rate.",
+    "target_models": [
+      "GPT-OSS-120B",
+      "Gemma-2-2B",
+      "Qwen2.5-1.5B"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCFV5WSQ2JK1309FQ0GTMF",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2602.19450",
+    "title": "Adversarial prompting against TEE security advisors",
+    "old_claimed_rate": 0.12,
+    "new_claimed_rate": 0.1202,
+    "stated_as": "\"some failures are not purely idiosyncratic, transferring up to 12.02% across LLM assistants\"",
+    "target_models": [
+      "ChatGPT-5.2",
+      "Claude Opus-4.6"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7BFDYSDNNVZ4P6M3QQRC95",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/claude-code-exfiltration-via-dns-requests/",
+    "title": "Claude Code: Data Exfiltration via DNS-Allowlist Injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source. The blog post is a vulnerability disclosure (CVE-2025-55284) demonstrating a proof-of-concept with qualitative descriptions (\"it works!\", \"Claude leaks the data\") but no measured percentage or fraction.",
+    "target_models": [
+      "Claude Code"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGXS9VDR30TT1WTBQWGY44",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24312",
+    "title": "Membership Inference Attack on RAG via Entailment (MEntA)",
+    "old_claimed_rate": 0.991,
+    "new_claimed_rate": 0.991,
+    "stated_as": "\"MEntA achieves up to 0.991 AUC with only 5 queries\"",
+    "target_models": [
+      "NFCorpus",
+      "SCIDOCS",
+      "TREC-COVID"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQHAPND13180ZHHK7E5MPP",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/defcon-talk-copirate-365/",
+    "title": "HTML Preview CSS Font-Face Data Exfiltration via Indirect Prompt Injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique anywhere in the source. The post is a qualitative walkthrough and vulnerability disclosure writeup; it describes the technique working in demos and across multiple M365 Copilot applications, but never quantifies a success rate.",
+    "target_models": [
+      "M365 Copilot (BizChat)",
+      "Microsoft Word Desktop",
+      "Microsoft Word Online",
+      "Microsoft Excel Online"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCXSYG3H0E07XGHEBKVSZ6",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.17324",
+    "title": "ASPI: Amplified Prompt Injection via Clarification-Seeking State",
+    "old_claimed_rate": 0.34,
+    "new_claimed_rate": 0.357,
+    "stated_as": "\"attack success rises from 1.8% to 34.0% for o3 and from 2.2% to 35.7% for Gemini-3-Flash\" \u2014 35.7% is the maximum across the two example models cited in the abstract for the clarification state",
+    "target_models": [
+      "o3",
+      "Gemini-3-Flash"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKDD7X8HVQC9J1NCKQGHFFY",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2022/Sep/12/prompt-injection/",
+    "title": "Direct instruction override via malicious user input",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated; the source is a blog post demonstrating the attack with qualitative examples and anecdotal observations, but provides no measured attack-success rate or percentage.",
+    "target_models": [
+      "GPT-3"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKHXX3Y9SD1ZA31DPEGB9VW",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25194",
+    "title": "Visual Prompt Injection via Adversarial Images in Multimodal LLMs",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (abstract only) discusses reducing attack success rates (ASR) \"to near zero\" via the proposed defense (GTM), but states no explicit numeric ASR for the adversarial image / visual prompt injection attack itself before defense.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMA8MTXV545N9QYCS6WBE3",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25389",
+    "title": "Evo-Attacker: Memory-Augmented Reinforcement Learning for Tool Attacks on LLM-MAS",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source is the arXiv abstract page only; no explicit numeric success/attack-success rate is stated for Evo-Attacker. The abstract says only that it \"consistently outperforms baselines\" without providing a specific percentage.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7BF43WB84DWB7VPRPQRE6H",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2024/aws-amazon-q-fixes-markdown-rendering-vulnerability/",
+    "title": "Markdown hyperlink data exfiltration via indirect prompt injection in Amazon Q",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate stated; the post is a vulnerability disclosure describing the attack technique and its fix, with no quantitative measurement of attack success rate reported.",
+    "target_models": [
+      "Amazon Q for Business"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCXJ6JPBDV4B38BKBZTXE5",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.16090",
+    "title": "Cross-Modal Prompt Injection via Image-Only Perturbation (CrossMPI)",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract only notes that \"extensive experiments across multiple LVLMs and datasets show that our method significantly outperforms baseline approaches\" without providing a specific percentage.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7BGE2XBY65VX4EKZ3ECQ5G",
+    "source_type": "blog",
+    "url": "https://www.promptarmor.com/resources/microsoft-copilot-cowork-exfiltrates-files",
+    "title": "Copilot Cowork file exfiltration via skill-file prompt injection",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"Copilot Cowork completed the entire attack chain on every trial (5 for 5)\"",
+    "target_models": [
+      "Claude Opus 4.7",
+      "Claude Sonnet 4.6",
+      "auto (dynamic routing between Claude Opus 4.7 and Claude Sonnet 4.6)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCFDGWV8R98WHGDYHSKCK8",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2508.20424",
+    "title": "Approximate Cache Poisoning and Prompt Stealing in Text-to-Image Diffusion Models",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page) describes the attacks qualitatively but provides no explicit numeric success/attack-success rate for any of the techniques (covert channel, prompt stealing, or cache poisoning).",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCXEJE3Z6ZDWRCJFPTB50K",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.11229v1",
+    "title": "Context-Grounded Agentic Workflow Hijacking via Issue Comments",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports that JAW identified 4,174 hijackable GitHub workflows and eight hijackable n8n templates, but provides no explicit numeric attack-success rate (percentage or fraction) for the context-grounded agentic workflow hijacking technique via issue comments specifically.",
+    "target_models": [
+      "Claude Code",
+      "Gemini CLI",
+      "Qwen CLI",
+      "Cursor CLI"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCXGKHEZK05X2PHMG1HS8B",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.24421v1",
+    "title": "Log-substrate prompt injection against SOC LLM analysts",
+    "old_claimed_rate": 0.68,
+    "new_claimed_rate": 0.96,
+    "stated_as": "\"S3 (context manipulation) achieves a 96% injection success rate against naive defenses\"",
+    "target_models": [
+      "gpt-4o-mini"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHM9JCCXKFRET7WSK9Q82TG",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24245",
+    "title": "User-Generated Content Poisoning of Deep-Research Agents",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract describes the attack and evaluation qualitatively but provides no percentage or fraction for the technique's success rate.",
+    "target_models": [
+      "STORM",
+      "Co-STORM",
+      "OmniThink"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGXWYSG6KXWAAYQ48M99M2",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24421",
+    "title": "Log-substrate prompt injection attacks against SOC LLM analysts",
+    "old_claimed_rate": 0.68,
+    "new_claimed_rate": 0.96,
+    "stated_as": "\"context manipulation reaches 96% injection success without defenses and 38% even with constrained output\"",
+    "target_models": [
+      "gpt-4o-mini"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B3J6R71M7A801JP9VZSC5",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/windsurf-dangers-lack-of-security-controls-for-mcp-server-tool-invocation/",
+    "title": "MCP Tool Hijack via Code Comment Prompt Injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated for this technique. The blog post provides a qualitative demonstration and describes the attack scenario but presents no measured attack-success rate or percentage.",
+    "target_models": [
+      "Windsurf"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGZMNDYJWFS82Q84BVES2M",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2510.05699",
+    "title": "Membership Inference Attacks on LLM Tokenizers",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The abstract describes five attack methods and mentions \"extensive experiments on millions of Internet samples reveal the vulnerabilities,\" but no explicit numeric success/attack-success rate is stated in the source markdown.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGYC06CN2Q4EV23YMMDSRW",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24941",
+    "title": "Memory-Induced Tool-Drift in LLM Agents",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports deflection scores raised by \"up to +3.6 points on a 1\u20135 scale\" \u2014 a parameter deviation measure, not an explicit attack-success rate or jailbreak percentage. No explicit numeric success/attack-success rate is stated for this technique.",
+    "target_models": [
+      "seven frontier models (unnamed in abstract)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQRVK8KFS0W7PMF9T1QN9N",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/amazon-q-developer-interprets-hidden-instructions/",
+    "title": "Invisible Unicode Tag character prompt injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated. The source only qualitatively notes: \"Attacks are not as reliable as regular text, as the latest Claude models at times refuses to follow invisible instructions. However, it's clear that these instructions consistently influence the model's behavior and reliability of such attacks tends to improve over time.\"",
+    "target_models": [
+      "Amazon Q Developer (Claude-based)",
+      "Claude"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQXZ3687BEY5V6SWR3HCSB",
+    "source_type": "blog",
+    "url": "https://www.lakera.ai/risk/multilingual-multimodal-attacks",
+    "title": "Multilingual prompt injection to evade refusal heuristics",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for multilingual prompt injection in the source. The page describes how the attack works and how Lakera detects it, but provides only operational metrics (e.g., \"15,000 average threats detected per day\", \"0.01% false-positive rate\", \"100+ languages covered\") rather than any measured jailbreak/bypass success rate for this technique.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSH9K6QG20KP59E3C4052B0N",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24069",
+    "title": "Tool Description Poisoning (TDP) via MCP Metadata Injection",
+    "old_claimed_rate": 0.95,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"leading models like GPT-4o exhibiting a nearly 100% Attack Success Rate (ASR) in six high-risk scenarios\"",
+    "target_models": [
+      "GPT-4o"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMTCCPC6V43RZFCECRJ3SE",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2510.26418",
+    "title": "Chain-of-Thought Hijacking via Extended Reasoning",
+    "old_claimed_rate": 0.95,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"Across HarmBench, CoT Hijacking achieves attack success rates of 99%, 94%, 100%, and 94% on Gemini 2.5 Pro, ChatGPT o4 Mini, Grok 3 Mini, and Claude 4 Sonnet, respectively.\" \u2014 maximum value (100% on Grok 3 Mini) reported as headline range; 100% selected as the maximum.",
+    "target_models": [
+      "Gemini 2.5 Pro",
+      "ChatGPT o4 Mini",
+      "Grok 3 Mini",
+      "Claude 4 Sonnet"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGXEMN8B0166M05A3AS66K",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24069",
+    "title": "Tool Description Poisoning (TDP) via MCP Metadata",
+    "old_claimed_rate": 0.95,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"leading models like GPT-4o exhibiting a nearly 100% Attack Success Rate (ASR) in six high-risk scenarios\"",
+    "target_models": [
+      "GPT-4o"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT77FBFB14ZPS1BRHTQVJ73H",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2022/Sep/12/prompt-injection/",
+    "title": "Direct instruction override via \"ignore the above\" injection",
+    "old_claimed_rate": 0.95,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated in the source; the blog post demonstrates the attack with qualitative examples showing it works, but provides no percentage or quantitative success rate for the technique.",
+    "target_models": [
+      "GPT-3"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCVPSQ1TJ9S4K1JDPKYC04",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.11868",
+    "title": "IPI-proxy: Indirect prompt injection via HTML response interception",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract describes the toolkit's architecture and design but reports no measured jailbreak or bypass rate for the IPI-proxy technique.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCCBKB75M86Q83GADJ237S",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2022/Sep/12/prompt-injection/",
+    "title": "Prompt injection: ignore-prior-instructions override",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated anywhere in the source. The blog post demonstrates the attack with qualitative examples (e.g., \"Haha pwned!!\") but provides no measured attack-success rate or percentage.",
+    "target_models": [
+      "GPT-3"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7B4MTDV3DYFXCXCS35A96G",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/aws-kiro-aribtrary-command-execution-with-indirect-prompt-injection/",
+    "title": "AWS Kiro configuration hijack via indirect prompt injection",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated anywhere in the source. The blog post demonstrates the vulnerability with a proof-of-concept and describes it qualitatively, but provides no percentage or fraction for the technique's success rate.",
+    "target_models": [
+      "AWS Kiro"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQEQA2HVHPPXSY42PYHNAJ",
+    "source_type": "blog",
+    "url": "https://adnanthekhan.com/posts/clinejection/",
+    "title": "Clinejection \u2014 GitHub Issue Title Prompt Injection to Supply Chain Compromise",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique. The blog describes the attack chain, provides qualitative evidence (\"Claude happily executed the payload in all test attempts in a mirror of the Cline repository\"), and documents real-world exploitation indicators, but never reports a percentage or fraction as a success rate.",
+    "target_models": [
+      "claude-opus-4-5-20251101"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGXGKNTMN0MD53MW81AWTX",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24245",
+    "title": "Deep-research agent poisoning via user-generated content injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract describes the attack and its evaluation qualitatively, noting it was evaluated across three systems and multiple query clusters, but provides no percentage or fraction for attack success.",
+    "target_models": [
+      "STORM",
+      "Co-STORM",
+      "OmniThink"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHM9H1MC3CHASYXYJ85HC8N",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24069",
+    "title": "Tool Description Poisoning (TDP) via MCP Metadata Injection",
+    "old_claimed_rate": 0.97,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"leading models like GPT-4o exhibiting a nearly 100% Attack Success Rate (ASR) in six high-risk scenarios\"",
+    "target_models": [
+      "GPT-4o"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWBS8PBVACS6RWN8RMV4S5N",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.29354",
+    "title": "Neutral Prompting Attack for Stealthy Hallucination Steering",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The abstract states NPA \"increases both Hallucination ASR and Pip Install ASR\" but provides no explicit numeric success rate; only the abstract/landing page is available, with no quantitative results.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKDD3X5K2F3S97N8N28M37N",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/May/26/copilot-cowork-exfiltrates-files/",
+    "title": "Agentic prompt injection via unapproved email with image exfil",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated for this technique anywhere in the source; the post is a descriptive link-blog entry explaining the vulnerability mechanism without providing measured rates.",
+    "target_models": [
+      "Microsoft Copilot Cowork"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWBTW70XM5EYXMD9M7XDZ2Y",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.26156",
+    "title": "Bandit-Guided Style Manipulation to Mislead LLM Judges (BITE)",
+    "old_claimed_rate": 0.65,
+    "new_claimed_rate": 0.65,
+    "stated_as": "\"BITE achieves an attack success rate exceeding 65%\"",
+    "target_models": [
+      "diverse range of LLM judges"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQK94NWYFAYMR54MC6KTPW",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2026/minting-next-auth-nextjs-auth-cookies-react2shell-threat/",
+    "title": "Next.js authentication cookie minting via NEXTAUTH_SECRET exposure",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success or attack-success rate is stated anywhere in the source. The post is a descriptive/educational write-up of the technique and tooling, with no measured jailbreak/bypass rate reported.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7BG5046CT7DDY0GJFECR52",
+    "source_type": "blog",
+    "url": "https://www.404media.co/hackers-simply-asked-meta-ai-to-give-them-access-to-high-profile-instagram-accounts-it-worked/",
+    "title": "Meta AI account takeover via direct instruction override",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source article. The article describes real-world incidents and shares a demonstration video/screenshots, but provides no quantified success rate for the technique.",
+    "target_models": [
+      "Meta AI support chatbot"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHM9NXN9D0WNXTPY0245C04",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24312",
+    "title": "Membership Entailment Attack (MEntA) on RAG Systems",
+    "old_claimed_rate": 0.991,
+    "new_claimed_rate": 0.991,
+    "stated_as": "\"MEntA achieves up to 0.991 AUC with only 5 queries\"",
+    "target_models": [
+      "NFCorpus",
+      "SCIDOCS",
+      "TREC-COVID"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7BE92C5C2HAK8F38NEX17E",
+    "source_type": "blog",
+    "url": "https://www.linkedin.com/posts/wasim-alam-212480117_aim-jailbreak-activity-7059754810761256960-YP1m",
+    "title": "AIM (Always Intelligent and Machiavellian) jailbreak",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate stated; the post only shares the AIM prompt and anecdotally notes \"Recently it may not work for some prompt. Looks like OpenAI has optimised their code to handle some cases.\"",
+    "target_models": [
+      "ChatGPT"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHAE9QKCVGY9DNSJ0MK03FZ",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2510.05699",
+    "title": "Membership Inference Attacks on LLM Tokenizers",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source markdown; the abstract describes vulnerabilities and five attack methods but provides no specific percentage or fraction for attack success.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMA88Q51XVQAB7B4Z70EM4",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24941",
+    "title": "Memory-Induced Tool-Drift Attack",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source reports deflection scores (a judge-scored measure of parameter deviation on a 1\u20135 scale) raised by up to +3.6 points, not an explicit success/attack-success rate as a fraction or percentage. No numeric success rate is stated for this technique.",
+    "target_models": [
+      "seven frontier models (including those with extended reasoning)"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHFT4BG2591BVX1EB8F2W5H",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2026/Mar/6/",
+    "title": "Clinejection: GitHub Issue Title Prompt Injection to Cache Poisoning and NPM Secret Exfil",
+    "old_claimed_rate": 1.0,
+    "new_claimed_rate": null,
+    "stated_as": "The source is a blog post summarizing the Clinejection attack chain. It describes the technique in detail but states no explicit numeric success rate, attack success rate, or jailbreak rate for this prompt injection technique.",
+    "target_models": [
+      "Claude Code"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCDV6Z9VFDG7A44B78TF8M",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24069",
+    "title": "Tool Description Poisoning (TDP) via MCP metadata injection",
+    "old_claimed_rate": 0.99,
+    "new_claimed_rate": 1.0,
+    "stated_as": "\"leading models like GPT-4o exhibiting a nearly 100% Attack Success Rate (ASR) in six high-risk scenarios\"",
+    "target_models": [
+      "GPT-4o"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCSDTQ0HSM2PTQV64DP514",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.24497",
+    "title": "Adaptive Evolutionary Chain-of-Thought Jailbreak (AE-CoT)",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated in the source; the abstract only notes that AE-CoT \"consistently outperforming state-of-the-art jailbreak methods\" without providing a specific percentage or fraction.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSHMB2H1H8GY2GY84KNAPRJ0",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2512.23995",
+    "title": "RepetitionCurse: Adversarial Prompts Causing Router Imbalance DoS in MoE LLMs",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit attack-success rate (e.g., jailbreak/bypass %) is stated for RepetitionCurse. The source reports a latency degradation metric: \"increases end-to-end inference latency by 3.063x\" on Mixtral-8x7B, which is a performance/DoS impact metric, not a success rate fraction.",
+    "target_models": [
+      "Mixtral-8x7B"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCW50BM16WFWMBZ8CBDJ8C",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/html/2605.28116v1",
+    "title": "MIRAGE: Context-aware prompt injection via user-generated content in mobile GUI agents",
+    "old_claimed_rate": 0.72,
+    "new_claimed_rate": 0.302,
+    "stated_as": "\"MIRAGE achieves consistent attack success across models, with ASR ranging from 23.0% to 30.2%, and reaching its peak performance (30.2%) on GPT-4o-mini\"",
+    "target_models": [
+      "gpt-4o-mini",
+      "Qwen3-VL-8B-Instruct",
+      "GLM-4.5V",
+      "Qwen3-VL-30B-A3B-Instruct",
+      "Qwen3-VL-32B-Instruct"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQPHVTAWG5CRY3FSSQ5ZST",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2025/aws-kiro-aribtrary-command-execution-with-indirect-prompt-injection/",
+    "title": "AWS Kiro arbitrary code execution via configuration file injection",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate or attack-success rate is stated anywhere in the source; the post is a qualitative vulnerability disclosure and proof-of-concept demonstration without measuring a percentage success rate.",
+    "target_models": [
+      "AWS Kiro"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQBB5RZA306E73HSN9FA2K",
+    "source_type": "blog",
+    "url": "https://simonwillison.net/2022/Sep/12/prompt-injection/",
+    "title": "Prompt injection via instruction override",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success rate is stated in the source; the blog post demonstrates the attack with qualitative examples (e.g., \"Haha pwned!!\") but provides no measured attack-success percentage.",
+    "target_models": [
+      "GPT-3"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGQXNT8RQGSBYES2PZW928X",
+    "source_type": "blog",
+    "url": "https://www.lakera.ai/risk/indirect-prompt-injection",
+    "title": "Indirect Prompt Injection via Fetched Website Content",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "No explicit numeric success/attack-success rate is stated for this technique anywhere in the source. The page describes how indirect prompt injection via fetched website content works and how Lakera detects it, but provides no measured attack success rate.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KT7BF68JCHEACGZ2J44WBRQS",
+    "source_type": "blog",
+    "url": "https://embracethered.com/blog/posts/2023/openai-data-exfiltration-first-mitigations-implemented/",
+    "title": "Image markdown injection for data exfiltration via URL validation bypass",
+    "old_claimed_rate": 0.25,
+    "new_claimed_rate": 0.25,
+    "stated_as": "\"out of 36 characters (a-z 0-9) I got nine of them rendered via unique URLs\"",
+    "target_models": [
+      "ChatGPT"
+    ],
+    "confidence": "medium",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSWCYGPQAQAX19ZC0CKZ4KJ3",
+    "source_type": "arxiv",
+    "url": "https://doi.org/10.48550/arXiv.2605.29354",
+    "title": "Neutral Prompting Attack (NPA) for package hallucination steering",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The abstract states NPA \"increases both Hallucination ASR and Pip Install ASR\" but provides no explicit numeric success rate; the source markdown contains only the abstract-level landing page with no specific percentage figures reported.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSGSA0JWRCT6HTGRJ34QQ9AS",
+    "source_type": "huggingface",
+    "url": "https://huggingface.co/OBLITERATUS/Qwen3.6-27B-OBLITERATED/raw/main/README.md",
+    "title": "Weight-space refusal ablation via source-tethered ASPA",
+    "old_claimed_rate": 0.9365,
+    "new_claimed_rate": 0.9365,
+    "stated_as": "\"Full HarmBench proxy: 93.65% non-refusal across 1,920 rows\" / \"Overall | 1,920 | 122 | 93.65% | full run completed\"",
+    "target_models": [
+      "Qwen3.6-27B-OBLITERATED"
+    ],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKCG4ZK9Q6VW3ZW04PAK1J9",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.14605",
+    "title": "Adaptive attack against malicious fine-tuning defenses",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page only) describes the unified adaptive attack as breaking \"defenses across all defense mechanisms\" and states \"current approaches do not provide robust security,\" but no explicit numeric success/attack-success rate is provided in the available markdown.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  },
+  {
+    "primitive_id": "01KSKGZCDD7KRWQ4RWAE3Q4V9C",
+    "source_type": "arxiv",
+    "url": "https://arxiv.org/abs/2605.25871",
+    "title": "Prompt injection via hidden instructions in external artifacts to hijack agentic coding assistants",
+    "old_claimed_rate": null,
+    "new_claimed_rate": null,
+    "stated_as": "The source (arXiv abstract page for 2605.25871) describes the technique and states the paper \"measure[s] their prevalence,\" but no explicit numeric success/attack-success rate is provided in the available markdown.",
+    "target_models": [],
+    "confidence": "high",
+    "ok": true
+  }
+]

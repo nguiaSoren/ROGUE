@@ -269,3 +269,17 @@ dest = ROOT / "data" / "research"
 dest.mkdir(parents=True, exist_ok=True)
 (dest / "reproducibility_gap_results.json").write_text(json.dumps(out, indent=2))
 print(f"\nwrote {dest / 'reproducibility_gap_results.json'}")
+
+# per-primitive table: released so the C2 null and C1 funnel recompute without the DB
+import csv
+with (dest / "reproducibility_gap_pairs.csv").open("w", newline="") as _fh:
+    _w = csv.writer(_fh)
+    _w.writerow(["primitive_id", "source_type", "family", "claimed_rate",
+                 "measured_any", "measured_pooled", "measured_llama", "measured_robust"])
+    for _pid in prims:
+        _r = prim_cfg[_pid]
+        _w.writerow([_pid, stratum(_pid), prim_family.get(_pid, ""),
+                     prim_claimed.get(_pid, ""),
+                     f"{prim_max_rate[_pid]:.4f}", f"{prim_pooled_rate[_pid]:.4f}",
+                     f"{_r.get(LLAMA, 0.0):.4f}", f"{_r.get(ROBUST, 0.0):.4f}"])
+print(f"wrote {dest / 'reproducibility_gap_pairs.csv'} ({len(prims)} primitives)")

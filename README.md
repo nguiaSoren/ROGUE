@@ -233,11 +233,11 @@ frontend/      # Next.js dashboard
 
 ## Built by
 
-Soren Obounou Nguia — AI Systems Engineer; previously Grand-Prize winner at Yonsei University for LLM security tooling (GPTFuzz optimization), adversarial-ML research at AIM Intelligence (HWARANG red-team series).
+Benaja Soren Obounou Lekogo Nguia — AI Systems Engineer; previously Grand-Prize winner at Yonsei University for LLM security tooling (GPTFuzz optimization), adversarial-ML research at AIM Intelligence (HWARANG red-team series).
 
 > "I built ROGUE solo in 6 days because Bright Data abstracted away 5 different anti-bot stacks I'd otherwise have spent weeks on. The MCP Server plus pre-built Reddit / X scrapers turned a 6-week project into a 6-day project."
 >
-> — Soren Obounou Nguia
+> — Benaja Soren Obounou Lekogo Nguia
 
 ## License
 
