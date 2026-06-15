@@ -62,6 +62,17 @@ alembic upgrade head && python scripts/ops/seed_demo_data.py
 uvicorn rogue.api.main:app --reload
 ```
 
+### Run the dashboard locally
+Self-host the whole thing — Postgres + API + the Next.js dashboard — with one command. It migrates and seeds demo data on startup, so the breach matrix isn't empty:
+
+```bash
+git clone https://github.com/nguiaSoren/ROGUE && cd ROGUE
+cp .env.example .env                              # demo data needs no keys
+docker compose -f docker-compose.full.yml up
+```
+
+Then open **http://localhost:3000** — `/feed`, `/matrix`, `/analytics`, and `/brief` run against your own local instance, no account and no hosted site required.
+
 ### Scan your own model — the SDK
 Install from PyPI — the `rogue` CLI + Python SDK, no clone needed (Python 3.11+):
 

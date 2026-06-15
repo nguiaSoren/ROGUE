@@ -36,7 +36,11 @@ services:
   frontend:
     build: { context: ./frontend, dockerfile: ../docker/frontend.Dockerfile }
     depends_on: [backend]
-    environment: { NEXT_PUBLIC_API_URL: http://localhost:8000 }
+    # SSR pages (/feed, /matrix, /brief) fetch from INSIDE this container, so they must reach the
+    # backend by its compose service name, not localhost (which is the frontend container itself).
+    # `API_BASE` is server-only (runtime) — the browser/client keeps the localhost:8000 default,
+    # which correctly hits the backend's published port on the host.
+    environment: { API_BASE: http://backend:8000 }
     ports: ["3000:3000"]
     command: npm run start
 

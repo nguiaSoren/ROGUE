@@ -27,7 +27,12 @@ function isAbsoluteUrl(b: string | undefined): b is string {
   }
 }
 
-const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE?.trim();
+// Server-side (SSR / server components) prefers a server-only `API_BASE`; this is what lets the
+// docker full-stack point in-container fetches at the backend SERVICE (`http://backend:8000`) — a
+// bare `localhost:8000` would resolve to the frontend container itself, not the backend. The browser
+// + client bundle never see `API_BASE` (non-NEXT_PUBLIC vars are `undefined` client-side), so they
+// fall through to `NEXT_PUBLIC_API_BASE` (the hosted URL) or the local default. Mirrors platform-api.ts.
+const RAW_API_BASE = (process.env.API_BASE ?? process.env.NEXT_PUBLIC_API_BASE)?.trim();
 const API_BASE = isAbsoluteUrl(RAW_API_BASE) ? RAW_API_BASE : "http://localhost:8000";
 
 /**
