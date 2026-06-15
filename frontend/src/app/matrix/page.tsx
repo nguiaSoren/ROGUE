@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, API_CONFIGURED } from "@/lib/api";
 import { MatrixHeatmap } from "@/components/matrix-heatmap";
 import { Term } from "@/components/glossary";
 import { plainifyRate } from "@/lib/plain-numbers";
@@ -24,21 +24,50 @@ import { resolveConfigLens } from "@/lib/config-lens";
  */
 export const revalidate = 300; // ISR, match REVALIDATE_SECONDS in lib/api.ts
 
-export default async function MatrixPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+/**
+ * /matrix default export — ONE try/catch around the render, mirroring /feed + /brief, so a build
+ * with no API base (the self-host docker build, or a Production-scoped NEXT_PUBLIC_API_BASE that's
+ * unset in preview/local) can't fail the build. Production (API_CONFIGURED) rethrows on a real
+ * failure so Next + Vercel keep serving the last-good static page instead of caching a degraded one;
+ * an unconfigured build degrades to a placeholder and the live grid renders at runtime.
+ */
+export default async function MatrixPage({ searchParams }: { searchParams: SearchParams }) {
+  try {
+    return await renderMatrix(searchParams);
+  } catch (err) {
+    if (API_CONFIGURED) throw err;
+    return <MatrixUnavailable />;
+  }
+}
+
+function MatrixUnavailable() {
+  return (
+    <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 text-center space-y-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+          /matrix · breach grid
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Breach Matrix</h1>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          This build has no API connection; the live breach matrix renders once the backend is up.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+async function renderMatrix(searchParams: SearchParams) {
   // The SCOPE × ATTACKER 2×2 needs four quadrant datasets, but only the
   // top-left (this-run × baseline) gates the headline + initial grid. The other
   // three quadrants are ~768 KB each and only feed the All-time / +Augmentations
   // toggles, so this render no longer blocks on them, `MatrixHeatmap`
   // lazy-loads them client-side after mount.
   //
-  // No try/catch on the baseline fetch ON PURPOSE: if it fails (API mid-restart
-  // / cold Neon), we let it throw so Next + Vercel keep serving the last-good
-  // statically-generated page instead of caching an error. A degraded "matrix
-  // unavailable" render would otherwise get cached for the full ISR window.
+  // The baseline fetch is intentionally un-caught HERE so it propagates to the
+  // default export's try/catch: prod rethrows (keep the last-good static page,
+  // never cache an error); an unconfigured build degrades to a placeholder.
   // Stubbornness is non-critical → degrades to null.
   const [matrix, stubbornness] = await Promise.all([
     api.breachMatrix(), // default (most-data) day × baseline, the required fetch
