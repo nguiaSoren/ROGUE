@@ -2,7 +2,7 @@
 name = "rogue"
 version = "1.0.0"
 description = "Open-web LLM threat intelligence agent (Bright Data hackathon submission)"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11"
 authors = [{name = "Soren Obounou Nguia"}]
 license = {text = "MIT"}
 dependencies = [
