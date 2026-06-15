@@ -54,7 +54,7 @@ The [dashboard home](https://rogue-eosin.vercel.app) has one-click **Add to Curs
 `POST /v1/scans` with a target → ROGUE queues it for the same scan engine behind the dashboard and MCP, returning a scored report as **JSON, HTML, or a CISO-ready PDF** on completion. The hosted `/v1` API is **live and key-authorized today** (private beta), but the background worker that drains the scan queue isn't deployed yet, so a queued scan does not complete on the host. For a graded report today, run it locally (below) or point the SDK at your own target — the identical engine, the identical report.
 
 ### Run it locally — the full app (dashboard + API)
-Self-host the whole thing — Postgres + API + the Next.js dashboard — with one command. It migrates and seeds the attack corpus + demo configs on startup; the **breach matrix fills once you run a scan** (below), since breaches are scan results, not seed data. (Want a fully-populated board to look at right now? The always-on [live demo](https://rogue-eosin.vercel.app/matrix) renders the real all-time matrix.)
+Self-host the whole thing — Postgres + API + the Next.js dashboard — with one command. It migrates and seeds a **redacted snapshot of the real all-time breach matrix** on startup, so every surface is fully populated on first boot — no scan, no keys. (The attack payloads + model responses are redacted to `[redacted]`, exactly like the public site; the verdicts/rates are the real ones.)
 
 ```bash
 git clone https://github.com/nguiaSoren/ROGUE && cd ROGUE
