@@ -1,1 +1,10 @@
-<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ROGUE logomark"><rect x="76" y="76" width="120" height="120" rx="22" fill="#00ff88" opacity="0.30"/><rect x="222" y="76" width="120" height="120" rx="22" fill="#00ff88"/><rect x="368" y="76" width="120" height="120" rx="22" fill="#00ff88" opacity="0.30"/><rect x="76" y="222" width="120" height="120" rx="22" fill="#00ff88" opacity="0.30"/><rect x="222" y="222" width="120" height="120" rx="22" fill="#00ff88"/><rect x="375" y="229" width="106" height="106" rx="16" fill="none" stroke="#00ff88" stroke-width="16"/><rect x="76" y="368" width="120" height="120" rx="22" fill="#00ff88"/><rect x="222" y="368" width="120" height="120" rx="22" fill="#00ff88" opacity="0.30"/><rect x="368" y="368" width="120" height="120" rx="22" fill="#00ff88" opacity="0.30"/></svg>
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ROGUE">
+<rect x="76" y="76" width="120" height="120" rx="26" fill="#00ff88" opacity="0.22"/>
+<rect x="368" y="76" width="120" height="120" rx="26" fill="#00ff88" opacity="0.22"/>
+<rect x="76" y="222" width="120" height="120" rx="26" fill="#00ff88" opacity="0.22"/>
+<rect x="222" y="368" width="120" height="120" rx="26" fill="#00ff88" opacity="0.22"/>
+<rect x="368" y="368" width="120" height="120" rx="26" fill="#00ff88" opacity="0.22"/>
+<rect x="222" y="76" width="120" height="120" rx="26" fill="#00ff88"/>
+<rect x="222" y="222" width="120" height="120" rx="26" fill="#00ff88"/>
+<rect x="76" y="368" width="120" height="120" rx="26" fill="#00ff88"/>
+<rect x="372" y="226" width="112" height="112" rx="22" fill="none" stroke="#00ff88" stroke-width="14"/></svg>
