@@ -73,14 +73,16 @@ docker compose -f docker-compose.full.yml up
 
 Then open **http://localhost:3000** — `/feed`, `/matrix`, `/analytics`, and `/brief` run against your own local instance, no account and no hosted site required.
 
-**Fill it with *your* model's data.** With the stack up, scan your endpoint and persist the results into the same DB the dashboard reads:
+**Fill it with *your* model's data.** ROGUE scans a **model endpoint** (any OpenAI-compatible API URL — your gateway or a hosted provider), not local files. With the stack up, install the `rogue` CLI on the host and point it at your endpoint with `--persist` so each result is written into the same DB the dashboard reads:
 
 ```bash
+pip install rogue-live-redteam                            # the CLI, on the host (or: pip install -e . from this clone)
+export ANTHROPIC_API_KEY=sk-ant-...                       # the judge that grades each response (or repoint JUDGE_MODEL)
 rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
-# (DATABASE_URL must point at the stack's Postgres — the local default already does)
+# (writes to $DATABASE_URL; its local default already matches the stack's Postgres, so no config needed)
 ```
 
-Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix scoped to *your* deployment. (The judge LLM still costs API spend per scan; point `JUDGE_MODEL` at a local model to keep it ~$0.)
+Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix scoped to *your* deployment. (The judge LLM costs API spend per scan; point `JUDGE_MODEL` at a local model — Ollama via `OPENAI_BASE_URL` — to keep it ~$0.)
 
 **Want a dashboard that's *only* your data?** Bring the stack up with `SEED_DEMO=0` and the DB starts empty — then every surface (`/feed`, `/matrix`, `/analytics`, `/brief`) shows nothing but your own scans, no demo rows to filter past:
 
