@@ -3,18 +3,17 @@ import { api } from "@/lib/api";
 import { MatrixHeatmap } from "@/components/matrix-heatmap";
 import { Term } from "@/components/glossary";
 import { plainifyRate } from "@/lib/plain-numbers";
+import { resolveConfigLens } from "@/lib/config-lens";
 
 /**
  * /matrix, Breach Matrix heatmap.
  *
- * Statically prerendered + ISR (5-min revalidate), like /brief and /feed, so
- * it's served from Vercel's CDN instead of re-rendering on every request. This
- * page used to read `?date=` from searchParams, which forced per-request
- * dynamic rendering (the `ƒ` route), the reason /matrix lagged behind the
- * other pages. The `?date=` run-day override is now handled client-side inside
- * `MatrixHeatmap` (it's a debug/power-user param, never set by internal nav),
- * which keeps this server render fully static. See ROGUE_PLAN.md STATUS note
- * "Post-deadline frontend perf, 2026-06-01".
+ * Statically prerendered + ISR (5-min revalidate) for the default (no-param)
+ * global view; per-request dynamic render when `?config=<id>` is present (the
+ * deployment-lens mode used by self-hosters with a single config). The `?date=`
+ * run-day override is handled client-side inside `MatrixHeatmap` (debug/power-user
+ * param, never set by internal nav) to keep the global server render fully static.
+ * See ROGUE_PLAN.md STATUS "Post-deadline frontend perf, 2026-06-01".
  *
  * Renders the headline stats + grid shell from the DEFAULT (most-data) day,
  * then hands the grid off to the client `MatrixHeatmap` for cell-click → drawer
@@ -25,7 +24,11 @@ import { plainifyRate } from "@/lib/plain-numbers";
  */
 export const revalidate = 300; // ISR, match REVALIDATE_SECONDS in lib/api.ts
 
-export default async function MatrixPage() {
+export default async function MatrixPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   // The SCOPE × ATTACKER 2×2 needs four quadrant datasets, but only the
   // top-left (this-run × baseline) gates the headline + initial grid. The other
   // three quadrants are ~768 KB each and only feed the All-time / +Augmentations
@@ -42,15 +45,30 @@ export default async function MatrixPage() {
     api.stubbornnessStats().catch(() => null),
   ]);
 
+  // `?config=<id>` deployment lens: validate against the known configs list so
+  // an unknown/stale ID falls back to the global view without erroring.
+  // When present, all headline stats are scoped to that one config's cells.
+  const { config: configParam } = await searchParams;
+  const configLens = resolveConfigLens(configParam, matrix.configs);
+  const configLensName = configLens
+    ? (matrix.configs.find((c) => c.config_id === configLens)?.config_name ?? configLens)
+    : null;
+
+  // Cells used for headline stats: filtered to the lens config when active,
+  // otherwise the full cell set (global view, backwards-compatible).
+  const headlineCells = configLens
+    ? matrix.cells.filter((c) => c.deployment_config_id === configLens)
+    : matrix.cells;
+
   // Headline-driving stats.
-  const allRates = matrix.cells.map((c) => c.any_breach_rate);
+  const allRates = headlineCells.map((c) => c.any_breach_rate);
   const maxRate = allRates.length ? Math.max(...allRates) : 0;
-  const criticalCellCount = matrix.cells.filter((c) => c.any_breach_rate >= 0.7).length;
+  const criticalCellCount = headlineCells.filter((c) => c.any_breach_rate >= 0.7).length;
 
   // Worst attacker today: highest single-cell any-breach rate, tie-broken by
   // full-breach (matches the grid cell's worst-offending pick, so the headline
   // and the cell drawer agree on which primitive is "worst").
-  const worstCell = matrix.cells.reduce<typeof matrix.cells[number] | null>(
+  const worstCell = headlineCells.reduce<typeof matrix.cells[number] | null>(
     (acc, c) => {
       if (acc === null) return c;
       if (c.any_breach_rate > acc.any_breach_rate) return c;
@@ -69,8 +87,9 @@ export default async function MatrixPage() {
   // ties, pin Pliny as the headline when it's present in the current view
   // (the label stays honest since it genuinely ties for worst). Falls back to
   // the computed worst cell on any day Pliny isn't in the matrix.
+  // In config-lens mode, Pliny is only featured if it appears in that config's cells.
   const FEATURED_PRIMITIVE_ID = "01KSWGSAY2ZJ7E7WEPB1QX7N55";
-  const featuredCell = matrix.cells
+  const featuredCell = headlineCells
     .filter((c) => c.primitive_id === FEATURED_PRIMITIVE_ID)
     .reduce<typeof matrix.cells[number] | null>((acc, c) => {
       if (acc === null) return c;
@@ -85,23 +104,42 @@ export default async function MatrixPage() {
   const headlineCell = featuredCell ?? worstCell;
 
   // Most-vulnerable config: column with the highest worst-rate across families.
-  const configWorstScore: Record<string, number> = {};
-  for (const c of matrix.cells) {
-    const prev = configWorstScore[c.deployment_config_id] ?? 0;
-    if (c.any_breach_rate > prev)
-      configWorstScore[c.deployment_config_id] = c.any_breach_rate;
-  }
-  const mostVulnConfig = Object.entries(configWorstScore).sort(
-    ([, a], [, b]) => b - a,
-  )[0];
-  const mostVulnConfigName = mostVulnConfig
-    ? matrix.configs.find((c) => c.config_id === mostVulnConfig[0])?.config_name ??
-      mostVulnConfig[0]
-    : null;
+  // In config-lens mode this always resolves to the single viewed config, so we
+  // skip the stat (the banner already tells the user which config they're viewing).
+  const mostVulnConfigName: string | null = (() => {
+    if (configLens) return null;
+    const scores: Record<string, number> = {};
+    for (const c of matrix.cells) {
+      const prev = scores[c.deployment_config_id] ?? 0;
+      if (c.any_breach_rate > prev) scores[c.deployment_config_id] = c.any_breach_rate;
+    }
+    const top = Object.entries(scores).sort(([, a], [, b]) => b - a)[0];
+    return top
+      ? (matrix.configs.find((c) => c.config_id === top[0])?.config_name ?? top[0])
+      : null;
+  })();
 
   return (
     <main className="flex-1 bg-rogue-grid bg-rogue-spotlight">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+        {/* Config-lens banner — visible only when ?config= is active */}
+        {configLens && configLensName && (
+          <div className="flex items-center justify-between gap-4 px-4 py-2.5 rounded-md border border-rogue-green/30 bg-rogue-green/5 animate-rogue-fade-up">
+            <p className="text-xs font-mono text-rogue-green flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                viewing config:
+              </span>
+              <span className="font-semibold">{configLensName}</span>
+            </p>
+            <Link
+              href="/matrix"
+              className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors border border-border/60 hover:border-border rounded px-2.5 py-1"
+            >
+              clear · all configs
+            </Link>
+          </div>
+        )}
+
         {/* Header */}
         <header className="flex items-start justify-between gap-6 flex-wrap animate-rogue-fade-up">
           <div className="space-y-2">
@@ -114,9 +152,15 @@ export default async function MatrixPage() {
               <Term name="family">family</Term> ×{" "}
               <Term name="deployment config">deployment config</Term>.{" "}
               <span className="text-foreground">{matrix.n_primitives} attacks</span> tested
-              against <span className="text-foreground">{matrix.configs.length} configs</span>{" "}
-              ({matrix.n_cells} cells total). Click any red cell to see the prompt that
-              breached it.
+              against{" "}
+              {configLens ? (
+                <span className="text-foreground">1 config</span>
+              ) : (
+                <span className="text-foreground">{matrix.configs.length} configs</span>
+              )}{" "}
+              ({configLens ? headlineCells.length : matrix.n_cells} cells
+              {configLens ? " for this config" : " total"}). Click any red cell to see the
+              prompt that breached it.
             </p>
           </div>
 
@@ -173,22 +217,28 @@ export default async function MatrixPage() {
                   (n={headlineCell.n_trials})
                 </p>
               </div>
-              <div className="shrink-0 text-left sm:text-right">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                  most-vulnerable config
-                </p>
-                <p className="text-sm font-mono mt-0.5">
-                  {mostVulnConfigName ?? ", "}
-                </p>
-              </div>
+              {mostVulnConfigName && (
+                <div className="shrink-0 text-left sm:text-right">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                    most-vulnerable config
+                  </p>
+                  <p className="text-sm font-mono mt-0.5">{mostVulnConfigName}</p>
+                </div>
+              )}
             </div>
           </Link>
         )}
 
         {/* Interactive heatmap (client component). The three augmentation /
             all-time quadrants are fetched client-side inside the component so
-            they don't block this server render. */}
-        <MatrixHeatmap matrix={matrix} stubbornness={stubbornness} />
+            they don't block this server render. `initialConfigFilter` pre-seeds
+            the column filter when `?config=` is active; the user can still clear
+            it or switch columns via the existing filter-chip controls. */}
+        <MatrixHeatmap
+          matrix={matrix}
+          stubbornness={stubbornness}
+          initialConfigFilter={configLens}
+        />
 
         <Legend />
 

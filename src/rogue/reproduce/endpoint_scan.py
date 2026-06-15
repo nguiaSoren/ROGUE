@@ -10,6 +10,14 @@ engine cannot tell a customer gateway from OpenAI.
 
 COSTLY: a real run spends money on both the endpoint calls AND the judge LLM calls. Run it
 deliberately (``scripts/reproduce/scan_endpoint.py``), never on a loop/timer.
+
+Opt-in persistence (``persist=True``):
+    When ``persist=True`` and a ``database_url`` is supplied, every judged (non-errored) trial is
+    written to the ``breach_results`` table via ``persistence.persist_breach_rows`` and the
+    deployment config is upserted via ``persistence.upsert_deployment_config``. This makes
+    ``/matrix``, ``/feed``, and ``/brief`` populate with the scan customer's own data rather than
+    the demo data. Errored trials (endpoint error or judge exception) are intentionally skipped —
+    the matrix cell aggregates over judged trials only, so a partial row would distort the rate.
 """
 
 from __future__ import annotations
@@ -91,12 +99,21 @@ def make_endpoint_config(
     *,
     system_prompt: str = "",
     forbidden_topics: list[str] | None = None,
+    config_id: str = "adhoc-endpoint-scan",
+    name: str | None = None,
 ) -> DeploymentConfig:
-    """Build an ephemeral DeploymentConfig that targets a custom OpenAI-compatible endpoint."""
+    """Build a DeploymentConfig that targets a custom OpenAI-compatible endpoint.
+
+    ``config_id`` defaults to ``"adhoc-endpoint-scan"`` for throwaway/stateless runs.  The
+    persist path passes a stable slug (derived from ``--config-name``) so the upserted row
+    becomes a durable dashboard column rather than a transient adhoc identity.
+
+    ``name`` defaults to ``"endpoint:<model>"`` when not supplied.
+    """
     return DeploymentConfig(
-        config_id="adhoc-endpoint-scan",
+        config_id=config_id,
         customer_id="adhoc",
-        name=f"endpoint:{model}",
+        name=name if name is not None else f"endpoint:{model}",
         target_model=model,
         system_prompt=system_prompt,
         declared_tools=[],
@@ -117,6 +134,11 @@ async def scan_endpoint(
     breach_threshold: float = DEFAULT_BREACH_THRESHOLD,
     panel: TargetPanel | None = None,
     judge: JudgeAgent | None = None,
+    # --- opt-in persistence (purely additive; default=False preserves today's stateless behavior) ---
+    persist: bool = False,
+    database_url: str | None = None,
+    config_id: str = "adhoc-endpoint-scan",
+    config_name: str | None = None,
 ) -> EndpointScanReport:
     """Reproduce ``primitives`` against an OpenAI-compatible endpoint and grade the responses.
 
@@ -126,8 +148,23 @@ async def scan_endpoint(
 
     ``panel`` / ``judge`` are injectable for testing (pass fakes to avoid network + spend). When the
     panel is constructed here, it is closed before returning.
+
+    When ``persist=True`` (and ``database_url`` is supplied), every judged (non-errored) trial is
+    written to ``breach_results`` via ``persistence.persist_breach_rows``, and the deployment config
+    is upserted via ``persistence.upsert_deployment_config`` so ``/matrix``, ``/feed``, and ``/brief``
+    populate with the scan customer's own data.  Errored trials (endpoint error or judge exception)
+    produce no row — the matrix cell aggregates over judged trials only, so partial rows would
+    distort the breach rate.
+
+    The returned ``EndpointScanReport`` is identical whether or not ``persist`` is set — persistence
+    is a pure side-effect.
     """
-    config = make_endpoint_config(base_url, model, system_prompt=system_prompt)
+    config = make_endpoint_config(
+        base_url, model,
+        system_prompt=system_prompt,
+        config_id=config_id,
+        name=config_name,
+    )
     owns_panel = panel is None
     if panel is None:
         panel = TargetPanel(adapter_extra={"api_key": api_key} if api_key else {})
@@ -135,6 +172,7 @@ async def scan_endpoint(
         judge = JudgeAgent()
 
     findings: list[EndpointFinding] = []
+    orm_rows: list = []  # BreachResultORM rows collected when persist=True
     try:
         for primitive in primitives:
             rendered = render(primitive, config)
@@ -145,6 +183,7 @@ async def scan_endpoint(
             n_error = 0
             for r in responses:
                 if r.error is not None:
+                    # errored trial — no judgment, no row (error skipped intentionally)
                     n_error += 1
                     continue
                 try:
@@ -152,9 +191,22 @@ async def scan_endpoint(
                 except Exception as e:  # a judge glitch must not abort the whole scan
                     _log.warning("judge failed on %s: %s", primitive.primitive_id, e)
                     n_error += 1
+                    # judge failure counts as errored — no row persisted for this trial
                     continue
                 if result.verdict in BREACH_VERDICTS:
                     n_breach += 1
+                if persist:
+                    from rogue.reproduce.persistence import build_breach_result_orm
+
+                    orm_rows.append(
+                        build_breach_result_orm(
+                            primitive_id=primitive.primitive_id,
+                            config_id=config.config_id,
+                            rendered=rendered,
+                            response=r,
+                            judge_result=result,
+                        )
+                    )
             n = len(responses)
             rate = n_breach / n if n else 0.0
             findings.append(
@@ -174,6 +226,19 @@ async def scan_endpoint(
     finally:
         if owns_panel:
             await panel.aclose()
+
+    if persist and orm_rows:
+        if not database_url:
+            _log.error("persist=True but database_url is None — skipping DB write")
+        else:
+            from rogue.reproduce.persistence import persist_breach_rows, upsert_deployment_config
+
+            upsert_deployment_config(config, database_url)
+            persisted, failed = persist_breach_rows(database_url, orm_rows)
+            _log.info(
+                "endpoint scan persisted: %d rows written, %d failed (config_id=%r)",
+                persisted, failed, config.config_id,
+            )
 
     findings.sort(key=lambda f: f.any_breach_rate, reverse=True)
     n_breached = sum(1 for f in findings if f.breached)

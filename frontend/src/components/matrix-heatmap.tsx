@@ -21,6 +21,7 @@ import { ProviderLogo } from "@/components/ui/provider-logo";
 export function MatrixHeatmap({
   matrix,
   stubbornness,
+  initialConfigFilter,
 }: {
   // `matrix` (this-run × baseline) is the only quadrant rendered server-side.
   // The other three quadrants of the SCOPE × ATTACKER 2×2 are ~768 KB each, so
@@ -29,6 +30,9 @@ export function MatrixHeatmap({
   // the baseline; any quadrant that fails to load degrades back to baseline.
   matrix: BreachMatrixResponse;
   stubbornness: StubbornnessStatsResponse | null;
+  /** Pre-seed the column filter to a specific config_id (from `?config=`).
+   *  Null/undefined = global view (no filter). */
+  initialConfigFilter?: string | null;
 }) {
   const [thisRunAugmented, setThisRunAugmented] =
     useState<BreachMatrixResponse | null>(null);
@@ -98,7 +102,10 @@ export function MatrixHeatmap({
   const [severityFilter, setSeverityFilter] = useState<
     "all" | "critical" | "high" | "any-breach"
   >("all");
-  const [configFilter, setConfigFilter] = useState<string | null>(null);
+  // Pre-seeded from `?config=` (server resolves + validates), falls back to
+  // null (global view) when absent or unrecognised. The user can still clear
+  // or change it via the existing column-header click / filter-chip controls.
+  const [configFilter, setConfigFilter] = useState<string | null>(initialConfigFilter ?? null);
   // Two fully-independent axes (the 2×2):
   //   SCOPE, this run (one day) vs all-time (every run day merged)
   //   ATTACKER, baseline (raw single-shot) vs + augmentations (persona + PAIR)

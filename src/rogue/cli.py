@@ -27,6 +27,15 @@ Config file (``--config PATH``, else ``./rogue.yaml`` or ``./rogue.toml`` if pre
 Explicit CLI flags override config-file values. Supported formats: YAML (``.yaml``) and TOML
 (``.toml``); YAML is parsed with PyYAML when available, else a tiny built-in reader handles the
 simple two-level ``section:\n  key: value`` shape documented above.
+
+Persist to the dashboard DB (opt-in)::
+
+    rogue scan --endpoint https://gw/v1 --model my-model --persist --config-name "my-bot"
+
+With ``--persist`` every judged trial is written to the dashboard DB (``$DATABASE_URL`` or the local
+dev Postgres), so ``/matrix``, ``/feed``, and ``/brief`` populate with YOUR data.
+``--config-name`` is required when ``--persist`` is set; the subcommand then routes through
+``scan_endpoint`` directly rather than the SDK ``Client.scan`` path.
 """
 
 from __future__ import annotations
@@ -177,6 +186,64 @@ def _cmd_validate(args: argparse.Namespace, out: Any) -> int:
 
 
 def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
+    persist = getattr(args, "persist", False)
+    config_name = getattr(args, "config_name", None)
+
+    if persist:
+        # Persist path: route directly through scan_endpoint so every judged trial lands in
+        # breach_results and /matrix /feed /brief populate with the user's own data.
+        # Client.scan goes through the SDK's run_scan, which has no persistence hook, so we
+        # bypass it here and call scan_endpoint directly with the pack primitives.
+        import asyncio
+        import os
+        import re
+
+        from rogue.packs import filter_attacks, load_pack
+        from rogue.reproduce.endpoint_scan import scan_endpoint
+
+        if not config_name:
+            print("error: --config-name NAME is required when --persist is set", file=sys.stderr)
+            return 1
+
+        cfg = _load_config(getattr(args, "config", None))
+        target = cfg.get("target", {}) if isinstance(cfg.get("target"), dict) else {}
+        endpoint = args.endpoint if args.endpoint is not None else target.get("endpoint")
+        api_key = args.api_key if args.api_key is not None else target.get("api_key")
+        model = args.model if args.model is not None else target.get("model") or "default"
+
+        if not endpoint:
+            print("error: --endpoint is required for --persist scans", file=sys.stderr)
+            return 1
+
+        args._scan_cfg = cfg.get("scan", {}) if isinstance(cfg.get("scan"), dict) else {}
+        pack = _scan_default(args, "pack", "default")
+        max_tests = _scan_default(args, "max_tests", 100)
+        n_trials = _scan_default(args, "n_trials", 1)
+        attacks = [a.strip() for a in args.attacks.split(",") if a.strip()] if args.attacks else None
+        primitives = filter_attacks(load_pack(pack), attacks)[:max_tests]
+
+        database_url = os.environ.get("DATABASE_URL", "postgresql+psycopg://rogue:rogue_dev_password@localhost:5432/rogue")
+        slug = re.sub(r"[^a-z0-9]+", "-", config_name.lower()).strip("-")[:80] or "endpoint-scan"
+
+        report = asyncio.run(
+            scan_endpoint(
+                endpoint,
+                model,
+                primitives,
+                api_key=api_key,
+                n_trials=n_trials,
+                persist=True,
+                database_url=database_url,
+                config_id=slug,
+                config_name=config_name,
+            )
+        )
+        if args.output:
+            Path(args.output).write_text(report.to_markdown(), encoding="utf-8")
+        _emit(report, as_json=args.json, out=out)
+        return 0
+
+    # Non-persist path: delegate to Client.scan (stateless, no DB write).
     client = _build_client(args)
     attacks = [a.strip() for a in args.attacks.split(",") if a.strip()] if args.attacks else None
     report = client.scan(
@@ -260,6 +327,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--pack", default=None, help="bundled attack pack (default: default)")
     p_scan.add_argument("--n-trials", dest="n_trials", type=int, default=None, help="trials per attack")
     p_scan.add_argument("--output", default=None, metavar="PATH", help="write report to .html or .json")
+    p_scan.add_argument(
+        "--persist",
+        action="store_true",
+        default=False,
+        help="write judged trial rows to the dashboard DB so /matrix /feed /brief show YOUR data",
+    )
+    p_scan.add_argument(
+        "--config-name",
+        dest="config_name",
+        default=None,
+        metavar="NAME",
+        help="human-readable deployment label (required with --persist); slugified to a stable config_id",
+    )
     p_scan.set_defaults(func=_cmd_scan)
 
     p_bench = sub.add_parser("benchmark", help="attack-success-rate against a standard dataset")
