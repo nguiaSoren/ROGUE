@@ -434,6 +434,18 @@ def build() -> Path:
         "instruction, instruction-following is not containment. And of four candidate skills with enough "
         "held-out tasks to measure, only " + b("one earned promotion") + " under a verified-net-effect gate; "
         "the rest were neutral or worse. Accumulated skills are not free upgrades.", S["body"])]
+    F += [Paragraph(
+        "The same canary pack across four targets shows the surprise: leakage does not fall with size or "
+        "capability, it falls with " + b("alignment") + ". A 32B reasoning model leaks every canary (100%), a "
+        "70B instruct model 65%, and the smallest, safety-tuned 20B model resists best (35%), so the size "
+        "ordering and the leak ordering have nothing to do with each other, a skill-pool leakage audit cannot "
+        "be waved off by pointing at how big or capable the model is.", S["body"])]
+    F += [Spacer(1, 4), _chips([
+        ("100%", "qwen3-32b · reasoning"),
+        ("85%", "llama-3.1-8b · instruct"),
+        ("65%", "llama-3.3-70b · instruct"),
+        ("35%", "gpt-oss-20b · safety-tuned"),
+    ]), Spacer(1, 6)]
     F += [Spacer(1, 4), _chips([
         ("17 / 20", "canary leak · weak target"),
         ("0 / 12", "control false positives"),

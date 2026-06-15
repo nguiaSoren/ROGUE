@@ -700,6 +700,24 @@ export default function ResearchPage() {
               worse. Accumulated skills are not free upgrades.
             </p>
 
+            <p className="text-base text-muted-foreground leading-relaxed">
+              The same canary pack across four targets shows the surprise:
+              leakage doesn&rsquo;t fall with size or capability, it falls with{" "}
+              <span className="text-foreground font-medium">alignment</span>. A 32B
+              reasoning model leaks every canary (100%), a 70B instruct model 65%,
+              and the smallest, safety-tuned 20B model resists best (35%), so the
+              size ordering and the leak ordering have nothing to do with each
+              other. A skill-pool leakage audit can&rsquo;t be waved off by
+              pointing at how big or capable the model is.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <Metric value="100%" label="qwen3-32b · reasoning" accent="red" />
+              <Metric value="85%" label="llama-3.1-8b · instruct" accent="red" />
+              <Metric value="65%" label="llama-3.3-70b · instruct" accent="red" />
+              <Metric value="35%" label="gpt-oss-20b · safety-tuned" accent="green" />
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               <Metric value="17 / 20" label="canary leak · weak target" accent="red" />
               <Metric value="0 / 12" label="control false positives" accent="green" />
