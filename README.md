@@ -27,6 +27,18 @@ ROGUE measures **every place a high-stakes AI agent can go wrong** — whether t
 
 https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 
+## Why ROGUE
+
+Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
+
+- **Harvests live, every day** — new jailbreaks and prompt-injections pulled from 15+ open-web sources (via all 5 Bright Data products), so your report is never older than yesterday.
+- **Reproduces against *your* exact config** — your model × system-prompt × tools, not a generic safety benchmark.
+- **Is queryable over MCP, both ways** — it *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
+- **Measures three surfaces, signed** — the model, the human approval gate, and the shared skill-pool — each scored against an independent answer key and emitted as a tamper-evident attestation.
+- **Runs on the LLM you choose** — the judge and extraction models are configurable (`JUDGE_MODEL`), any provider or a local model (Ollama via `OPENAI_BASE_URL`); not locked to one vendor.
+
+Each ingredient exists somewhere; **no competitor does the whole combination** — that's what makes ROGUE a continuous, queryable, multi-surface red-team rather than a one-off scan.
+
 ## Use it in 30 seconds
 
 ### Query ROGUE from your IDE — hosted MCP, zero setup
@@ -51,14 +63,13 @@ uvicorn rogue.api.main:app --reload
 ```
 
 ### Scan your own model — the SDK
-After cloning, run a **full scan offline with no API key** (a mocked target + judge, end to end → an HTML report):
+Install from PyPI — the `rogue` CLI + Python SDK, no clone needed (Python 3.11+):
 
 ```bash
-pip install -e .                                       # the `rogue` SDK + CLI
-PYTHONPATH=src python3 examples/sdk_quickstart.py       # runs a scan, writes a report — no key
+pip install rogue-live-redteam
 ```
 
-Against a real target it's three lines (plus a judge key — ROGUE grades every response; see [`docs/SDK.md`](docs/SDK.md)):
+Scan any OpenAI-compatible target in three lines (plus a judge key — ROGUE grades every response; see [`docs/SDK.md`](docs/SDK.md)):
 
 ```python
 from rogue import Client
@@ -67,7 +78,9 @@ report = client.scan(pack="aggressive", budget=10.0)
 print(report.summary()); report.to_html("scan.html")
 ```
 
-*(`pip install rogue` is not live yet — the package isn't on PyPI; install editable from this repo as above.)*
+…or from the CLI: `rogue scan --provider openai --pack aggressive`.
+
+No API key handy? Clone the repo and run the offline demo (mocked target + judge → an HTML report): `PYTHONPATH=src python3 examples/sdk_quickstart.py`.
 
 ## Integrations
 
@@ -77,7 +90,7 @@ ROGUE meets your team where it already works:
 |---|---|---|
 | **Your IDE** — MCP | ✅ **Available now** · keyless | One config block in Claude Desktop / Cursor / Windsurf / VS Code; the editor's agent queries the live threat DB on the spot. Add an account to launch full scans without leaving your work. `https://rogue-private.onrender.com/mcp` |
 | **Your chat & tracker** — Slack + Jira | ✅ Slack alerts now · ⏳ auto-fan-out rolling out | Point a Slack incoming webhook (`SLACK_WEBHOOK_URL`) at ROGUE and the daily threat brief + new CRITICAL/HIGH breaches post to your workspace automatically — **works today**. Or connect Slack + Jira as per-org integrations (Fernet-encrypted creds) and file findings via the MCP action tools (`send_slack_alert` / `create_jira_ticket`); automatic fan-out on every scan completion is rolling out with the hosted worker. [Setup](docs/platform/integrations/slack-github-jira.md) |
-| **API & SDK** — REST `/v1` + Python | ✅ live · ⏳ hosted scans rolling out | The `/v1` REST API + OpenAPI spec are live and key-authorized at `https://rogue-private.onrender.com/v1`. The **Python SDK runs real scans today** against your own target (`from rogue import Client`; `pip install -e .` — see [`docs/SDK.md`](docs/SDK.md)). *Hosted* scan execution (a `POST /v1/scans` that completes server-side) is rolling out. |
+| **API & SDK** — REST `/v1` + Python | ✅ live · ⏳ hosted scans rolling out | The `/v1` REST API + OpenAPI spec are live and key-authorized at `https://rogue-private.onrender.com/v1`. The **Python SDK runs real scans today** against your own target (`pip install rogue-live-redteam`; `from rogue import Client` — see [`docs/SDK.md`](docs/SDK.md)). *Hosted* scan execution (a `POST /v1/scans` that completes server-side) is rolling out. |
 | **Security tooling** — SOAR / SIEM | 🔜 **Coming soon** | Splunk / Palo Alto Cortex connectors to pipe findings into your existing security stack. On the roadmap, not available today. |
 
 ## What ROGUE does
