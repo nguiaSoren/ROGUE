@@ -29,7 +29,7 @@ docker compose -f docker-compose.full.yml up      # then open http://localhost:3
 To fill it with **your** model's data, scan your endpoint with `--persist` and open the per-config view:
 
 ```bash
-rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
+rogue scan --endpoint https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
 # → http://localhost:3000/matrix?config=my-bot
 ```
 

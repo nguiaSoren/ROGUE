@@ -69,7 +69,7 @@ Open **http://localhost:3000** — `/feed`, `/matrix`, `/analytics`, and `/brief
 ```bash
 pip install rogue-live-redteam                            # the CLI, on the host (or: pip install -e . from this clone)
 export ANTHROPIC_API_KEY=sk-ant-...                       # the judge that grades each response (or repoint JUDGE_MODEL)
-rogue scan https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
+rogue scan --endpoint https://api.company.com/v1 --model my-model --persist --config-name "my-bot"
 # (writes to $DATABASE_URL; its local default already matches the stack's Postgres, so no config needed)
 ```
 
@@ -79,7 +79,7 @@ Then open **http://localhost:3000/matrix?config=my-bot** — the breach matrix s
 
 ```bash
 SEED_DEMO=0 docker compose -f docker-compose.full.yml up -d   # empty DB, detached
-rogue scan https://api.company.com/v1 --model my-model --persist --config-name my-bot
+rogue scan --endpoint https://api.company.com/v1 --model my-model --persist --config-name my-bot
 # → http://localhost:3000 — every surface is now 100% your data
 ```
 
