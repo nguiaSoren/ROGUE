@@ -131,6 +131,17 @@ def _load_config(explicit: str | None) -> dict[str, dict[str, Any]]:
 # --- client construction ----------------------------------------------------------------------
 
 
+def _resolve_system_prompt(args: argparse.Namespace, target: dict) -> str:
+    """The target system prompt: ``--system-prompt`` > ``--system-prompt-file`` > config > ``""``."""
+    sp = getattr(args, "system_prompt", None)
+    if sp is not None:
+        return sp
+    spf = getattr(args, "system_prompt_file", None)
+    if spf:
+        return Path(spf).read_text(encoding="utf-8")
+    return target.get("system_prompt", "") if isinstance(target, dict) else ""
+
+
 def _build_client(args: argparse.Namespace) -> Client:
     """Build a :class:`Client` from CLI flags, falling back to the config-file ``target`` section."""
     cfg = _load_config(getattr(args, "config", None))
@@ -144,7 +155,13 @@ def _build_client(args: argparse.Namespace) -> Client:
     # Stash the resolved scan section so scan() can read its defaults.
     args._scan_cfg = cfg.get("scan", {}) if isinstance(cfg.get("scan"), dict) else {}
 
-    return Client(endpoint=endpoint, api_key=api_key, provider=provider, model=model)
+    return Client(
+        endpoint=endpoint,
+        api_key=api_key,
+        provider=provider,
+        model=model,
+        system_prompt=_resolve_system_prompt(args, target),
+    )
 
 
 def _scan_default(args: argparse.Namespace, key: str, fallback: Any) -> Any:
@@ -231,6 +248,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
                 model,
                 primitives,
                 api_key=api_key,
+                system_prompt=_resolve_system_prompt(args, target),
                 n_trials=n_trials,
                 persist=True,
                 database_url=database_url,
@@ -302,6 +320,20 @@ def _add_target_flags(p: argparse.ArgumentParser) -> None:
     p.add_argument("--api-key", dest="api_key", default=None, help="API key (else provider env var)")
     p.add_argument("--provider", default=None, help="known provider: openai/anthropic/openrouter/gemini/groq")
     p.add_argument("--model", default=None, help="target model (optional)")
+    p.add_argument(
+        "--system-prompt",
+        dest="system_prompt",
+        default=None,
+        metavar="TEXT",
+        help="the target's system prompt — red-team YOUR exact deployment, not a bare model",
+    )
+    p.add_argument(
+        "--system-prompt-file",
+        dest="system_prompt_file",
+        default=None,
+        metavar="PATH",
+        help="read the system prompt from a file (alternative to --system-prompt)",
+    )
     p.add_argument(
         "--config",
         default=None,
