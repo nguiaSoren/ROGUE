@@ -179,7 +179,7 @@ The mechanics behind the pipeline, each on its own page:
 
 - 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see [`docs/taxonomy.md`](docs/taxonomy.md).
 - 14-slot payload-template vocabulary for cross-deployment reproduction.
-- 19-source open-web harvest list — see [`docs/sources.md`](docs/sources.md).
+- 19-source open-web harvest list — see [`docs/sources.md`](docs/sources.md). Not a fixed set: add your own with a ~30-line plugin → [`docs/adding-sources.md`](docs/adding-sources.md).
 - 8-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B, Mistral Small, Gemini 3.1 Flash-Lite, Claude Opus 4.8, + two audio targets) — cheap-tier models per lab, an open-weight reliability anchor, a frontier reference, and audio endpoints for multimodal coverage.
 - Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated four ways — see [Judge calibration](docs/judge-calibration.md).
 - Daily threat brief (markdown + JSON) + Slack webhook.
@@ -272,6 +272,10 @@ uv run python scripts/reproduce/reproduce_once.py --primitive-limit 50 --judge-b
 `scripts/reproduce/candidate_quota_ab.py` runs the candidate-quota A/B (the empirical baseline for the break-bandit).
 
 </details>
+
+## Add your own source
+
+ROGUE's sources are plugins, not a hard-coded list. To harvest from a forum, blog, repo, or feed it doesn't cover yet, write one `SourcePlugin` subclass — declare a `name`, a `source_type`, the `required_capabilities` it needs to fetch (e.g. `UNLOCK` for a page, `SERP` for a search), and an `async fetch_since(fetcher, since)` that returns `RawDocument`s. Your plugin owns *what the content means*; the injected fetcher owns *how the bytes arrive*. Register it in `default_plugins()` and the next harvest run extracts, dedupes, and reproduces from it like any built-in. Full walkthrough + a copy-paste example: **[`docs/adding-sources.md`](docs/adding-sources.md)**.
 
 ## Repository layout
 
