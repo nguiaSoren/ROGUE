@@ -110,11 +110,11 @@ export function AttackRow({
 
       {open && (
         <div className="border-t border-border bg-background/40 px-4 py-3 space-y-3 animate-rogue-fade-up">
-          {attack.payload_template ? (
+          {(attack.example_payload ?? attack.payload_template) ? (
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
-                  payload_template
+                  {attack.example_payload ? "payload · sent" : "payload_template"}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -128,14 +128,14 @@ export function AttackRow({
                   >
                     ▶ {replayKey !== null ? "replay" : "play"}
                   </button>
-                  <CopyButton text={attack.payload_template} />
+                  <CopyButton text={attack.example_payload ?? attack.payload_template ?? ""} />
                 </div>
               </div>
               {replayKey !== null ? (
                 <AttackReplay key={replayKey} attack={attack} />
               ) : (
                 <pre className="text-[11px] font-mono leading-relaxed text-foreground/85 bg-card/60 rounded-md p-3 max-h-64 overflow-y-auto whitespace-pre-wrap break-words border border-border/40">
-                  {attack.payload_template}
+                  {attack.example_payload ?? attack.payload_template}
                 </pre>
               )}
             </div>

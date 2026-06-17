@@ -391,15 +391,47 @@ def _enum_str(v: Any) -> Any:
     return v
 
 
+def _rendered_examples(db: Session, primitive_ids: list[str]) -> dict[str, str]:
+    """One representative *filled* prompt per primitive — the actual text sent to the target with
+    slots resolved (``breach_results.rendered_payload``), so the feed can show the concrete attack
+    instead of the raw ``{target_behavior}`` slot-template. Prefers a fully-resolved, breaching,
+    recent trial; one round-trip for the whole page (no N+1)."""
+    if not primitive_ids:
+        return {}
+    rows = db.execute(
+        text(
+            """
+            SELECT DISTINCT ON (primitive_id) primitive_id, rendered_payload
+            FROM breach_results
+            WHERE primitive_id = ANY(:ids)
+              AND rendered_payload IS NOT NULL
+              AND verdict <> 'error'
+            ORDER BY primitive_id,
+                     (rendered_payload LIKE '%{target%' OR rendered_payload LIKE '%{trigger%'
+                      OR rendered_payload LIKE '%{tone%') ASC,
+                     (verdict IN ('full_breach','partial_breach')) DESC,
+                     ran_at DESC
+            """
+        ),
+        {"ids": list(primitive_ids)},
+    ).all()
+    return {r.primitive_id: r.rendered_payload for r in rows if r.rendered_payload}
+
+
 def _primitive_to_dict(
     primitive: AttackPrimitiveORM,
     *,
     include_payload: bool = False,
     truncate_payload: bool = True,
+    rendered_example: str | None = None,
 ) -> dict[str, Any]:
-    payload = primitive.payload_template or ""
-    if truncate_payload and len(payload) > 500:
-        payload = payload[:500] + "...[truncated]"
+    def _cap(s: str) -> str:
+        return s[:500] + "...[truncated]" if truncate_payload and len(s) > 500 else s
+
+    payload = _cap(primitive.payload_template or "")
+    # The actual filled prompt sent to the target (slots resolved), from a representative breach
+    # trial — the feed prefers this so a viewer sees the concrete attack, not `{slot}` placeholders.
+    example = _cap(rendered_example) if rendered_example else None
 
     # Image availability for the drawer/cell view. DB-stored bytes
     # (primitive_images, synced to Neon) work on the deployed site; the on-disk
@@ -417,6 +449,7 @@ def _primitive_to_dict(
         "base_severity": _enum_str(primitive.base_severity),
         "short_description": primitive.short_description,
         "payload_template": payload if include_payload else None,
+        "example_payload": example if include_payload else None,
         "requires_multimodal": bool(primitive.requires_multimodal),
         "has_image": has_image,
         "reproducibility_score": primitive.reproducibility_score,
@@ -614,6 +647,7 @@ def list_attacks(
         rows = db.execute(fallback).scalars().all()
         stale = bool(rows)  # only "stale" if we actually surfaced older rows
 
+    rendered = _rendered_examples(db, [p.primitive_id for p in rows])
     return {
         "since_days": since_days,
         "family": family,
@@ -621,7 +655,10 @@ def list_attacks(
         "limit": limit,
         "stale": stale,
         "count": len(rows),
-        "attacks": [_primitive_to_dict(p, include_payload=True) for p in rows],
+        "attacks": [
+            _primitive_to_dict(p, include_payload=True, rendered_example=rendered.get(p.primitive_id))
+            for p in rows
+        ],
     }
 
 
@@ -666,7 +703,12 @@ def attack_detail(
     ).all()
 
     return {
-        "primitive": _primitive_to_dict(primitive, include_payload=True, truncate_payload=False),
+        "primitive": _primitive_to_dict(
+            primitive,
+            include_payload=True,
+            truncate_payload=False,
+            rendered_example=_rendered_examples(db, [primitive.primitive_id]).get(primitive.primitive_id),
+        ),
         "breaches": [
             {
                 "deployment_config_id": row.deployment_config_id,
@@ -1081,11 +1123,15 @@ def breach_cell(
     config = db.get(DeploymentConfigORM, config_id)
 
     primitives: list[dict[str, Any]] = []
+    rendered = _rendered_examples(db, [r.primitive_id for r in rows])
     for r in rows:
         prim = db.get(AttackPrimitiveORM, r.primitive_id)
         if prim is None:
             continue
-        detail = _primitive_to_dict(prim, include_payload=True, truncate_payload=False)
+        detail = _primitive_to_dict(
+            prim, include_payload=True, truncate_payload=False,
+            rendered_example=rendered.get(prim.primitive_id),
+        )
         n_trials = int(r.n_trials or 0)
         rate = float(r.any_breach_rate or 0.0)
         n_succ = int(round(rate * n_trials))

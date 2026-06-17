@@ -79,16 +79,16 @@ function CellCard({ p, rank }: { p: CellPrimitive; rank: number }) {
         </div>
       </div>
 
-      {p.payload_template && (
+      {(p.example_payload ?? p.payload_template) && (
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
-              payload_template
+              {p.example_payload ? "payload · sent" : "payload_template"}
             </p>
-            <CopyButton text={p.payload_template} />
+            <CopyButton text={p.example_payload ?? p.payload_template ?? ""} />
           </div>
           <pre className="text-[11px] font-mono leading-relaxed text-foreground/85 bg-card/60 rounded-md p-3 max-h-72 overflow-y-auto whitespace-pre-wrap break-words border border-border/40">
-            {p.payload_template}
+            {p.example_payload ?? p.payload_template}
           </pre>
         </div>
       )}
