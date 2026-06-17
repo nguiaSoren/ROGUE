@@ -1,10 +1,20 @@
 [project]
-name = "rogue"
-version = "1.0.0"
-description = "Open-web LLM threat intelligence agent (Bright Data hackathon submission)"
+name = "rogue-live-redteam"
+version = "1.3.1"
+description = "Continuous open-web LLM red-team: harvests live jailbreaks from 15+ open-web sources, reproduces them against your model x system-prompt x tools, and serves results over its own MCP server."
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "Soren Obounou Nguia"}]
 license = {text = "MIT"}
+keywords = ["llm", "red-team", "security", "jailbreak", "prompt-injection", "ai-safety", "mcp", "bright-data"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pydantic>=2.7,<3",
     "fastapi>=0.115,<1",
@@ -32,13 +42,43 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0", "ruff>=0.5", "mypy>=1.10"]
+# Optional harvest-fetcher backends (keyless/free). Bright Data + the httpx-based backends
+# (direct, ddg, hf_api, firecrawl) need no extra; these pull heavier deps and stay opt-in.
+# crawl4ai also needs a chromium binary: `crawl4ai-setup` (or `playwright install chromium`).
+crawl4ai = ["crawl4ai>=0.4.0"]
 
 [project.scripts]
 rogue = "rogue.cli:main"
 
+[project.urls]
+Homepage = "https://rogue-eosin.vercel.app"
+Repository = "https://github.com/nguiaSoren/ROGUE"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# The distribution name (rogue-live-redteam) differs from the import package (rogue), so hatchling
+# can't auto-detect it from the project name — point it at the package explicitly. Bundle the runtime
+# data files (attack packs, judge/extraction rubrics, benchmark datasets) and drop macOS .DS_Store junk.
+[tool.hatch.build.targets.wheel]
+packages = ["src/rogue"]
+
+# slot_defaults.json is a committed static fixture canonically at tests/fixtures/ (the wire-format
+# source of truth), but the reproduce layer loads it at import time — so it MUST ship inside the wheel
+# (tests/ is not packaged). force-include maps the single canonical file into the package as
+# rogue/data/slot_defaults.json; the loader (instantiator.py) reads that path when installed and falls
+# back to tests/fixtures/ in-repo. No committed duplicate → no drift.
+[tool.hatch.build.targets.wheel.force-include]
+"tests/fixtures/slot_defaults.json" = "rogue/data/slot_defaults.json"
+
+# Keep the sdist tiny + clean — the default sweeps the whole repo (assets/videos, data/, tests/),
+# which bloats the upload to ~66MB and leaks non-package content. Ship only the package + metadata.
+[tool.hatch.build.targets.sdist]
+only-include = ["src/rogue", "README.md", "LICENSE"]
+
+[tool.hatch.build]
+exclude = ["**/.DS_Store", "**/__pycache__"]
 
 [tool.ruff]
 line-length = 100

@@ -25,9 +25,10 @@ export default async function CellPage({
     date?: string;
     scope?: string;
     attacker?: string;
+    from?: string;
   }>;
 }) {
-  const { family, config, date, scope, attacker } = await searchParams;
+  const { family, config, date, scope, attacker, from } = await searchParams;
   const initialScope = scope === "all-time" ? "all-time" : "this-run";
   const initialAttacker = attacker === "augmented" ? "augmented" : "baseline";
 
@@ -45,6 +46,7 @@ export default async function CellPage({
             date={date}
             initialScope={initialScope}
             initialAttacker={initialAttacker}
+            from={from}
           />
         )}
       </div>
