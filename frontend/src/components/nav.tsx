@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { useSseFeed } from "@/components/sse-feed-provider";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
@@ -77,10 +77,7 @@ export function Nav() {
         <nav className="flex items-center gap-3 md:gap-5 text-xs uppercase tracking-widest">
           {/* Threat-intel links, hidden on small screens */}
           <span className="hidden lg:flex items-center gap-5">
-            <NavLink href="/feed" active={pathname === "/feed"}>/feed</NavLink>
-            <NavLink href="/matrix" active={pathname === "/matrix"}>/matrix</NavLink>
-            <NavLink href="/analytics" active={pathname === "/analytics"}>/analytics</NavLink>
-            <NavLink href="/brief" active={pathname === "/brief"}>/brief</NavLink>
+            <ThreatIntelMenu pathname={pathname} />
             <NavLink href="/research" active={pathname === "/research"}>research</NavLink>
           </span>
           <span className="hidden md:flex items-center gap-5">
@@ -137,6 +134,7 @@ export function Nav() {
             <MobileLink href="/feed" active={pathname === "/feed"} onClick={closeMenu}>/feed</MobileLink>
             <MobileLink href="/matrix" active={pathname === "/matrix"} onClick={closeMenu}>/matrix</MobileLink>
             <MobileLink href="/analytics" active={pathname === "/analytics"} onClick={closeMenu}>/analytics</MobileLink>
+            <MobileLink href="/leaderboard" active={pathname === "/leaderboard"} onClick={closeMenu}>/leaderboard</MobileLink>
             <MobileLink href="/brief" active={pathname === "/brief"} onClick={closeMenu}>/brief</MobileLink>
             <MobileLink href="/research" active={pathname === "/research"} onClick={closeMenu}>research</MobileLink>
             <div className="my-1 border-t border-border" />
@@ -205,6 +203,53 @@ function NavLink({
     >
       {children}
     </Link>
+  );
+}
+
+const DATA_LINKS = [
+  { href: "/feed", label: "/feed" },
+  { href: "/matrix", label: "/matrix" },
+  { href: "/analytics", label: "/analytics" },
+  { href: "/leaderboard", label: "/leaderboard" },
+  { href: "/brief", label: "/brief" },
+];
+
+/** Desktop dropdown grouping the threat-intel data pages so the top bar stays uncrowded.
+ *  Hover- and keyboard-(focus-within)-revealed; the pt-2 gap is a hover bridge to the panel. */
+function ThreatIntelMenu({ pathname }: { pathname: string }) {
+  const active = DATA_LINKS.some((l) => l.href === pathname);
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        aria-haspopup="true"
+        data-active={active}
+        className={`rogue-nav-link inline-flex items-center gap-1 transition-colors ${
+          active ? "text-rogue-green" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        threat intel
+        <ChevronDown className="w-3 h-3 transition-transform group-hover:rotate-180" />
+      </button>
+      <div className="invisible absolute left-0 top-full pt-2 opacity-0 transition-opacity group-hover:visible group-hover:opacity-100 focus-within:visible focus-within:opacity-100">
+        <div className="flex min-w-[11rem] flex-col gap-0.5 rounded-md border border-border bg-background/95 p-1.5 shadow-lg backdrop-blur">
+          {DATA_LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              data-active={pathname === l.href}
+              className={`rounded px-3 py-2 transition-colors ${
+                pathname === l.href
+                  ? "text-rogue-green bg-rogue-green/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+              }`}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

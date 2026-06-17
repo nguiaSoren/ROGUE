@@ -125,12 +125,15 @@ def _auto_image_strategy(primitive: AttackPrimitive) -> str:
 
 # ---------- Slot defaults (loaded once at import) ----------
 
-SLOT_DEFAULTS_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "tests"
-    / "fixtures"
-    / "slot_defaults.json"
+# Installed mode: the file is shipped inside the package at rogue/data/slot_defaults.json
+# (via the wheel force-include in pyproject.toml). In-repo dev: it lives canonically at
+# tests/fixtures/slot_defaults.json. Prefer the in-package copy (present when installed),
+# fall back to the repo fixture (present in a source checkout). One of the two always exists.
+_PKG_SLOT_DEFAULTS = Path(__file__).resolve().parent.parent / "data" / "slot_defaults.json"
+_REPO_SLOT_DEFAULTS = (
+    Path(__file__).resolve().parent.parent.parent.parent / "tests" / "fixtures" / "slot_defaults.json"
 )
+SLOT_DEFAULTS_PATH = _PKG_SLOT_DEFAULTS if _PKG_SLOT_DEFAULTS.exists() else _REPO_SLOT_DEFAULTS
 
 # Loaded at import time on purpose: slot_defaults.json is a committed static
 # fixture, not user input. A missing/malformed file is a deployment bug and

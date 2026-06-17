@@ -41,6 +41,20 @@ Each ingredient exists somewhere; **no competitor does the whole combination** �
 
 ## Use it in 30 seconds
 
+### See your first breach in 20 seconds — no key, no signup
+```bash
+pip install rogue-live-redteam
+rogue try
+```
+`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card. When you're ready, point it at your own model:
+
+```bash
+rogue scan --provider openai --model gpt-5.4-nano       # keyless quick judge by default
+rogue scan --provider openai --judge calibrated          # + a judge key → the calibrated v3 verdict
+```
+
+Compare any model on the public **[leaderboard](https://rogue-eosin.vercel.app/leaderboard)**, or browse the measured, continuously-updated **[attack corpus](corpus/)** (every attack tagged with *which models it actually breaches* — not an unverified prompt dump).
+
 ### Query ROGUE from your IDE — hosted MCP, zero setup
 The MCP server is mounted into the live API, so there is nothing to clone or run:
 
@@ -116,7 +130,7 @@ report = client.scan(pack="aggressive", budget=10.0)
 print(report.summary()); report.to_html("scan.html")
 ```
 
-…or from the CLI: `rogue scan --provider openai --pack aggressive --system-prompt-file ./system_prompt.txt` (`--system-prompt "…"` for inline; both also work with `--persist`).
+…or from the CLI: `rogue scan --provider openai --pack aggressive --system-prompt-file ./system_prompt.txt` (`--system-prompt "…"` for inline; both also work with `--persist`). Pick your scrape backend and judge model — see [`docs/harvest-backends.md`](docs/harvest-backends.md).
 
 No API key handy? Clone the repo and run the offline demo (mocked target + judge → an HTML report): `PYTHONPATH=src python3 examples/sdk_quickstart.py`.
 

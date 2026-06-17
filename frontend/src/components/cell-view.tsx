@@ -65,12 +65,15 @@ export function CellView({
   date,
   initialScope,
   initialAttacker,
+  from,
 }: {
   family: string;
   config: string;
   date?: string;
   initialScope: Scope;
   initialAttacker: Attacker;
+  /** Where the user arrived from, so "back" returns there (e.g. "leaderboard"); defaults to the matrix. */
+  from?: string;
 }) {
   // SCOPE × ATTACKER mirror the matrix 2×2: the page opens in whatever quadrant
   // you clicked from (so a cell that's red all-time / augmented but empty in this
@@ -128,10 +131,10 @@ export function CellView({
     return (
       <div className="space-y-4">
         <Link
-          href="/matrix"
+          href={from === "leaderboard" ? "/leaderboard" : "/matrix"}
           className="inline-block font-mono text-xs text-rogue-green hover:underline"
         >
-          ← back to matrix
+          {from === "leaderboard" ? "← back to leaderboard" : "← back to matrix"}
         </Link>
         <div className="border border-rogue-red/40 rounded-lg p-6 font-mono text-sm text-rogue-red bg-rogue-red/5 space-y-3">
           <p>{"// the API didn't respond (it may be waking up from idle)"}</p>
@@ -182,10 +185,10 @@ export function CellView({
           .
         </p>
         <Link
-          href="/matrix"
+          href={from === "leaderboard" ? "/leaderboard" : "/matrix"}
           className="inline-block font-mono text-xs text-rogue-green hover:underline"
         >
-          ← back to matrix
+          {from === "leaderboard" ? "← back to leaderboard" : "← back to matrix"}
         </Link>
       </header>
 

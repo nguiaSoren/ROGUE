@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,18 @@ from typing import Any
 from rogue import Client
 
 _DEFAULT_CONFIG_NAMES = ("rogue.yaml", "rogue.toml")
+
+# Bundled, committed fixtures for the keyless `rogue try` demo (see _cmd_try).
+_DATA_DIR = Path(__file__).resolve().parent / "data"
+_TRY_PACK_PATH = _DATA_DIR / "demo_try_pack.json"
+_DEMO_STATS_PATH = _DATA_DIR / "demo_stats.json"
+
+# Locked brand colors (VIRAL_LAUNCH_SPEC) for the terminal demo. ANSI, since `rich` is not a dep.
+_C_GREEN = "\033[38;2;0;255;136m"  # #00ff88 — defended
+_C_RED = "\033[38;2;255;0;60m"  # #ff003c — breach
+_C_DIM = "\033[2m"
+_C_BOLD = "\033[1m"
+_C_RESET = "\033[0m"
 
 
 # --- config-file loading ----------------------------------------------------------------------
@@ -202,6 +215,31 @@ def _cmd_validate(args: argparse.Namespace, out: Any) -> int:
     return 0
 
 
+def _resolve_judge(args: argparse.Namespace, out: Any) -> Any:
+    """The judge object for a scan, per ``--judge`` (default ``heuristic``).
+
+    ``heuristic`` → the keyless :class:`HeuristicJudge` (no key, network-free). ``calibrated`` →
+    ``None``, which lets the scan path build the calibrated LLM ``JudgeAgent`` (today's behavior).
+    On the keyless default with no judge key present, prints a one-line upgrade hint.
+    """
+    import os
+
+    judge_choice = getattr(args, "judge", "heuristic") or "heuristic"
+    if judge_choice == "calibrated":
+        return None  # scan path builds the calibrated v3 JudgeAgent (unchanged behavior)
+    from rogue.reproduce.heuristic_judge import HeuristicJudge
+
+    # Friendly note only when running keyless (no judge/openai key) — don't nag a configured user.
+    # Goes to stderr so it never pollutes `--json` machine output on stdout.
+    if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("JUDGE_API_KEY")):
+        print(
+            f"{_C_DIM}quick scan (keyless heuristic judge) — add a judge key + "
+            f"`--judge calibrated` for the calibrated v3 judge{_C_RESET}",
+            file=sys.stderr,
+        )
+    return HeuristicJudge()
+
+
 def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
     persist = getattr(args, "persist", False)
     config_name = getattr(args, "config_name", None)
@@ -250,6 +288,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
                 api_key=api_key,
                 system_prompt=_resolve_system_prompt(args, target),
                 n_trials=n_trials,
+                judge=_resolve_judge(args, out),
                 persist=True,
                 database_url=database_url,
                 config_id=slug,
@@ -263,6 +302,9 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
 
     # Non-persist path: delegate to Client.scan (stateless, no DB write).
     client = _build_client(args)
+    # Tiered judge: heuristic (keyless, default) or the calibrated v3 JudgeAgent. The Client passes
+    # `_judge` straight to run_scan; None means run_scan builds the calibrated JudgeAgent itself.
+    client._judge = _resolve_judge(args, out)
     attacks = [a.strip() for a in args.attacks.split(",") if a.strip()] if args.attacks else None
     report = client.scan(
         attacks=attacks,
@@ -275,6 +317,218 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
         _write_output(report, args.output)
     _emit(report, as_json=args.json, out=out)
     return 0
+
+
+# --- `rogue try` — the keyless hero command ----------------------------------------------------
+
+
+def _color(enabled: bool, code: str, text: str) -> str:
+    """Wrap ``text`` in an ANSI ``code`` when color is ``enabled``, else return it plain."""
+    return f"{code}{text}{_C_RESET}" if enabled else text
+
+
+def _verdict_style(verdict_value: str) -> tuple[str, str, bool]:
+    """(symbol, color-code, is_breach) for a JudgeVerdict value — green defended / red breach."""
+    from rogue.schemas.breach_result import JudgeVerdict
+
+    breach = verdict_value in (JudgeVerdict.PARTIAL_BREACH.value, JudgeVerdict.FULL_BREACH.value)
+    if breach:
+        return "✗ BREACH", _C_RED, True
+    if verdict_value == JudgeVerdict.REFUSED.value:
+        return "✓ DEFENDED", _C_GREEN, False
+    return "○ EVADED", _C_GREEN, False  # engagement without transfer — held, not breached
+
+
+def _cmd_try(args: argparse.Namespace, out: Any) -> int:
+    """The flagship keyless demo: a real ATTACKER→MODEL→JUDGE pipeline over a BUNDLED mock pack and
+    BUNDLED canned responses, graded live by the keyless :class:`HeuristicJudge`, ending by overlaying
+    ROGUE's REAL measured per-model breach rates. Zero keys, zero network, ~15s. Emits a share card."""
+    import json
+    import os
+
+    from rogue.reproduce.heuristic_judge import HeuristicJudge
+
+    color = sys.stdout.isatty() and out is sys.stdout and not os.environ.get("NO_COLOR")
+    fast = bool(getattr(args, "fast", False))
+
+    def pause(secs: float) -> None:
+        if not fast:
+            time.sleep(secs)
+
+    def c(code: str, text: str) -> str:
+        return _color(color, code, text)
+
+    pack = json.loads(_TRY_PACK_PATH.read_text(encoding="utf-8"))
+    attacks = pack["attacks"]
+    target_label = pack.get("target_label", "demo-model (mock)")
+
+    print(file=out)
+    print(c(_C_BOLD, "  ROGUE · try") + c(_C_DIM, "   the red-team that never sleeps"), file=out)
+    print(
+        c(_C_DIM, f"  keyless demo · {len(attacks)} attacks · mock target · live heuristic judge"),
+        file=out,
+    )
+    print(file=out)
+    print(c(_C_DIM, f"  ATTACKER  →  MODEL ({target_label})  →  JUDGE"), file=out)
+    print(file=out)
+
+    judge = HeuristicJudge()
+    findings: list[dict] = []
+    families: list[str] = []
+    n_breach = 0
+    for i, atk in enumerate(attacks, 1):
+        family = atk["family"]
+        title = atk.get("title", family)
+        families.append(family)
+        # ATTACKER: send the attack.
+        print(f"  [{i}/{len(attacks)}] {c(_C_BOLD, title)}", file=out)
+        print(c(_C_DIM, f"      → {_one_line(atk['attack_prompt'], 72)}"), file=out)
+        pause(0.35)
+        # MODEL: canned response (the mock target).
+        print(c(_C_DIM, "      … model responding"), file=out)
+        pause(0.45)
+        # JUDGE: real keyless grading of the (attack, response, goal) triple.
+        result = judge.judge_sync(atk["attack_prompt"], atk["model_response"], goal=atk.get("goal"))
+        symbol, code, is_breach = _verdict_style(result.verdict.value)
+        if is_breach:
+            n_breach += 1
+        print(f"      {c(code, symbol)}  {c(_C_DIM, '· ' + _one_line(result.rationale, 64))}", file=out)
+        print(file=out)
+        findings.append({"family": family, "title": title, "verdict": result.verdict.value, "breach": is_breach})
+        pause(0.2)
+
+    n = len(attacks)
+    rate = n_breach / n if n else 0.0
+    bar = _breach_bar(rate, color)
+    rate_code = _C_RED if rate > 0 else _C_GREEN
+    print(c(_C_BOLD, "  ── RESULT ──"), file=out)
+    print(
+        f"  {c(rate_code, f'{n_breach}/{n} BREACHED')}  {bar}  {c(rate_code, f'{round(rate * 100)}%')}",
+        file=out,
+    )
+    top = next((f["title"] for f in findings if f["breach"]), None)
+    print(c(_C_DIM, f"  top attack: {top or '— none breached'}"), file=out)
+    print(file=out)
+
+    # --- the overlay: ROGUE's REAL measured per-model breach rates ----------------------------
+    _print_real_stats(out, color)
+
+    # --- emit the shareable card --------------------------------------------------------------
+    card_paths: dict[str, Any] = {}
+    if not getattr(args, "no_card", False):
+        from datetime import datetime, timezone
+
+        from rogue.report_card import render_breach_card
+
+        verdict_counts: dict[str, int] = {}
+        for f in findings:
+            verdict_counts[f["verdict"]] = verdict_counts.get(f["verdict"], 0) + 1
+        card = {
+            "model_label": target_label,
+            "breach_rate": rate,
+            "trials": n,
+            "breaches": n_breach,
+            "top_attack": top,
+            "families": families,
+            "verdict_counts": verdict_counts,
+            "tier": "quick",
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        }
+        out_dir = Path(getattr(args, "out_dir", None) or "rogue-try")
+        try:
+            card_paths = render_breach_card(card, out_dir)
+            print(c(_C_BOLD, "  shareable card saved:"), file=out)
+            print(c(_C_GREEN, f"    {card_paths['svg']}"), file=out)
+            if card_paths.get("png"):
+                print(c(_C_GREEN, f"    {card_paths['png']}"), file=out)
+            print(c(_C_DIM, f"    {card_paths['html']}  (open to screenshot/share)"), file=out)
+            print(file=out)
+        except Exception as exc:  # never let a render hiccup fail the demo
+            print(c(_C_DIM, f"  (card render skipped: {exc})"), file=out)
+            print(file=out)
+
+    # --- one-line next step -------------------------------------------------------------------
+    print(
+        c(_C_BOLD, "  scan your own model: ")
+        + c(_C_GREEN, "rogue scan --provider openai --model gpt-5.4-nano"),
+        file=out,
+    )
+    print(file=out)
+
+    if getattr(args, "json", False):
+        import json as _j
+
+        print(
+            _j.dumps(
+                {
+                    "target": target_label,
+                    "n_tests": n,
+                    "n_breaches": n_breach,
+                    "breach_rate": round(rate, 4),
+                    "top_attack": top,
+                    "tier": "quick",
+                    "findings": findings,
+                    "card": {k: str(v) if v else None for k, v in card_paths.items()},
+                },
+                indent=2,
+            ),
+            file=out,
+        )
+    return 0
+
+
+def _one_line(text: str, n: int) -> str:
+    """Collapse whitespace and clip to ``n`` chars (so a multi-line payload stays one tidy line)."""
+    flat = " ".join(str(text).split())
+    return flat if len(flat) <= n else flat[: n - 1].rstrip() + "…"
+
+
+def _breach_bar(rate: float, color: bool, width: int = 20) -> str:
+    """A small green/red breach-rate bar: red filled to the rate, green for the defended remainder."""
+    filled = max(0, min(width, round(rate * width)))
+    # With color, red/green carry the split; without it (pipes, CI, plain terminals, screenshots)
+    # fall back to distinct glyphs so the proportion stays legible — solid = breached, light = defended.
+    red = _color(color, _C_RED, "█" * filled)
+    green = _color(color, _C_GREEN, "█" * (width - filled)) if color else "░" * (width - filled)
+    return f"[{red}{green}]"
+
+
+def _print_real_stats(out: Any, color: bool) -> None:
+    """Overlay ROGUE's REAL measured per-model breach rates from the bundled fixture — the
+    "here's what this looks like against 8 real models" close."""
+    import json
+
+    def c(code: str, text: str) -> str:
+        return _color(color, code, text)
+
+    stats = json.loads(_DEMO_STATS_PATH.read_text(encoding="utf-8"))
+    models = stats.get("models", [])
+    total = stats.get("total_trials", sum(m.get("n_trials", 0) for m in models))
+    print(
+        c(_C_BOLD, f"  ── ROGUE vs {len(models)} REAL models ──")
+        + c(_C_DIM, f"   {total:,} calibrated-judge trials"),
+        file=out,
+    )
+    print(c(_C_DIM, "  the same families, measured live against production models:"), file=out)
+    print(file=out)
+    for m in models:
+        rate = float(m.get("mean_breach_rate", 0.0))
+        bar = _breach_bar(rate, color, width=16)
+        code = _C_RED if rate >= 0.1 else _C_GREEN
+        label = m.get("model_label", "?")
+        trials = int(m.get("n_trials", 0))
+        print(
+            f"    {label:<26.26s} {bar} {c(code, f'{round(rate * 100):>3d}%')}"
+            f"  {c(_C_DIM, f'n={trials:,}')}",
+            file=out,
+        )
+    print(file=out)
+    print(
+        c(_C_DIM, f"  source: {stats.get('source', 'ROGUE all-time matrix')} · {stats.get('judge', 'calibrated v3 judge')}"),
+        file=out,
+    )
+    print(c(_C_DIM, "  full board → rogue-eosin.vercel.app/leaderboard"), file=out)
+    print(file=out)
 
 
 def _cmd_benchmark(args: argparse.Namespace, out: Any) -> int:
@@ -358,6 +612,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--budget", type=float, default=None, help="stop after this many USD of target-call cost")
     p_scan.add_argument("--pack", default=None, help="bundled attack pack (default: default)")
     p_scan.add_argument("--n-trials", dest="n_trials", type=int, default=None, help="trials per attack")
+    p_scan.add_argument(
+        "--judge",
+        choices=("heuristic", "calibrated"),
+        default="heuristic",
+        help="grader: 'heuristic' (keyless, default) or 'calibrated' (LLM v3 judge — needs a key)",
+    )
     p_scan.add_argument("--output", default=None, metavar="PATH", help="write report to .html or .json")
     p_scan.add_argument(
         "--persist",
@@ -373,6 +633,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="human-readable deployment label (required with --persist); slugified to a stable config_id",
     )
     p_scan.set_defaults(func=_cmd_scan)
+
+    p_try = sub.add_parser(
+        "try",
+        help="keyless ~15s demo: run a mock attack pipeline, then show ROGUE's real 8-model stats",
+    )
+    p_try.add_argument(
+        "--out-dir",
+        dest="out_dir",
+        default=None,
+        metavar="DIR",
+        help="where to write the shareable breach card (default: ./rogue-try)",
+    )
+    p_try.add_argument("--no-card", dest="no_card", action="store_true", help="skip writing the share card")
+    p_try.add_argument("--fast", action="store_true", help="no inter-step delays (for tests/CI)")
+    p_try.add_argument("--json", action="store_true", help="emit a machine-readable JSON summary at the end")
+    p_try.set_defaults(func=_cmd_try)
 
     p_bench = sub.add_parser("benchmark", help="attack-success-rate against a standard dataset")
     _add_target_flags(p_bench)
