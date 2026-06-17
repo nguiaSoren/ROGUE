@@ -35,21 +35,23 @@ export function Nav() {
 
   useEffect(() => {
     let alive = true;
+    // Status dot = "is the web service reachable". Hits the DB-FREE /api/livez, NOT
+    // /api/health (which runs 4 COUNT(*) queries on Neon). Polling a DB endpoint on a
+    // timer kept Neon's serverless compute from ever auto-suspending and burned the
+    // free CU-hour allowance; liveness is all the dot needs, and data availability is
+    // already surfaced on the pages themselves.
     const pingHealth = () => {
-      // 8s timeout (< the 15s ping interval) so a held socket during a Render
-      // cold boot resolves to "down" instead of leaving the status dot stale.
-      fetch(`${API_BASE}/api/health`, {
+      // 8s timeout (< the ping interval) so a held socket during a Render cold boot
+      // resolves to "down" instead of leaving the status dot stale.
+      fetch(`${API_BASE}/api/livez`, {
         cache: "no-store",
         signal: AbortSignal.timeout(8000),
       })
-        .then((r) => r.json())
-        .then((d: { db?: string }) => {
-          if (alive) setDbUp(d.db === "up");
-        })
+        .then((r) => alive && setDbUp(r.ok))
         .catch(() => alive && setDbUp(false));
     };
     pingHealth();
-    const interval = window.setInterval(pingHealth, 15000);
+    const interval = window.setInterval(pingHealth, 30000);
     return () => {
       alive = false;
       window.clearInterval(interval);
@@ -225,7 +227,7 @@ function LivePill({
   return (
     <span
       className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-md text-[10px] tracking-wider ${tint}`}
-      title="Live status from /api/health and /api/sse/feed"
+      title="Live status from /api/livez and /api/sse/feed"
     >
       <span className={`inline-block w-1.5 h-1.5 rounded-full ${dotClass}`} />
       {dbUp === false ? "db down" : "live"}
