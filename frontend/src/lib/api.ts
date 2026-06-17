@@ -44,7 +44,7 @@ const API_BASE = isAbsoluteUrl(RAW_API_BASE) ? RAW_API_BASE : "http://localhost:
  */
 export const API_CONFIGURED = isAbsoluteUrl(RAW_API_BASE);
 
-const REVALIDATE_SECONDS = 300;
+const REVALIDATE_SECONDS = 1800;
 
 // The API runs on Render's free tier, which spins the service down when idle
 // and returns a transient 502/503/504 (or drops the connection) for the first

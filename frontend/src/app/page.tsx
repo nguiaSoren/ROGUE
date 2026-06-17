@@ -22,7 +22,7 @@ import { EarlyAccessSection } from "@/components/marketing/early-access-section"
 // data surfaces within the window instead of paying the full round-trip.
 // "auto" = ISR on Vercel; the self-host docker build rewrites it to "force-dynamic" (docker/frontend.Dockerfile).
 export const dynamic = "auto";
-export const revalidate = 300;
+export const revalidate = 1800;
 
 /**
  * Cinematic home, the demo entry. Designed for a 5-second pitch and a
