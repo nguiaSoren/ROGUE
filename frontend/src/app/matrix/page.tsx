@@ -27,7 +27,7 @@ import { resolveConfigLens } from "@/lib/config-lens";
 // backend instead of serving a build-time-cached "API unavailable" placeholder. `dynamic` must be a
 // static string literal (Next 16 rejects an expression), hence the build-step rewrite.
 export const dynamic = "auto";
-export const revalidate = 300; // ISR, match REVALIDATE_SECONDS in lib/api.ts
+export const revalidate = 1800; // ISR, match REVALIDATE_SECONDS in lib/api.ts
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 

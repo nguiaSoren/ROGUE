@@ -13,7 +13,7 @@ import { StubbornnessWidget } from "@/components/stubbornness-widget";
 // data surfaces within the window instead of paying the full round-trip.
 // "auto" = ISR on Vercel; the self-host docker build rewrites it to "force-dynamic" (docker/frontend.Dockerfile).
 export const dynamic = "auto";
-export const revalidate = 300;
+export const revalidate = 1800;
 
 /**
  * /feed default export — ONE try/catch around the whole render so a missing API base in a preview
