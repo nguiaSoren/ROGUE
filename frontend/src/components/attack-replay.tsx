@@ -29,7 +29,7 @@ export function AttackReplay({ attack }: { attack: AttackPrimitive }) {
     };
   }, []);
 
-  const payload = attack.payload_template?.trim() ?? "(no payload template)";
+  const payload = (attack.example_payload ?? attack.payload_template)?.trim() ?? "(no payload)";
   const repro = attack.reproducibility_score ?? 0;
   const willBreach = repro >= 0.5;
   const sev = (attack.base_severity || "medium").toUpperCase();

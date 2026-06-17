@@ -111,6 +111,7 @@ export type AttackPrimitive = {
   base_severity: string;
   short_description: string;
   payload_template: string | null;
+  example_payload: string | null;
   reproducibility_score: number | null;
   canonical: boolean;
   cluster_id: string | null;

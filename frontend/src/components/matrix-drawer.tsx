@@ -30,6 +30,7 @@ type AttackDetailResponse = {
     base_severity: string;
     short_description: string;
     payload_template: string | null;
+    example_payload: string | null;
     requires_multi_turn: boolean;
     requires_tools: string[];
     requires_multimodal?: boolean;
@@ -313,16 +314,18 @@ export function MatrixCellDrawer({
                 </div>
               </section>
 
-              {shownDetail.primitive.payload_template && (
+              {(shownDetail.primitive.example_payload ?? shownDetail.primitive.payload_template) && (
                 <section>
                   <div className="flex items-center justify-between mb-1.5">
                     <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-rogue-green">
-                      payload_template, the prompt that breached this
+                      {shownDetail.primitive.example_payload
+                        ? "payload · sent (slots filled), the prompt that breached this"
+                        : "payload_template, the prompt that breached this"}
                     </p>
-                    <CopyButton text={shownDetail.primitive.payload_template} />
+                    <CopyButton text={shownDetail.primitive.example_payload ?? shownDetail.primitive.payload_template ?? ""} />
                   </div>
                   <pre className="text-[11px] font-mono leading-relaxed text-foreground/85 bg-card/60 rounded-md p-3 max-h-72 overflow-y-auto whitespace-pre-wrap break-words border border-border/40">
-                    {shownDetail.primitive.payload_template}
+                    {shownDetail.primitive.example_payload ?? shownDetail.primitive.payload_template}
                   </pre>
                 </section>
               )}
