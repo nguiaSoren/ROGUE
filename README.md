@@ -44,7 +44,8 @@ Each ingredient exists somewhere; **no competitor does the whole combination** �
 ### See your first breach in 20 seconds — no key, no signup
 ```bash
 pip install rogue-live-redteam
-rogue try
+rogue try        # 20s, offline, zero keys — real breach rates + a shareable card
+rogue setup      # one command → the best free scraper (crawl4ai + Chromium); run the live harvest, no Bright Data
 ```
 `rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card.
 
@@ -56,7 +57,7 @@ rogue scan --provider openai --model gpt-5.4-nano --judge calibrated   # …or a
 ```
 
 - **Judge:** defaults to a **keyless heuristic** (no API key). `--judge calibrated` grades with the v3 LLM judge — that one uses **your** judge key (e.g. `ANTHROPIC_API_KEY` / `JUDGE_MODEL`'s provider).
-- **Attacks:** the scan fires a **bundled attack pack** (`--pack default|aggressive|compliance`), frozen at this release — fresh as of `pip install`, *not* live-updating. The continuously-harvested live corpus drives the hosted dashboard + the [public corpus](corpus/); to run the live open-web harvest locally, **`rogue setup`** installs the best free scraper in one command (crawl4ai + its browser, no Bright Data — see [Run the harvest free](#run-the-harvest-free--no-bright-data-no-keys)).
+- **Attacks:** the scan fires a **bundled attack pack** (`--pack default|aggressive|compliance`), frozen at this release — fresh as of `pip install`, *not* live-updating. The continuously-harvested live corpus drives the hosted dashboard + the [public corpus](corpus/); to run that live open-web harvest locally, use **`rogue setup`** (above) — see [Run the harvest free](#run-the-harvest-free--no-bright-data-no-keys).
 
 Compare any model on the public **[leaderboard](https://rogue-eosin.vercel.app/leaderboard)**, or browse the measured **[attack corpus](corpus/)** (every attack tagged with *which models it actually breaches* — not an unverified prompt dump).
 
