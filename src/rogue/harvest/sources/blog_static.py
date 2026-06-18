@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin, urlparse
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument, SourceType
 
 from .base import SourcePlugin
@@ -78,6 +78,7 @@ class BlogStaticPlugin(SourcePlugin):
     name = "blog_static"
     source_type = "blog"  # default; per-target source_type wins on each doc
     bright_data_product = "web_unlocker"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.UNLOCK})
 
     def __init__(self, blogs: Iterable[BlogTarget] | None = None) -> None:
         self.blogs: list[BlogTarget] = list(blogs) if blogs is not None else list(DEFAULT_BLOGS)
@@ -102,7 +103,7 @@ class BlogStaticPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Per blog: fetch the feed, parse out post URLs, fetch each post."""
@@ -111,7 +112,7 @@ class BlogStaticPlugin(SourcePlugin):
 
         for target in self.blogs:
             try:
-                feed = await client.web_unlock(target.feed_url, format="markdown")
+                feed = await fetcher.unlock(target.feed_url, format="markdown")
             except NotImplementedError:
                 raise
             except Exception:
@@ -121,7 +122,7 @@ class BlogStaticPlugin(SourcePlugin):
 
             for post_url in post_urls:
                 try:
-                    page = await client.web_unlock(post_url, format="markdown")
+                    page = await fetcher.unlock(post_url, format="markdown")
                 except NotImplementedError:
                     raise
                 except Exception:

@@ -42,11 +42,11 @@ class _FakeClient:
         self.serp_calls = 0
         self.unlocked: list[str] = []
 
-    async def serp_search(self, query, count=10, *, session=None):
+    async def serp(self, query, count=10, engine="google"):
         self.serp_calls += 1
         return _Serp(self._serp)
 
-    async def web_unlock(self, url, format="html", *, session=None):
+    async def unlock(self, url, format="html"):
         self.unlocked.append(url)
         if url in self._fail:
             raise RuntimeError("unlock boom")
@@ -128,7 +128,7 @@ async def test_per_url_unlock_failure_isolated() -> None:
 @pytest.mark.asyncio
 async def test_serp_failure_isolated_per_handle() -> None:
     class _SerpFails(_FakeClient):
-        async def serp_search(self, query, count=10, *, session=None):
+        async def serp(self, query, count=10, engine="google"):
             raise RuntimeError("serp down")
 
     plugin = XViaUnlockerPlugin(handles=["a", "b"])

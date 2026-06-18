@@ -2,10 +2,9 @@
 
 Closes the causal-attribution gap left by (c-runtime). After
 :meth:`DiscoveryAgent.run` collects RawDocuments from the 8 plugins, this
-module runs the bandit's 10 picked SERP queries via
-:meth:`BrightDataClient.serp_search`, dedupes the returned URLs against what
-plugins already produced, fetches the new URLs via
-:meth:`BrightDataClient.web_unlock`, and emits them as additional
+module runs the bandit's 10 picked SERP queries via :meth:`Fetcher.serp`,
+dedupes the returned URLs against what plugins already produced, fetches
+the new URLs via :meth:`Fetcher.unlock`, and emits them as additional
 RawDocuments tagged ``discovered_via=f"serp_arm:{arm_id}"``.
 
 Net effect: the bandit becomes a *discovery controller* whose picks drive
@@ -21,6 +20,16 @@ Exception isolation is per-arm: a SERP timeout on one arm doesn't block the
 others; a Web Unlocker failure on one URL doesn't kill the whole arm. All
 failures land in a per-arm error list returned alongside the docs+cost so
 the dashboard can surface "arm X had 3/10 URL failures" if useful later.
+
+SERP bandit cost caveat (spec §SERP-bandit-caveat):
+  The ε-greedy bandit optimises novel-attacks-per-dollar of SERP spend.
+  A free SERP backend (DDG etc.) has cost≈0, making that ratio undefined.
+  When the active SERP backend is NOT ``brightdata``, bandit cost-tracking is
+  bypassed: all arms run (no spend-weighted selection pruning), and
+  ``per_arm_cost`` is zeroed so the caller does NOT feed cost≈0 into the
+  bandit's reward math. Pass the :class:`~rogue.harvest.fetchers.FetcherRegistry`
+  as ``registry`` to enable this detection; omit it (or pass ``None``) if cost
+  tracking is explicitly not needed.
 """
 
 from __future__ import annotations
@@ -31,8 +40,14 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from typing import TYPE_CHECKING
+
+from rogue.harvest.fetchers.base import Fetcher
+from rogue.harvest.fetchers.capabilities import Capability
 from rogue.schemas.raw_document import RawDocument
+
+if TYPE_CHECKING:
+    from rogue.harvest.fetchers.registry import FetcherRegistry
 
 __all__ = [
     "BanditSerpPhaseResult",
@@ -75,21 +90,40 @@ class BanditSerpPhaseResult:
     """{arm_id: ["serp_failed: ...", "fetch_failed: ..."]} for observability."""
 
 
+def _serp_is_brightdata(registry: "FetcherRegistry | None") -> bool:
+    """True iff the active SERP backend is the Bright Data backend.
+
+    When ``registry`` is absent or no SERP backend is registered, returns
+    ``False`` (unknown/free path → skip bandit cost tracking to be safe).
+    """
+    if registry is None:
+        return False
+    serp_backend = registry.for_capability(Capability.SERP)
+    return serp_backend is not None and serp_backend.name == "brightdata"
+
+
 async def run_bandit_serp_phase(
-    client: BrightDataClient,
+    fetcher: Fetcher,
     picked_arms: list[tuple[str, str]],
     *,
+    registry: "FetcherRegistry | None" = None,
     seen_urls: set[str] | None = None,
     max_urls_per_arm: int = DEFAULT_MAX_URLS_PER_ARM,
     arm_timeout_s: float = DEFAULT_ARM_TIMEOUT_S,
 ) -> BanditSerpPhaseResult:
-    """For each picked arm, SERP-search → URL dedup → Web Unlocker fetch.
+    """For each picked arm, SERP-search → URL dedup → unlock fetch.
 
     Args:
-        client: a live :class:`BrightDataClient`.
+        fetcher: a :class:`~rogue.harvest.fetchers.base.Fetcher` (typically a
+            :class:`~rogue.harvest.fetchers.routing.RoutingFetcher`); uses
+            :meth:`Fetcher.serp` and :meth:`Fetcher.unlock`.
         picked_arms: ``[(arm_id, substituted_query), ...]`` — typically
             ``agent.last_selected_arms`` after :meth:`DiscoveryAgent.serp_queries`
             populates it.
+        registry: the :class:`~rogue.harvest.fetchers.registry.FetcherRegistry` in
+            use. Used to detect whether the active SERP backend is Bright Data —
+            only then does cost-tracking engage (per SERP bandit caveat). Pass
+            ``None`` to unconditionally skip cost tracking (free-backend or test path).
         seen_urls: URLs to skip (don't fetch). Caller pre-populates with URLs
             the plugin phase has already produced so we don't double-spend on
             content the plugins covered. ``None`` means "skip nothing."
@@ -101,6 +135,8 @@ async def run_bandit_serp_phase(
     Returns:
         :class:`BanditSerpPhaseResult` — never raises. Per-arm failures land
         in ``per_arm_errors`` so harvest_once can log them without aborting.
+        When the SERP backend is not Bright Data, ``per_arm_cost`` values are
+        all ``0.0`` so the caller must NOT feed them into the bandit's reward math.
 
     Empty ``picked_arms`` is a fast no-op: returns empty result, makes zero
     network calls.
@@ -108,14 +144,24 @@ async def run_bandit_serp_phase(
     if not picked_arms:
         return BanditSerpPhaseResult(docs=[], per_arm_cost={})
 
+    # SERP bandit cost caveat: only engage cost-tracking when BD is the SERP
+    # backend. A free backend (DDG etc.) has cost≈0, making yield-per-dollar
+    # undefined. When not BD, log once and run all queries without spend tracking.
+    use_cost_tracking = _serp_is_brightdata(registry)
+    if not use_cost_tracking:
+        logger.info(
+            "bandit_serp_phase: SERP backend is not brightdata (or registry absent) — "
+            "cost tracking disabled; running all %d arms without spend-weighted pruning",
+            len(picked_arms),
+        )
+
     seen: set[str] = set(seen_urls) if seen_urls is not None else set()
 
-    # Run all arms concurrently — the BD client's own semaphore (if any) plus
-    # the SDK's connection pool bound network parallelism. Per-arm timeouts
-    # prevent a single hung arm from holding the entire phase.
+    # Run all arms concurrently. Per-arm timeouts prevent a single hung arm
+    # from holding the entire phase.
     coros = [
         _run_one_arm(
-            client=client,
+            fetcher=fetcher,
             arm_id=arm_id,
             query=query,
             seen_urls=seen,
@@ -131,15 +177,18 @@ async def run_bandit_serp_phase(
     per_arm_errors: dict[str, list[str]] = {}
     for arm_id, docs, cost, errors in per_arm_results:
         all_docs.extend(docs)
-        per_arm_cost[arm_id] = cost
+        # Zero out cost when not on the BD path so callers can't accidentally
+        # feed it into the bandit (cost≈0 makes yield-per-dollar meaningless).
+        per_arm_cost[arm_id] = cost if use_cost_tracking else 0.0
         if errors:
             per_arm_errors[arm_id] = errors
 
     logger.info(
-        "bandit_serp_phase: %d arms ran, %d total RawDocuments, $%.4f total spend",
+        "bandit_serp_phase: %d arms ran, %d total RawDocuments, $%.4f total spend%s",
         len(picked_arms),
         len(all_docs),
         sum(per_arm_cost.values()),
+        "" if use_cost_tracking else " (cost zeroed — free SERP backend)",
     )
     return BanditSerpPhaseResult(
         docs=all_docs,
@@ -150,7 +199,7 @@ async def run_bandit_serp_phase(
 
 async def _run_one_arm(
     *,
-    client: BrightDataClient,
+    fetcher: Fetcher,
     arm_id: str,
     query: str,
     seen_urls: set[str],
@@ -169,7 +218,7 @@ async def _run_one_arm(
 
     try:
         serp = await asyncio.wait_for(
-            client.serp_search(query, count=max_urls),
+            fetcher.serp(query, count=max_urls),
             timeout=timeout_s,
         )
     except asyncio.TimeoutError:
@@ -202,12 +251,12 @@ async def _run_one_arm(
     if not candidate_urls:
         return (arm_id, [], cost, errors)
 
-    # Fetch each candidate via Web Unlocker. Per-URL failures stay isolated;
+    # Fetch each candidate via unlock. Per-URL failures stay isolated;
     # the arm still gets credit for the URLs that DID land.
     docs: list[RawDocument] = []
     for url in candidate_urls:
         try:
-            page = await client.web_unlock(url, format="markdown")
+            page = await fetcher.unlock(url, format="markdown")
         except Exception as exc:  # noqa: BLE001
             errors.append(f"fetch_failed {url}: {type(exc).__name__}: {exc}")
             continue

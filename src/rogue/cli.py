@@ -597,6 +597,54 @@ def _add_target_flags(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of a summary")
 
 
+def _cmd_setup(args: argparse.Namespace, out: Any) -> int:
+    """Install the best free scraper on demand: crawl4ai + its Chromium (and --pdf for local PDF).
+
+    Keeps the base ``pip install rogue-live-redteam`` lean — crawl4ai pulls ~37 deps + needs a Chromium
+    download that pip can't do, so it's an opt-in one-command upgrade instead of a core dependency.
+    """
+    import shutil
+    import subprocess
+
+    pip_pkgs = ["crawl4ai"]
+    if args.pdf:
+        pip_pkgs.append("pymupdf4llm")
+
+    pip_cmd = [sys.executable, "-m", "pip", "install", *pip_pkgs]
+    browser_cmd: list[str] | None = None
+    if not args.no_browser:
+        setup_bin = shutil.which("crawl4ai-setup")
+        browser_cmd = [setup_bin] if setup_bin else [sys.executable, "-m", "playwright", "install", "chromium"]
+
+    if args.dry_run:
+        print("# rogue setup would run:", file=out)
+        print("#   " + " ".join(pip_cmd), file=out)
+        if browser_cmd:
+            print("#   " + " ".join(browser_cmd) + "   (download Chromium for crawl4ai)", file=out)
+        return 0
+
+    print(f"[rogue setup] installing {', '.join(pip_pkgs)} …", file=out)
+    if subprocess.run(pip_cmd).returncode != 0:
+        print("[rogue setup] pip install failed — see output above.", file=out)
+        return 1
+
+    if browser_cmd:
+        print("[rogue setup] downloading Chromium for crawl4ai …", file=out)
+        if subprocess.run(browser_cmd).returncode != 0:
+            print("[rogue setup] browser download failed — run `crawl4ai-setup` manually.", file=out)
+
+    try:
+        from rogue.harvest.fetchers.crawl4ai import Crawl4AIFetcher
+
+        if Crawl4AIFetcher.is_available():
+            print("[rogue setup] crawl4ai ready ✓ — it now leads UNLOCK/BROWSER in the harvest.", file=out)
+        else:
+            print("[rogue setup] crawl4ai installed; browser not detected — run `crawl4ai-setup`.", file=out)
+    except Exception:  # noqa: BLE001
+        print("[rogue setup] crawl4ai installed (restart your shell, then `rogue try`).", file=out)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rogue", description="ROGUE red-team SDK command-line interface.")
     sub = parser.add_subparsers(dest="command", metavar="<command>")
@@ -661,6 +709,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_report.add_argument("--output", default=None, metavar="PATH", help="write to .html or .json (else print)")
     p_report.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of a summary")
     p_report.set_defaults(func=_cmd_report)
+
+    p_setup = sub.add_parser(
+        "setup",
+        help="install the best free scraper: crawl4ai + its Chromium (one command; keeps base install lean)",
+    )
+    p_setup.add_argument("--pdf", action="store_true", help="also install local PDF parsing (pymupdf4llm)")
+    p_setup.add_argument("--no-browser", dest="no_browser", action="store_true", help="skip the one-time Chromium download")
+    p_setup.add_argument("--dry-run", dest="dry_run", action="store_true", help="print the commands without running them")
+    p_setup.set_defaults(func=_cmd_setup)
 
     return parser
 

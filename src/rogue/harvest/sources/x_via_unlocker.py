@@ -22,7 +22,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.harvest.sources.x_user_timeline import DEFAULT_HANDLES
 from rogue.harvest.x_status import is_x_status_url, parse_x_status
 from rogue.schemas import RawDocument
@@ -40,6 +40,7 @@ class XViaUnlockerPlugin(SourcePlugin):
     name = "x_via_unlocker"
     source_type = "x"
     bright_data_product = "web_unlocker"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.SERP, Capability.UNLOCK})
 
     def __init__(
         self,
@@ -76,7 +77,7 @@ class XViaUnlockerPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """SERP-discover each handle's recent posts, Web-Unlock + parse each."""
@@ -86,7 +87,7 @@ class XViaUnlockerPlugin(SourcePlugin):
 
         for handle, query in zip(self.handles, self.serp_queries(since), strict=True):
             try:
-                serp = await client.serp_search(query, count=self.per_handle_limit)
+                serp = await fetcher.serp(query, count=self.per_handle_limit)
             except NotImplementedError:
                 raise
             except Exception as exc:  # noqa: BLE001 — one handle's SERP failure isn't fatal
@@ -97,7 +98,7 @@ class XViaUnlockerPlugin(SourcePlugin):
             status_urls = self._status_urls(serp.organic_results, self.per_handle_limit)
             for url in status_urls:
                 try:
-                    page = await client.web_unlock(url, format="html")
+                    page = await fetcher.unlock(url, format="html")
                 except Exception as exc:  # noqa: BLE001 — one bad post isn't fatal
                     self.call_errors.append(f"{url} unlock: {type(exc).__name__}: {exc}")
                     continue

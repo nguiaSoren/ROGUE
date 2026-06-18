@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument, SourceType
 
 from .base import SourcePlugin
@@ -80,6 +80,7 @@ class CommunityArchivePlugin(SourcePlugin):
     name = "community_archive"
     source_type = "community_archive"
     bright_data_product = "scraping_browser"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.BROWSER})
 
     def __init__(
         self,
@@ -105,7 +106,7 @@ class CommunityArchivePlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Render each archive page via the Scraping Browser; emit one
@@ -121,7 +122,7 @@ class CommunityArchivePlugin(SourcePlugin):
 
         for target in self.archives:
             try:
-                page = await client.scrape_browser(
+                page = await fetcher.browser(
                     target.url,
                     wait_for_selector=target.wait_for_selector,
                     scroll_pages=target.scroll_pages,

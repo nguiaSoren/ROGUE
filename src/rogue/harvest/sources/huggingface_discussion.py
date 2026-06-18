@@ -20,7 +20,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -34,6 +34,7 @@ class HuggingFaceDiscussionPlugin(SourcePlugin):
     name = "huggingface_discussion"
     source_type = "huggingface"
     bright_data_product = "web_scraper_api"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.HF, Capability.UNLOCK})
 
     def __init__(self, model_ids: Optional[list[str]] = None) -> None:
         # Empty by default — Day-1 populates from a SERP sweep + confirmed
@@ -66,7 +67,7 @@ class HuggingFaceDiscussionPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Fetch each model's discussions. Try Web Scraper API first; on
@@ -90,7 +91,7 @@ class HuggingFaceDiscussionPlugin(SourcePlugin):
             # --- Try the structured Web Scraper API path first ---
             primary_failed = False
             try:
-                threads = await client.scrape_huggingface_discussion(model_id)
+                threads = await fetcher.hf_discussion(model_id)
             except NotImplementedError:
                 raise
             except RuntimeError:
@@ -157,7 +158,7 @@ class HuggingFaceDiscussionPlugin(SourcePlugin):
             # IDs and follow through.
             discussions_url = f"https://huggingface.co/{model_id}/discussions"
             try:
-                page = await client.web_unlock(discussions_url, format="html")
+                page = await fetcher.unlock(discussions_url, format="html")
             except NotImplementedError:
                 raise
             except Exception as exc:

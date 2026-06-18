@@ -1,23 +1,24 @@
-"""Bright Data media fetcher (§11.8) — real-image carriers for multimodal attacks.
+"""Media fetcher (§11.8) — real-image carriers for multimodal attacks.
 
 When a harvested multimodal attack describes the *kind* of carrier it needs
 (``payload_slots["media_query"]`` — e.g. "bank login screenshot", "tax form
 scan", "meme template"), this fetches a matching REAL image from the open web via
-Bright Data: **SERP image search** (``serp_image_search``) to find a candidate,
-then **Web Unlocker** (``fetch_image_bytes``) to download the bytes. The image is
-then composited under the attack overlay via the renderers' existing
-``base_image`` slot — turning synthetic Pillow canvases into real-world carriers.
+the backend-agnostic :class:`~rogue.harvest.fetchers.Fetcher`: **SERP image
+search** (:meth:`~Fetcher.serp_image`) to find a candidate, then
+:meth:`~Fetcher.fetch_image_bytes` to download the bytes. The image is then
+composited under the attack overlay via the renderers' existing ``base_image``
+slot — turning synthetic Pillow canvases into real-world carriers.
 
 **Disk cache (why):** the renderers are deterministic by contract (§10.3); a live
 web image is not. Caching the first fetch (keyed by the query) freezes the carrier
 so every replay composites onto the SAME bytes — deterministic again — and we
-never re-spend Bright Data credit on a repeat. This mirrors the §11.7 fetch-cache
+never re-spend backend credit on a repeat. This mirrors the §11.7 fetch-cache
 idea, applied to media assets.
 
 **Pipeline position:** extraction sets ``media_query`` → a *gated* resolve step
-(this module — costs BD credit) fetches once + caches + stamps
-``payload_slots["base_image"]`` → the offline ``render()`` composites onto it. The
-network call lives HERE (harvest layer), never inside ``render()``.
+(this module) fetches once + caches + stamps ``payload_slots["base_image"]`` →
+the offline ``render()`` composites onto it. The network call lives HERE (harvest
+layer), never inside ``render()``.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:  # pragma: no cover
-    from rogue.harvest.bright_data_client import BrightDataClient
+    from rogue.harvest.fetchers import Fetcher
 
 logger = logging.getLogger("rogue.harvest.media_fetch")
 
@@ -60,23 +61,29 @@ _EXT_BY_CTYPE = {
 
 
 class BrightDataMediaFetcher:
-    """Fetch + cache a real carrier image for a multimodal attack, via Bright Data.
+    """Fetch + cache a real carrier image for a multimodal attack.
 
-    ``client`` is a ``BrightDataClient`` (SERP + Web Unlocker). Carriers are
-    stored **per attack** so they're browsable: ``cache_dir/{primitive_id}/``
-    holds ``carrier.{ext}`` (the real image, proper extension — opens on
-    double-click) + ``meta.json`` (source URL, query, where it was fetched from).
-    First fetch spends BD credit; every later call is a free disk read.
+    ``fetcher`` is a backend-agnostic :class:`~rogue.harvest.fetchers.Fetcher`
+    (needs :attr:`~Capability.SERP_IMAGE` and :attr:`~Capability.IMAGE_BYTES`).
+    Carriers are stored **per attack** so they're browsable:
+    ``cache_dir/{primitive_id}/`` holds ``carrier.{ext}`` (the real image, proper
+    extension — opens on double-click) + ``meta.json`` (source URL, query, where
+    it was fetched from). First fetch hits the backend; every later call is a free
+    disk read.
+
+    .. note::
+        The class name is kept for caller compatibility. Wave 2 can rename it to
+        ``MediaFetcher`` and update callers.
     """
 
     def __init__(
         self,
-        client: "BrightDataClient",
+        fetcher: "Fetcher",
         cache_dir: Path = DEFAULT_MEDIA_CACHE_DIR,
         *,
         max_candidates: int = 5,
     ) -> None:
-        self.client = client
+        self.fetcher = fetcher
         self.cache_dir = Path(cache_dir)
         self.max_candidates = max_candidates
 
@@ -132,22 +139,15 @@ class BrightDataMediaFetcher:
         if hit is not None:
             return hit
 
-        # No credentials → don't attempt a network call; degrade to synthetic.
-        if not getattr(self.client, "api_key", ""):
-            logger.info("media_fetch: no BD api_key — skipping fetch for %s", primitive_id)
-            return None
-
         try:
-            urls = await self.client.serp_image_search(
-                query, count=self.max_candidates, session=session
-            )
+            urls = await self.fetcher.serp_image(query, count=self.max_candidates)
         except Exception as exc:  # noqa: BLE001 — search failure ⇒ degrade, don't crash
             logger.warning("media_fetch: SERP image search failed for %r: %s", query[:60], exc)
             return None
 
         for url in urls:
             try:
-                data, ctype = await self.client.fetch_image_bytes(url, session=session)
+                data, ctype = await self.fetcher.fetch_image_bytes(url)
             except Exception as exc:  # noqa: BLE001 — try the next candidate
                 logger.warning("media_fetch: download failed %s: %s", url[:80], exc)
                 continue

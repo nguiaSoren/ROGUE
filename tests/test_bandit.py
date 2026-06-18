@@ -221,7 +221,7 @@ def test_discovery_agent_with_bandit_calls_select(small_arm_pool, monkeypatch) -
     class _NoopClient:
         async def aclose(self): pass
 
-    agent = DiscoveryAgent(client=_NoopClient(), plugins=[], bandit=bandit)
+    agent = DiscoveryAgent(fetcher=_NoopClient(), plugins=[], bandit=bandit)
     queries = agent.serp_queries(datetime.now(timezone.utc))
     # 5-arm pool clamps k=10 down to 5.
     assert len(queries) == 5

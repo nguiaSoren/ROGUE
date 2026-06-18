@@ -24,7 +24,7 @@ import hashlib
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -65,6 +65,7 @@ class ObliteratusHfPlugin(SourcePlugin):
     name = "obliteratus_hf"
     source_type = "huggingface"
     bright_data_product = "web_unlocker"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.UNLOCK})
 
     def __init__(
         self,
@@ -83,7 +84,7 @@ class ObliteratusHfPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Per model: fetch README via Web Unlocker. Plus the org activity page once."""
@@ -94,7 +95,7 @@ class ObliteratusHfPlugin(SourcePlugin):
         for model in self.models:
             url = _readme_url(model)
             try:
-                page = await client.web_unlock(url, format="markdown")
+                page = await fetcher.unlock(url, format="markdown")
             except NotImplementedError:
                 raise
             except Exception:
@@ -132,7 +133,7 @@ class ObliteratusHfPlugin(SourcePlugin):
         # --- 2. /activity page (daily delta of new publishes) ---
         if self.include_activity_page:
             try:
-                activity = await client.web_unlock(HF_ACTIVITY_URL, format="markdown")
+                activity = await fetcher.unlock(HF_ACTIVITY_URL, format="markdown")
             except NotImplementedError:
                 raise
             except Exception:

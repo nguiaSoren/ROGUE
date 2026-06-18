@@ -39,7 +39,7 @@ from rogue.harvest.media_extract import DEFAULT_MEDIA_LIMIT, media_urls_for_docu
 from rogue.harvest.media_fetch import _EXT_BY_CTYPE, _looks_like_image
 
 if TYPE_CHECKING:  # pragma: no cover
-    from rogue.harvest.bright_data_client import BrightDataClient
+    from rogue.harvest.fetchers import Fetcher
     from rogue.schemas import RawDocument
 
 logger = logging.getLogger("rogue.harvest.media_ingest")
@@ -120,22 +120,20 @@ class IngestedImage:
 
 
 class MediaIngestor:
-    """Download + cache a harvested document's images via Bright Data Web Unlocker.
+    """Download + cache a harvested document's images via a backend-agnostic :class:`~rogue.harvest.fetchers.Fetcher`.
 
-    ``client`` is a ``BrightDataClient`` (uses ``fetch_image_bytes``). A blank
-    ``api_key`` degrades every call to a no-op (returns ``[]``) so offline /
-    test runs never attempt a network call. Per-image failures are isolated —
-    one bad URL never sinks the rest of the document's images.
+    ``fetcher`` needs :attr:`~Capability.IMAGE_BYTES`. Per-image failures are
+    isolated — one bad URL never sinks the rest of the document's images.
     """
 
     def __init__(
         self,
-        client: "BrightDataClient",
+        fetcher: "Fetcher",
         cache_dir: Path = DEFAULT_INGEST_CACHE_DIR,
         *,
         max_images_per_doc: int = 4,
     ) -> None:
-        self.client = client
+        self.fetcher = fetcher
         self.cache_dir = Path(cache_dir)
         self.max_images_per_doc = max_images_per_doc
 
@@ -168,12 +166,8 @@ class MediaIngestor:
         if hit is not None:
             return IngestedImage.from_path(hit, url)
 
-        if not getattr(self.client, "api_key", ""):
-            logger.info("media_ingest: no BD api_key — skipping download of %s", url[:80])
-            return None
-
         try:
-            data, ctype = await self.client.fetch_image_bytes(url, session=session)
+            data, ctype = await self.fetcher.fetch_image_bytes(url)
         except Exception as exc:  # noqa: BLE001 — one bad image must not crash the doc
             logger.warning("media_ingest: download failed %s: %s", url[:80], exc)
             return None

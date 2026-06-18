@@ -330,6 +330,114 @@ class _FakeBrightDataClient:
         )
 
 
+class _FakeFetcher:
+    """Minimal Fetcher-shaped stub for the refactored source plugins.
+
+    Exposes Fetcher-interface methods: ``serp``, ``unlock``, ``browser``,
+    ``reddit_subreddit``, ``reddit_keyword``, ``x_user_posts``, ``hf_discussion``.
+    Tests that previously used ``_FakeBrightDataClient`` for github_search /
+    pliny / x_via_unlocker now use this stub instead.
+    """
+
+    def __init__(
+        self,
+        *,
+        reddit_posts: list[RedditPost] | None = None,
+        x_posts: list[XPost] | None = None,
+        hf_threads: list[HFDiscussion] | None = None,
+        hf_raises_runtime: bool = False,
+        serp_results: dict[str, SerpResponse] | None = None,
+        unlock_pages: dict[str, UnlockedPage] | None = None,
+        browser_pages: dict[str, ScrapedPage] | None = None,
+    ) -> None:
+        self.reddit_posts = reddit_posts or []
+        self.x_posts = x_posts or []
+        self.hf_threads = hf_threads or []
+        self.hf_raises_runtime = hf_raises_runtime
+        self.serp_results = serp_results or {}
+        self.unlock_pages = unlock_pages or {}
+        self.browser_pages = browser_pages or {}
+
+        self.reddit_subreddit_calls: list[str] = []
+        self.reddit_keyword_calls: list[str] = []
+        self.x_calls: list[str] = []
+        self.serp_calls: list[str] = []
+        self.unlock_calls: list[str] = []
+        self.browser_calls: list[str] = []
+        self.browser_storage_state_seen: list[Any] = []
+
+    async def serp(
+        self,
+        query: str,
+        count: int = 10,
+        engine: str = "google",
+    ) -> SerpResponse:
+        self.serp_calls.append(query)
+        if query in self.serp_results:
+            return self.serp_results[query]
+        return SerpResponse(
+            query=query,
+            engine=engine,
+            fetched_at=datetime.now(timezone.utc),
+            organic_results=[],
+            knowledge_panel=None,
+            raw_json={"organic": []},
+        )
+
+    async def unlock(self, url: str, format: str = "markdown") -> UnlockedPage:
+        self.unlock_calls.append(url)
+        if url in self.unlock_pages:
+            return self.unlock_pages[url]
+        return UnlockedPage(
+            url=url,
+            fetched_at=datetime.now(timezone.utc),
+            content="",
+            content_format=format if format in ("html", "markdown") else "markdown",
+            status_code=200,
+        )
+
+    async def browser(
+        self,
+        url: str,
+        wait_for_selector: str | None = None,
+        scroll_pages: int = 1,
+        *,
+        storage_state: dict | None = None,
+    ) -> ScrapedPage:
+        self.browser_calls.append(url)
+        self.browser_storage_state_seen.append(storage_state)
+        if url in self.browser_pages:
+            return self.browser_pages[url]
+        return ScrapedPage(
+            url=url,
+            fetched_at=datetime.now(timezone.utc),
+            html="<html></html>",
+            rendered_text="placeholder body text",
+        )
+
+    async def reddit_subreddit(self, subreddit: str, limit: int = 100) -> list[RedditPost]:
+        self.reddit_subreddit_calls.append(subreddit)
+        return list(self.reddit_posts)
+
+    async def reddit_keyword(
+        self,
+        keyword: str,
+        date_range: str = "Past week",
+        num_of_posts: int = 50,
+    ) -> list[RedditPost]:
+        self.reddit_keyword_calls.append(keyword)
+        return list(self.reddit_posts)
+
+    async def x_user_posts(self, profile_url: str, limit: int = 50) -> list[XPost]:
+        self.x_calls.append(profile_url)
+        return list(self.x_posts)
+
+    async def hf_discussion(self, model_id: str) -> list[HFDiscussion]:
+        if self.hf_raises_runtime:
+            raise RuntimeError("HF capability unavailable (no dataset provisioned)")
+        return list(self.hf_threads)
+
+
 # --------------------------------------------------------------------------- #
 # A. BrightDataClient — REST products
 # --------------------------------------------------------------------------- #
@@ -854,8 +962,8 @@ def _assert_basic_raw_document_shape(
 
 @pytest.mark.asyncio
 async def test_reddit_plugin_emits_raw_documents() -> None:
-    plugin = RedditSubredditPlugin(subreddits=["ChatGPTJailbreak"])
-    fake = _FakeBrightDataClient(
+    plugin = RedditSubredditPlugin(subreddits=["ChatGPTJailbreak"], keywords=[])
+    fake = _FakeFetcher(
         reddit_posts=[
             _make_reddit_post(post_id="recent", posted_at=NEWER),
             # Older than `since` — must be filtered out by the plugin.
@@ -887,7 +995,7 @@ async def test_reddit_plugin_serp_queries_substitutes_date() -> None:
 @pytest.mark.asyncio
 async def test_x_plugin_emits_raw_documents() -> None:
     plugin = XUserTimelinePlugin(handles=["simonw"])
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         x_posts=[
             _make_x_post(post_id="111", posted_at=NEWER),
             _make_x_post(post_id="000", posted_at=OLDER),
@@ -939,7 +1047,7 @@ async def test_arxiv_plugin_extracts_ids_and_fetches_abstracts() -> None:
             status_code=200,
         )
 
-    fake = _FakeBrightDataClient(unlock_pages=unlock_pages)
+    fake = _FakeFetcher(unlock_pages=unlock_pages)
 
     docs = await plugin.fetch_since(fake, since=SINCE)  # type: ignore[arg-type]
 
@@ -972,7 +1080,7 @@ async def test_blog_static_plugin_fetches_feed_then_posts() -> None:
     )
 
     plugin = BlogStaticPlugin(blogs=[target])
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         unlock_pages={
             "https://blog.example.com/": UnlockedPage(
                 url="https://blog.example.com/",
@@ -1023,7 +1131,7 @@ async def test_github_search_plugin_serp_then_readme() -> None:
         raw_json={},
     )
     readme_md = "# Awesome jailbreaks\n\n" + ("Body paragraph. " * 20)
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         serp_results={queries[0]: canned_serp},
         unlock_pages={
             "https://raw.githubusercontent.com/owner/repo/main/README.md": (
@@ -1051,11 +1159,11 @@ async def test_github_search_plugin_serp_then_readme() -> None:
 
 @pytest.mark.asyncio
 async def test_huggingface_plugin_falls_back_to_web_unlocker() -> None:
-    """When the Web Scraper API path raises ``RuntimeError`` (no dataset
-    provisioned), the plugin must fall back to a Web Unlocker fetch."""
+    """When the HF capability raises ``RuntimeError`` (no dataset provisioned),
+    the plugin must fall back to an unlock fetch."""
     plugin = HuggingFaceDiscussionPlugin(model_ids=["bigscience/bloomz"])
     discussions_url = "https://huggingface.co/bigscience/bloomz/discussions"
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         hf_raises_runtime=True,
         unlock_pages={
             discussions_url: UnlockedPage(
@@ -1088,7 +1196,7 @@ async def test_community_archive_plugin_uses_scraping_browser() -> None:
         scroll_pages=2,
     )
     plugin = CommunityArchivePlugin(archives=[target])
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         browser_pages={
             "https://archive.example.com/": ScrapedPage(
                 url="https://archive.example.com/",
@@ -1132,8 +1240,8 @@ def test_source_plugin_base_class_enforces_fetch_since() -> None:
 async def test_reddit_plugin_archive_hash_matches_content() -> None:
     """``RawDocument.archive_hash`` must equal SHA-256 of ``raw_content`` —
     catches regressions in the plugin's hash computation."""
-    plugin = RedditSubredditPlugin(subreddits=["LocalLLaMA"])
-    fake = _FakeBrightDataClient(
+    plugin = RedditSubredditPlugin(subreddits=["LocalLLaMA"], keywords=[])
+    fake = _FakeFetcher(
         reddit_posts=[_make_reddit_post(posted_at=NEWER, subreddit="LocalLLaMA")]
     )
     docs = await plugin.fetch_since(fake, since=SINCE)  # type: ignore[arg-type]
@@ -1233,7 +1341,7 @@ async def test_pliny_plugin_l1b3rt4s_direct_fetch_emits_one_doc_per_file(monkeyp
         )
         for name in (*test_files, *test_special)
     }
-    fake = _FakeBrightDataClient(unlock_pages=unlock_pages)
+    fake = _FakeFetcher(unlock_pages=unlock_pages)
 
     docs = await plugin.fetch_since(fake, since=SINCE)  # type: ignore[arg-type]
 
@@ -1277,9 +1385,9 @@ async def test_pliny_plugin_skips_empty_unlock_responses(monkeypatch) -> None:
         include_cl4r1t4s=False,
         include_serp_discovery=False,
     )
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         unlock_pages={
-            # The default _FakeBrightDataClient returns empty content for any
+            # The default _FakeFetcher returns empty content for any
             # URL not in unlock_pages — so leaving this dict empty exercises
             # the "no content" branch directly.
         }
@@ -1317,7 +1425,7 @@ async def test_pliny_plugin_cl4r1t4s_discovery_uses_github_tree_api(monkeypatch)
 
     monkeypatch.setattr(plg.PlinyGithubPlugin, "_discover_cl4r1t4s_paths", staticmethod(fake_discover))
 
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         unlock_pages={
             _cl4r1t4s_raw_url("OPENAI/ChatGPT5-08-07-2025.mkd"): UnlockedPage(
                 url=_cl4r1t4s_raw_url("OPENAI/ChatGPT5-08-07-2025.mkd"),
@@ -1400,7 +1508,7 @@ async def test_pliny_plugin_serp_umbrella_skips_already_covered_repos(monkeypatc
     readme_url = (
         "https://raw.githubusercontent.com/elder-plinius/SOME-NEW-REPO/main/README.md"
     )
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         serp_results={query: canned},
         unlock_pages={
             readme_url: UnlockedPage(
@@ -1462,7 +1570,7 @@ async def test_leakhub_plugin_keeps_verified_pages_only(monkeypatch) -> None:
 
     verified_url = "https://leakhub.ai/prompts/openai"
     pending_url = "https://leakhub.ai/prompts/anthropic"
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         browser_pages={
             verified_url: ScrapedPage(
                 url=verified_url,
@@ -1507,7 +1615,7 @@ async def test_leakhub_plugin_flags_all_empty_for_day1_morning_gate(monkeypatch)
         '"localStorage": [{"name": "__convexAuthJWT_test", "value": "dummy"}]}]}',
     )
     plugin = LeakHubScrapePlugin(providers=["openai", "anthropic"])
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         browser_pages={
             "https://leakhub.ai/prompts/openai": ScrapedPage(
                 url="https://leakhub.ai/prompts/openai",
@@ -1538,7 +1646,7 @@ async def test_leakhub_plugin_records_clear_error_when_storage_state_missing(
     2026-05-26 "silent zero source" anti-pattern."""
     monkeypatch.delenv("LEAKHUB_STORAGE_STATE", raising=False)
     plugin = LeakHubScrapePlugin(providers=["openai"])
-    fake = _FakeBrightDataClient(browser_pages={})
+    fake = _FakeFetcher(browser_pages={})
     docs = await plugin.fetch_since(fake, since=SINCE)  # type: ignore[arg-type]
     assert docs == []
     assert len(plugin.call_errors) == 1
@@ -1566,7 +1674,7 @@ async def test_leakhub_plugin_loads_storage_state_from_file_path(
     monkeypatch.setenv("LEAKHUB_STORAGE_STATE", str(state_path))
 
     plugin = LeakHubScrapePlugin(providers=["openai"])
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         browser_pages={
             "https://leakhub.ai/prompts/openai": ScrapedPage(
                 url="https://leakhub.ai/prompts/openai",
@@ -1578,7 +1686,7 @@ async def test_leakhub_plugin_loads_storage_state_from_file_path(
     )
     docs = await plugin.fetch_since(fake, since=SINCE)  # type: ignore[arg-type]
     assert len(docs) == 1
-    # Verify storage_state actually reached scrape_browser
+    # Verify storage_state actually reached fetcher.browser
     assert fake.browser_storage_state_seen == [state]
 
 
@@ -1628,7 +1736,7 @@ async def test_obliteratus_plugin_fetches_readme_per_model_plus_activity() -> No
         content_format="markdown",
         status_code=200,
     )
-    fake = _FakeBrightDataClient(unlock_pages=unlock_pages)
+    fake = _FakeFetcher(unlock_pages=unlock_pages)
 
     docs = await plugin.fetch_since(fake, since=SINCE)  # type: ignore[arg-type]
 
@@ -1654,7 +1762,7 @@ async def test_obliteratus_plugin_skips_short_readme_responses() -> None:
         models=("Qwen3-4B-OBLITERATED",),
         include_activity_page=False,
     )
-    fake = _FakeBrightDataClient(
+    fake = _FakeFetcher(
         unlock_pages={
             _readme_url("Qwen3-4B-OBLITERATED"): UnlockedPage(
                 url=_readme_url("Qwen3-4B-OBLITERATED"),
@@ -1719,7 +1827,7 @@ def test_discovery_agent_day1_query_picker_returns_ten() -> None:
     )
 
     assert len(DAY1_HANDPICKED_QUERIES) == 10
-    agent = DiscoveryAgent(client=None, plugins=[])  # type: ignore[arg-type]
+    agent = DiscoveryAgent(fetcher=None, plugins=[])  # type: ignore[arg-type]
     picked = agent.serp_queries(SINCE)
     assert len(picked) == 10
     # `{date}` must be substituted in every query.
@@ -1737,7 +1845,7 @@ def test_discovery_agent_query_picker_can_be_overridden() -> None:
         return ["site:example.com after:2026-05-19"]
 
     agent = DiscoveryAgent(
-        client=None,  # type: ignore[arg-type]
+        fetcher=None,  # type: ignore[arg-type]
         plugins=[],
         query_picker=bandit_stub,
     )
@@ -1751,9 +1859,9 @@ class _FailingPlugin(SourcePlugin):
     source_type = "other"
     bright_data_product = "web_unlocker"
 
-    async def fetch_since(
+    async def fetch_since(  # type: ignore[override]
         self,
-        client: BrightDataClient,
+        fetcher: Any,
         since: datetime,
     ) -> list[RawDocument]:
         raise RuntimeError("simulated upstream blowup")
@@ -1766,9 +1874,9 @@ class _StubReturnsDocsPlugin(SourcePlugin):
     source_type = "blog"
     bright_data_product = "web_unlocker"
 
-    async def fetch_since(
+    async def fetch_since(  # type: ignore[override]
         self,
-        client: BrightDataClient,
+        fetcher: Any,
         since: datetime,
     ) -> list[RawDocument]:
         fetched_at = datetime.now(timezone.utc)
@@ -1798,7 +1906,7 @@ async def test_discovery_agent_run_fans_out_and_isolates_failures() -> None:
     from rogue.harvest.discovery_agent import DiscoveryAgent
 
     plugins = [_StubReturnsDocsPlugin(), _FailingPlugin(), _StubReturnsDocsPlugin()]
-    agent = DiscoveryAgent(client=None, plugins=plugins)  # type: ignore[arg-type]
+    agent = DiscoveryAgent(fetcher=None, plugins=plugins)  # type: ignore[arg-type]
 
     docs = await agent.run(since=SINCE)
 
@@ -1820,9 +1928,9 @@ class _NotImplementedStubPlugin(SourcePlugin):
     source_type = "other"
     bright_data_product = "web_unlocker"
 
-    async def fetch_since(
+    async def fetch_since(  # type: ignore[override]
         self,
-        client: BrightDataClient,
+        fetcher: Any,
         since: datetime,
     ) -> list[RawDocument]:
         raise NotImplementedError("Day-0 stub")
@@ -1836,7 +1944,7 @@ async def test_discovery_agent_run_propagates_not_implemented_loudly() -> None:
     from rogue.harvest.discovery_agent import DiscoveryAgent
 
     agent = DiscoveryAgent(  # type: ignore[arg-type]
-        client=None,
+        fetcher=None,
         plugins=[_NotImplementedStubPlugin()],
     )
     with pytest.raises(NotImplementedError):

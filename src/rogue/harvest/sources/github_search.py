@@ -29,7 +29,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -100,6 +100,7 @@ class GithubSearchPlugin(SourcePlugin):
     name = "github_search"
     source_type = "github"
     bright_data_product = "serp"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.SERP, Capability.UNLOCK})
 
     def __init__(
         self,
@@ -132,7 +133,7 @@ class GithubSearchPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """SERP-discover repos → README → conditional deep tree traversal.
@@ -150,7 +151,7 @@ class GithubSearchPlugin(SourcePlugin):
 
         for query in self.serp_queries(since):
             try:
-                serp = await client.serp_search(query)
+                serp = await fetcher.serp(query)
             except NotImplementedError:
                 raise
             except Exception as exc:
@@ -187,7 +188,7 @@ class GithubSearchPlugin(SourcePlugin):
                         f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/README.md"
                     )
                     try:
-                        readme = await client.web_unlock(readme_url, format="markdown")
+                        readme = await fetcher.unlock(readme_url, format="markdown")
                     except NotImplementedError:
                         raise
                     except Exception:
@@ -230,7 +231,7 @@ class GithubSearchPlugin(SourcePlugin):
                     # --- Phase 3: conditional deep tree traversal ---
                     if self.enable_deep_traversal and _DEEP_TRAVERSAL_RE.search(raw_content):
                         deep_docs = await self._deep_traverse_repo(
-                            client=client,
+                            fetcher=fetcher,
                             owner=owner,
                             repo=repo,
                             branch=branch,
@@ -247,7 +248,7 @@ class GithubSearchPlugin(SourcePlugin):
     async def _deep_traverse_repo(
         self,
         *,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         owner: str,
         repo: str,
         branch: str,
@@ -294,7 +295,7 @@ class GithubSearchPlugin(SourcePlugin):
             if self.should_skip_fetch(raw_url, blob_sha):
                 continue
             try:
-                page = await client.web_unlock(raw_url, format="markdown")
+                page = await fetcher.unlock(raw_url, format="markdown")
             except NotImplementedError:
                 raise
             except Exception as exc:

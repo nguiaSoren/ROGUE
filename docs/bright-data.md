@@ -2,6 +2,8 @@
 
 How ROGUE uses Bright Data's five data-collection products end-to-end, the self-tuning SERP-spend bandit that allocates the discovery budget by online learning, and the concrete per-harvest economics.
 
+> Bright Data is the **default** harvest backend, not a hard requirement — the harvest is backend-agnostic. To run it on other scrapers (Crawl4AI, Firecrawl, keyless built-ins) or no paid account at all, and to pick your own extraction/judge model, see [`harvest-backends.md`](harvest-backends.md).
+
 ## Bright Data integration
 
 ROGUE uses 5 Bright Data products end-to-end:

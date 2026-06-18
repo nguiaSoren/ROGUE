@@ -49,7 +49,7 @@ import re
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -160,6 +160,7 @@ class LeakHubScrapePlugin(SourcePlugin):
     name = "leakhub_scrape"
     source_type = "other"  # no closer match in SourceType literal — locked Day 0
     bright_data_product = "scraping_browser"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.BROWSER})
 
     def __init__(
         self,
@@ -185,7 +186,7 @@ class LeakHubScrapePlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Per provider: render the browse route, keep verified-only content."""
@@ -218,7 +219,7 @@ class LeakHubScrapePlugin(SourcePlugin):
         for provider in self.providers:
             url = f"{LEAKHUB_BASE}/prompts/{provider}"
             try:
-                page = await client.scrape_browser(
+                page = await fetcher.browser(
                     url,
                     wait_for_selector=self.wait_for_selector,
                     scroll_pages=self.scroll_pages,

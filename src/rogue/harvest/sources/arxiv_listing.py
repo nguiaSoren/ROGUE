@@ -20,7 +20,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -68,6 +68,7 @@ class ArxivListingPlugin(SourcePlugin):
     name = "arxiv_listing"
     source_type = "arxiv"
     bright_data_product = "web_unlocker"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.UNLOCK})
 
     def __init__(self, listings: list[str] | None = None) -> None:
         self.listings = listings if listings is not None else list(DEFAULT_LISTINGS)
@@ -85,7 +86,7 @@ class ArxivListingPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Fetch each listing in parallel, then each abstract in chunked parallel.
@@ -101,7 +102,7 @@ class ArxivListingPlugin(SourcePlugin):
 
         async def fetch_listing(listing_url: str) -> tuple[str, list[str]]:
             try:
-                listing = await client.web_unlock(listing_url, format="html")
+                listing = await fetcher.unlock(listing_url, format="html")
             except NotImplementedError:
                 raise
             except Exception as exc:
@@ -155,7 +156,7 @@ class ArxivListingPlugin(SourcePlugin):
                 return None
             async with sem:
                 try:
-                    page = await client.web_unlock(abs_url, format="html")
+                    page = await fetcher.unlock(abs_url, format="html")
                 except NotImplementedError:
                     raise
                 except Exception:

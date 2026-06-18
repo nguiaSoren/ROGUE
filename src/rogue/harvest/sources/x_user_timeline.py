@@ -21,7 +21,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -60,6 +60,7 @@ class XUserTimelinePlugin(SourcePlugin):
     name = "x_user_timeline"
     source_type = "x"
     bright_data_product = "web_scraper_api"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.X})
 
     def __init__(
         self,
@@ -77,7 +78,7 @@ class XUserTimelinePlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Fetch each account's recent posts; emit one RawDocument per post."""
@@ -89,7 +90,7 @@ class XUserTimelinePlugin(SourcePlugin):
         for handle in self.handles:
             profile_url = f"https://x.com/{handle}"
             try:
-                posts = await client.scrape_x_user_posts(
+                posts = await fetcher.x_user_posts(
                     profile_url, limit=self.per_user_limit
                 )
             except NotImplementedError:

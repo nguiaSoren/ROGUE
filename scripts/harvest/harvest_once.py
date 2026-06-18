@@ -100,6 +100,11 @@ from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # n
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.discovery_agent import DiscoveryAgent  # noqa: E402
 from rogue.harvest.fetch_cache import FetchCache, load_snapshot  # noqa: E402
+from rogue.harvest.fetchers import (  # noqa: E402
+    RoutingFetcher,
+    build_default_registry,
+    is_keyless_harvest,
+)
 from rogue.harvest.media_ingest import MediaIngestor  # noqa: E402
 from rogue.reproduce.strategy_library import persist_technique  # noqa: E402
 from rogue.schemas import AttackPrimitive, RawDocument, TechniqueSpec  # noqa: E402
@@ -416,6 +421,13 @@ async def run_harvest(
     #     constructs the real client from env vars). ---
     if bd_client is None:
         bd_client = BrightDataClient.from_env()
+    # Scraper-agnostic harvest: Bright Data is the default backend (wrapping the client
+    # above, so an injected test double still drives the run); the free/keyless backends
+    # register behind it so the harvest can run without a BD account. Sources, phases and
+    # media all talk to this one RoutingFetcher, which dispatches each capability to the
+    # registry-resolved backend (BD first when present).
+    fetcher_registry = build_default_registry(brightdata_client=bd_client)
+    fetcher = RoutingFetcher(fetcher_registry)
     if embed_fn is None:
         embed_fn = _default_openai_embed_fn(embedding_model)
     if extractor is None:
@@ -429,7 +441,7 @@ async def run_harvest(
     # Reuses the same BD client (Web Unlocker) for image downloads.
     if media_ingestor is None and os.environ.get("HARVEST_INGEST_IMAGES", "1") != "0":
         media_ingestor = MediaIngestor(
-            bd_client,
+            fetcher,
             max_images_per_doc=int(os.environ.get("MEDIA_INGEST_MAX_PER_DOC", "4")),
         )
 
@@ -508,8 +520,28 @@ async def run_harvest(
 
             plugins = default_plugins() + [XViaUnlockerPlugin(handles=list(x_handles))]
             logger.info("X (SERP+Unlocker) ENABLED for handles: %s", ", ".join(x_handles))
+
+        # Keyless/free first run: no explicit source selection + only a rate-limited free scraper
+        # (keyless Firecrawl / direct+ddg). Scope to the highest-yield sources so the tight rate
+        # budget is spent on the sources that actually produce breaches (~96% of them) instead of
+        # 429-ing on low-value crawls. Override with explicit --x-handles / a focused run, or add
+        # crawl4ai / keys for the full set.
+        if plugins is None and is_keyless_harvest(fetcher_registry):
+            from rogue.harvest.discovery_agent import high_yield_plugins
+
+            plugins = high_yield_plugins()
+            logger.warning(
+                "keyless/free harvest — scoping to the %d highest-yield sources (%s) to fit the free "
+                "rate limit; install crawl4ai or add FIRECRAWL_API_KEY / BRIGHTDATA_* for the full set.",
+                len(plugins),
+                ", ".join(p.name for p in plugins),
+            )
         agent = DiscoveryAgent(
-            bd_client, plugins=plugins, bandit=agent_bandit, follow_links=follow_links
+            fetcher,
+            plugins=plugins,
+            bandit=agent_bandit,
+            follow_links=follow_links,
+            registry=fetcher_registry,
         )
 
         # §11.7 Tier B — preload the fetch_cache ledger so harvest can skip
@@ -896,7 +928,16 @@ async def run_harvest(
         except Exception as exc:  # noqa: BLE001 - bandit failure must not block harvest
             logger.warning("bandit: persist failed (%s) — state may be stale", exc)
     finally:
-        await bd_client.aclose()
+        # Close every registered backend's HTTP pool (the BD client wrapping bd_client,
+        # plus any free backends' httpx clients). Best-effort: one failing close never
+        # blocks the others or the engine dispose.
+        for _name in fetcher_registry.list():
+            _backend = fetcher_registry.get(_name)
+            if _backend is not None:
+                try:
+                    await _backend.aclose()
+                except Exception:  # noqa: BLE001
+                    logger.debug("backend %s aclose failed", _name, exc_info=True)
         engine.dispose()
 
     return stats
@@ -1019,6 +1060,19 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())
+
+    # Keyless Firecrawl hits a per-IP/day 429 cap; if any fetches were rate-limited (and skipped),
+    # surface it in the run summary so the user knows coverage was partial + how to scale.
+    from rogue.harvest.fetchers.firecrawl import FirecrawlFetcher
+
+    if FirecrawlFetcher.rate_limited_count > 0:
+        logger.warning(
+            "run_id=%s — Firecrawl rate limit hit %d×; those fetches were skipped (partial coverage). "
+            "For the full harvest: install crawl4ai (free/local/unlimited: `pip install \"rogue[crawl4ai]\"`), "
+            "or set FIRECRAWL_API_KEY / BRIGHTDATA_* keys, or re-run later.",
+            run_id,
+            FirecrawlFetcher.rate_limited_count,
+        )
 
     # Cache any ingested images into the DB, then auto-push to Neon — both
     # data-only, no spend, no-op when NEON_DATABASE_URL is unset / on Neon.
