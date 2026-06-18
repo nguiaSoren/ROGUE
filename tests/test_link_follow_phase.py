@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.bright_data_client import BrightDataClient  # noqa: F401 — used in resolve_redirect tests below
 from rogue.harvest.discovery_agent import DiscoveryAgent
 from rogue.harvest.link_follow_phase import (
     SUGGESTED_POST_SOURCE_TYPES,
@@ -34,7 +34,11 @@ class _Page:
 
 
 class _FakeClient:
-    """Records calls; resolves t.co → a fixed dest; web_unlock returns a page."""
+    """Records calls; resolves t.co → a fixed dest; unlock returns a page.
+
+    Implements the Fetcher duck-type surface used by run_link_follow_phase:
+    ``resolve_redirect`` + ``unlock``.
+    """
 
     api_key = "k"
 
@@ -48,7 +52,7 @@ class _FakeClient:
         self.resolved.append(url)
         return self._resolve_map.get(url, url)
 
-    async def web_unlock(self, url, format="markdown", **kw):
+    async def unlock(self, url, format="markdown", **kw):
         self.unlocked.append(url)
         if url in self._fail_urls:
             raise RuntimeError("unlock boom")
@@ -139,7 +143,7 @@ async def test_one_hop_only_followed_pages_links_not_followed() -> None:
     doc = _doc("https://x.com/u/status/1", body, content_format="text")
 
     class _OneHopClient(_FakeClient):
-        async def web_unlock(self, url, format="markdown", **kw):
+        async def unlock(self, url, format="markdown", **kw):
             self.unlocked.append(url)
             # The fetched page itself links onward to siteB — must be ignored.
             return _Page(url, content="see also https://siteB.org/deeper")
@@ -256,8 +260,8 @@ class _PostPlugin(SourcePlugin):
 
 @pytest.mark.asyncio
 async def test_discovery_agent_runs_link_follow_after_plugins() -> None:
-    client = _FakeClient()
-    agent = DiscoveryAgent(client, plugins=[_PostPlugin()])  # follow_links defaults True
+    fetcher = _FakeClient()
+    agent = DiscoveryAgent(fetcher, plugins=[_PostPlugin()])  # follow_links defaults True
     docs = await agent.run(since=datetime(2026, 5, 1, tzinfo=timezone.utc))
 
     # The plugin doc + the followed github link doc.
@@ -271,8 +275,8 @@ async def test_discovery_agent_runs_link_follow_after_plugins() -> None:
 
 @pytest.mark.asyncio
 async def test_discovery_agent_follow_links_disabled() -> None:
-    client = _FakeClient()
-    agent = DiscoveryAgent(client, plugins=[_PostPlugin()], follow_links=False)
+    fetcher = _FakeClient()
+    agent = DiscoveryAgent(fetcher, plugins=[_PostPlugin()], follow_links=False)
     docs = await agent.run(since=datetime(2026, 5, 1, tzinfo=timezone.utc))
     assert len(docs) == 1  # only the plugin doc; no link followed
-    assert client.unlocked == []
+    assert fetcher.unlocked == []

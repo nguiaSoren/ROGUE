@@ -34,7 +34,7 @@ DEFAULT_LINKS_PER_DOC = 3
 
 # URL shorteners whose final destination must be resolved before dedup/routing
 # (an X post body is full of ``t.co`` links). Resolution is a cheap auth-less
-# HEAD/GET hop (``BrightDataClient.resolve_redirect``), NOT a BD-billed fetch.
+# HEAD/GET hop (``Fetcher.resolve_redirect``), NOT a billed fetch.
 SHORTENER_HOSTS: frozenset[str] = frozenset(
     {
         "t.co",

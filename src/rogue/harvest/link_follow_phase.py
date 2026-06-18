@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from rogue.harvest.bandit_serp_phase import _infer_source_type
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers.base import Fetcher
 from rogue.harvest.link_extract import (
     DEFAULT_LINKS_PER_DOC,
     extract_outbound_urls,
@@ -87,7 +87,7 @@ class LinkFollowPhaseResult:
 
 
 async def run_link_follow_phase(
-    client: BrightDataClient,
+    fetcher: Fetcher,
     source_docs: list[RawDocument],
     *,
     seen_urls: set[str] | None = None,
@@ -98,8 +98,9 @@ async def run_link_follow_phase(
     """Follow outbound links from ``source_docs`` 1-hop and emit tagged RawDocuments.
 
     Args:
-        client: a live :class:`BrightDataClient` (uses ``resolve_redirect`` +
-            ``web_unlock``).
+        fetcher: a :class:`~rogue.harvest.fetchers.base.Fetcher` (typically a
+            :class:`~rogue.harvest.fetchers.routing.RoutingFetcher`); uses
+            :meth:`Fetcher.resolve_redirect` and :meth:`Fetcher.unlock`.
         source_docs: the plugin/post docs to mine for outbound links. 1-hop is
             enforced by the caller passing ONLY plugin docs (never this phase's
             own output or the SERP phase's).
@@ -148,10 +149,10 @@ async def run_link_follow_phase(
             seen.add(raw_url)
 
             # Resolve t.co-style shorteners to the real destination so dedup +
-            # routing + provenance key on the true URL (cheap, non-BD hop).
+            # routing + provenance key on the true URL.
             if is_shortener(raw_url):
                 try:
-                    final_url = await client.resolve_redirect(raw_url)
+                    final_url = await fetcher.resolve_redirect(raw_url)
                 except Exception as exc:  # noqa: BLE001 — degrade to the short link
                     errors.append(f"resolve_failed {raw_url}: {type(exc).__name__}: {exc}")
                     final_url = raw_url
@@ -167,7 +168,7 @@ async def run_link_follow_phase(
                 seen.add(final_url)
 
             try:
-                page = await client.web_unlock(final_url, format="markdown")
+                page = await fetcher.unlock(final_url, format="markdown")
             except Exception as exc:  # noqa: BLE001 — one bad link must not sink the phase
                 errors.append(f"fetch_failed {final_url}: {type(exc).__name__}: {exc}")
                 continue

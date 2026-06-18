@@ -243,6 +243,25 @@ ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
 # serves http://127.0.0.1:8001/mcp  (ROGUE_MCP_HOST / ROGUE_MCP_PORT override the bind)
 ```
 
+## Run the harvest free — no Bright Data, no keys
+
+ROGUE runs the **entire harvest for free** — Bright Data is *optional* (a premium tier for the hardest anti-bot targets + structured X), **not a dependency**. One command sets up the best free scraper:
+
+```bash
+rogue setup
+```
+
+That installs **crawl4ai** + its Chromium — and that's all most people need: it then auto-leads page fetch + JS render (clean markdown, stealth, unlimited). The harvest is **backend-agnostic** — a `Fetcher` registry picks the best backend per capability — so the rest of the free stack slots in automatically with no further config:
+
+| Capability | Free backend | How |
+|---|---|---|
+| Page fetch + JS render | **crawl4ai** | `rogue setup` (clean markdown, stealth, **unlimited**) |
+| Web + image search | **SearXNG** | self-host → `SEARXNG_URL` (70+ engines, unlimited) |
+| PDF → markdown | **local_pdf** | always on (`pypdf` core; `rogue setup --pdf` upgrades it) |
+| Zero-install fallback | **Firecrawl keyless** | auto-enabled when nothing else is configured (no account) |
+
+Add **residential scale** with any cheap proxy (Webshare, IPRoyal, your own) — one var, applied to all scrapers: `ROGUE_PROXY_URL=http://user:pass@host:port`. Full matrix + preference order: [`docs/harvest-backends.md`](docs/harvest-backends.md).
+
 ## Pipeline CLI reference
 
 The two `$`-billed driver scripts spend Bright Data + LLM credit and write the live DB — run them deliberately. All flags are optional.

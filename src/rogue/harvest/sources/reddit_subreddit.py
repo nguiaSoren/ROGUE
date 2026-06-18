@@ -39,7 +39,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -78,6 +78,7 @@ class RedditSubredditPlugin(SourcePlugin):
     name = "reddit_subreddit"
     source_type = "reddit"
     bright_data_product = "web_scraper_api"
+    required_capabilities: frozenset[Capability] = frozenset({Capability.REDDIT})
 
     def __init__(
         self,
@@ -124,7 +125,7 @@ class RedditSubredditPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Run subreddit_url + keyword discovery; emit one RawDocument per post.
@@ -142,7 +143,7 @@ class RedditSubredditPlugin(SourcePlugin):
 
         async def fetch_one_subreddit(sub: str) -> list[RawDocument]:
             try:
-                posts = await client.scrape_reddit_subreddit(
+                posts = await fetcher.reddit_subreddit(
                     sub, limit=self.per_subreddit_limit
                 )
             except NotImplementedError:
@@ -160,7 +161,7 @@ class RedditSubredditPlugin(SourcePlugin):
 
         async def fetch_one_keyword(kw: str) -> list[RawDocument]:
             try:
-                posts = await client.scrape_reddit_keyword(
+                posts = await fetcher.reddit_keyword(
                     kw,
                     date_range=self.keyword_date_range,
                     num_of_posts=self.per_keyword_num_of_posts,

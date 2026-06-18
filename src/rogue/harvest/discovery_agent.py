@@ -45,10 +45,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers.base import Fetcher
 
 if TYPE_CHECKING:
     from rogue.harvest.bandit import EpsilonGreedyBandit
+    from rogue.harvest.fetchers.registry import FetcherRegistry
 from rogue.harvest.sources import (
     ArxivListingPlugin,
     BlogStaticPlugin,
@@ -360,6 +361,28 @@ def default_plugins() -> list[SourcePlugin]:
     ]
 
 
+def high_yield_plugins() -> list[SourcePlugin]:
+    """The highest-yield sources only — for a rate-limited keyless/free first run.
+
+    Ranked from ROGUE's OWN results (per-source breaching-primitive counts, measured 2026-06-18):
+    ``github`` 80 · ``arxiv`` 52 · ``reddit`` 27 · ``blog`` 24 dominate; ``huggingface`` (3),
+    ``x`` (1) and the community archives are negligible. These five plugins cover ~96% of all
+    breaching primitives, so a keyless run with a tight per-IP/day rate budget spends it on the
+    sources that actually produce breaches instead of 429-ing on low-value crawls. The full set is
+    :func:`default_plugins`; pass ``--sources`` / explicit ``plugins=`` to override.
+
+    Order is cheapest-fetch-first (direct before SERP-discovery) so a mid-run rate cap drops the
+    fetch-heavy GitHub crawls last.
+    """
+    return [
+        ArxivListingPlugin(),  # arxiv — 52 breaching, 64% rate (highest), cheap direct fetch
+        BlogStaticPlugin(),  # blog — 24 breaching
+        RedditSubredditPlugin(),  # reddit — 27 breaching
+        GithubSearchPlugin(),  # github — 80 breaching (the top), SERP-discovery
+        PlinyGithubPlugin(),  # github / CL4R1T4S path
+    ]
+
+
 # --------------------------------------------------------------------------- #
 # Per-plugin run report (telemetry for the dashboard's freshness panel)
 # --------------------------------------------------------------------------- #
@@ -407,7 +430,7 @@ class DiscoveryAgent:
 
     Day-1 behavior:
       1. Substitute ``{date}`` in each of the 10 hand-tuned queries.
-      2. Fan out across every registered plugin's ``fetch_since(client, since)``
+      2. Fan out across every registered plugin's ``fetch_since(fetcher, since)``
          via :func:`asyncio.gather`, isolating per-plugin failures.
       3. Return the flat ``list[RawDocument]`` for the extraction layer.
       4. Stash per-plugin reports on ``last_run_reports`` for telemetry.
@@ -418,17 +441,23 @@ class DiscoveryAgent:
     to credit each arm with the post-dedup novel-primitive count. The bandit's
     state is persisted across runs by the caller (typically ``harvest_once.py``
     via ``bandit.to_disk(...)``); this class stays persistence-free.
+
+    Wave 1b: ``fetcher`` replaces ``client`` (BrightDataClient). Pass a
+    :class:`~rogue.harvest.fetchers.routing.RoutingFetcher` at runtime; the
+    optional ``registry`` enables the SERP-bandit cost caveat detection (see
+    :func:`~rogue.harvest.bandit_serp_phase.run_bandit_serp_phase`).
     """
 
     def __init__(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         plugins: Iterable[SourcePlugin] | None = None,
         query_picker: QueryPicker | None = None,
         bandit: "EpsilonGreedyBandit | None" = None,  # noqa: UP037 - forward ref
         follow_links: bool = True,
+        registry: "FetcherRegistry | None" = None,
     ) -> None:
-        self.client = client
+        self.fetcher = fetcher
         self.plugins: list[SourcePlugin] = (
             list(plugins) if plugins is not None else default_plugins()
         )
@@ -438,6 +467,8 @@ class DiscoveryAgent:
         # bounded by the phase's per-doc/total caps). Harvest_once flips it off
         # via HARVEST_FOLLOW_LINKS=0.
         self.follow_links = follow_links
+        # Registry enables SERP-bandit cost caveat detection in bandit_serp_phase.
+        self._registry = registry
         self.last_run_reports: list[PluginRunReport] = []
         # The most-recent select() result, exposed for the harvest script's
         # reward attribution call. Tuple of (arm_id, substituted_query).
@@ -563,8 +594,9 @@ class DiscoveryAgent:
             serp_seen = plugin_urls | (prefetched_urls or set())
             try:
                 phase = await run_bandit_serp_phase(
-                    client=self.client,
+                    self.fetcher,
                     picked_arms=self.last_selected_arms,
+                    registry=self._registry,
                     seen_urls=serp_seen,
                 )
                 flat_docs.extend(phase.docs)
@@ -591,7 +623,7 @@ class DiscoveryAgent:
             link_seen = {str(d.url) for d in flat_docs} | (prefetched_urls or set())
             try:
                 lf = await run_link_follow_phase(
-                    client=self.client,
+                    self.fetcher,
                     source_docs=plugin_docs,
                     seen_urls=link_seen,
                 )
@@ -615,7 +647,7 @@ class DiscoveryAgent:
         """Run one plugin's ``fetch_since``; convert any non-stub exception
         into ``(<empty>, error_str)`` so :meth:`run` can keep going."""
         try:
-            docs = await plugin.fetch_since(self.client, since)
+            docs = await plugin.fetch_since(self.fetcher, since)
         except NotImplementedError:
             # Day-0 stubs still surface loudly — never silently swallow.
             raise

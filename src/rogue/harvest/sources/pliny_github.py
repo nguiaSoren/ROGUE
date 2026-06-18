@@ -39,7 +39,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
-from rogue.harvest.bright_data_client import BrightDataClient
+from rogue.harvest.fetchers import Capability, Fetcher
 from rogue.schemas import RawDocument
 
 from .base import SourcePlugin
@@ -161,6 +161,7 @@ class PlinyGithubPlugin(SourcePlugin):
     name = "pliny_github"
     source_type = "github"
     bright_data_product = "serp"  # discovery-phase cost band; per-doc → web_unlocker
+    required_capabilities: frozenset[Capability] = frozenset({Capability.SERP, Capability.UNLOCK})
 
     def __init__(
         self,
@@ -187,7 +188,7 @@ class PlinyGithubPlugin(SourcePlugin):
 
     async def fetch_since(
         self,
-        client: BrightDataClient,
+        fetcher: Fetcher,
         since: datetime,
     ) -> list[RawDocument]:
         """Three-phase fetch: L1B3RT4S direct, CL4R1T4S discovery, SERP umbrella."""
@@ -217,7 +218,7 @@ class PlinyGithubPlugin(SourcePlugin):
             # skip the Web Unlocker fetch; an in-place rewrite changes the SHA.
             if self.should_skip_fetch(url, blob_sha or None):
                 continue
-            page = await self._safe_unlock(client, url, fmt="markdown")
+            page = await self._safe_unlock(fetcher, url, fmt="markdown")
             if page is None or not page.content or len(page.content) < 10:
                 # Empty body usually means the URL was treated as a fragment
                 # anchor — confirm the call path went through quote() above
@@ -256,7 +257,7 @@ class PlinyGithubPlugin(SourcePlugin):
                 # `.md` and `.txt` formats render best as `markdown` through
                 # Web Unlocker (raw text passthrough); `.mkd` does too — it's
                 # GitHub-flavored markdown despite the unusual extension.
-                page = await self._safe_unlock(client, url, fmt="markdown")
+                page = await self._safe_unlock(fetcher, url, fmt="markdown")
                 if page is None or not page.content or len(page.content) < 10:
                     continue
                 doc = self._build_doc(
@@ -281,7 +282,7 @@ class PlinyGithubPlugin(SourcePlugin):
             seen_repos: set[str] = set()
             for query in self.serp_queries(since):
                 try:
-                    serp = await client.serp_search(query)
+                    serp = await fetcher.serp(query)
                 except NotImplementedError:
                     raise
                 except Exception:
@@ -308,7 +309,7 @@ class PlinyGithubPlugin(SourcePlugin):
                         f"https://raw.githubusercontent.com/elder-plinius/{repo}"
                         "/main/README.md"
                     )
-                    page = await self._safe_unlock(client, readme_url, fmt="markdown")
+                    page = await self._safe_unlock(fetcher, readme_url, fmt="markdown")
                     if page is None or not page.content or len(page.content) < 10:
                         continue
                     doc = self._build_doc(
@@ -336,7 +337,7 @@ class PlinyGithubPlugin(SourcePlugin):
 
     @staticmethod
     async def _safe_unlock(
-        client: BrightDataClient,
+        fetcher: Fetcher,
         url: str,
         *,
         fmt: str,
@@ -345,7 +346,7 @@ class PlinyGithubPlugin(SourcePlugin):
         NotImplementedError used by Day-0 stubs (so test scaffolds still
         surface unimplemented paths loudly)."""
         try:
-            return await client.web_unlock(url, format=fmt)
+            return await fetcher.unlock(url, format=fmt)
         except NotImplementedError:
             raise
         except Exception:
