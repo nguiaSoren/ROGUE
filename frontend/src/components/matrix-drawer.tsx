@@ -412,7 +412,7 @@ export function PayloadImage({ primitiveId }: { primitiveId: string }) {
         src={`${API_BASE}/api/attacks/${primitiveId}/image`}
         alt="attack payload / carrier image"
         onError={() => setFailed(true)}
-        className="max-h-80 w-auto rounded-md border border-border/60 bg-card/40"
+        className="max-h-80 max-w-full w-auto rounded-md border border-border/60 bg-card/40"
       />
     </section>
   );

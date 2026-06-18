@@ -49,6 +49,10 @@ _CARDS: dict[str, dict] = {
         "top_attack": "training_data_extraction",
         "families": [f"family_{i}" for i in range(15)],
         "tier": "calibrated",
+        # The marketing card shows REAL mistral numbers, so its QR deep-links to mistral's breach
+        # cell (via the short /m/<slug> redirect), not the generic leaderboard. The sample card stays
+        # generic (gpt-4o-mini is illustrative, not a measured leaderboard model).
+        "qr_url": "https://rogue-eosin.vercel.app/m/mistral-small-2603",
     },
 }
 

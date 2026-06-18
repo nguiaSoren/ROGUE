@@ -127,7 +127,7 @@ function CellCard({ p, rank }: { p: CellPrimitive; rank: number }) {
                   href={s.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-rogue-green hover:underline truncate inline-block max-w-[380px] align-middle"
+                  className="text-rogue-green hover:underline truncate inline-block max-w-full sm:max-w-[380px] align-middle"
                   title={s.url}
                 >
                   {s.url} ↗
