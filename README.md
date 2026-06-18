@@ -46,14 +46,19 @@ Each ingredient exists somewhere; **no competitor does the whole combination** �
 pip install rogue-live-redteam
 rogue try
 ```
-`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card. When you're ready, point it at your own model:
+`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card.
+
+**Then scan _your_ model.** The target is *your own* deployment — any OpenAI-compatible **`--endpoint`** + your real **`--system-prompt`** (that's what makes it a deployment red-team, not a bare-model test). Pass `--provider`/`--model` instead to hit a hosted model by name:
 
 ```bash
-rogue scan --provider openai --model gpt-5.4-nano       # keyless quick judge by default
-rogue scan --provider openai --judge calibrated          # + a judge key → the calibrated v3 verdict
+rogue scan --endpoint https://api.your-co.com/v1 --model your-model --system-prompt-file ./prompt.txt
+rogue scan --provider openai --model gpt-5.4-nano --judge calibrated   # …or a hosted model by name
 ```
 
-Compare any model on the public **[leaderboard](https://rogue-eosin.vercel.app/leaderboard)**, or browse the measured, continuously-updated **[attack corpus](corpus/)** (every attack tagged with *which models it actually breaches* — not an unverified prompt dump).
+- **Judge:** defaults to a **keyless heuristic** (no API key). `--judge calibrated` grades with the v3 LLM judge — that one uses **your** judge key (e.g. `ANTHROPIC_API_KEY` / `JUDGE_MODEL`'s provider).
+- **Attacks:** the scan fires a **bundled attack pack** (`--pack default|aggressive|compliance`), frozen at this release — fresh as of `pip install`, *not* live-updating. The continuously-harvested live corpus drives the hosted dashboard + the [public corpus](corpus/); to run the live open-web harvest locally, **`rogue setup`** installs the best free scraper in one command (crawl4ai + its browser, no Bright Data — see [Run the harvest free](#run-the-harvest-free--no-bright-data-no-keys)).
+
+Compare any model on the public **[leaderboard](https://rogue-eosin.vercel.app/leaderboard)**, or browse the measured **[attack corpus](corpus/)** (every attack tagged with *which models it actually breaches* — not an unverified prompt dump).
 
 ### Query ROGUE from your IDE — hosted MCP, zero setup
 The MCP server is mounted into the live API, so there is nothing to clone or run:
