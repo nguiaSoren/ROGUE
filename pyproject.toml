@@ -1,6 +1,6 @@
 [project]
 name = "rogue-live-redteam"
-version = "1.4.1"
+version = "1.4.2"
 description = "Continuous open-web LLM red-team: harvests live jailbreaks from 15+ open-web sources, reproduces them against your model x system-prompt x tools, and serves results over its own MCP server."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,6 +33,9 @@ dependencies = [
     "mcp>=1.0",
     "playwright>=1.60.0",
     "pillow>=10.4",
+    # Shareable breach card: python-qrcode StyledPilImage renders the clean styled QR (rounded
+    # modules + eyes + center logomark) that the card embeds. Pulls Pillow (already a dep).
+    "qrcode[pil]>=8.2",
     "datasets>=4.8.5",
     "reportlab>=4.5.1",
     # Production-readiness (both degrade to no-ops when their env vars are unset):
@@ -102,4 +105,8 @@ markers = [
 [dependency-groups]
 dev = [
     "matplotlib>=3.10.9",
+    # QR decode verification: the card tests render a card and decode its QR off the PNG with
+    # cv2.QRCodeDetector to PROVE every generated code scans to the right URL (headless = no system
+    # deps). Tests importorskip("cv2"), so this just needs to be present in the dev env / CI.
+    "opencv-python-headless>=4.10",
 ]

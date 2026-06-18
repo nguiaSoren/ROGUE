@@ -250,6 +250,15 @@ function Row({
         <p className="font-mono text-sm font-semibold truncate" title={row.config_name}>
           {row.model_label}
         </p>
+        <a
+          href={`/cards/${row.model_label.toLowerCase().replace(/\//g, "-")}.png`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-[10px] text-rogue-green/70 hover:text-rogue-green hover:underline inline-flex items-center gap-1 transition-colors"
+          title={`Open ${row.model_label}'s shareable breach card`}
+        >
+          ↗ share card
+        </a>
         <p className="font-mono text-[10px] text-muted-foreground truncate sm:hidden">
           {Math.round(row.mean_breach_rate * 100)}% breach · n={row.n_trials.toLocaleString()}
         </p>

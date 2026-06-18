@@ -18,6 +18,15 @@ Three artifacts come out, in order of how brand-native they are:
   adding a heavy/browser dependency, so the PNG is a parallel Pillow render, and if Pillow is somehow
   unavailable we return ``png: None`` and the SVG/HTML stay canonical.
 
+A brand-styled **QR code** (python-qrcode ``StyledPilImage``) sits bottom-right on a small white
+rounded tile (green border): rounded data modules, rounded finder "eyes", and the ROGUE logomark
+embedded in the center — error-correction level H (~30%) keeps it scannable despite the logo. Modules
+are rendered at an INTEGER pixels-per-module (no fractional resizing, which blurs edges and defeats
+finicky decoders) and white-padded to the tile size; the PNG pastes it and the SVG embeds it as a
+base64 data-URI. If qrcode/Pillow aren't importable the card still renders, just without the code. The
+QR target defaults to the live ``/leaderboard`` (``_QR_URL``) but a card may override it via
+``card["qr_url"]`` — e.g. a per-model card points its QR at that model's breach cell.
+
 Pure: zero network, zero API keys, works from a plain ``dict``.
 """
 
@@ -98,6 +107,9 @@ def _norm_card(card: dict) -> dict:
         "n_families": n_families,
         "tier": tier,
         "generated_at": str(card.get("generated_at") or ""),
+        # Per-card QR target: a model card points its QR at that model's breach detail; the generic
+        # card has no override and falls back to the leaderboard (`_QR_URL`) at draw time.
+        "qr_url": str(card.get("qr_url")) if card.get("qr_url") else None,
     }
 
 
@@ -135,17 +147,123 @@ def _headline_parts(c: dict) -> tuple[str, str]:
     return f"{c['breaches']}/{c['trials']}", "BREACHED"
 
 
+def _measured_text(generated_at: str) -> str:
+    """The muted ``measured <date>`` credibility line. Accepts either a plain ``YYYY-MM-DD`` or a
+    full ISO timestamp (``2026-06-18T12:00:00Z``) and keeps only the date. Empty when unset."""
+    g = (generated_at or "").strip()
+    if not g:
+        return ""
+    date = g.split("T", 1)[0].split(" ", 1)[0]
+    return f"measured {date}"
+
+
 def _tier_chip_text(tier: str) -> str:
-    return (
-        "calibrated judge ✓"
-        if tier == "calibrated"
-        else "quick scan — upgrade for calibrated judge"
-    )
+    # The chip is a confidence band (green = calibrated/human-validated; muted = quick heuristic),
+    # not a paywall — the calibrated judge just needs your own judge key. Keep it short + clean.
+    return "calibrated judge ✓" if tier == "calibrated" else "quick scan"
 
 
 TAGLINE = "The red-team that never sleeps."
 FOOTER_URL = "rogue-eosin.vercel.app"
 _FOOTER_FULL = "https://rogue-eosin.vercel.app"
+
+# The QR target — the live leaderboard. Scanning the card lands the reader on the public matrix.
+_QR_URL = "https://rogue-eosin.vercel.app/leaderboard"
+_QR_LABEL = "scan → leaderboard"
+
+
+# --- QR code (python-qrcode StyledPilImage, optional dep) ---------------------------------------
+# We render the QR with python-qrcode's StyledPilImage — rounded modules + rounded finder eyes + the
+# ROGUE logomark embedded in the center — at high resolution, then downscale with LANCZOS so it stays
+# crisp and CLEAN at card size (hand-drawing 2px modules never looks clean). Error-correction H (~30%)
+# keeps it scannable despite the center logo. Both renderers share one image: the PNG pastes it, the
+# SVG embeds it as a base64 data-URI. Graceful: if qrcode/Pillow are unavailable the card still
+# renders, just without the code.
+
+
+def _logomark_pil(px: int):
+    """The ROGUE logomark on a white rounded tile, as an RGBA PIL image — embedded in the QR center.
+    Returns None if Pillow is unavailable."""
+    try:
+        from PIL import Image, ImageDraw
+    except Exception:  # pragma: no cover
+        return None
+    img = Image.new("RGBA", (px, px), (255, 255, 255, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((0, 0, px - 1, px - 1), radius=int(px * 0.22), fill=(255, 255, 255, 255))
+    pad = px * 0.15
+    inner = px - 2 * pad
+    gap = inner * 0.1
+    cell = (inner - 2 * gap) / 3
+    for idx in range(9):
+        row, col = divmod(idx, 3)
+        cx0 = pad + col * (cell + gap)
+        cy0 = pad + row * (cell + gap)
+        if idx == 5:
+            fill = _hex(RED)
+        elif idx in (1, 4, 6):
+            fill = _hex(GREEN)
+        else:
+            fill = _hex("#16281e")
+        d.rounded_rectangle((cx0, cy0, cx0 + cell, cy0 + cell), radius=int(cell * 0.25), fill=fill)
+    return img
+
+
+def _styled_qr_image(url: str, px: int):
+    """A clean, brand-styled QR for ``url`` as an RGB PIL image of side ``px`` (rounded modules +
+    rounded eyes + center ROGUE logomark, dark-on-white, EC level H). Returns None if qrcode/Pillow
+    aren't importable (the card then drops the QR).
+
+    The modules are rendered at an INTEGER number of pixels each (no fractional downscale) and the
+    result is white-padded to ``px`` — fractional resizing blurs module edges and makes finicky
+    decoders (e.g. cv2) mis-sample them, so we never do it. The pixel-crisp grid scans reliably."""
+    try:
+        import qrcode
+        from PIL import Image
+        from qrcode.constants import ERROR_CORRECT_H
+        from qrcode.image.styledpil import StyledPilImage
+        from qrcode.image.styles.colormasks import SolidFillColorMask
+        from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
+    except Exception:  # pragma: no cover - declared deps, but stay graceful
+        return None
+    try:
+        qr = qrcode.QRCode(error_correction=ERROR_CORRECT_H, border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        units = qr.modules_count + 2 * qr.border  # modules + quiet-zone border
+        # Largest integer px-per-module that fits within px (≥3 keeps the small finder/timing
+        # features legible to a phone scanner); the QR ends up ≤ px and is white-padded to px.
+        box = max(3, px // units)
+        qr.box_size = box
+        img = qr.make_image(
+            image_factory=StyledPilImage,
+            module_drawer=RoundedModuleDrawer(radius_ratio=1.0),
+            color_mask=SolidFillColorMask(front_color=_hex(BG), back_color=(255, 255, 255)),
+            embedded_image=_logomark_pil(box * 12),
+            embedded_image_ratio=0.24,
+        ).convert("RGB")
+        if img.size[0] == px:
+            return img
+        canvas = Image.new("RGB", (px, px), (255, 255, 255))
+        off = (px - img.size[0]) // 2
+        canvas.paste(img, (off, off))
+        return canvas
+    except Exception:  # pragma: no cover - never let QR failure break the card
+        return None
+
+
+def _qr_png_b64(url: str, px: int) -> str | None:
+    """The styled QR for ``url`` as a base64-encoded PNG string (for embedding as an SVG data-URI), or
+    None if it couldn't be rendered."""
+    import base64
+    import io
+
+    img = _styled_qr_image(url, px)
+    if img is None:
+        return None
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 # ================================================================================================
@@ -208,18 +326,43 @@ def _grid_svg(x: float, y: float, size: float, rate: float, *, cell_id: str) -> 
     pcx = x + pcol * (cell + gap) + cell / 2
     pcy = y + prow * (cell + gap) + cell / 2
     ping_color = RED if lit else GREEN
+    # Radii kept under (cell/2 + panel margin) so the rings stay inside the backing panel even when
+    # the ping cell is a grid corner — no sweep bleeding past the panel into the metadata row.
     rings = (
-        f'<circle cx="{pcx:.1f}" cy="{pcy:.1f}" r="{cell * 0.95:.1f}" fill="none" '
+        f'<circle cx="{pcx:.1f}" cy="{pcy:.1f}" r="{cell * 0.64:.1f}" fill="none" '
         f'stroke="{ping_color}" stroke-width="{cell * 0.03:.1f}" opacity="0.14"/>'
-        f'<circle cx="{pcx:.1f}" cy="{pcy:.1f}" r="{cell * 0.66:.1f}" fill="none" '
+        f'<circle cx="{pcx:.1f}" cy="{pcy:.1f}" r="{cell * 0.46:.1f}" fill="none" '
         f'stroke="{ping_color}" stroke-width="{cell * 0.04:.1f}" opacity="0.3"/>'
     )
 
+    # Solid backing panel under the grid so the background mesh never shows through the cell gaps
+    # (which read as a stray line slicing across the matrix). Frames the matrix like an inset screen.
+    pm = size * 0.05
+    panel = (
+        f'<rect x="{x - pm:.1f}" y="{y - pm:.1f}" width="{size + 2 * pm:.1f}" '
+        f'height="{size + 2 * pm:.1f}" rx="{size * 0.05:.1f}" fill="{BG}"/>'
+    )
+
     return (
-        f"{defs}{rings}"
+        f"{defs}{panel}{rings}"
         f"{''.join(dim_rects)}"
         f'<g filter="url(#{glow})">{"".join(green_rects)}</g>'
         f'<g filter="url(#{rglow})">{"".join(red_rects)}</g>'
+    )
+
+
+def _qr_block_svg(x: float, y: float, tile: float, b64: str) -> str:
+    """The QR block as SVG: a white rounded tile with a thin ``#00ff88`` border, and the clean styled
+    QR (python-qrcode, rounded modules + eyes + center logomark) embedded as a base64 PNG ``<image>``
+    inset with a quiet-zone margin. ``b64`` is the already-rendered QR PNG (caller guards on it)."""
+    tile_r = tile * 0.14
+    margin = tile * 0.08
+    inner = tile - 2 * margin
+    return (
+        f'<rect x="{x:.1f}" y="{y:.1f}" width="{tile:.1f}" height="{tile:.1f}" rx="{tile_r:.1f}" '
+        f'fill="#ffffff" stroke="{GREEN}" stroke-width="2"/>'
+        f'<image x="{x + margin:.1f}" y="{y + margin:.1f}" width="{inner:.1f}" height="{inner:.1f}" '
+        f'href="data:image/png;base64,{b64}" preserveAspectRatio="xMidYMid meet"/>'
     )
 
 
@@ -336,6 +479,13 @@ def _build_svg(c: dict, *, w: int, h: int, square: bool) -> str:
             f'<text x="{w / 2:.0f}" y="{hy + 118:.0f}" text-anchor="middle" font-family="{e(_MONO)}" '
             f'font-size="22" letter-spacing="3" fill="{_MUTE}">{pct}% BREACH RATE</text>'
         )
+        measured = _measured_text(c["generated_at"])
+        if measured:
+            headline += (
+                f'<text x="{w / 2:.0f}" y="{hy + 152:.0f}" text-anchor="middle" '
+                f'font-family="{e(_MONO)}" font-size="15" letter-spacing="2" '
+                f'fill="{_MUTE}" opacity="0.72">{e(measured)}</text>'
+            )
         meta_y = hy + 168
         meta_anchor = w / 2
         meta_center = True
@@ -355,9 +505,27 @@ def _build_svg(c: dict, *, w: int, h: int, square: bool) -> str:
             f'<text x="{hx:.0f}" y="{hy + 116:.0f}" font-family="{e(_MONO)}" '
             f'font-size="23" letter-spacing="3" fill="{_MUTE}">{pct}% BREACH RATE</text>'
         )
+        measured = _measured_text(c["generated_at"])
+        if measured:
+            headline += (
+                f'<text x="{hx:.0f}" y="{hy + 148:.0f}" font-family="{e(_MONO)}" '
+                f'font-size="16" letter-spacing="2" fill="{_MUTE}" opacity="0.72">'
+                f'{e(measured)}</text>'
+            )
         meta_y = grid_y + grid_size + 40
         meta_anchor = cx
         meta_center = False
+
+    # --- QR geometry (bottom-right) — fixed first so the OG metadata row can stop short of it ----
+    qr_url = c.get("qr_url") or _QR_URL
+    # A per-model card (qr_url override) deep-links to that model's breach cell; the generic card
+    # lands on the leaderboard. Keep the scan label honest about where it goes.
+    qr_label = "scan → breaches" if c.get("qr_url") else _QR_LABEL
+    qr_tile = 188 if square else 162
+    qr_x = w - pad - 36 - qr_tile
+    qr_y = h - pad - 36 - qr_tile
+    qr_inner = qr_tile - 2 * (qr_tile * 0.08)
+    qr_b64 = _qr_png_b64(qr_url, px=max(220, int(qr_inner * 3)))  # ~3× for retina-crisp embedding
 
     # --- metadata row: model · top attack · families ------------------------------------------
     top_attack = c["top_attack"] or "— none breached"
@@ -369,7 +537,7 @@ def _build_svg(c: dict, *, w: int, h: int, square: bool) -> str:
     ]
     meta_parts: list[str] = []
     if meta_center:
-        # Stacked, centered for the square.
+        # Stacked, centered for the square (the QR sits below in its own corner, no overlap).
         for i, (label, val) in enumerate(metas):
             yy = meta_y + i * 52
             meta_parts.append(
@@ -379,29 +547,41 @@ def _build_svg(c: dict, *, w: int, h: int, square: bool) -> str:
                 f'font-family="{e(_MONO)}" font-size="22" fill="{_INK}">{e(_clip(val, 34))}</text>'
             )
     else:
-        # A row of three labelled columns for the OG card.
-        col_w = (w - 2 * pad - 72) / 3
+        # Three labelled columns for the OG card, PACKED into the span LEFT of the QR so the row never
+        # collides with the tile. Each column owns an equal third of that span and clips its own value
+        # to its width — so the COVERAGE column ("N trials · M families") stays fully visible and the
+        # families read on the OG card too (previously it was the last column and got truncated by the
+        # QR). The hairline above the row also stops short of the QR.
+        meta_right = qr_x - 28 if qr_b64 is not None else w - pad - 36
+        gutter = 16  # clear gap so a long TOP ATTACK label never kisses the COVERAGE column
+        col_w = (meta_right - cx - 2 * gutter) / 3
+        val_fs = 18  # sized so three columns still fit beside the larger (scannable) QR tile
         for i, (label, val) in enumerate(metas):
-            mx = cx + i * col_w
+            mx = cx + i * (col_w + gutter)
+            clip = max(8, int((col_w - 4) / 10.6))  # chars that fit this column at val_fs (mono)
             meta_parts.append(
                 f'<text x="{mx:.0f}" y="{meta_y:.0f}" font-family="{e(_MONO)}" '
                 f'font-size="14" letter-spacing="3" fill="{_MUTE}">{label}</text>'
                 f'<text x="{mx:.0f}" y="{meta_y + 30:.0f}" font-family="{e(_MONO)}" '
-                f'font-size="23" fill="{_INK}">{e(_clip(val, 26))}</text>'
+                f'font-size="{val_fs}" fill="{_INK}">{e(_clip(val, clip))}</text>'
             )
-        # Hairline above the metadata row.
-        meta_parts.insert(
-            0,
-            f'<line x1="{cx}" y1="{meta_y - 36}" x2="{w - pad - 36}" y2="{meta_y - 36}" '
-            f'stroke="{_HAIRLINE}" stroke-width="1.5"/>',
+
+    # --- QR draw (white tile + green border + embedded styled QR + compact label) --------------
+    qr = ""
+    if qr_b64 is not None:
+        qr = _qr_block_svg(qr_x, qr_y, qr_tile, qr_b64)
+        qr += (
+            f'<text x="{qr_x + qr_tile / 2:.0f}" y="{qr_y - 11:.0f}" text-anchor="middle" '
+            f'font-family="{e(_MONO)}" font-size="13" letter-spacing="1" fill="{_MUTE}">'
+            f'{e(qr_label)}</text>'
         )
 
-    # --- footer: tagline + url -----------------------------------------------------------------
+    # --- footer: tagline + url, stacked bottom-LEFT (clear of the QR tile on the right) ---------
     fy = h - pad - 34
     footer = (
-        f'<text x="{cx:.0f}" y="{fy:.0f}" font-family="{e(_MONO)}" font-size="20" '
+        f'<text x="{cx:.0f}" y="{fy - 24:.0f}" font-family="{e(_MONO)}" font-size="20" '
         f'letter-spacing="1" fill="{GREEN}">{e(TAGLINE)}</text>'
-        f'<text x="{w - pad - 36:.0f}" y="{fy:.0f}" text-anchor="end" font-family="{e(_MONO)}" '
+        f'<text x="{cx:.0f}" y="{fy:.0f}" font-family="{e(_MONO)}" '
         f'font-size="18" letter-spacing="1" fill="{_MUTE}">{e(FOOTER_URL)}</text>'
     )
 
@@ -409,7 +589,7 @@ def _build_svg(c: dict, *, w: int, h: int, square: bool) -> str:
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" '
         f'viewBox="0 0 {w} {h}" role="img" aria-label="ROGUE breach report card: '
         f'{e(count)} breached, {c["model_label"]}">'
-        f"{bg}{plate}{lockup}{chip}{grid}{headline}{''.join(meta_parts)}{footer}"
+        f"{bg}{plate}{lockup}{chip}{grid}{headline}{''.join(meta_parts)}{footer}{qr}"
         f"</svg>"
     )
 
@@ -585,6 +765,9 @@ def _build_png(c: dict, out_path: Path, *, w: int, h: int, square: bool) -> Path
         _centered(d, w // 2, hy, count, f_word(112), accent)
         _centered(d, w // 2, hy + 130, breached_word, f_word(46), ink, track=2)
         _centered(d, w // 2, hy + 196, f"{pct}% BREACH RATE", f_word(20), mute, track=2)
+        measured = _measured_text(c["generated_at"])
+        if measured:
+            _centered(d, w // 2, hy + 224, measured, f_word(15), mute, track=1)
         meta_y = hy + 250
         meta_center = True
     else:
@@ -597,8 +780,20 @@ def _build_png(c: dict, out_path: Path, *, w: int, h: int, square: bool) -> Path
         d.text((hx, hy), count, font=f_word(140), fill=accent)
         d.text((hx + 4, hy + 168), breached_word, font=f_word(50), fill=ink)
         d.text((hx + 4, hy + 236), f"{pct}% BREACH RATE", font=f_word(21), fill=mute)
+        measured = _measured_text(c["generated_at"])
+        if measured:
+            d.text((hx + 4, hy + 262), measured, font=f_word(15), fill=mute)
         meta_y = gy + grid_size + 18
         meta_center = False
+
+    # QR geometry (bottom-right) — computed first so the OG metadata row stops short of it.
+    qr_url = c.get("qr_url") or _QR_URL
+    qr_label = "scan → breaches" if c.get("qr_url") else _QR_LABEL
+    qr_tile = 188 if square else 162
+    qr_x = w - pad - 36 - qr_tile
+    qr_y = h - pad - 36 - qr_tile
+    qr_margin = int(qr_tile * 0.08)
+    qr_img = _styled_qr_image(qr_url, qr_tile - 2 * qr_margin)
 
     # Metadata.
     top_attack = c["top_attack"] or "— none breached"
@@ -608,26 +803,42 @@ def _build_png(c: dict, out_path: Path, *, w: int, h: int, square: bool) -> Path
         ("TOP ATTACK", _clip(top_attack, 26)),
         ("COVERAGE", f"{c['trials']} trials · {c['n_families']} {fam_word}"),
     ]
-    lf, vf = f_word(14), f_word(22)
+    lf = f_word(14)  # the value font is per-branch: square uses f_word(20), OG uses f_word(19)
     if meta_center:
         for i, (label, val) in enumerate(metas):
             yy = meta_y + i * 54
             _centered(d, w // 2, yy, label, lf, mute, track=3)
             _centered(d, w // 2, yy + 24, val, f_word(20), ink)
     else:
-        d.line([(cx, meta_y - 28), (w - pad - 36, meta_y - 28)], fill=(*hair, 255), width=2)
-        col_w = (w - 2 * pad - 72) / 3
+        # Columns packed into the span left of the QR (mirrors the SVG) so the COVERAGE/families
+        # column is never truncated by the tile — families read on the OG png too.
+        meta_right = qr_x - 28 if qr_img is not None else w - pad - 36
+        gutter = 16  # clear gap so a long TOP ATTACK label never kisses the COVERAGE column
+        col_w = (meta_right - cx - 2 * gutter) / 3
+        vf = f_word(18)
         for i, (label, val) in enumerate(metas):
-            mx = cx + int(i * col_w)
+            mx = cx + int(i * (col_w + gutter))
+            clip = max(8, int((col_w - 4) / 10.6))  # chars that fit this column at the value font
             d.text((mx, meta_y), label, font=lf, fill=mute)
-            d.text((mx, meta_y + 26), val, font=vf, fill=ink)
+            d.text((mx, meta_y + 26), _clip(val, clip), font=vf, fill=ink)
 
-    # Footer.
+    # QR draw: white rounded tile + green border, the styled QR image pasted inside, label above.
+    if qr_img is not None:
+        _rounded_rect(
+            d,
+            (qr_x, qr_y, qr_x + qr_tile, qr_y + qr_tile),
+            int(qr_tile * 0.14),
+            fill=(255, 255, 255),
+            outline=(*green, 255),
+            width=2,
+        )
+        img.paste(qr_img, (qr_x + qr_margin, qr_y + qr_margin))
+        _centered(d, qr_x + qr_tile // 2, qr_y - 24, qr_label, f_word(13), mute)
+
+    # Footer: tagline + url stacked bottom-left.
     fy = h - pad - 44
-    d.text((cx, fy), TAGLINE, font=f_word(20), fill=green)
-    uf = f_word(18)
-    ub = d.textbbox((0, 0), FOOTER_URL, font=uf)
-    d.text((w - pad - 36 - (ub[2] - ub[0]), fy + 2), FOOTER_URL, font=uf, fill=mute)
+    d.text((cx, fy - 26), TAGLINE, font=f_word(20), fill=green)
+    d.text((cx, fy + 2), FOOTER_URL, font=f_word(18), fill=mute)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path, "PNG")
@@ -673,6 +884,15 @@ def _png_grid(img, d, x: int, y: int, size: int, rate: float, green, red, hair) 
     cell = (size - 2 * gap) / 3
     radius = int(cell * 0.2)
 
+    # Backing panel under the grid: covers the background mesh so it can't show through the cell gaps
+    # (which reads as a stray line slicing across the matrix). Mirrors the SVG.
+    pm = int(size * 0.05)
+    d.rounded_rectangle(
+        (int(x - pm), int(y - pm), int(x + size + pm), int(y + size + pm)),
+        radius=int(size * 0.05),
+        fill=_hex(BG),
+    )
+
     # Draw glowing cells onto an overlay we blur, then the crisp cells on top — gives the soft glow.
     glow = Image.new("RGBA", img.size, (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
@@ -704,7 +924,8 @@ def _png_grid(img, d, x: int, y: int, size: int, rate: float, green, red, hair) 
     pcx = int(x + pcol * (cell + gap) + cell / 2)
     pcy = int(y + prow * (cell + gap) + cell / 2)
     ping_color = red if lit else green
-    for rr, a, wdt in ((cell * 0.95, 36, 3), (cell * 0.66, 76, 4)):
+    # Radii kept inside the backing panel (see SVG note) so the ping never bleeds past it.
+    for rr, a, wdt in ((cell * 0.64, 36, 3), (cell * 0.46, 76, 4)):
         d2.ellipse(
             (pcx - rr, pcy - rr, pcx + rr, pcy + rr),
             outline=(*ping_color, a),
@@ -740,7 +961,9 @@ def render_breach_card(card: dict, out_dir: Path) -> dict:
         ``model_label`` str, ``breach_rate`` float(0-1), ``trials`` int, ``breaches`` int,
         ``top_attack`` str (family slug or humane label), ``families`` list[str],
         ``verdict_counts`` dict[str,int] (accepted for forward-compat, not required for the visual),
-        ``tier`` str ('quick'|'calibrated'), ``generated_at`` str.
+        ``tier`` str ('quick'|'calibrated'), ``generated_at`` str (drives the muted ``measured <date>``
+        line — a plain ``YYYY-MM-DD`` or full ISO timestamp), ``qr_url`` str (optional — overrides the
+        QR target; defaults to the live ``/leaderboard``).
 
     Writes (and returns absolute paths to):
         * ``breach-card.svg``        — the 1200×630 OG card (canonical, brand-native vector).

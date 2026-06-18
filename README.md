@@ -47,7 +47,9 @@ pip install rogue-live-redteam
 rogue try        # 20s, offline, zero keys — real breach rates + a shareable card
 rogue setup      # one command → run the live open-web harvest yourself (free, no signup)
 ```
-`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card.
+`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card:
+
+<p align="center"><img src="assets/card/marketing/breach-card.png" alt="ROGUE breach card — mistral-small-2603, 668/2189 breached, calibrated judge" width="620"></p>
 
 **Then scan _your_ model.** The target is *your own* deployment — any OpenAI-compatible **`--endpoint`** + your real **`--system-prompt`** (that's what makes it a deployment red-team, not a bare-model test). Pass `--provider`/`--model` instead to hit a hosted model by name:
 
