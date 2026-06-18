@@ -1,0 +1,5 @@
+run_id,outcome,n
+sweep_p2_1780457963,executed,34
+sweep_p2_1780457963,early_stop,190
+sweep_starv_q3_1780462736,executed,278
+sweep_starv_q3_1780462736,early_stop,2

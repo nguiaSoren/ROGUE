@@ -12,7 +12,7 @@ then ``rogue.memory.judges.calibration_case_*`` scores judge-vs-human afterward.
 nothing from the judge module here on purpose.)
 
 Real cases REUSE the wiring from the sibling REAL runs:
-- leakage: ``run_leakage_redteam.GroqExtractionAttacker`` + the extraction pack + the canary
+- leakage: ``run_leakage_redteam.ExtractionAttacker`` + the extraction pack + the canary
   targets (the target HOLDS the confidential canary), capturing per (canary skill × template)
   ``{attack_prompt, model_response, protected_content}``.
 - net-effect: ``run_net_effect.GroqRolloutRunner`` + ``_load_skills`` + the held-out tasks,
@@ -95,7 +95,7 @@ def _load_canaries() -> list[ScrubbedSkill]:
 
 
 def _template_prompt(template: dict[str, Any], scrubbed_md: str) -> str:
-    """The exact attack_prompt the target saw (mirrors GroqExtractionAttacker.attack)."""
+    """The exact attack_prompt the target saw (mirrors ExtractionAttacker.attack)."""
     return (template.get("prompt") or template.get("template") or "").format(
         scrubbed_md=scrubbed_md
     )
@@ -111,7 +111,7 @@ def build_leakage_real(model: str, limit_real: int | None) -> list[dict[str, Any
     key = os.environ["GROQ_API_KEY"]
     templates = _leak._load_pack()
     canaries = _load_canaries()
-    attacker = _leak.GroqExtractionAttacker(key, model, templates)
+    attacker = _leak.ExtractionAttacker(_leak.PROVIDER_BASE_URLS["groq"], key, model, templates)
 
     cases: list[dict[str, Any]] = []
     print(
