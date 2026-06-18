@@ -1,0 +1,14 @@
+GRID: 2 models on featherless (https://api.featherless.ai/v1); 4 templates, paraphrase_judge=False
+
+  -- run 1/3 --
+[Qwen/Qwen2.5-1.5B-Instruct] firing 4 templates x 20 canaries + 6 controls = ~104 calls…
+  rate=75% (15/20)  CI=[55%,95%]  controls_fp=0  live=104/104 (OK)
+  -- run 2/3 --
+[Qwen/Qwen2.5-1.5B-Instruct] firing 4 templates x 20 canaries + 6 controls = ~104 calls…
+  rate=80% (16/20)  CI=[60%,95%]  controls_fp=0  live=104/104 (OK)
+  -- run 3/3 --
+[Qwen/Qwen2.5-1.5B-Instruct] firing 4 templates x 20 canaries + 6 controls = ~104 calls…
+  rate=75% (15/20)  CI=[55%,95%]  controls_fp=0  live=104/104 (OK)
+  AGG over 3 runs: mean=77%  sd=3%  across-run 95% CI=[69%,84%]  per-run=['75%', '80%', '75%']
+  -- run 1/3 --
+[Qwen/Qwen2.5-14B-Instruct] firing 4 templates x 20 canaries + 6 controls = ~104 calls…

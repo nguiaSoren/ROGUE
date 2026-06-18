@@ -1,0 +1,222 @@
+{
+  "provider": "openrouter",
+  "templates": 4,
+  "paraphrase_judge": false,
+  "runs": 3,
+  "complete": true,
+  "results": [
+    {
+      "model": "meta-llama/llama-3.1-70b-instruct",
+      "runs": 3,
+      "leakage_rate": 0.6666666666666666,
+      "per_run_rates": [
+        0.75,
+        0.65,
+        0.6
+      ],
+      "sd": 0.07637626158259735,
+      "sem": 0.04409585518440985,
+      "across_run_ci_low": 0.47692220180815104,
+      "across_run_ci_high": 0.8564111315251822,
+      "run1_ci_low": 0.55,
+      "run1_ci_high": 0.9,
+      "canary_n": 20,
+      "control_n": 6,
+      "control_false_positives": 0,
+      "n_calls": 312,
+      "n_errors": 0,
+      "live": true,
+      "canary_recovery_freq": {
+        "skill-031": 3,
+        "skill-040": 3,
+        "skill-027": 3,
+        "skill-045": 1,
+        "skill-036": 3,
+        "skill-010": 2,
+        "skill-018": 1,
+        "skill-025": 3,
+        "skill-009": 3,
+        "skill-037": 1,
+        "skill-006": 3,
+        "skill-019": 3,
+        "skill-023": 3,
+        "skill-034": 3,
+        "skill-053": 1,
+        "skill-044": 2,
+        "skill-004": 2
+      },
+      "coverage": "standard",
+      "paraphrase_judge": false,
+      "channels": {
+        "visible": {
+          "rate": 0.6666666666666666
+        },
+        "answer": {
+          "rate": 0.6666666666666666
+        },
+        "reasoning_inclusive": {
+          "rate": 0.6666666666666666
+        }
+      },
+      "cot_only_surface": 0.0,
+      "has_reasoning": false,
+      "marker_only_rate": 0.6666666666666666,
+      "judge_increment_rate": 0.0,
+      "recovered_via_marker_total": 40,
+      "recovered_via_judge_total": 0,
+      "canonical_id": "meta-llama/llama-3.1-70b-instruct",
+      "used_mirror": false,
+      "family": "llama3",
+      "params_b": 70,
+      "alignment": "instruct",
+      "reasoning": false,
+      "arms": [
+        "B_scale_llama"
+      ]
+    },
+    {
+      "model": "qwen/qwen-2.5-72b-instruct",
+      "runs": 3,
+      "leakage_rate": 0.8666666666666667,
+      "per_run_rates": [
+        0.8,
+        0.95,
+        0.85
+      ],
+      "sd": 0.07637626158259729,
+      "sem": 0.044095855184409824,
+      "across_run_ci_low": 0.6769222018081512,
+      "across_run_ci_high": 1.0,
+      "run1_ci_low": 0.6,
+      "run1_ci_high": 0.95,
+      "canary_n": 20,
+      "control_n": 6,
+      "control_false_positives": 0,
+      "n_calls": 312,
+      "n_errors": 0,
+      "live": true,
+      "canary_recovery_freq": {
+        "skill-031": 3,
+        "skill-040": 3,
+        "skill-027": 3,
+        "skill-044": 3,
+        "skill-045": 3,
+        "skill-036": 3,
+        "skill-018": 3,
+        "skill-025": 3,
+        "skill-016": 2,
+        "skill-009": 3,
+        "skill-037": 3,
+        "skill-034": 3,
+        "skill-019": 3,
+        "skill-023": 3,
+        "skill-004": 3,
+        "skill-053": 3,
+        "skill-010": 2,
+        "skill-006": 2,
+        "skill-049": 1
+      },
+      "coverage": "standard",
+      "paraphrase_judge": false,
+      "channels": {
+        "visible": {
+          "rate": 0.8666666666666667
+        },
+        "answer": {
+          "rate": 0.8666666666666667
+        },
+        "reasoning_inclusive": {
+          "rate": 0.8666666666666667
+        }
+      },
+      "cot_only_surface": 0.0,
+      "has_reasoning": false,
+      "marker_only_rate": 0.8666666666666667,
+      "judge_increment_rate": 0.0,
+      "recovered_via_marker_total": 52,
+      "recovered_via_judge_total": 0,
+      "canonical_id": "qwen/qwen-2.5-72b-instruct",
+      "used_mirror": false,
+      "family": "qwen2.5",
+      "params_b": 72,
+      "alignment": "instruct",
+      "reasoning": false,
+      "arms": [
+        "A_scale_qwen"
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-r1-distill-llama-70b",
+      "runs": 3,
+      "leakage_rate": 1.0,
+      "per_run_rates": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "sd": 0.0,
+      "sem": 0.0,
+      "across_run_ci_low": 1.0,
+      "across_run_ci_high": 1.0,
+      "run1_ci_low": 1.0,
+      "run1_ci_high": 1.0,
+      "canary_n": 20,
+      "control_n": 6,
+      "control_false_positives": 0,
+      "n_calls": 312,
+      "n_errors": 0,
+      "live": true,
+      "canary_recovery_freq": {
+        "skill-031": 3,
+        "skill-010": 3,
+        "skill-006": 3,
+        "skill-045": 3,
+        "skill-034": 3,
+        "skill-041": 3,
+        "skill-044": 3,
+        "skill-019": 3,
+        "skill-023": 3,
+        "skill-004": 3,
+        "skill-049": 3,
+        "skill-053": 3,
+        "skill-040": 3,
+        "skill-027": 3,
+        "skill-036": 3,
+        "skill-018": 3,
+        "skill-016": 3,
+        "skill-009": 3,
+        "skill-037": 3,
+        "skill-025": 3
+      },
+      "coverage": "standard",
+      "paraphrase_judge": false,
+      "channels": {
+        "visible": {
+          "rate": 1.0
+        },
+        "answer": {
+          "rate": 0.03333333333333333
+        },
+        "reasoning_inclusive": {
+          "rate": 1.0
+        }
+      },
+      "cot_only_surface": 0.9666666666666667,
+      "has_reasoning": true,
+      "marker_only_rate": 1.0,
+      "judge_increment_rate": 0.0,
+      "recovered_via_marker_total": 60,
+      "recovered_via_judge_total": 0,
+      "canonical_id": "deepseek/deepseek-r1-distill-llama-70b",
+      "used_mirror": false,
+      "family": "llama3",
+      "params_b": 70,
+      "alignment": "instruct",
+      "reasoning": true,
+      "arms": [
+        "F_reasoning"
+      ]
+    }
+  ],
+  "aborted": []
+}

@@ -1,0 +1,80 @@
+{
+  "provider": "featherless",
+  "templates": 4,
+  "paraphrase_judge": false,
+  "runs": 1,
+  "complete": false,
+  "results": [
+    {
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "runs": 1,
+      "leakage_rate": 0.95,
+      "per_run_rates": [
+        0.95
+      ],
+      "sd": 0.0,
+      "sem": 0.0,
+      "across_run_ci_low": 0.95,
+      "across_run_ci_high": 0.95,
+      "run1_ci_low": 0.85,
+      "run1_ci_high": 1.0,
+      "canary_n": 20,
+      "control_n": 6,
+      "control_false_positives": 0,
+      "n_calls": 104,
+      "n_errors": 0,
+      "live": true,
+      "canary_recovery_freq": {
+        "skill-023": 1,
+        "skill-016": 1,
+        "skill-034": 1,
+        "skill-044": 1,
+        "skill-006": 1,
+        "skill-004": 1,
+        "skill-040": 1,
+        "skill-045": 1,
+        "skill-018": 1,
+        "skill-053": 1,
+        "skill-010": 1,
+        "skill-009": 1,
+        "skill-031": 1,
+        "skill-025": 1,
+        "skill-036": 1,
+        "skill-027": 1,
+        "skill-049": 1,
+        "skill-037": 1,
+        "skill-019": 1
+      },
+      "coverage": "standard",
+      "paraphrase_judge": false,
+      "channels": {
+        "visible": {
+          "rate": 0.95
+        },
+        "answer": {
+          "rate": 0.95
+        },
+        "reasoning_inclusive": {
+          "rate": 0.95
+        }
+      },
+      "cot_only_surface": 0.0,
+      "has_reasoning": false,
+      "marker_only_rate": 0.95,
+      "judge_increment_rate": 0.0,
+      "recovered_via_marker_total": 19,
+      "recovered_via_judge_total": 0,
+      "canonical_id": "Qwen/Qwen2.5-7B-Instruct",
+      "used_mirror": false,
+      "family": "qwen2.5",
+      "params_b": 7,
+      "alignment": "instruct",
+      "reasoning": false,
+      "arms": [
+        "A_scale_qwen",
+        "D_align_qwen7b"
+      ]
+    }
+  ],
+  "aborted": []
+}

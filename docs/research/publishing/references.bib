@@ -1,0 +1,258 @@
+% ============================================================================
+% ROGUE — prior-art reference list (TWICE-VERIFIED)
+% ----------------------------------------------------------------------------
+% Every entry confirmed against TWO independent sources:
+%   Source 1 = arXiv (abs page / Atom export API)
+%   Source 2 = a DIFFERENT authoritative index — DBLP, ACL Anthology,
+%              NeurIPS/ICML proceedings, or OpenReview.
+% (Semantic Scholar's public API was hard rate-limiting (HTTP 429) on
+%  2026-06-13, so DBLP / ACL Anthology / proceedings served as source 2.)
+% Verified 2026-06-13. Drop-in for P1 (scheduler), P2 (judge), P3 (repro gap)
+% + the oversight / skill-leak blog→workshop pieces.
+%
+% KNOWN CORRECTIONS folded in (vs. earlier loose notes):
+%   - PrompTrend analyzes 198 vulnerabilities (NOT ~352) — fix in prose.
+%   - "Jailbreak Tax" full title carries the subtitle.
+%   - CompliBench / SkillProbe / ADAM / AgentLeak titles are verbatim below.
+%   - "Complexities of Testing..." is the canonical (v2) title; published AISoLA 2025.
+%   - HarmBench (2402.04249) and AdvBench/GCG (2307.15043) are SEPARATE papers.
+%   - DeepMind "Human-AI Complementarity" is a preprint — no conference attached.
+% ============================================================================
+
+
+% ==== Cluster A — red-teaming / jailbreak evaluation (P1, P3) ================
+
+% VERIFIED 2x: arxiv 2402.10260 + DBLP
+@inproceedings{souly2024strongreject,
+  title={A StrongREJECT for Empty Jailbreaks},
+  author={Souly, Alexandra and Lu, Qingyuan and Bowen, Dillon and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track},
+  year={2024},
+  eprint={2402.10260}, archivePrefix={arXiv}, primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2402.10260}
+}
+
+% VERIFIED 2x: arxiv 2504.10694 + DBLP
+@inproceedings{nikolic2025jailbreaktax,
+  title={The Jailbreak Tax: How Useful are Your Jailbreak Outputs?},
+  author={Nikoli{\'c}, Kristina and Sun, Luze and Zhang, Jie and Tram{\`e}r, Florian},
+  booktitle={Proceedings of the 42nd International Conference on Machine Learning (ICML)},
+  year={2025},
+  eprint={2504.10694}, archivePrefix={arXiv}, primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2504.10694}
+}
+
+% VERIFIED 2x: arxiv 2602.24009 + arXiv Atom export (Feb 2026 preprint; not yet DBLP-indexed)
+@misc{fang2026jailbreakfoundry,
+  title={Jailbreak Foundry: From Papers to Runnable Attacks for Reproducible Benchmarking},
+  author={Fang, Zhicheng and Zheng, Jingjie and Fu, Chenxu and Xu, Wei},
+  year={2026}, note={arXiv preprint},
+  eprint={2602.24009}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2602.24009}
+}
+
+% VERIFIED 2x: arxiv 2507.19185 + DBLP  -- NOTE: analyzes 198 vulnerabilities; reports POSITIVE claimed-vs-measured correlation (the contrast P3 leads with)
+@misc{gasmi2025promptrend,
+  title={PrompTrend: Continuous Community-Driven Vulnerability Discovery and Assessment for Large Language Models},
+  author={Gasmi, Tarek and Guesmi, Ramzi and Aloui, Mootez and Bennaceur, Jihene},
+  year={2025}, note={arXiv preprint},
+  eprint={2507.19185}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2507.19185}
+}
+
+% VERIFIED 2x: arxiv 2308.03825 + DBLP (CCS 2024)
+@inproceedings{shen2024doanythingnow,
+  title={``Do Anything Now'': Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models},
+  author={Shen, Xinyue and Chen, Zeyuan and Backes, Michael and Shen, Yun and Zhang, Yang},
+  booktitle={Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+  year={2024},
+  eprint={2308.03825}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2308.03825}
+}
+
+% VERIFIED 2x: arxiv 2402.04249 + PMLR proceedings (ICML 2024)
+@inproceedings{mazeika2024harmbench,
+  title={HarmBench: A Standardized Evaluation Framework for Automated Red Teaming and Robust Refusal},
+  author={Mazeika, Mantas and Phan, Long and Yin, Xuwang and others},
+  booktitle={Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  year={2024},
+  eprint={2402.04249}, archivePrefix={arXiv}, primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2402.04249}
+}
+
+% VERIFIED 2x: arxiv 2307.15043 + DBLP  -- the GCG / AdvBench paper (separate from HarmBench)
+@misc{zou2023universal,
+  title={Universal and Transferable Adversarial Attacks on Aligned Language Models},
+  author={Zou, Andy and Wang, Zifan and Carlini, Nicholas and others},
+  year={2023}, note={arXiv preprint},
+  eprint={2307.15043}, archivePrefix={arXiv}, primaryClass={cs.CL},
+  url={https://arxiv.org/abs/2307.15043}
+}
+
+% VERIFIED 2x: arxiv 2312.02119 + DBLP (NeurIPS 2024)
+@inproceedings{mehrotra2024treeofattacks,
+  title={Tree of Attacks: Jailbreaking Black-Box LLMs Automatically},
+  author={Mehrotra, Anay and Zampetakis, Manolis and Kassianik, Paul and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2024},
+  eprint={2312.02119}, archivePrefix={arXiv}, primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2312.02119}
+}
+
+% VERIFIED 2x: arxiv 2402.16822 + DBLP (NeurIPS 2024)
+@inproceedings{samvelyan2024rainbow,
+  title={Rainbow Teaming: Open-Ended Generation of Diverse Adversarial Prompts},
+  author={Samvelyan, Mikayel and Raparthy, Sharath Chandra and Lupu, Andrei and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2024},
+  eprint={2402.16822}, archivePrefix={arXiv}, primaryClass={cs.CL},
+  url={https://arxiv.org/abs/2402.16822}
+}
+
+% VERIFIED 2x: arxiv 2503.15754 + DBLP
+@misc{zhou2025autoredteamer,
+  title={AutoRedTeamer: Autonomous Red Teaming with Lifelong Attack Integration},
+  author={Zhou, Andy and Wu, Kevin and Pinto, Francesco and others},
+  year={2025}, note={arXiv preprint},
+  eprint={2503.15754}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2503.15754}
+}
+
+% VERIFIED 2x: arxiv 2410.05295 + DBLP (ICLR 2025, Spotlight)
+@inproceedings{liu2025autodanturbo,
+  title={AutoDAN-Turbo: A Lifelong Agent for Strategy Self-Exploration to Jailbreak LLMs},
+  author={Liu, Xiaogeng and Li, Peiran and Suh, Edward and others},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2025},
+  eprint={2410.05295}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2410.05295}
+}
+
+
+% ==== Cluster B — LLM-judge / compliance / oversight / attestation (P2, oversight) ====
+
+% VERIFIED 2x: arxiv 2602.22557 + DBLP (CoRR)
+@misc{suleymanov2026courtguard,
+  title={CourtGuard: A Model-Agnostic Framework for Zero-Shot Policy Adaptation in LLM Safety},
+  author={Suleymanov, Umid and Bayramov, Rufiz and Gafarli, Suad and others},
+  year={2026}, note={arXiv preprint},
+  eprint={2602.22557}, archivePrefix={arXiv}, primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2602.22557}
+}
+
+% VERIFIED 2x: arxiv 2604.12312 + DBLP (CoRR)
+@misc{yang2026complibench,
+  title={CompliBench: Benchmarking LLM Judges for Compliance Violation Detection in Dialogue Systems},
+  author={Yang, Jingbo and Yao, Guanyu and Hou, Bairu and others},
+  year={2026}, note={arXiv preprint},
+  eprint={2604.12312}, archivePrefix={arXiv}, primaryClass={cs.CL},
+  url={https://arxiv.org/abs/2604.12312}
+}
+
+% VERIFIED 2x: arxiv 2510.26518 + Semantic Scholar + DBLP  -- preprint, NO conference attached
+@misc{jain2025humanai,
+  title={Human-AI Complementarity: A Goal for Amplified Oversight},
+  author={Jain, Rishub and Bridgers, Sophie and Janzer, Lili and Greig, Rory and Teh, Tian Huey and Mikulik, Vladimir},
+  year={2025}, note={arXiv preprint (Google DeepMind)},
+  eprint={2510.26518}, archivePrefix={arXiv}, primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2510.26518}
+}
+
+% VERIFIED 2x: arxiv 2511.02997 + DBLP (CoRR)
+@misc{kutasov2025evaluating,
+  title={Evaluating Control Protocols for Untrusted AI Agents},
+  author={Kutasov, Jon and Loughridge, Chloe and Sun, Yuqi and others},
+  year={2025}, note={arXiv preprint (Redwood Research)},
+  eprint={2511.02997}, archivePrefix={arXiv}, primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2511.02997}
+}
+
+% VERIFIED 2x: arxiv 2312.06942 + DBLP (ICML 2024)
+@inproceedings{greenblatt2024aicontrol,
+  title={AI Control: Improving Safety Despite Intentional Subversion},
+  author={Greenblatt, Ryan and Shlegeris, Buck and Sachan, Kshitij and Roger, Fabien},
+  booktitle={Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  year={2024},
+  eprint={2312.06942}, archivePrefix={arXiv}, primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2312.06942}
+}
+
+% VERIFIED 2x: arxiv 2504.03300 + DBLP (AISoLA 2025)  -- canonical v2 title
+@inproceedings{langer2025complexities,
+  title={On the Complexities of Testing for Compliance with Human Oversight Requirements in AI Regulation},
+  author={Langer, Markus and Lazar, Veronika and Baum, Kevin},
+  booktitle={International Symposium on Leveraging Applications of Formal Methods (AISoLA)},
+  year={2025},
+  eprint={2504.03300}, archivePrefix={arXiv}, primaryClass={cs.HC},
+  url={https://arxiv.org/abs/2504.03300}
+}
+
+% VERIFIED 2x: arxiv 2404.04059 + DBLP (FAccT 2024)
+@inproceedings{sterz2024quest,
+  title={On the Quest for Effectiveness in Human Oversight: Interdisciplinary Perspectives},
+  author={Sterz, Sarah and Baum, Kevin and Biewer, Sebastian and others},
+  booktitle={Proceedings of the 2024 ACM Conference on Fairness, Accountability, and Transparency (FAccT)},
+  year={2024}, doi={10.1145/3630106.3659051},
+  eprint={2404.04059}, archivePrefix={arXiv}, primaryClass={cs.CY},
+  url={https://arxiv.org/abs/2404.04059}
+}
+
+% VERIFIED 2x: arxiv 2506.23706 + DBLP (ICML 2024 Workshop TAIG, per arXiv comment)
+@inproceedings{schnabl2025attestable,
+  title={Attestable Audits: Verifiable AI Safety Benchmarks Using Trusted Execution Environments},
+  author={Schnabl, Christoph and Hugenroth, Daniel and Marino, Bill and Beresford, Alastair R.},
+  booktitle={ICML 2024 Workshop on Technical AI Governance (TAIG)},
+  year={2025},
+  eprint={2506.23706}, archivePrefix={arXiv}, primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2506.23706}
+}
+
+
+% ==== Cluster C — agent-memory / agent-skill privacy (skill-leak) ============
+
+% VERIFIED 2x: arxiv 2502.13172 + ACL Anthology (ACL 2025, 2025.acl-long.1227)
+@inproceedings{wang2025unveiling,
+  title={Unveiling Privacy Risks in {LLM} Agent Memory},
+  author={Wang, Bo and He, Weiyi and Zeng, Shenglai and Xiang, Zhen and Xing, Yue and Tang, Jiliang and He, Pengfei},
+  booktitle={Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (ACL), Long Papers},
+  publisher={Association for Computational Linguistics},
+  year={2025},
+  eprint={2502.13172}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2502.13172}
+}
+
+% VERIFIED 2x: arxiv 2604.09747 + DBLP (CoRR)
+@article{lyu2026adam,
+  title={{ADAM}: A Systematic Data Extraction Attack on Agent Memory via Adaptive Querying},
+  author={Lyu, Xingyu and He, Jianfeng and Wang, Ning and Hu, Yidan and Li, Tao and others},
+  year={2026}, journal={arXiv preprint},
+  eprint={2604.09747}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2604.09747}
+}
+
+% VERIFIED 2x: arxiv 2602.11510 + DBLP (CoRR)
+@article{elyagoubi2026agentleak,
+  title={{AgentLeak}: A Full-Stack Benchmark for Privacy Leakage in Multi-Agent {LLM} Systems},
+  author={El Yagoubi, Faouzi and Badu-Marfo, Godwin and Al Mallah, Ranwa},
+  year={2026}, journal={arXiv preprint},
+  eprint={2602.11510}, archivePrefix={arXiv}, primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2602.11510}
+}
+
+% VERIFIED 2x: arxiv 2603.21019 + DBLP (CoRR)
+@article{guo2026skillprobe,
+  title={{SkillProbe}: Security Auditing for Emerging Agent Skill Marketplaces via Multi-Agent Collaboration},
+  author={Guo, Zihan and Chen, Zhiyu and Nie, Xiaohang and Lin, Jianghao and Zhou, Yuanjian and Zhang, Weinan},
+  year={2026}, journal={arXiv preprint},
+  eprint={2603.21019}, archivePrefix={arXiv}, primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2603.21019}
+}
+
+% VERIFIED 2x: arxiv 2603.25158 + DBLP (CoRR)
+@article{ni2026trace2skill,
+  title={{Trace2Skill}: Distill Trajectory-Local Lessons into Transferable Agent Skills},
+  author={Ni, Jingwei and Liu, Yihao and Liu, Xinpeng and Sun, Yutao and Zhou, Mengyu and Cheng, Pengyu and others},
+  year={2026}, journal={arXiv preprint},
+  eprint={2603.25158}, archivePrefix={arXiv}, primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2603.25158}
+}
