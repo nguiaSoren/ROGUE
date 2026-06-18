@@ -45,7 +45,7 @@ Each ingredient exists somewhere; **no competitor does the whole combination** �
 ```bash
 pip install rogue-live-redteam
 rogue try        # 20s, offline, zero keys — real breach rates + a shareable card
-rogue setup      # one command → the best free scraper (crawl4ai + Chromium); run the live harvest, no Bright Data
+rogue setup      # one command → run the live open-web harvest yourself (free, no signup)
 ```
 `rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card.
 
