@@ -56,6 +56,8 @@ rogue scan --endpoint https://api.your-co.com/v1 --model your-model --system-pro
 rogue scan --provider openai --model gpt-5.4-nano --judge calibrated   # …or a hosted model by name
 ```
 
+Every scan drops the same **shareable breach card** as `rogue try` (`--no-card` to skip) — now with *your* model's real numbers.
+
 - **Judge:** defaults to a **keyless heuristic** (no API key). `--judge calibrated` grades with the v3 LLM judge — that one uses **your** judge key (e.g. `ANTHROPIC_API_KEY` / `JUDGE_MODEL`'s provider).
 - **Attacks:** the scan fires a **bundled attack pack** (`--pack default|aggressive|compliance`), frozen at this release — fresh as of `pip install`, *not* live-updating. The continuously-harvested live corpus drives the hosted dashboard + the [public corpus](corpus/); to run that live open-web harvest locally, use **`rogue setup`** (above) — see [Run the harvest free](#run-the-harvest-free--no-bright-data-no-keys).
 
