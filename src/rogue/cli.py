@@ -205,6 +205,43 @@ def _emit(report: Any, *, as_json: bool, out: Any) -> None:
     print(report.to_json() if as_json else report.summary(), file=out)
 
 
+def _emit_scan_card(report: Any, args: argparse.Namespace, out: Any) -> None:
+    """Drop the shareable breach card for a real scan (same artifact as ``rogue try``).
+
+    Skipped on ``--no-card`` or ``--json`` (machine output). Never fails the scan — a card-render
+    error is reported but swallowed. ``tier`` reflects the judge used (heuristic→quick, calibrated)."""
+    if getattr(args, "no_card", False) or getattr(args, "json", False):
+        return
+    try:
+        from datetime import datetime, timezone
+
+        from rogue.report_card import render_breach_card
+
+        top = getattr(report, "top_attack", None)
+        top = top() if callable(top) else top
+        fams = getattr(report, "families_covered", None)
+        fams = list(fams()) if callable(fams) else []
+        card = {
+            "model_label": getattr(report, "target", None) or "scanned-model",
+            "breach_rate": float(getattr(report, "breach_rate", 0.0) or 0.0),
+            "trials": int(getattr(report, "n_tests", 0) or 0),
+            "breaches": int(getattr(report, "n_breaches", 0) or 0),
+            "top_attack": top or "",
+            "families": fams,
+            "verdict_counts": {},
+            "tier": "calibrated" if getattr(args, "judge", "") == "calibrated" else "quick",
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        }
+        out_dir = Path(getattr(args, "out_dir", None) or "rogue-scan")
+        paths = render_breach_card(card, out_dir)
+        print("\n  shareable card saved:", file=out)
+        for k in ("svg", "png", "html"):
+            if paths.get(k):
+                print(f"    {paths[k]}", file=out)
+    except Exception as exc:  # noqa: BLE001 — a card-render failure must never fail the scan
+        print(f"  (shareable card not generated: {exc})", file=out)
+
+
 # --- subcommand handlers ----------------------------------------------------------------------
 
 
@@ -298,6 +335,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
         if args.output:
             Path(args.output).write_text(report.to_markdown(), encoding="utf-8")
         _emit(report, as_json=args.json, out=out)
+        _emit_scan_card(report, args, out)
         return 0
 
     # Non-persist path: delegate to Client.scan (stateless, no DB write).
@@ -316,6 +354,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
     if args.output:
         _write_output(report, args.output)
     _emit(report, as_json=args.json, out=out)
+    _emit_scan_card(report, args, out)
     return 0
 
 
@@ -667,6 +706,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="grader: 'heuristic' (keyless, default) or 'calibrated' (LLM v3 judge — needs a key)",
     )
     p_scan.add_argument("--output", default=None, metavar="PATH", help="write report to .html or .json")
+    p_scan.add_argument("--no-card", dest="no_card", action="store_true", help="skip the shareable breach card")
+    p_scan.add_argument("--out-dir", dest="out_dir", default=None, metavar="DIR", help="where to write the breach card (default: ./rogue-scan)")
     p_scan.add_argument(
         "--persist",
         action="store_true",

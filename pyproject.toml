@@ -1,6 +1,6 @@
 [project]
 name = "rogue-live-redteam"
-version = "1.4.0"
+version = "1.4.1"
 description = "Continuous open-web LLM red-team: harvests live jailbreaks from 15+ open-web sources, reproduces them against your model x system-prompt x tools, and serves results over its own MCP server."
 readme = "README.md"
 requires-python = ">=3.11"
