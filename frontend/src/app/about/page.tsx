@@ -202,10 +202,10 @@ export default function AboutPage() {
               .
             </p>
             <Link
-              href="/request-demo"
+              href="/try"
               className="inline-flex items-center gap-2 font-mono text-sm font-bold tracking-[0.12em] uppercase text-rogue-green hover:opacity-90 transition-opacity"
             >
-              Request a demo
+              Try the demo
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>

@@ -1885,16 +1885,18 @@ def bandit_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# Demo-request lead capture (`POST /api/demo-request`). Imported at the bottom
-# so `get_session` / `app` are already defined — the demo router imports
-# `get_session` from this module, so a top-of-file import would be circular.
+# Newsletter subscription (`POST /api/newsletter`). Imported at the bottom so
+# `get_session` / `app` are already defined — the router imports `get_session`
+# from this module, so a top-of-file import would be circular.
 # --------------------------------------------------------------------------- #
-from rogue.api import demo as _demo_router  # noqa: E402
-
-app.include_router(_demo_router.router)
-
-# Newsletter subscription (`POST /api/newsletter`). Imported at the bottom for
-# the same reason as the demo router — it imports `get_session` from this module.
 from rogue.api import newsletter as _newsletter_router  # noqa: E402
 
 app.include_router(_newsletter_router.router)
+
+# --------------------------------------------------------------------------- #
+# Public zero-install "scan → breach card" funnel (`POST /api/public-scan`).
+# DB-free + SSRF-guarded + rate-limited; mounted last like the other routers.
+# --------------------------------------------------------------------------- #
+from rogue.api import public_scan as _public_scan_router  # noqa: E402
+
+app.include_router(_public_scan_router.router)

@@ -65,7 +65,7 @@ never drift (enforced by the CHECK constraints reconciled in migration 0030).
 frontend/src/
 ├── app/         # routes: / · /feed · /matrix(/cell) · /brief · /analytics · /product
 │                #         + commercial (gated by NEXT_PUBLIC_SHOW_COMMERCIAL):
-│                #         /pricing · /enterprise · /security · /about · /deck · /request-demo …
+│                #         /pricing · /enterprise · /security · /about · /deck · /resources · /try …
 │                #         + (app)/ authed scan flow, api/ route handlers (revalidate, scan proxy)
 ├── components/  # ~40 components (cinematic hero, matrix heatmap, SSE feed widget, marketing/*)
 ├── lib/         # api.ts (public reader) · platform-api.ts (/v1) · flags.ts · proof.ts

@@ -18,9 +18,9 @@ import { cn } from "@/lib/utils";
  * non-2xx other than 422) we show an inline error and keep the entered value so
  * the visitor can retry.
  *
- * The API base is resolved the same way `request-demo-form.tsx` / `src/lib/api.ts`
- * do, from `NEXT_PUBLIC_API_BASE` (defaulting to localhost:8000), so it tracks
- * whatever the dashboard pages already talk to.
+ * The API base is resolved the same way `src/lib/api.ts` does, from
+ * `NEXT_PUBLIC_API_BASE` (defaulting to localhost:8000), so it tracks whatever
+ * the dashboard pages already talk to.
  */
 
 // Mirror `src/lib/api.ts`: same env var, same localhost fallback.

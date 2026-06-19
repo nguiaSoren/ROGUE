@@ -40,12 +40,12 @@ export default function TryPage() {
             <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl border-l-2 border-border pl-4">
               A real recorded ROGUE scan against a demo target, replayed in your
               browser, not a live scan on your input. Want it on your own model
-              &times; system-prompt &times; tools?{" "}
+              &times; system-prompt?{" "}
               <Link
-                href="/sign-in"
+                href="/scan"
                 className="text-rogue-green hover:underline underline-offset-4"
               >
-                request access
+                scan your own model — live, no install
               </Link>
               .
             </p>

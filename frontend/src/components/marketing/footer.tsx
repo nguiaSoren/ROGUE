@@ -21,7 +21,6 @@ const PRODUCT: FooterLink[] = [
 
 const COMPANY: FooterLink[] = [
   { label: "About", href: "/about" },
-  { label: "Case studies", href: "/case-studies" },
 ];
 
 const DEVELOPERS: FooterLink[] = [
@@ -49,10 +48,10 @@ export function Footer() {
               Independent assurance for high-stakes AI agents — model, oversight, and memory, measured and signed.
             </p>
             <Link
-              href="/request-demo"
+              href="/try"
               className="mt-6 inline-flex items-center rounded-md bg-rogue-green px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#050508] transition-opacity hover:opacity-90"
             >
-              Request a demo
+              Try the demo
             </Link>
           </div>
 

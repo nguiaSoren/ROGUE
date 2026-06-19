@@ -3,9 +3,8 @@
 These exercise the GET endpoints that had ZERO coverage. They run against a
 real, migrated ``rogue_test`` Postgres seeded with a small deterministic
 fixture, using the same monkeypatch-DATABASE_URL + alembic-upgrade pattern as
-``tests/test_reproduce_once.py`` and the live-DB skip guard from
-``tests/test_demo_request.py`` — so the whole module ``pytest.skip``s cleanly
-when Docker/Postgres is down.
+``tests/test_reproduce_once.py`` and a live-DB skip guard — so the whole module
+``pytest.skip``s cleanly when Docker/Postgres is down.
 
 Emphasis (per the build brief) is on the breach-matrix SCOPE × ATTACKER
 selection and breach-count consistency — the areas with prior production bugs
@@ -193,7 +192,7 @@ def client(seeded_db) -> Iterator[TestClient]:
     which mounts an MCP ``StreamableHTTPSessionManager`` whose ``run()`` may be
     called only once per instance (re-entering per test raises RuntimeError).
     The read endpoints under test need no lifespan startup; the DB dependency is
-    overridden directly, mirroring ``tests/test_demo_request.py``.
+    overridden directly.
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker

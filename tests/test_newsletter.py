@@ -7,8 +7,8 @@ Cases per the §-build brief:
 
 Email-validation cases (c) need no DB — FastAPI rejects at the Pydantic layer
 before the dependency runs. The persistence cases (a, b) hit a live Postgres via
-the same `live_engine`-style skip guard used in `tests/test_demo_request.py`, so
-they `pytest.skip` cleanly when Docker/DB is down. The fixture only creates the
+a `live_engine`-style skip guard, so they `pytest.skip` cleanly when Docker/DB
+is down. The fixture only creates the
 table if absent and only drops it on teardown when it created it — otherwise the
 leftover table pollutes `rogue_test` and breaks test_smoke's alembic round-trip.
 """

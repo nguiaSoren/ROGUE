@@ -247,12 +247,12 @@ export default function ProductPage() {
               Point it at your stack.
             </h2>
             <p className="text-[17px] text-foreground leading-relaxed max-w-2xl">
-              Get on the list for{" "}
+              Watch ROGUE run a scan right now —{" "}
               <Link
-                href="/early-access"
+                href="/try"
                 className="text-rogue-green hover:underline underline-offset-4"
               >
-                early access
+                try the demo
               </Link>
               .
             </p>
