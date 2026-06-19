@@ -1,6 +1,6 @@
 # Add your own source
 
-ROGUE's 19 open-web sources (see [`sources.md`](sources.md)) are not a fixed list — each one is a small plugin, and you can add your own to harvest from a forum, blog, repo, or feed ROGUE doesn't cover yet. A source is one subclass of `SourcePlugin`; it declares **what kind of fetch it needs**, and the harvest pipeline hands it a fetcher that performs the fetch, extracts the result into `AttackPrimitive`s, deduplicates, and routes it through the rest of the pipeline like any built-in source.
+ROGUE's 15 open-web sources (see [`sources.md`](sources.md)) are not a fixed list — each one is a small plugin, and you can add your own to harvest from a forum, blog, repo, or feed ROGUE doesn't cover yet. A source is one subclass of `SourcePlugin`; it declares **what kind of fetch it needs**, and the harvest pipeline hands it a fetcher that performs the fetch, extracts the result into `AttackPrimitive`s, deduplicates, and routes it through the rest of the pipeline like any built-in source.
 
 ## The contract
 

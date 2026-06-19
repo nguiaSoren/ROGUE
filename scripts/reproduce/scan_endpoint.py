@@ -67,6 +67,18 @@ def _load_fixtures(limit: int) -> list[AttackPrimitive]:
     return out
 
 
+def _load_pack(name: str, limit: int) -> list[AttackPrimitive]:
+    """A bundled attack pack (default / aggressive / compliance) — curated single-shot-capable
+    jailbreaks. This is the RIGHT corpus for scanning a bare model: the db's top canonical primitives
+    skew to multi-turn / system-prompt-leak escalation artifacts that can't breach a model with no
+    confidential system prompt (they read 0% no matter how deep), whereas the pack's DAN / Evil
+    Confidant / ROT13 / refusal-suppression jailbreaks break a permissive model directly."""
+    from rogue.packs import load_pack
+
+    prims = load_pack(name)
+    return prims[:limit] if limit and limit < len(prims) else prims
+
+
 def _load_from_db(database_url: str, limit: int) -> list[AttackPrimitive]:
     """Top ``limit`` canonical primitives by reproducibility score, ORM → Pydantic."""
     from sqlalchemy import create_engine, select
@@ -89,10 +101,12 @@ def _load_from_db(database_url: str, limit: int) -> list[AttackPrimitive]:
 
 
 def _slugify(name: str) -> str:
-    """Convert a human name to a stable config_id slug (lowercase, hyphens, max 80 chars)."""
+    """Convert a human name to a stable config_id slug (lowercase, hyphens). Capped at 40 chars —
+    the `deployment_configs.config_id` column is `varchar(40)`, so a longer slug (e.g.
+    `fl-meta-llama-3-1-8b-instruct-abliterated` = 41) overflows and the persist DataErrors."""
     import re
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    return slug[:80] or "endpoint-scan"
+    return slug[:40].rstrip("-") or "endpoint-scan"
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -104,6 +118,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--model", required=True, help="bare model name the endpoint serves, e.g. 'my-model'")
     p.add_argument("--api-key", default=None, help="endpoint API key (else $CUSTOM_API_KEY / $OPENAI_API_KEY)")
     p.add_argument("--corpus", choices=("db", "fixtures"), default="db", help="attack source (default: db)")
+    p.add_argument(
+        "--pack",
+        default=None,
+        help="bundled attack pack (default/aggressive/compliance) — overrides --corpus; the right "
+        "corpus for scanning a bare model (curated jailbreaks that breach without a system prompt)",
+    )
     p.add_argument("--limit", type=int, default=15, help="max primitives to scan (default: 15)")
     p.add_argument("--n-trials", type=int, default=3, help="trials per primitive (default: 3)")
     p.add_argument("--system-prompt", default="", help="system prompt the deployment runs with")
@@ -125,6 +145,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Required when --persist is set."
         ),
     )
+    # --- opt-in deep scan (COSTS MORE — many more model calls) ---
+    p.add_argument(
+        "--deep",
+        action="store_true",
+        default=False,
+        help="deep scan: persona-wrap + (PAIR + escalation on a non-breaching baseline). Costs more.",
+    )
+    p.add_argument(
+        "--pair-max-iters",
+        type=int,
+        default=3,
+        help="PAIR refinement cap under --deep (0 disables PAIR; default 3)",
+    )
+    p.add_argument(
+        "--no-escalate",
+        action="store_true",
+        default=False,
+        help="under --deep, skip the escalation ladder (keep persona + multi-turn + PAIR only)",
+    )
     return p.parse_args(argv)
 
 
@@ -132,7 +171,9 @@ async def _run(args: argparse.Namespace) -> EndpointScanReport:
     if args.persist and not args.config_name:
         raise SystemExit("--config-name NAME is required when --persist is set")
 
-    if args.corpus == "fixtures":
+    if args.pack:
+        primitives = _load_pack(args.pack, args.limit)
+    elif args.corpus == "fixtures":
         primitives = _load_fixtures(args.limit)
     else:
         primitives = _load_from_db(args.database_url, args.limit)
@@ -158,6 +199,9 @@ async def _run(args: argparse.Namespace) -> EndpointScanReport:
         database_url=args.database_url if args.persist else None,
         config_id=config_id,
         config_name=args.config_name,
+        deep=args.deep,
+        pair_max_iters=args.pair_max_iters,
+        escalate=not args.no_escalate,
     )
 
 

@@ -13,15 +13,16 @@
 
 // Defensible static citations, every value traces to a line in README.md /
 // ROGUE_PLAN.md and is kept in sync with the live corpus (canonical: 15 attack
-// families, 459 primitives, 8 deployment configs). These are NOT fetched at
-// runtime; they are the verified marketing figures the commercial pages cite.
+// families, 459 primitives of which 298 are open-web–harvested, 15 firing
+// sources). These are NOT fetched at runtime; they are the verified marketing
+// figures the commercial pages cite.
 export const CORPUS = {
-  primitives: 459, // canonical live corpus, attack_primitives rows
-  harvested: 298, // README.md:25, public HuggingFace dataset
+  primitives: 459, // canonical live corpus, attack_primitives rows (298 harvested + 161 synthesized/augmented)
+  harvested: 298, // README.md:25, public HuggingFace dataset (the open-web–harvested slice)
   families: 15, // canonical, OWASP LLM Top 10 + MITRE ATLAS aligned
-  sources: 19, // README.md:41, open-web sources
-  bdProducts: 5, // README.md:55, Bright Data products
-  modelsTested: 6, // README.md:221
+  sources: 15, // docs/sources.md, open-web sources that actually fire (15 primary)
+  bdProducts: 5, // README.md, Bright Data products
+  modelsTested: 6, // 6 production text models (+ 2 audio targets sampled lighter)
   reproductionTrials: 8321, // ROGUE_PLAN.md:2560, reproduction trials run
 } as const
 
@@ -84,7 +85,7 @@ export const PROOF_POINTS: ReadonlyArray<{
   {
     value: "459",
     label: "attack primitives",
-    sublabel: "15 families · 19 sources",
+    sublabel: "298 open-web–harvested · 15 families · 15 sources",
   },
   {
     value: "89.3%",

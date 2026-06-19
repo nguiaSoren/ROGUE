@@ -26,7 +26,7 @@
 
 - **Production reliability, learned the hard way.** Operated as a live service through a serverless-DB outage that I diagnosed and fixed — un-gating startup from migrations, adding a DB-free liveness probe, hardening the connection pool, and closing a streaming connection leak — then distilled into a reusable resilience playbook.
 
-- **The corpus.** 358 attack primitives across a 15-family taxonomy aligned to the OWASP LLM Top-10 and MITRE ATLAS, drawn from 19 open-web sources via 5 Bright Data products, reproduced against a 6-model panel (OpenAI / Anthropic / Meta / Mistral / Google), with 8,300+ breach-trial records. Published as an access-gated, MIT-licensed HuggingFace dataset.
+- **The corpus.** 459 attack primitives (298 harvested from the open web) across a 15-family taxonomy aligned to the OWASP LLM Top-10 and MITRE ATLAS, drawn from 15 open-web sources via 5 Bright Data products, reproduced against a 6-model panel (OpenAI / Anthropic / Meta / Mistral / Google) plus 2 audio targets, with 8,300+ breach-trial records. The 298 harvested primitives are published as an access-gated, MIT-licensed HuggingFace dataset.
 
 ---
 

@@ -5,8 +5,9 @@ import { SourceLogo } from "@/components/ui/source-logo";
 import { plainifyYield } from "@/lib/plain-numbers";
 
 /**
- * "Powered by Bright Data" spotlight + horizontal marquee of the 19
- * open-web sources. The spotlight surfaces ROGUE's two BD-aligned
+ * "Powered by Bright Data" spotlight + horizontal marquee of the
+ * open-web sources (15 fire; the strip below shows representative examples).
+ * The spotlight surfaces ROGUE's two BD-aligned
  * differentiators that the BD CEO outreach made explicit:
  *
  *   1. Cost-effectiveness, the §11.6 ε-greedy bandit measures bytes-of-
@@ -68,7 +69,7 @@ export function SourcesMarquee({
           powered by Bright Data
         </p>
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight max-w-3xl">
-          Five products. Nineteen sources.{" "}
+          Five products. Fifteen sources.{" "}
           <span className="text-rogue-green">One self-tuning budget.</span>
         </h2>
         <p className="text-base text-muted-foreground max-w-2xl leading-relaxed">
@@ -173,7 +174,7 @@ export function SourcesMarquee({
           tint="green"
         />
         <MetricTile
-          value="19"
+          value="15"
           unit="open-web sources fanned out"
           sub={
             <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">

@@ -81,10 +81,10 @@ export default function RequestDemoPage() {
               ))}
             </ul>
             <p className="text-sm text-muted-foreground leading-relaxed border-t border-border pt-5">
-              ROGUE continuously harvests jailbreaks and prompt-injections from
-              19 open-web sources and reproduces them against real deployment
-              configs, so you&apos;re tested against what attackers are sharing
-              today, not a frozen benchmark.
+              ROGUE harvests jailbreaks and prompt-injections from 15 open-web
+              sources on a recurring schedule and reproduces them against real
+              deployment configs, so you&apos;re tested against what attackers are
+              sharing recently, not a frozen benchmark.
             </p>
           </div>
 

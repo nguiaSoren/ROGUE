@@ -163,7 +163,7 @@ async def test_dispatch_one_exhausted_rate_limit_to_model_response():
         await panel.aclose()
     assert result.error is not None
     assert result.error.startswith("rate_limit_exhausted")
-    assert calls["n"] == 3  # initial + 2 retries (stop_after_attempt(3))
+    assert calls["n"] == 6  # initial + 5 retries (stop_after_attempt(6) in _provider_errors.py)
 
 
 # --- error projection from typed AdapterErrors (panel's except-clause mapping) --------------------

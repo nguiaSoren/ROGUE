@@ -167,6 +167,24 @@ class TargetPanel:
 
     # ----- Public API -----
 
+    @staticmethod
+    def modality_skip_reason(
+        rendered: RenderedAttack, config: DeploymentConfig
+    ) -> str | None:
+        """Why this (rendered, config) pair would be skipped for modality, or None if it dispatches.
+
+        Returns a short human-readable reason string when ``run_attack`` would skip the pair
+        (image attack vs a text-only target, audio attack vs a non-audio target), else ``None``.
+        Callers (``scan.py`` / ``endpoint_scan.py``) use this to surface an honest "skipped: target
+        not multimodal" finding instead of silently producing zero rows — the skip is a real signal
+        (you tested a media attack against a model that can't even read it), not a no-op.
+        """
+        if rendered.image_b64 is not None and not supports_image(config.target_model):
+            return f"target not multimodal (image attack vs text-only model {config.target_model})"
+        if rendered.audio_b64 is not None and not supports_audio(config.target_model):
+            return f"target not multimodal (audio attack vs non-audio model {config.target_model})"
+        return None
+
     async def run_attack(
         self,
         rendered: RenderedAttack,
@@ -183,20 +201,18 @@ class TargetPanel:
         Multimodal gate (Step 0a/0b): if the rendered attack carries an image/audio payload but the
         target model is not capable, return an EMPTY list rather than dispatching — an honest
         "modality-unsupported" skip (an image sent to a text-only model would 400 and pollute the
-        matrix as a fake ERROR). The caller simply produces no breach rows for that pair.
+        matrix as a fake ERROR). The caller simply produces no breach rows for that pair; callers that
+        want to *report* the skip (rather than drop it silently) first consult
+        :meth:`modality_skip_reason`.
+
+        SINGLE-TURN ONLY: this stacks every user turn into one ``invoke`` with no interleaved model
+        reply. For a primitive whose render has multiple user turns (Crescendo / gradient escalation),
+        callers should use :meth:`run_conversation` instead, which drives a real back-and-forth.
         """
-        if rendered.image_b64 is not None and not supports_image(config.target_model):
+        skip = self.modality_skip_reason(rendered, config)
+        if skip is not None:
             _log.info(
-                "skip: image attack vs text-only model %s — modality_unsupported "
-                "(not an error; no trials dispatched)",
-                config.target_model,
-            )
-            return []
-        if rendered.audio_b64 is not None and not supports_audio(config.target_model):
-            _log.info(
-                "skip: audio attack vs non-audio model %s — modality_unsupported "
-                "(not an error; no trials dispatched)",
-                config.target_model,
+                "skip: %s — modality_unsupported (not an error; no trials dispatched)", skip
             )
             return []
         temperatures = [min(temperature + 0.1 * i, 1.5) for i in range(n_trials)]
@@ -206,6 +222,54 @@ class TargetPanel:
         ]
         # Per-call concurrency stays bounded by n_trials; the OUTER fan-out over
         # (primitives × configs) in scripts/reproduce/reproduce_once.py owns the Semaphore (§11.3).
+        responses = await asyncio.gather(*coros)
+        return sorted(responses, key=lambda r: r.trial_index)
+
+    @staticmethod
+    def user_turn_count(rendered: RenderedAttack) -> int:
+        """How many user turns the rendered attack carries (system/assistant turns excluded).
+
+        A count ≥ 2 means the primitive is a real multi-turn (Crescendo / gradient) attack that
+        :meth:`run_conversation` should drive turn-by-turn rather than stacking into one ``invoke``.
+        """
+        return sum(1 for m in rendered.messages if m.get("role") == "user")
+
+    async def run_conversation(
+        self,
+        rendered: RenderedAttack,
+        config: DeploymentConfig,
+        temperature: float = 0.7,
+        n_trials: int = 5,
+    ) -> list[ModelResponse]:
+        """Drive a TRUE multi-turn back-and-forth; return the FINAL model reply per trial.
+
+        This is the default path for a primitive whose render has multiple user turns. For each
+        trial it sends user turn 1, gets the model's reply, appends that assistant reply to the
+        running history, sends user turn 2, … and so on until the last user turn. The returned
+        ``ModelResponse`` for the trial carries the FINAL reply (the one the judge grades), with
+        latency/tokens/cost SUMMED across every turn in the exchange so the cost ledger stays honest.
+
+        Adapter selection, the canonical message build (incl. the out-of-band image/audio payload on
+        the LAST user turn), and the RateLimit/ContentPolicy/ProviderError → legacy-tag projection are
+        identical to :meth:`run_attack` (they share ``_adapter_for`` / ``_build_messages`` /
+        ``_error_response``) — only the dispatch shape (sequential with interleaved replies) differs.
+
+        Multimodal gate and temperature walk match ``run_attack`` exactly: an image/audio attack
+        against an incapable target returns ``[]`` (see :meth:`modality_skip_reason`), and trial ``i``
+        runs at ``temperature + 0.1 * i`` capped at 1.5. A single-turn render is handled too (it
+        degrades to one invoke), but callers should prefer ``run_attack`` for the single-turn case.
+        """
+        skip = self.modality_skip_reason(rendered, config)
+        if skip is not None:
+            _log.info(
+                "skip: %s — modality_unsupported (not an error; no trials dispatched)", skip
+            )
+            return []
+        temperatures = [min(temperature + 0.1 * i, 1.5) for i in range(n_trials)]
+        coros = [
+            self._drive_conversation_once(rendered, config, trial_index=i, temperature=t)
+            for i, t in enumerate(temperatures)
+        ]
         responses = await asyncio.gather(*coros)
         return sorted(responses, key=lambda r: r.trial_index)
 
@@ -291,6 +355,89 @@ class TargetPanel:
             tokens_in=result.usage.input_tokens,
             tokens_out=result.usage.output_tokens,
             cost_usd=result.usage.estimated_cost_usd or 0.0,
+            error=None,
+            trial_index=trial_index,
+            temperature=temperature,
+        )
+
+    async def _drive_conversation_once(
+        self,
+        rendered: RenderedAttack,
+        config: DeploymentConfig,
+        trial_index: int,
+        temperature: float,
+    ) -> ModelResponse:
+        """Run ONE trial as a real multi-turn exchange; return the FINAL reply as a ModelResponse.
+
+        Mirrors ``_dispatch_one``'s adapter selection + error projection exactly, but instead of one
+        ``invoke`` it walks the user turns: send up through user turn k → get reply → append the
+        assistant reply to the running history → send up through user turn k+1 → … The final turn's
+        reply is what the caller judges. Latency/tokens/cost are SUMMED across every invoke so the
+        per-trial ModelResponse reflects the whole conversation, not just its last leg.
+
+        If any turn errors (rate-limit exhausted, content-policy block, provider error), the exchange
+        stops there and that error is returned as the trial's ModelResponse — exactly the same typed
+        legacy tags ``_dispatch_one`` produces. A content-policy block mid-crescendo is a legitimate
+        REFUSED outcome and is preserved verbatim.
+        """
+        provider = "custom" if config.base_url else _resolve_provider(config.target_model)
+        adapter = self._adapter_for(provider, config.target_model, config.base_url)
+        full = self._build_messages(rendered)
+
+        # Indices of the user turns we advance through, in order. Everything before the first user
+        # turn (a system turn) is carried as the standing prefix; assistant replies are interleaved.
+        user_idxs = [i for i, m in enumerate(full) if m.role == MessageRole.USER]
+        if not user_idxs:
+            # No user turn to send — degrade to a single invoke of whatever was built (defensive;
+            # render() guarantees at least one user turn for every primitive).
+            return await self._dispatch_one(rendered, config, trial_index, temperature)
+
+        history: list[CanonicalMessage] = []
+        total_latency_ms = 0
+        total_tokens_in = 0
+        total_tokens_out = 0
+        total_cost = 0.0
+        last_text = ""
+        prev_idx = 0
+        for turn_no, idx in enumerate(user_idxs):
+            # Append the slice from the previous user turn (exclusive) through this user turn
+            # (inclusive): the leading system prefix on the first leg, then each subsequent user turn.
+            history.extend(full[prev_idx : idx + 1])
+            prev_idx = idx + 1
+
+            t0 = time.perf_counter()
+            try:
+                result = await adapter.invoke(history, temperature=temperature)
+            except RateLimitError as e:
+                return self._error_response(
+                    "rate_limit_exhausted", e, trial_index, temperature, t0
+                )
+            except ContentPolicyError as e:  # subclass of ProviderError — must precede it
+                return self._error_response(
+                    "content_policy_or_bad_request", e, trial_index, temperature, t0
+                )
+            except (ProviderError, AuthenticationError) as e:
+                status = getattr(e, "status_code", None) or "unknown"
+                return self._error_response(
+                    f"http_status_{status}", e, trial_index, temperature, t0
+                )
+
+            total_latency_ms += result.latency_ms
+            total_tokens_in += result.usage.input_tokens
+            total_tokens_out += result.usage.output_tokens
+            total_cost += result.usage.estimated_cost_usd or 0.0
+            last_text = result.text
+            # Interleave the model's reply before the next user turn (skip after the final turn —
+            # there's no further user turn to follow it, and the final reply is what we return).
+            if turn_no < len(user_idxs) - 1:
+                history.append(result.to_message())
+
+        return ModelResponse(
+            content=last_text,
+            latency_ms=total_latency_ms,
+            tokens_in=total_tokens_in,
+            tokens_out=total_tokens_out,
+            cost_usd=total_cost,
             error=None,
             trial_index=trial_index,
             temperature=temperature,

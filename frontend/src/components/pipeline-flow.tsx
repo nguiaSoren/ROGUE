@@ -1,7 +1,7 @@
 /**
  * Animated 4-stage pipeline visualization for the home page hero.
  *
- *   [19 sources]  →  [harvest]  →  [reproduce 5-panel]  →  [judge]
+ *   [15 sources]  →  [harvest]  →  [reproduce 5-panel]  →  [judge]
  *
  * Pure SVG + CSS animations, server component, zero JS. The "moving pulses"
  * are repeating <circle> elements animated along the connecting paths via
@@ -11,7 +11,7 @@
  * The four stage counters come from /api/health (passed in as props).
  */
 export function PipelineFlow({
-  nSources = 19,
+  nSources = 15,
   nPrimitives,
   nConfigs,
   nBreaches,

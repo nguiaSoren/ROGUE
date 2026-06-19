@@ -70,7 +70,7 @@ const personas: Persona[] = [
     problem:
       "Manual red-teaming is slow and expensive, and the threat landscape moves daily.",
     solution:
-      "ROGUE runs continuous autonomous red-team and delivers a daily threat-brief diff; Slack + Jira today, SOAR/SIEM (Splunk, Palo Alto) coming soon.",
+      "ROGUE continuously harvests the open web and re-tests your deployment in periodic measured runs, delivering a threat-brief diff; Slack + Jira today, SOAR/SIEM (Splunk, Palo Alto) coming soon.",
   },
   {
     icon: Briefcase,

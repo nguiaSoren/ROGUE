@@ -1,0 +1,100 @@
+# PAID reproduce sweep — refresh the leaderboard / breach-matrix data.
+#
+# ⚠️ THIS SPENDS REAL MONEY. It fires every (canonical primitive × deployment
+# config × trial) through the live LLM target panel + LLM judge. A full sweep is
+# ≈ $35 (panel + judge calls); a capped sweep (--primitive-limit N) is cheaper.
+# It writes the results straight to the live Neon DB, refreshing the public
+# leaderboard / breach matrix.
+#
+# MANUAL ONLY. There is deliberately NO `schedule:` cron here — per CLAUDE.md,
+# ROGUE's costly / live-DB scripts must NEVER run on a timer or unattended.
+# A human triggers this from the Actions tab when a refresh is wanted, and must
+# type `confirm: yes` to arm it (a guard against an accidental click).
+#
+# The FREE continuous harvest is the scheduled job (harvest-keyless.yml). This
+# paid reproduce is the separate, gated, manual step that turns freshly-harvested
+# attacks into leaderboard breach data.
+
+name: reproduce-refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm you understand this SPENDS REAL MONEY (~$35 full, less if limited) and writes to the live Neon DB.'
+        required: true
+        default: "no"
+      primitive_limit:
+        description: "Cap the sweep to the top-N primitives by reproducibility_score (cheaper). Leave blank to reproduce ALL canonical primitives (~$35)."
+        required: false
+        default: ""
+      only_unreproduced:
+        description: 'Set to "true" for an incremental, cheaper pass: reproduce ONLY primitives that have no breach_results yet.'
+        required: false
+        default: "false"
+
+# One paid sweep at a time — they write the same Neon tables.
+concurrency:
+  group: reproduce-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    # A full sweep is long-running (panel + judge over the whole corpus). Bound
+    # it generously but not unbounded.
+    timeout-minutes: 240
+
+    env:
+      # Live Neon DB (the production leaderboard target). Required.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Target-panel + judge provider keys (reproduce_once.py docstring §A.13):
+      #   ANTHROPIC_API_KEY  — judge + Anthropic panel slot
+      #   OPENAI_API_KEY     — OpenAI panel slot
+      #   OPENROUTER_API_KEY — Mistral + Google + Llama panel slots
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # Optional Slack alerts on new HIGH/CRITICAL breaches (§10.4).
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      # Optional: regenerate the cached dashboard/leaderboard pages after the run.
+      FRONTEND_REVALIDATE_URL: ${{ secrets.FRONTEND_REVALIDATE_URL }}
+      REVALIDATE_TOKEN: ${{ secrets.REVALIDATE_TOKEN }}
+
+    steps:
+      - name: Confirm intent (abort unless confirm == yes)
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "yes" ]; then
+            echo "::error::confirm input was '${{ github.event.inputs.confirm }}', not 'yes' — aborting the PAID reproduce sweep."
+            exit 1
+          fi
+          echo "Confirmed. Proceeding with the PAID reproduce sweep (this spends real money)."
+
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install deps
+        run: uv sync
+
+      - name: Run paid reproduce sweep → live Neon DB
+        run: |
+          set -euo pipefail
+          ARGS=""
+          if [ -n "${{ github.event.inputs.primitive_limit }}" ]; then
+            ARGS="$ARGS --primitive-limit ${{ github.event.inputs.primitive_limit }}"
+          fi
+          if [ "${{ github.event.inputs.only_unreproduced }}" = "true" ]; then
+            ARGS="$ARGS --only-unreproduced"
+          fi
+          echo "Running: scripts/reproduce/reproduce_once.py$ARGS"
+          uv run python scripts/reproduce/reproduce_once.py $ARGS
