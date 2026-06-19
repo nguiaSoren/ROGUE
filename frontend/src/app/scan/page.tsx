@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PopularCards } from "@/components/popular-cards";
 import { PublicScan } from "@/components/public-scan";
 
 /**
@@ -45,16 +46,45 @@ export default function ScanPage() {
             Scan your model for jailbreaks
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-            Point ROGUE at your own LLM endpoint and run a live{" "}
-            <span className="text-rogue-green">ATTACKER → MODEL → JUDGE</span> red-team. No SDK, no signup —
-            just your endpoint and a key. You get back a{" "}
+            No SDK, no signup. Pick a{" "}
+            <span className="text-foreground">popular model</span> to see its already-measured breach
+            card instantly — or point ROGUE at your own endpoint to run a live{" "}
+            <span className="text-rogue-green">ATTACKER → MODEL → JUDGE</span> red-team and get back a{" "}
             <span className="text-foreground">shareable breach card</span> in about a minute.
           </p>
         </header>
 
-        <div className="animate-rogue-fade-up" style={{ animationDelay: "0.1s" }}>
-          <PublicScan />
+        {/* Path A — zero-input, zero-cost: see a popular model's pre-rendered
+            breach card. The "no endpoint?" path for a visitor who has nothing
+            to type into the form yet. Purely client-side, no API call. */}
+        <section className="animate-rogue-fade-up" style={{ animationDelay: "0.1s" }}>
+          <PopularCards />
+        </section>
+
+        {/* Visual divider between the two clearly-separate paths. */}
+        <div className="flex items-center gap-4 animate-rogue-fade-up" style={{ animationDelay: "0.15s" }}>
+          <span className="h-px flex-1 bg-border/60" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            or scan your own
+          </span>
+          <span className="h-px flex-1 bg-border/60" />
         </div>
+
+        {/* Path B — the live self-serve scan against the visitor's OWN endpoint. */}
+        <section className="space-y-3 animate-rogue-fade-up" style={{ animationDelay: "0.2s" }}>
+          <div className="space-y-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
+              have an endpoint? · live scan
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Scan your own model</h2>
+            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+              Point ROGUE at your own LLM endpoint and run a live{" "}
+              <span className="text-rogue-green">ATTACKER → MODEL → JUDGE</span> red-team. You get back
+              your own shareable breach card in about a minute.
+            </p>
+          </div>
+          <PublicScan />
+        </section>
       </div>
     </main>
   );

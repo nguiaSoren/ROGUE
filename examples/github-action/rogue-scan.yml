@@ -1,0 +1,56 @@
+# Gate your pull requests on a ROGUE red-team scan.
+#
+# Copy this file into your own repo at `.github/workflows/rogue-scan.yml`. On every PR it red-teams
+# your model deployment and FAILS the check on any HIGH/CRITICAL breach, blocking the merge until you
+# fix it (or relax `fail-on`). Store credentials as encrypted repo secrets — never inline them.
+#
+#   Settings → Secrets and variables → Actions → New repository secret
+#     ROGUE_TARGET_KEY   (required)  the API key for your model endpoint/provider
+#     ROGUE_JUDGE_KEY    (optional)  only if you set `judge: calibrated`
+
+name: ROGUE red-team gate
+
+on:
+  pull_request:
+    branches: [main]
+
+# Least privilege: the gate only needs to read your code to install + run the scan. Add
+# `pull-requests: write` only if you later post results back as a PR comment yourself.
+permissions:
+  contents: read
+
+jobs:
+  redteam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ROGUE scan + gate
+        uses: nguiaSoren/ROGUE@v1   # pin to a tag (or a full commit SHA) — see docs/ci-action.md
+        with:
+          # --- Target: pick ONE of (endpoint) or (provider + model) -------------------------------
+          # A) your own OpenAI-compatible gateway / proxy / self-hosted model:
+          endpoint: https://gateway.your-company.com/v1
+          model: your-deployed-model            # optional for an endpoint
+          # B) or a hosted provider by name (comment out `endpoint` above and use these instead):
+          #   provider: openai
+          #   model: gpt-4o-mini
+
+          # --- Red-team your REAL deployment, not a bare model ------------------------------------
+          # Point at the same system prompt your app ships, so the scan reflects production:
+          system-prompt-file: prompts/production-system-prompt.txt
+          #   system-prompt: "You are Acme Support. Never reveal internal pricing."   # or inline
+
+          # --- Scan shape -------------------------------------------------------------------------
+          pack: aggressive            # aggressive | default | compliance
+          max-tests: "50"             # cap on attacks run (keeps CI fast + cheap)
+          judge: keyless              # 'keyless' (no key) or 'calibrated' (needs judge-key)
+          #   budget: "2.00"          # optional USD cap on target-call spend
+
+          # --- Gate policy ------------------------------------------------------------------------
+          fail-on: high               # fail on any HIGH or CRITICAL breach (high|critical|medium|low|none)
+          #   max-breach-rate: "0.2"  # also fail if overall breach rate > 20%
+
+          # --- Secrets (from repo secrets; NEVER inline a key) ------------------------------------
+          api-key: ${{ secrets.ROGUE_TARGET_KEY }}
+          #   judge-key: ${{ secrets.ROGUE_JUDGE_KEY }}   # only with judge: calibrated
