@@ -1,0 +1,82 @@
+{
+  "provider": "featherless",
+  "templates": 4,
+  "paraphrase_judge": false,
+  "runs": 3,
+  "complete": false,
+  "results": [
+    {
+      "model": "Qwen/Qwen2.5-1.5B-Instruct",
+      "runs": 3,
+      "leakage_rate": 0.7666666666666666,
+      "per_run_rates": [
+        0.75,
+        0.8,
+        0.75
+      ],
+      "sd": 0.028867513459481315,
+      "sem": 0.016666666666666684,
+      "across_run_ci_low": 0.6949499999999998,
+      "across_run_ci_high": 0.8383833333333334,
+      "run1_ci_low": 0.55,
+      "run1_ci_high": 0.95,
+      "canary_n": 20,
+      "control_n": 6,
+      "control_false_positives": 0,
+      "n_calls": 312,
+      "n_errors": 0,
+      "live": true,
+      "canary_recovery_freq": {
+        "skill-031": 3,
+        "skill-044": 3,
+        "skill-009": 2,
+        "skill-023": 3,
+        "skill-036": 3,
+        "skill-045": 3,
+        "skill-018": 3,
+        "skill-019": 2,
+        "skill-040": 1,
+        "skill-053": 3,
+        "skill-027": 3,
+        "skill-006": 3,
+        "skill-016": 3,
+        "skill-004": 1,
+        "skill-025": 3,
+        "skill-010": 2,
+        "skill-049": 1,
+        "skill-041": 1,
+        "skill-037": 2,
+        "skill-034": 1
+      },
+      "coverage": "standard",
+      "paraphrase_judge": false,
+      "channels": {
+        "visible": {
+          "rate": 0.7666666666666666
+        },
+        "answer": {
+          "rate": 0.7666666666666666
+        },
+        "reasoning_inclusive": {
+          "rate": 0.7666666666666666
+        }
+      },
+      "cot_only_surface": 0.0,
+      "has_reasoning": false,
+      "marker_only_rate": 0.7666666666666666,
+      "judge_increment_rate": 0.0,
+      "recovered_via_marker_total": 46,
+      "recovered_via_judge_total": 0,
+      "canonical_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "used_mirror": false,
+      "family": "qwen2.5",
+      "params_b": 1.5,
+      "alignment": "instruct",
+      "reasoning": false,
+      "arms": [
+        "A_scale_qwen"
+      ]
+    }
+  ],
+  "aborted": []
+}

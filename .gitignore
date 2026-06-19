@@ -1,0 +1,232 @@
+# secrets
+.env
+.env.local
+.env.*.local
+.neon_url.local
+.env.bak*
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# uv / poetry caches (lockfiles ARE committed)
+.uv-cache/
+.poetry-cache/
+
+# node / next.js
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# db / data
+postgres-data/
+pgdata/
+*.db
+*.sqlite
+*.sqlite3
+dump.sql
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# bright data / llm cost logs (regenerated per run)
+bright_data_cost_log.csv
+llm_cost_log.csv
+*.log
+
+# build artifacts
+dist/
+build/
+*.egg-info/
+
+# runtime-generated state (bandit arm stats, dataset exports, threat-brief outputs)
+# Tracked at the directory level via tests/fixtures/.gitkeep — actual contents stay local.
+data/*
+!data/.gitkeep
+# Bandit arm stats — harmless (no secrets/PII); published so /api/bandit/stats
+# renders on a fresh clone + the Render build can COPY it.
+!data/discovery_bandit.json
+# Per-breach-type judge calibration SUMMARIES — Surface-1 RedlineGuard + the per-rule judge read
+# these at runtime (data/calibration/<breach_type>_report.json) to report REAL precision; without
+# them prod degrades to "uncalibrated". Small summary stats only (precision/recall/agreement CIs +
+# gate + one summary line) — NO eval cases / transcripts / PII. Eval corpora, kappa worksheets,
+# benchmark reports (over_block/strongreject/wildguard), and backups stay local.
+!data/calibration/
+data/calibration/*
+!data/calibration/information_disclosure_report.json
+!data/calibration/unauthorized_action_report.json
+!data/calibration/fabricated_sensitive_value_report.json
+# P2 external-benchmark result reports (back the JBB / WildGuard / StrongREJECT numbers)
+!data/calibration/jbb_judge_report_v3.json
+!data/calibration/wildguard_report.json
+!data/calibration/wildguard_report_harmful.json
+!data/calibration/strongreject_report.json
+# Released derived results behind the papers (derived only — see RESPONSIBLE_RELEASE.md)
+!data/research/
+data/research/*
+!data/research/reproducibility_gap_results.json
+!data/research/reextracted_claims.json
+!data/research/reproducibility_gap_pairs.csv
+!data/research/coverage_validity_results.json
+!data/research/scheduler_results.json
+!data/research/skill_leak_curve_2026-06-13_REDO.log
+!data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md
+
+# LeakHub session capture — Playwright storage_state JSON. Effectively your
+# signed-in session; never commit. See scripts/_capture_leakhub_storage.py.
+leakhub_storage_state.json
+
+# notebooks / scratch
+.ipynb_checkpoints/
+scratch/
+tmp/
+
+# vendor docs archive — local reference only, not for committing
+website/
+
+# research-paper code archive — same pattern as website/ above.
+# Holds shallow clones of PAIR / Crescendo / AutoDAN / PAP reference repos
+# per ROGUE_PLAN.md §10.7 implementation checklist. Research code is not
+# licensed for redistribution in our repo; canonical sources stay on GitHub.
+papers/
+
+# Local-only agent instructions
+CLAUDE.md
+
+mani.py
+
+# AI session files (local-only)
+frontend/AGENTS.md
+
+# local test creds + demo flow (plaintext throwaway key — kept out of git history)
+TESTING.md
+frontend/CLAUDE.md
+tasks/
+
+# Internal planning / notes — not for the public repo
+ROGUE_PLAN.md
+glossary.md
+answers.md
+new_methods.md
+assets/deck_slide_lines.md
+# rogue v2 spec — internal planning, local-only
+docs/v2/
+# Moat-building method notes (SERP queries, BD harvest recipe, harvest scripts) —
+# the corpus DATA stays committed (tests/runtime load it), but the prose that
+# documents HOW it was harvested is internal-only. Nothing in code/CI reads these.
+tests/fixtures/memory/HARVEST_NOTES.md
+tests/fixtures/oversight/HARVEST_NOTES.md
+
+# Dev-scratch scripts — not part of the runnable project
+scripts/_*
+# Unpublished paper teaser figure generator (the sibling research fig scripts are tracked)
+scripts/research/p3_teaser.py
+
+# Stray root npm files (accidental `npm install react-markdown` at repo root;
+# real frontend deps live in frontend/package.json)
+/package.json
+/package-lock.json
+
+# Internal marketing/positioning notes — not part of the public repo
+/marketing_claims.md
+/monetization_venues.md
+# Internal go-to-market + demo-production playbook (trailer/filming notes,
+# creative briefs, sitemap, positioning) — production process, not product.
+docs/marketing/
+# Founder's internal outbound/sales index (cold-email skeleton, prospect list,
+# pre-send checklist) — never public.
+docs/outbound_package.md
+
+# Personal / non-product files (must never reach the auto-deploying repo)
+*_CV.md
+skills-lock.json
+.agents/
+startup/
+video/
+# Content-marketing / demo-video tooling — not part of the red-team product
+scripts/youtube_research.py
+scripts/assemble_video.sh
+scripts/build_trailer_clips.sh
+scripts/build_trailer_cut.sh
+scripts/make_trailer_captions.py
+scripts/trailer/
+assets/trailer/
+
+# Local working artifacts + review UIs — not for the public repo
+.claude/
+/19_leakage_labels.json
+/19_net_effect_labels.json
+/oversight_decisions.json
+/leakage_label.html
+/net_effect_label.html
+/oversight_review.html
+
+# Local-only research/working docs (WIP; not for the public repo)
+docs/research/adaptive_orchestration_systems.md
+docs/research/scheduler_allocation_study.md
+docs/research/adaptive_orchestration_paper.md
+docs/research/paper_figures.md
+docs/research/figs/
+scripts/paper_figs.py
+scripts/export_paper_data.py
+docs/research/RESEARCH_TODO.md
+# arXiv/workshop submission packages — papers live on arXiv; the repo links to
+# them (see PAPERS.md) rather than shipping the LaTeX sources + internal plan.
+docs/research/publishing/
+# contingent roadmap (build-if-trigger), not implemented system
+docs/3b_v2_renderer_design.md
+.vercel
+.env*
+# ...but .env.example files ARE tracked (documentation, no secrets).
+!.env.example
+!frontend/.env.example
+
+# Demo/video working media — large; excluded from deploy via .vercelignore, kept local.
+assets/*.mp4
+assets/*.mp3
+assets/*.pdf
+assets/captures/
+assets/music/
+assets/rogue-*.png
+assets/0531.mp4
+
+# Surface-2 oversight: the harvested-page provenance CACHE is bulky (~5.7M) + reproducible from
+# source_refs — keep it local. The answer-key corpus + notes + the lightweight index ARE committed
+# (the corpus is the moat; the CI lint + tests load it).
+tests/fixtures/oversight/_raw/*
+!tests/fixtures/oversight/_raw/_index.json
+
+# Surface-3 skill-pool harvested-page provenance CACHE — bulky + reproducible from source_refs; local.
+# The skill pool + canary ground-truth + manifest ARE committed (the moat; tests/lint load them).
+tests/fixtures/memory/_raw/*
+!tests/fixtures/memory/_raw/_index.json
+
+# Surface-3 held-out-task harvested-page cache — bulky + reproducible; local. Tasks + manifest committed.
+tests/fixtures/memory/_raw_tasks/*
+!tests/fixtures/memory/_raw_tasks/_index.json
+
+# §08 judge-calibration labelable case fixtures — committed so a labeler's labels tie to a fixed set
+# (the harvester's Groq capture is non-deterministic and can't be regenerated identically).
+!data/calibration/leakage_label_cases.json
+!data/calibration/net_effect_label_cases.json
+!data/calibration/net_effect_synthetic_cases.json
+!data/calibration/net_effect_report.json

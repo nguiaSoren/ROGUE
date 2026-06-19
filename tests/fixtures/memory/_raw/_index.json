@@ -1,0 +1,198 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/anthropics/skills/main/README.md",
+    "file": "raw-githubusercontent-com-anthropics-skills-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 5624,
+    "fetched_at": "2026-06-10T17:17:51.685144+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ComposioHQ/awesome-claude-skills/main/README.md",
+    "file": "raw-githubusercontent-com-composiohq-awesome-claude-skills-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 14,
+    "fetched_at": "2026-06-10T17:17:55.014254+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/VoltAgent/awesome-agent-skills/main/README.md",
+    "file": "raw-githubusercontent-com-voltagent-awesome-agent-skills-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 227994,
+    "fetched_at": "2026-06-10T17:17:59.637351+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md",
+    "file": "raw-githubusercontent-com-addyosmani-agent-skills-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 15103,
+    "fetched_at": "2026-06-10T17:18:04.223962+00:00"
+  },
+  {
+    "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview",
+    "file": "platform-claude-com-docs-en-agents-and-tools-agent-skills-overview.md",
+    "status_code": 200,
+    "content_len": 28658,
+    "fetched_at": "2026-06-10T17:18:09.399845+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cursorrules/main/README.md",
+    "file": "raw-githubusercontent-com-patrickjs-awesome-cursorrules-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 52132,
+    "fetched_at": "2026-06-10T17:18:14.133342+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/SchneiderSam/awesome-windsurfrules/main/README.md",
+    "file": "raw-githubusercontent-com-schneidersam-awesome-windsurfrules-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 361,
+    "fetched_at": "2026-06-10T17:18:18.191247+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/aurelia/aurelia/master/docs/user-docs/developer-guides/developing-with-ai/windsurf-rules-example.md",
+    "file": "raw-githubusercontent-com-aurelia-aurelia-master-docs-user-docs-developer-guides-developing-with-ai-windsurf-rules-examp.md",
+    "status_code": 200,
+    "content_len": 8456,
+    "fetched_at": "2026-06-10T17:18:21.479577+00:00"
+  },
+  {
+    "url": "https://docs.crewai.com/en/learn/create-custom-tools",
+    "file": "docs-crewai-com-en-learn-create-custom-tools.md",
+    "status_code": 200,
+    "content_len": 13680,
+    "fetched_at": "2026-06-10T17:18:25.736214+00:00"
+  },
+  {
+    "url": "https://www.langchain.com/blog/how-to-build-an-agent",
+    "file": "www-langchain-com-blog-how-to-build-an-agent.md",
+    "status_code": 200,
+    "content_len": 16739,
+    "fetched_at": "2026-06-10T17:18:29.598901+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/dair-ai/prompt-engineering-guide/main/README.md",
+    "file": "raw-githubusercontent-com-dair-ai-prompt-engineering-guide-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 10868,
+    "fetched_at": "2026-06-10T17:18:33.847169+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/promptslab/awesome-prompt-engineering/main/README.md",
+    "file": "raw-githubusercontent-com-promptslab-awesome-prompt-engineering-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 94254,
+    "fetched_at": "2026-06-10T17:18:38.648299+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/mgreiler/code-review-checklist/main/README.md",
+    "file": "raw-githubusercontent-com-mgreiler-code-review-checklist-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 14,
+    "fetched_at": "2026-06-10T17:18:42.982120+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md",
+    "file": "raw-githubusercontent-com-mgreiler-secure-code-review-checklist-main-readme-md.md",
+    "status_code": 200,
+    "content_len": 7942,
+    "fetched_at": "2026-06-10T17:18:47.182840+00:00"
+  },
+  {
+    "url": "https://google.github.io/eng-practices/review/reviewer/standard.html",
+    "file": "google-github-io-eng-practices-review-reviewer-standard-html.md",
+    "status_code": 200,
+    "content_len": 6003,
+    "fetched_at": "2026-06-10T17:18:51.029837+00:00"
+  },
+  {
+    "url": "https://owasp.org/www-project-secure-coding-practices-quick-reference-guide/stable-en/02-checklist/05-checklist",
+    "file": "owasp-org-www-project-secure-coding-practices-quick-reference-guide-stable-en-02-checklist-05-checklist.md",
+    "status_code": 200,
+    "content_len": 27647,
+    "fetched_at": "2026-06-10T17:18:54.873616+00:00"
+  },
+  {
+    "url": "https://blog.hartleybrody.com/web-scraping-boilerplate/",
+    "file": "blog-hartleybrody-com-web-scraping-boilerplate.md",
+    "status_code": 200,
+    "content_len": 14242,
+    "fetched_at": "2026-06-10T17:18:59.608404+00:00"
+  },
+  {
+    "url": "https://medium.com/@hadiyolworld007/pandas-data-cleaning-cookbook-8-essential-techniques-for-real-world-messy-data-fa7c4bd88aa8",
+    "file": "medium-com-hadiyolworld007-pandas-data-cleaning-cookbook-8-essential-techniques-for-real-world-messy-data-fa7c4bd88aa8.md",
+    "status_code": 200,
+    "content_len": 8155,
+    "fetched_at": "2026-06-10T17:19:04.452638+00:00"
+  },
+  {
+    "url": "https://dev.to/zainaboyedeji/the-complete-git-commands-cheat-sheet-everything-you-need-to-know-4n9b",
+    "file": "dev-to-zainaboyedeji-the-complete-git-commands-cheat-sheet-everything-you-need-to-know-4n9b.md",
+    "status_code": 200,
+    "content_len": 22053,
+    "fetched_at": "2026-06-10T17:19:09.223403+00:00"
+  },
+  {
+    "url": "https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/",
+    "file": "www-geeksforgeeks-org-sql-best-practices-for-sql-query-optimizations.md",
+    "status_code": 200,
+    "content_len": 16066,
+    "fetched_at": "2026-06-10T17:19:14.220770+00:00"
+  },
+  {
+    "url": "https://sre.google/resources/practices-and-processes/incident-management-guide/",
+    "file": "sre-google-resources-practices-and-processes-incident-management-guide.md",
+    "status_code": 200,
+    "content_len": 15520,
+    "fetched_at": "2026-06-10T17:19:19.216559+00:00"
+  },
+  {
+    "url": "https://emmer.dev/blog/an-effective-incident-runbook-template/",
+    "file": "emmer-dev-blog-an-effective-incident-runbook-template.md",
+    "status_code": 200,
+    "content_len": 15383,
+    "fetched_at": "2026-06-10T17:19:24.578267+00:00"
+  },
+  {
+    "url": "https://blog.logrocket.com/a-complete-guide-to-react-performance-optimization/",
+    "file": "blog-logrocket-com-a-complete-guide-to-react-performance-optimization.md",
+    "status_code": 200,
+    "content_len": 30650,
+    "fetched_at": "2026-06-10T17:19:29.240327+00:00"
+  },
+  {
+    "url": "https://towardsdatascience.com/a-practical-guide-to-memory-for-autonomous-llm-agents/",
+    "file": "towardsdatascience-com-a-practical-guide-to-memory-for-autonomous-llm-agents.md",
+    "status_code": 200,
+    "content_len": 25139,
+    "fetched_at": "2026-06-10T17:19:33.213567+00:00"
+  },
+  {
+    "url": "https://ericmjl.github.io/blog/2026/1/18/how-to-build-self-improving-coding-agents-part-2/",
+    "file": "ericmjl-github-io-blog-2026-1-18-how-to-build-self-improving-coding-agents-part-2.md",
+    "status_code": 200,
+    "content_len": 8837,
+    "fetched_at": "2026-06-10T17:19:37.498494+00:00"
+  },
+  {
+    "url": "https://www.briancoords.com/agent-skills-are-the-markdown-files-ive-been-waiting-for/",
+    "file": "www-briancoords-com-agent-skills-are-the-markdown-files-ive-been-waiting-for.md",
+    "status_code": 200,
+    "content_len": 9849,
+    "fetched_at": "2026-06-10T17:19:40.184596+00:00"
+  },
+  {
+    "url": "https://microsoft.github.io/code-with-engineering-playbook/engineering-fundamentals-checklist/",
+    "file": "microsoft-github-io-code-with-engineering-playbook-engineering-fundamentals-checklist.md",
+    "status_code": 200,
+    "content_len": 32667,
+    "fetched_at": "2026-06-10T17:19:45.870823+00:00"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/wshobson/agents/main/docs/agent-skills.md",
+    "file": "raw-githubusercontent-com-wshobson-agents-main-docs-agent-skills-md.md",
+    "status_code": 200,
+    "content_len": 26181,
+    "fetched_at": "2026-06-10T17:19:50.149787+00:00"
+  }
+]

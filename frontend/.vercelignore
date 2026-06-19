@@ -1,0 +1,10 @@
+# Vercel installs deps + builds remotely, so never upload local build/dev artifacts.
+# (Two files here exceed Vercel's 100 MB limit: node_modules' next-swc native binary
+# and a .next/dev Turbopack cache from a stray `next dev`.) .vercelignore guarantees
+# these are excluded even when .gitignore isn't honored.
+node_modules
+.next
+.git
+*.tsbuildinfo
+*.log
+.env*.local

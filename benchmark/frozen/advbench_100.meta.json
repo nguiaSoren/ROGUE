@@ -1,0 +1,6 @@
+{
+  "name": "advbench_100",
+  "source": "walledai/AdvBench (canonical 100 of 520, seed=rogue-benchmark-v1)",
+  "n": 100,
+  "sha256": "351c67aaf830d2fdb925621d77edee3d6760a1bdcee3490df336422121653f9e"
+}

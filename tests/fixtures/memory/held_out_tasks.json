@@ -1,0 +1,242 @@
+[
+  {
+    "task_id": "task-001",
+    "applicable_skill_ids": ["skill-030", "skill-035", "skill-036", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\ndef get_item(conn, owner, item_name):\n    query = \"SELECT * FROM items WHERE owner = '\" + owner + \"' AND itemname = '\" + item_name + \"'\"\n    cur = conn.cursor()\n    cur.execute(query)\n    return cur.fetchall()\n```",
+    "expected_outcome": "Identifies SQL injection: user input (owner/item_name) is string-concatenated into the SQL query. Recommends parameterized queries / prepared statements (e.g. cur.execute with placeholders and a params tuple) instead of building the SQL string from input.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/89.html", "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"]
+  },
+  {
+    "task_id": "task-002",
+    "applicable_skill_ids": ["skill-030", "skill-035", "skill-036", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```php\n$category = $_GET['category'];\n$query = \"SELECT item, price FROM product WHERE item_category = '$category' ORDER BY price\";\n$result = mysqli_query($conn, $query);\n```",
+    "expected_outcome": "Identifies SQL injection: the $_GET['category'] request parameter is interpolated directly into the SQL string. Recommends parameterized queries / prepared statements (mysqli/PDO bound parameters) rather than interpolating request input.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/89.html", "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"]
+  },
+  {
+    "task_id": "task-003",
+    "applicable_skill_ids": ["skill-030", "skill-036", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\nimport os\n\ndef ping_host(hostname):\n    os.system(\"nslookup \" + hostname)\n```",
+    "expected_outcome": "Identifies OS command injection: the hostname argument is concatenated into a shell command, so command separators (e.g. ';', '&&', '|') let an attacker run arbitrary commands. Recommends avoiding the shell (e.g. subprocess with an argument list / shell=False) and/or allow-list validation of the input.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/78.html", "https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html"]
+  },
+  {
+    "task_id": "task-004",
+    "applicable_skill_ids": ["skill-030", "skill-036", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```java\nString btype = request.getParameter(\"backuptype\");\nString cmd = \"cmd.exe /K \\\"c:\\\\util\\\\rmanDB.bat \" + btype + \"&&c:\\\\util\\\\cleanup.bat\\\"\";\nRuntime.getRuntime().exec(cmd);\n```",
+    "expected_outcome": "Identifies OS command injection: the 'backuptype' request parameter is concatenated into a command string passed to Runtime.exec, allowing injection of extra commands. Recommends passing arguments as an array / avoiding shell concatenation and validating input against an allow-list.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/78.html", "https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html"]
+  },
+  {
+    "task_id": "task-005",
+    "applicable_skill_ids": ["skill-031", "skill-034", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\nDB_HOST = \"10.0.0.5\"\nDB_USER = \"admin\"\nDB_PASSWORD = \"S3cr3tP@ss!\"\n\ndef connect():\n    return db.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)\n```",
+    "expected_outcome": "Identifies hardcoded credentials (the database password embedded in source). Recommends loading secrets from environment variables / a secrets manager / config kept out of source control rather than hard-coding them.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/798.html"]
+  },
+  {
+    "task_id": "task-006",
+    "applicable_skill_ids": ["skill-031", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\nAPI_KEY = \"sk_live_REDACTED_EXAMPLE_KEY\"\n\ndef charge(amount):\n    return requests.post(\"https://api.payments.example/charge\",\n                         headers={\"Authorization\": f\"Bearer {API_KEY}\"},\n                         json={\"amount\": amount})\n```",
+    "expected_outcome": "Identifies a hardcoded secret / API key committed in source. Recommends loading it from an environment variable or secrets manager and removing/rotating the exposed key.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/798.html"]
+  },
+  {
+    "task_id": "task-007",
+    "applicable_skill_ids": ["skill-034", "skill-035", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\nimport requests\n\ndef fetch_url(user_supplied_url):\n    # Fetch whatever URL the user asks for and return the body\n    resp = requests.get(user_supplied_url)\n    return resp.text\n```",
+    "expected_outcome": "Identifies Server-Side Request Forgery (SSRF): a user-controlled URL is fetched server-side with no validation, letting an attacker reach internal/metadata endpoints (e.g. 169.254.169.254, localhost, internal hosts). Recommends allow-listing permitted hosts/schemes and blocking internal/private address ranges.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/918.html", "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"]
+  },
+  {
+    "task_id": "task-008",
+    "applicable_skill_ids": ["skill-035", "skill-036", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\ndef read_user_file(filename):\n    base = \"/var/www/uploads/\"\n    with open(base + filename) as f:\n        return f.read()\n```",
+    "expected_outcome": "Identifies path traversal: 'filename' is concatenated onto a base directory with no validation, so input like '../../etc/passwd' escapes the intended directory. Recommends canonicalizing the path and verifying it stays within the base directory, and/or allow-listing the filename.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/22.html"]
+  },
+  {
+    "task_id": "task-009",
+    "applicable_skill_ids": ["skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\nimport hashlib\n\ndef store_password(pw):\n    digest = hashlib.md5(pw.encode()).hexdigest()\n    db.save(digest)\n```",
+    "expected_outcome": "Identifies use of a broken/weak cryptographic hash (MD5) for password storage. Recommends a slow, salted password-hashing algorithm such as bcrypt, scrypt, or Argon2 instead of MD5.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/327.html", "https://cwe.mitre.org/data/definitions/798.html"]
+  },
+  {
+    "task_id": "task-010",
+    "applicable_skill_ids": ["skill-035", "skill-036", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```python\nimport pickle\n\ndef load_session(request):\n    data = request.cookies.get(\"session\")\n    return pickle.loads(base64.b64decode(data))\n```",
+    "expected_outcome": "Identifies insecure deserialization of untrusted data: pickle.loads on attacker-controlled cookie data allows arbitrary code execution. Recommends not deserializing untrusted input with pickle and using a safe format (e.g. signed JSON) instead.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/502.html"]
+  },
+  {
+    "task_id": "task-011",
+    "applicable_skill_ids": ["skill-036", "skill-035", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue:\n\n```javascript\napp.get('/welcome', (req, res) => {\n  const name = req.query.name;\n  res.send('<h1>Welcome ' + name + '</h1>');\n});\n```",
+    "expected_outcome": "Identifies reflected cross-site scripting (XSS): the 'name' query parameter is written into the HTML response without output encoding. Recommends contextual HTML output-encoding/escaping of the untrusted value before rendering it.",
+    "source_refs": ["https://cwe.mitre.org/data/definitions/79.html"]
+  },
+  {
+    "task_id": "task-012",
+    "applicable_skill_ids": ["skill-031", "skill-033"],
+    "domain": "security",
+    "task": "Review this authentication code and report any security issue:\n\n```python\ndef login(username, password):\n    user = db.find_user(username)\n    if user is None:\n        return error(\"No account exists for username \" + username)\n    if user.password_hash != hash(password):\n        log.info(\"Failed login for %s with password %s\", username, password)\n        return error(\"Wrong password\")\n    return ok(user)\n```",
+    "expected_outcome": "Identifies at least one of: (a) the distinct 'no such user' vs 'wrong password' messages leak which field was wrong (username enumeration) — should be a single generic failure message; and (b) the cleartext password is written to the log — passwords must never be logged.",
+    "source_refs": ["https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"]
+  },
+  {
+    "task_id": "task-013",
+    "applicable_skill_ids": ["skill-033"],
+    "domain": "security",
+    "task": "Review this error-handling code and report any security issue:\n\n```python\n@app.errorhandler(Exception)\ndef handle(e):\n    import traceback\n    return Response(traceback.format_exc(), status=500, mimetype='text/plain')\n```",
+    "expected_outcome": "Identifies information leakage via error messages: returning the full stack trace to the client exposes internal implementation details. Recommends showing a generic error to the user and logging the detailed trace server-side only.",
+    "source_refs": ["https://raw.githubusercontent.com/mgreiler/secure-code-review-checklist/main/README.md"]
+  },
+  {
+    "task_id": "task-014",
+    "applicable_skill_ids": ["skill-030", "skill-049"],
+    "domain": "security",
+    "task": "Review this code and report any security issue. If there is no real vulnerability, say so explicitly.\n\n```python\ndef get_user(conn, user_id: int):\n    cur = conn.cursor()\n    cur.execute(\"SELECT id, name, email FROM users WHERE id = %s\", (user_id,))\n    return cur.fetchone()\n```",
+    "expected_outcome": "Reports that the query is safe / not injectable: it uses a parameterized query (%s placeholder with a params tuple), which is the correct defense. Does NOT falsely claim SQL injection. (Regression = wrongly flagging this safe code as vulnerable.)",
+    "source_refs": ["https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html", "https://cwe.mitre.org/data/definitions/89.html"]
+  },
+  {
+    "task_id": "task-015",
+    "applicable_skill_ids": ["skill-038", "skill-040"],
+    "domain": "sql",
+    "task": "Improve the performance of this query and explain why:\n\n```sql\nSELECT * FROM employees WHERE YEAR(joining_date) = 2022;\n```",
+    "expected_outcome": "Identifies that wrapping the indexed column in a function (YEAR(joining_date)) prevents index use / forces a scan. Recommends rewriting as a sargable range, e.g. WHERE joining_date >= '2022-01-01' AND joining_date < '2023-01-01', and avoiding SELECT * in favor of only needed columns.",
+    "source_refs": ["https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"]
+  },
+  {
+    "task_id": "task-016",
+    "applicable_skill_ids": ["skill-038"],
+    "domain": "sql",
+    "task": "Improve the performance of this query and explain why:\n\n```sql\nSELECT * FROM orders WHERE status = 'shipped';\n```\nThe caller only needs the order_id and customer_id columns, and there are millions of rows but only a handful are needed at a time.",
+    "expected_outcome": "Recommends selecting only the needed columns (SELECT order_id, customer_id) instead of SELECT *, and limiting the rows returned (WHERE + LIMIT) rather than returning all matches. May also note indexing the status column.",
+    "source_refs": ["https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"]
+  },
+  {
+    "task_id": "task-017",
+    "applicable_skill_ids": ["skill-039"],
+    "domain": "sql",
+    "task": "Review this data-access code for a performance problem and fix it:\n\n```python\nusers = db.query(\"SELECT id, name FROM users\")\nfor u in users:\n    orders = db.query(\"SELECT order_id, amount FROM orders WHERE user_id = %s\", (u.id,))\n    process(u, orders)\n```",
+    "expected_outcome": "Identifies the N+1 query problem (one query per user inside the loop). Recommends fetching the related data in a single JOIN (e.g. SELECT u.id, u.name, o.order_id, o.amount FROM users u JOIN orders o ON u.id = o.user_id) to reduce the number of DB round-trips.",
+    "source_refs": ["https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"]
+  },
+  {
+    "task_id": "task-018",
+    "applicable_skill_ids": ["skill-040"],
+    "domain": "sql",
+    "task": "Improve the performance of this query and explain why:\n\n```sql\nSELECT * FROM customers WHERE name LIKE '%john';\n```",
+    "expected_outcome": "Identifies that a leading-wildcard LIKE ('%john') disables index use and forces a full table scan. Recommends a trailing-wildcard pattern (LIKE 'john%') where the use case allows, or a full-text index for substring search.",
+    "source_refs": ["https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"]
+  },
+  {
+    "task_id": "task-019",
+    "applicable_skill_ids": ["skill-037", "skill-040"],
+    "domain": "sql",
+    "task": "This query is slow on a large orders table. Suggest a fix:\n\n```sql\nSELECT order_id, total FROM orders WHERE customer_id = 4815;\n```\nThe orders table has 50 million rows and no indexes.",
+    "expected_outcome": "Recommends creating an index on the filtered column customer_id (e.g. CREATE INDEX idx_orders_customer_id ON orders(customer_id)) so the DB can find rows without a full-table scan. May mention monitoring index usage / not over-indexing.",
+    "source_refs": ["https://www.geeksforgeeks.org/sql/best-practices-for-sql-query-optimizations/"]
+  },
+  {
+    "task_id": "task-020",
+    "applicable_skill_ids": ["skill-009", "skill-013"],
+    "domain": "debugging",
+    "task": "This function misbehaves: every call seems to remember items from previous calls. Find the bug and fix it.\n\n```python\ndef add_item(item, basket=[]):\n    basket.append(item)\n    return basket\n```",
+    "expected_outcome": "Identifies the mutable default argument bug: the default list is created once at function definition and shared across calls. Recommends defaulting to None and creating a new list inside the function (basket=None; if basket is None: basket = []).",
+    "source_refs": ["https://www.geeksforgeeks.org/python/python-mutable-default-arguments/"]
+  },
+  {
+    "task_id": "task-021",
+    "applicable_skill_ids": ["skill-009", "skill-013"],
+    "domain": "debugging",
+    "task": "This code raises 'RuntimeError: dictionary changed size during iteration'. Find the bug and fix it.\n\n```python\ndef drop_inactive(users):\n    for uid, u in users.items():\n        if not u['active']:\n            del users[uid]\n    return users\n```",
+    "expected_outcome": "Identifies that the dict is mutated (del) while being iterated. Recommends iterating over a copy of the keys/items (e.g. for uid in list(users) / list(users.items())) or building a new dict via comprehension instead of deleting during iteration.",
+    "source_refs": ["https://www.geeksforgeeks.org/python/iterate-over-a-dictionary-in-python/"]
+  },
+  {
+    "task_id": "task-022",
+    "applicable_skill_ids": ["skill-009"],
+    "domain": "debugging",
+    "task": "This function should return the average of a list of numbers but crashes on some inputs. Find the bug and fix it.\n\n```python\ndef average(nums):\n    return sum(nums) / len(nums)\n```",
+    "expected_outcome": "Identifies the division-by-zero bug when nums is empty (len(nums) == 0). Recommends guarding the empty case (e.g. return 0 or raise a clear error / return None when the list is empty).",
+    "source_refs": ["https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"]
+  },
+  {
+    "task_id": "task-023",
+    "applicable_skill_ids": ["skill-009", "skill-013"],
+    "domain": "debugging",
+    "task": "This loop should sum the first n integers (1..n) but returns the wrong total. Find the bug and fix it.\n\n```python\ndef sum_to(n):\n    total = 0\n    for i in range(n):\n        total += i\n    return total\n```",
+    "expected_outcome": "Identifies the off-by-one bug: range(n) iterates 0..n-1, so it sums 0..n-1 and omits n (and includes 0). Recommends range(1, n+1) so the sum covers 1..n.",
+    "source_refs": ["https://raw.githubusercontent.com/addyosmani/agent-skills/main/README.md"]
+  },
+  {
+    "task_id": "task-024",
+    "applicable_skill_ids": ["skill-044"],
+    "domain": "web-scraping",
+    "task": "Review this scraper HTTP layer and suggest the correct approach for production scraping that must survive blocks and transient failures:\n\n```python\nimport requests\n\ndef scrape(url):\n    return requests.get(url).text\n```",
+    "expected_outcome": "Recommends a single make_request-style wrapper that (1) sets a timeout so requests can't hang, (2) handles/retries intermittent network exceptions, and (3) routes through rotating proxies (detecting and rotating away from blocked proxies). Identifies that calling requests.get directly with no timeout/retry/proxy is the wrong approach.",
+    "source_refs": ["https://blog.hartleybrody.com/web-scraping-boilerplate/"]
+  },
+  {
+    "task_id": "task-025",
+    "applicable_skill_ids": ["skill-045"],
+    "domain": "web-scraping",
+    "task": "This script must scrape ~500,000 product URLs and currently does this. Recommend the correct architecture:\n\n```python\nfor url in all_urls:        # ~500k urls\n    html = requests.get(url).text\n    save(parse(html))\n```",
+    "expected_outcome": "Recommends moving the work onto a queue processed by multiple parallel workers (rather than a single request-in-a-loop), with each unit of work as a function taking one URL, so the backlog is parallelized and persisted for pause/restart. May note using a Redis SET for auto-dedupe so no URL is scraped twice.",
+    "source_refs": ["https://blog.hartleybrody.com/web-scraping-boilerplate/"]
+  },
+  {
+    "task_id": "task-026",
+    "applicable_skill_ids": ["skill-046"],
+    "domain": "web-scraping",
+    "task": "We are scraping records into a relational DB and the schema will keep evolving over time. What is the recommended way to (a) track when each record was collected and (b) evolve the schema?",
+    "expected_outcome": "Recommends capturing data into the DB as you go with a shared base mixin giving every model an id plus first_seen_at / last_seen_at timestamps, and evolving the schema with migrations (e.g. Alembic, diffing models against the DB) rather than dropping and recreating the database.",
+    "source_refs": ["https://blog.hartleybrody.com/web-scraping-boilerplate/"]
+  },
+  {
+    "task_id": "task-027",
+    "applicable_skill_ids": ["skill-017"],
+    "domain": "api-integration",
+    "task": "Write a CrewAI custom tool that takes a single string argument with validated structured input. Show the correct way to define it.",
+    "expected_outcome": "Subclasses BaseTool and sets name, description, and an args_schema that is a pydantic BaseModel for input validation, and implements _run(self, argument). (The args_schema being a pydantic model is the load-bearing detail.)",
+    "source_refs": ["https://docs.crewai.com/en/learn/create-custom-tools"]
+  },
+  {
+    "task_id": "task-028",
+    "applicable_skill_ids": ["skill-019"],
+    "domain": "api-integration",
+    "task": "A CrewAI agent tool makes an HTTP request to fetch a web page, and the agent's run is blocking on it. Show the correct way to make this tool non-blocking.",
+    "expected_outcome": "Defines the tool as async (async def under @tool, or subclassing BaseTool and implementing _arun) and uses a non-blocking HTTP client (e.g. aiohttp with async with session.get(...)) so the I/O-bound call doesn't block. Identifies that a plain synchronous requests.get inside the tool is the wrong approach for non-blocking I/O.",
+    "source_refs": ["https://docs.crewai.com/en/learn/create-custom-tools"]
+  },
+  {
+    "task_id": "task-029",
+    "applicable_skill_ids": ["skill-020"],
+    "domain": "api-integration",
+    "task": "A CrewAI agent keeps re-calling an expensive tool with the same arguments. Show the correct CrewAI mechanism to cache the tool's results.",
+    "expected_outcome": "Sets the tool's cache_function attribute to a function (arguments: dict, result: str) -> bool that decides whether a given result is cacheable. Identifies cache_function as the CrewAI-specific caching mechanism.",
+    "source_refs": ["https://docs.crewai.com/en/learn/create-custom-tools"]
+  },
+  {
+    "task_id": "task-030",
+    "applicable_skill_ids": ["skill-018"],
+    "domain": "api-integration",
+    "task": "You need a small single-function CrewAI agent tool (no full class). Show the correct, minimal way to define it.",
+    "expected_outcome": "Uses the @tool decorator on a function whose docstring becomes the tool description (e.g. @tool(\"Tool Name\") def my_tool(question: str) -> str: \"\"\"description\"\"\" ...), rather than subclassing BaseTool. Identifies the @tool decorator as the lightweight path.",
+    "source_refs": ["https://docs.crewai.com/en/learn/create-custom-tools"]
+  }
+]

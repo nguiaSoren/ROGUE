@@ -1,0 +1,9 @@
+# Bundled attack packs
+
+These JSON files are curated sets of `AttackPrimitive` rows exported read-only from ROGUE's live threat DB; each is a list the loader replays via `AttackPrimitive.model_validate(row)`, so the wheel ships real harvested jailbreaks with no DB at scan time. Every primitive is `canonical=True`, `synthesized=False`, picked by top `reproducibility_score` per family. `default` is the balanced starter set `client.scan()` loads when no attacks are named; `aggressive` is the hard/broad battery that spans every family and also probes vision-capable targets (text-only targets honestly skip the multimodal-image primitives); `compliance` is the focused "is my deployment leaking or refusing properly" set restricted to leak/refusal/roleplay/extraction/override/injection families on text vectors only.
+
+| Pack | Purpose | Primitives | Family coverage |
+|---|---|---|---|
+| `default` | Balanced starter battery loaded by `client.scan()` when no attacks are specified — one primitive per common family. | 8 | dan_persona, multi_turn_gradient, role_hijack, indirect_prompt_injection, refusal_suppression, obfuscation_encoding, direct_instruction_override, system_prompt_leak (8 families) |
+| `aggressive` | The hardest/broadest set: top primitives across every family, biased to high/critical severity, including 2 `multimodal_image` injections so vision-capable targets get probed too. | 17 | All 15 families; multimodal_injection ×3 (2 via `multimodal_image` vector); 12 critical / 3 high / 2 medium |
+| `compliance` | The "is my deployment leaking / refusing properly" set — text vectors only (user_turn, user_multi_turn, rag_document, tool_output, system_prompt). | 10 | system_prompt_leak ×2, refusal_suppression ×2, policy_roleplay ×2, training_data_extraction ×2, direct_instruction_override, indirect_prompt_injection (6 families) |

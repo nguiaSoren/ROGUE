@@ -1,0 +1,6 @@
+{
+  "name": "jbb_judge_comparison",
+  "source": "JailbreakBench/JBB-Behaviors:judge_comparison/test",
+  "n": 300,
+  "sha256": "700b068f5ce762449ea62cd7b22a10d652bef8adfebb32f6c03d758ed40a5626"
+}

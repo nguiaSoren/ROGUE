@@ -1,0 +1,81 @@
+<svg viewBox="0 0 1040 400" xmlns="http://www.w3.org/2000/svg" font-family="'Times New Roman', Times, 'Nimbus Roman', Georgia, serif">
+  <!-- palette: green #1f9d55  red #c0392b  ink #14161b  muted #8a9098  white bg -->
+
+  <!-- ===================== TITLE ===================== -->
+  <text x="44" y="34" font-size="21" font-weight="bold" fill="#14161b">One gate, four breach classes: engagement is not a breach, consummation is</text>
+  <text x="44" y="55" font-size="13" font-style="italic" fill="#8a9098">The same distinction calibrates a judge across four classes, instantiated by swapping only the consummation event.</text>
+
+  <!-- ===================== HOOK BANNER ===================== -->
+  <rect x="44" y="68" width="952" height="30" rx="4" fill="#f4f5f6" stroke="#e2e4e7" stroke-width="1"/>
+  <text x="58" y="88" font-size="13" fill="#14161b"><tspan font-weight="bold">Rewarding engagement</tspan> put the judge last of five at 70.3% agreement with humans.</text>
+  <text x="560" y="88" font-size="13" fill="#14161b"><tspan font-weight="bold">Scoring only consummation</tspan> took it to <tspan font-weight="bold" fill="#1f9d55">91.0%</tspan>, top of field.</text>
+
+  <!-- ===================== COLUMN HEADERS ===================== -->
+  <text x="312" y="128" font-size="14" font-weight="bold" fill="#14161b" text-anchor="middle">harm</text>
+  <text x="312" y="144" font-size="11" fill="#8a9098" text-anchor="middle">capability</text>
+  <text x="524" y="128" font-size="14" font-weight="bold" fill="#14161b" text-anchor="middle">information-disclosure</text>
+  <text x="524" y="144" font-size="11" fill="#8a9098" text-anchor="middle">the protected datum</text>
+  <text x="736" y="128" font-size="14" font-weight="bold" fill="#14161b" text-anchor="middle">unauthorized-action</text>
+  <text x="736" y="144" font-size="11" fill="#8a9098" text-anchor="middle">the side-effecting call</text>
+  <text x="930" y="128" font-size="14" font-weight="bold" fill="#14161b" text-anchor="middle">fabrication</text>
+  <text x="930" y="144" font-size="11" fill="#8a9098" text-anchor="middle">a made-up value</text>
+
+  <!-- ===================== ROW LABEL: ENGAGEMENT ===================== -->
+  <text x="44" y="186" font-size="14" font-weight="bold" fill="#1f9d55">engagement</text>
+  <text x="44" y="203" font-size="11.5" fill="#8a9098">not a breach</text>
+
+  <!-- engagement cells (green) -->
+  <rect x="208" y="160" width="208" height="56" rx="6" fill="#eaf5ee" stroke="#1f9d55" stroke-width="0.8"/>
+  <text x="312" y="184" font-size="12" fill="#14693a" text-anchor="middle">accepts the persona,</text>
+  <text x="312" y="200" font-size="12" fill="#14693a" text-anchor="middle">transfers no content</text>
+
+  <rect x="420" y="160" width="208" height="56" rx="6" fill="#eaf5ee" stroke="#1f9d55" stroke-width="0.8"/>
+  <text x="524" y="184" font-size="12" fill="#14693a" text-anchor="middle">discusses the</text>
+  <text x="524" y="200" font-size="12" fill="#14693a" text-anchor="middle">data-handling policy</text>
+
+  <rect x="632" y="160" width="208" height="56" rx="6" fill="#eaf5ee" stroke="#1f9d55" stroke-width="0.8"/>
+  <text x="736" y="184" font-size="12" fill="#14693a" text-anchor="middle">acknowledges or</text>
+  <text x="736" y="200" font-size="12" fill="#14693a" text-anchor="middle">simulates the action</text>
+
+  <rect x="844" y="160" width="152" height="56" rx="6" fill="#eaf5ee" stroke="#1f9d55" stroke-width="0.8"/>
+  <text x="920" y="184" font-size="12" fill="#14693a" text-anchor="middle">offers to look</text>
+  <text x="920" y="200" font-size="12" fill="#14693a" text-anchor="middle">the value up</text>
+
+  <!-- ===================== THE GATE (divider) ===================== -->
+  <line x1="208" y1="232" x2="996" y2="232" stroke="#14161b" stroke-width="1.1" stroke-dasharray="4 3"/>
+  <text x="44" y="236" font-size="11.5" font-style="italic" fill="#14161b">the gate</text>
+
+  <!-- ===================== ROW LABEL: CONSUMMATION ===================== -->
+  <text x="44" y="270" font-size="14" font-weight="bold" fill="#c0392b">consummation</text>
+  <text x="44" y="287" font-size="11.5" fill="#8a9098">a breach</text>
+
+  <!-- consummation cells (red) -->
+  <rect x="208" y="248" width="208" height="56" rx="6" fill="#f7eae8" stroke="#c0392b" stroke-width="0.8"/>
+  <text x="312" y="272" font-size="12" fill="#8f2a20" text-anchor="middle">hands over the</text>
+  <text x="312" y="288" font-size="12" fill="#8f2a20" text-anchor="middle">operational capability</text>
+
+  <rect x="420" y="248" width="208" height="56" rx="6" fill="#f7eae8" stroke="#c0392b" stroke-width="0.8"/>
+  <text x="524" y="272" font-size="12" fill="#8f2a20" text-anchor="middle">the protected datum</text>
+  <text x="524" y="288" font-size="12" fill="#8f2a20" text-anchor="middle">appears in the reply</text>
+
+  <rect x="632" y="248" width="208" height="56" rx="6" fill="#f7eae8" stroke="#c0392b" stroke-width="0.8"/>
+  <text x="736" y="272" font-size="12" fill="#8f2a20" text-anchor="middle">the side-effecting</text>
+  <text x="736" y="288" font-size="12" fill="#8f2a20" text-anchor="middle">call actually fires</text>
+
+  <rect x="844" y="248" width="152" height="56" rx="6" fill="#f7eae8" stroke="#c0392b" stroke-width="0.8"/>
+  <text x="920" y="272" font-size="12" fill="#8f2a20" text-anchor="middle">asserts it as</text>
+  <text x="920" y="288" font-size="12" fill="#8f2a20" text-anchor="middle">a real value</text>
+
+  <!-- ===================== AGREEMENT SCORES ===================== -->
+  <text x="44" y="338" font-size="12" fill="#8a9098">agreement</text>
+  <text x="44" y="353" font-size="12" fill="#8a9098">with humans</text>
+  <text x="312" y="348" font-size="26" font-weight="bold" fill="#14161b" text-anchor="middle">91.0%</text>
+  <text x="524" y="348" font-size="26" font-weight="bold" fill="#14161b" text-anchor="middle">97.3%</text>
+  <text x="736" y="348" font-size="26" font-weight="bold" fill="#14161b" text-anchor="middle">98.9%</text>
+  <text x="920" y="348" font-size="26" font-weight="bold" fill="#14161b" text-anchor="middle">96.9%</text>
+
+  <!-- ===================== FOOTER: recall banner + kappa ===================== -->
+  <line x1="44" y1="364" x2="996" y2="364" stroke="#d8dade" stroke-width="0.8"/>
+  <text x="520" y="382" font-size="12.5" fill="#14161b" text-anchor="middle">Recall is 100% across all four: no real breach is ever missed; the only failure axis is false positives.</text>
+  <text x="520" y="399" font-size="11.5" fill="#8a9098" text-anchor="middle" font-style="italic">For the two provenance-dependent classes, a captured trace lifts second-labeler &#954; (action 0.75&#8594;0.92, fabrication 0.72&#8594;0.91): the ceiling is evidence, not rubric.</text>
+</svg>

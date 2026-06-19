@@ -1,0 +1,50 @@
+[project]
+name = "rogue"
+version = "0.1.0"
+description = "ROGUE — continuous LLM red-team. Register a deployment, run a scan, get a risk report."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Soren Obounou Nguia" }]
+keywords = ["llm", "security", "red-team", "jailbreak", "prompt-injection", "ai-safety"]
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+pdf = ["reportlab>=4.0"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+rogue = "rogue.cli.main:main"
+
+[project.urls]
+Homepage = "https://rogue-eosin.vercel.app"
+API = "https://rogue-private.onrender.com"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rogue"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501",   # line length handled by line-length, not hard-enforced
+    "UP042",  # deliberate (str, Enum) idiom for our .value-based public enums (not StrEnum)
+    "B027",   # Transport.close is an intentional optional-override no-op default
+]

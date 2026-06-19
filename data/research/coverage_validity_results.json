@@ -1,0 +1,18 @@
+{
+  "study": "attack-coverage calibration — empirical validity",
+  "date": "2026-06-08",
+  "question": "Does a pack's coverage_score predict its measured breach rate on a vulnerable target? (i.e. does 'holds (low coverage)' really mean 'not tested hard enough'?)",
+  "design": "per (rule, pack-variant, target) cell; three coverage variants per rule (strong/medium/weak) to manufacture coverage variance; each cell = (coverage_score, breach_rate)",
+  "n_cells": 32,
+  "spearman_rho": 0.352,
+  "ci95_bootstrap": [0.29, 0.61],
+  "ci_excludes_zero": true,
+  "rank_reversals": 0,
+  "by_variant": {
+    "strong": {"mean_coverage": 1.00, "breached_cells": 14, "n_cells": 32},
+    "medium": {"mean_coverage": 0.90, "breached_cells": 1,  "n_cells": 32},
+    "weak":   {"mean_coverage": 0.52, "breached_cells": 0,  "n_cells": 32}
+  },
+  "verdict": "validated (modest): coverage predicts breach-detection power; monotone strong>medium>weak with zero reversals across all 32 rule x target pairs. A low-coverage 'holds' is not load-bearing.",
+  "note": "Released summary statistics (derived). Full design + protocol: docs/research/coverage_validity_study.md (local). Used in the reproducibility-gap paper to argue non-reproductions are adequately tested, not weakly tested."
+}

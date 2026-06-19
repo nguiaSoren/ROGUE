@@ -1,0 +1,324 @@
+{
+  "epsilon": 0.1,
+  "seed": 20260524,
+  "updated_at": "2026-06-03T18:25:36.241540+00:00",
+  "seeded_from_corpus_at": "2026-05-27T00:05:19.468247+00:00",
+  "last_live_pulled_at": "2026-06-03T18:25:36.241061+00:00",
+  "arms": [
+    {
+      "arm_id": "reddit_gptjb_new_method",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "reddit_gptjb_after",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "reddit_claudejb_sysprompt",
+      "pulls": 5,
+      "total_novel": 6,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 800.0
+    },
+    {
+      "arm_id": "reddit_claudejb_after",
+      "pulls": 5,
+      "total_novel": 6,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 800.0
+    },
+    {
+      "arm_id": "reddit_localllama_uncensor",
+      "pulls": 5,
+      "total_novel": 1,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 133.3333
+    },
+    {
+      "arm_id": "reddit_localllama_sysleak",
+      "pulls": 5,
+      "total_novel": 1,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 133.3333
+    },
+    {
+      "arm_id": "reddit_prompteng_inj",
+      "pulls": 5,
+      "total_novel": 2,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 266.6667
+    },
+    {
+      "arm_id": "arxiv_prompt_injection",
+      "pulls": 8,
+      "total_novel": 57,
+      "total_cost_usd": 0.0545,
+      "mean_yield": 1045.8716
+    },
+    {
+      "arm_id": "arxiv_jailbreak_llm",
+      "pulls": 9,
+      "total_novel": 30,
+      "total_cost_usd": 0.016,
+      "mean_yield": 1875.0
+    },
+    {
+      "arm_id": "arxiv_adversarial_lm",
+      "pulls": 6,
+      "total_novel": 53,
+      "total_cost_usd": 0.034,
+      "mean_yield": 1558.8235
+    },
+    {
+      "arm_id": "arxiv_red_team_llm",
+      "pulls": 6,
+      "total_novel": 53,
+      "total_cost_usd": 0.0315,
+      "mean_yield": 1682.5397
+    },
+    {
+      "arm_id": "arxiv_indirect_pi",
+      "pulls": 6,
+      "total_novel": 53,
+      "total_cost_usd": 0.034,
+      "mean_yield": 1558.8235
+    },
+    {
+      "arm_id": "arxiv_pi_agent",
+      "pulls": 8,
+      "total_novel": 53,
+      "total_cost_usd": 0.0345,
+      "mean_yield": 1536.2319
+    },
+    {
+      "arm_id": "arxiv_tool_exploit",
+      "pulls": 6,
+      "total_novel": 53,
+      "total_cost_usd": 0.0315,
+      "mean_yield": 1682.5397
+    },
+    {
+      "arm_id": "github_pi_trending",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "github_jb_vendor",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "github_llm_attacks",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.008,
+      "mean_yield": 500.0
+    },
+    {
+      "arm_id": "github_sysprompt_leak",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.028,
+      "mean_yield": 142.8571
+    },
+    {
+      "arm_id": "github_pliny_umbrella",
+      "pulls": 11,
+      "total_novel": 85,
+      "total_cost_usd": 0.0165,
+      "mean_yield": 5151.5152
+    },
+    {
+      "arm_id": "blog_simonw_pi",
+      "pulls": 5,
+      "total_novel": 8,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 1066.6667
+    },
+    {
+      "arm_id": "blog_simonw_indirect",
+      "pulls": 5,
+      "total_novel": 8,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 1066.6667
+    },
+    {
+      "arm_id": "blog_etr_after",
+      "pulls": 7,
+      "total_novel": 33,
+      "total_cost_usd": 0.0105,
+      "mean_yield": 3142.8571
+    },
+    {
+      "arm_id": "blog_etr_mcp_tool",
+      "pulls": 7,
+      "total_novel": 33,
+      "total_cost_usd": 0.033,
+      "mean_yield": 1000.0
+    },
+    {
+      "arm_id": "blog_lakera_attack",
+      "pulls": 5,
+      "total_novel": 2,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 266.6667
+    },
+    {
+      "arm_id": "mitre_atlas_after",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "mitre_atlas_t1_technique",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.0055,
+      "mean_yield": 727.2727
+    },
+    {
+      "arm_id": "owasp_llm10_after",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "owasp_llm10_2026",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.0255,
+      "mean_yield": 156.8627
+    },
+    {
+      "arm_id": "vendor_anthropic_news",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "vendor_openai_blog",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "vendor_deepmind_blog",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.018,
+      "mean_yield": 222.2222
+    },
+    {
+      "arm_id": "hf_jb_discussion",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.028,
+      "mean_yield": 142.8571
+    },
+    {
+      "arm_id": "hf_obliteratus_org",
+      "pulls": 5,
+      "total_novel": 5,
+      "total_cost_usd": 0.0075,
+      "mean_yield": 666.6667
+    },
+    {
+      "arm_id": "leakhub_after",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.003,
+      "mean_yield": 1333.3333
+    },
+    {
+      "arm_id": "promptfoo_discord",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.028,
+      "mean_yield": 142.8571
+    },
+    {
+      "arm_id": "jailbreakchat_dan",
+      "pulls": 2,
+      "total_novel": 4,
+      "total_cost_usd": 0.0255,
+      "mean_yield": 156.8627
+    },
+    {
+      "arm_id": "arxiv_actorattack",
+      "pulls": 4,
+      "total_novel": 27,
+      "total_cost_usd": 0.031,
+      "mean_yield": 870.9677
+    },
+    {
+      "arm_id": "arxiv_xteaming",
+      "pulls": 1,
+      "total_novel": 27,
+      "total_cost_usd": 0.0265,
+      "mean_yield": 1018.8679
+    },
+    {
+      "arm_id": "github_multiturn_jb",
+      "pulls": 1,
+      "total_novel": 0,
+      "total_cost_usd": 0.0015,
+      "mean_yield": 0.0
+    },
+    {
+      "arm_id": "arxiv_vlm_jailbreak",
+      "pulls": 1,
+      "total_novel": 0,
+      "total_cost_usd": 0.0015,
+      "mean_yield": 0.0
+    },
+    {
+      "arm_id": "arxiv_multimodal_jailbreak",
+      "pulls": 1,
+      "total_novel": 0,
+      "total_cost_usd": 0.009,
+      "mean_yield": 0.0
+    },
+    {
+      "arm_id": "arxiv_crossmodal_attack",
+      "pulls": 1,
+      "total_novel": 0,
+      "total_cost_usd": 0.009,
+      "mean_yield": 0.0
+    },
+    {
+      "arm_id": "arxiv_typographic_vlm",
+      "pulls": 1,
+      "total_novel": 0,
+      "total_cost_usd": 0.0115,
+      "mean_yield": 0.0
+    },
+    {
+      "arm_id": "arxiv_audio_jailbreak",
+      "pulls": 1,
+      "total_novel": 0,
+      "total_cost_usd": 0.009,
+      "mean_yield": 0.0
+    },
+    {
+      "arm_id": "github_multimodal_jb",
+      "pulls": 1,
+      "total_novel": 1,
+      "total_cost_usd": 0.009,
+      "mean_yield": 111.1111
+    }
+  ]
+}

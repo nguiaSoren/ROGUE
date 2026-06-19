@@ -1,0 +1,53 @@
+# Keep the Render free-tier API warm.
+#
+# The API (https://rogue-private.onrender.com) runs on Render's free tier,
+# which spins the service down after ~15 min idle; the next request then pays a
+# cold-boot (the source of the occasional 502 / multi-second first load — and an
+# "empty" dashboard/marketing site, since the data pages fail hard when the API
+# is unreachable). Updated 2026-06-05: the canonical API moved to rogue-private
+# (the old rogue-api-mr5w is retired) — repoint UptimeRobot to match.
+#
+# UptimeRobot should ping /api/livez every 5 min as the PRIMARY
+# warm-keeper. This workflow is a code-side BACKUP so warm-keeping isn't solely
+# dependent on an external dashboard — and it lives in the repo where it's
+# visible. Both pinging is harmless: /api/livez is a DB-free liveness check
+# (no DB load, no LLM / Bright Data spend — see CLAUDE.md "Costly scripts").
+#
+# Caveats (why UptimeRobot stays primary):
+#  - GitHub's scheduled cron is best-effort and can be delayed 10–30 min under
+#    load, so a single */10 schedule may occasionally let the 15-min idle window
+#    lapse. We fire two offset jobs per run to tighten the effective interval.
+#  - Scheduled workflows are auto-disabled after 60 days of no repo activity.
+name: keep-warm
+
+on:
+  schedule:
+    # Every 10 minutes (UTC). GitHub cron granularity is 5 min minimum.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+# Don't pile up runs if a previous one is still going.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /api/livez (with one mid-window retry)
+        run: |
+          set -euo pipefail
+          URL="https://rogue-private.onrender.com/api/livez"
+          ping() {
+            code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 90 "$URL" || echo "000")
+            echo "$(date -u +%H:%M:%S)Z → $code"
+            [ "$code" = "200" ]
+          }
+          # First ping wakes a cold instance; a cold boot can exceed one curl,
+          # so retry once ~4 min later to also cover the back half of the window.
+          if ping; then exit 0; fi
+          echo "first ping not 200 — waiting to retry"
+          sleep 240
+          ping

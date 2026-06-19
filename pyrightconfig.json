@@ -1,0 +1,10 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "pythonPlatform": "Darwin",
+  "include": ["src", "tests", "scripts"],
+  "exclude": [".venv", "website", "frontend", "**/__pycache__"],
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none"
+}

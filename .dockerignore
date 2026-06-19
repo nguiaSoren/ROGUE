@@ -1,0 +1,26 @@
+# Keep the backend build context small (matters for `railway up` uploads + docker build).
+.git
+.venv
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Frontend has its own build context (./frontend) — never needed by the backend image.
+frontend/node_modules
+frontend/.next
+node_modules
+
+# Local-only / gitignored bulk that must not bloat the image.
+website/
+dist/
+*.log
+
+# Everything under data/ EXCEPT the bandit state file the /api/bandit/stats widget reads.
+data/*
+!data/discovery_bandit.json
+
+# Secrets stay local.
+.env

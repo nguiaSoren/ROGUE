@@ -1,0 +1,105 @@
+{
+  "provenance": "scripts/export_paper_data.py \u2014 graduations queried via first_breach_at within each run's [min,max](ladder_attempts.created_at) window; escalation_spend parsed from /tmp/rogue_*.log done: lines; snapshots derived from cumulative graduations + current active total; quota_sim re-run from simulate_quota.py.",
+  "runs": {
+    "greedy": {
+      "run_id": "sweep_p2_1780457963",
+      "K": 3,
+      "quota": 0,
+      "order": "canonical",
+      "graduations": 0,
+      "escalation_spend": 2.8,
+      "active_after": 7,
+      "candidate_after": 15
+    },
+    "starv_q3": {
+      "run_id": "sweep_starv_q3_1780462736",
+      "K": 3,
+      "quota": 3,
+      "order": "starvation",
+      "graduations": 3,
+      "escalation_spend": 25.1,
+      "active_after": 10,
+      "candidate_after": 12
+    },
+    "growth_k5": {
+      "run_id": "sweep_K5_q5_1780477935",
+      "K": 5,
+      "quota": 5,
+      "order": "starvation",
+      "graduations": 4,
+      "escalation_spend": 28.06,
+      "active_after": 14,
+      "candidate_after": 8
+    },
+    "growth_k20": {
+      "run_id": "abq_1781308343",
+      "K": 20,
+      "quota": 20,
+      "order": "starvation",
+      "graduations": 8,
+      "escalation_spend": 11.5,
+      "active_after": 35,
+      "candidate_after": 53,
+      "note": "2026-06-13. 20 distinct fresh (least-tried) candidates evaluated, 8 graduated (40% yield) vs 0 under greedy; Fisher exact p=0.0033 two-sided. escalation_spend approx = all-in run cost $14.57 minus ~$3 base sweep. Yield fell from the small-N 87.5% but cost-per-graduation kept falling, extending the economic inversion."
+    }
+  },
+  "quota_sim": {
+    "source_run": "sweep_p2_1780457963",
+    "quota": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "candidate_reach": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "est_cost": [
+      2.8,
+      18.45,
+      18.45,
+      18.45
+    ]
+  },
+  "k_cost_projection": {
+    "per_attempt": 0.0929,
+    "fixed_rotation": 26.2,
+    "n_parents": 10,
+    "points": [
+      {
+        "K": 3,
+        "attempts_per_ladder": 29.2,
+        "est_escalation_cost": 27.15
+      },
+      {
+        "K": 5,
+        "attempts_per_ladder": 31.2,
+        "est_escalation_cost": 29.0
+      },
+      {
+        "K": 8,
+        "attempts_per_ladder": 34.2,
+        "est_escalation_cost": 31.79
+      },
+      {
+        "K": 10,
+        "attempts_per_ladder": 36.2,
+        "est_escalation_cost": 33.65
+      },
+      {
+        "K": 12,
+        "attempts_per_ladder": 38.2,
+        "est_escalation_cost": 35.51
+      },
+      {
+        "K": 15,
+        "attempts_per_ladder": 41.2,
+        "est_escalation_cost": 38.29
+      }
+    ],
+    "note": "FULL-coverage projection; measured K=3/K=5 spends were spend-capped. Cost half only \u2014 graduation yield at higher K needs a paid run."
+  }
+}
