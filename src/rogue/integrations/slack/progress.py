@@ -34,16 +34,39 @@ __all__ = ["is_progress_command", "build_progress_report"]
 #    "latest": datetime | None,
 #    "fl": [{"model": str, "np": int, "brp": int}, ...]}  # one per fl-* config
 
-# Accept "progress" / "status" optionally prefixed by a bot mention ("<@U123> progress") and
-# surrounded by whitespace. Deliberately strict (exact word) so normal chatter never triggers it.
-_PROGRESS_RE = re.compile(r"^\s*(?:<@[A-Z0-9]+>\s*)?(?:progress|status)\b[\s.!?]*$", re.IGNORECASE)
+# A leading Slack bot-mention ("<@U123> progress") to strip before matching.
+_MENTION_RE = re.compile(r"^\s*<@[A-Z0-9]+>\s*")
+# The command word(s) the message must contain.
+_CORE = {"progress", "status"}
+# A small allow-list of command-ish filler words permitted AROUND the core word, so natural
+# phrasings fire ("check progress", "show me the status", "progress report", "status update")
+# while a real sentence that merely mentions the word ("how is progress going", "what's the
+# status of the Q3 doc") does NOT — any token outside CORE∪FILLER, or more than a few tokens,
+# rejects the message.
+_FILLER = {
+    "check", "show", "get", "gimme", "give", "fetch", "whats", "hows",
+    "the", "me", "us", "a", "an", "on", "current", "latest",
+    "rogue", "pipeline", "report", "update", "snapshot", "please", "now",
+}
+_MAX_TOKENS = 5
 
 _BREACH = ("partial_breach", "full_breach")
 
 
 def is_progress_command(text: str) -> bool:
-    """True iff ``text`` is the bare ``progress``/``status`` command (mention-prefix tolerated)."""
-    return bool(_PROGRESS_RE.match(text or ""))
+    """True iff ``text`` is a short progress/status request — the bare word, or a natural command
+    phrase built only from the core word ("progress"/"status") + a few filler words. A leading
+    ``<@bot>`` mention and trailing punctuation are tolerated; longer sentences that merely mention
+    the word are rejected (so normal channel chatter never triggers a snapshot post)."""
+    if not text:
+        return False
+    stripped = _MENTION_RE.sub("", text).replace("'", "").replace("’", "")
+    tokens = re.findall(r"[a-z0-9]+", stripped.lower())
+    if not tokens or len(tokens) > _MAX_TOKENS:
+        return False
+    if not (_CORE & set(tokens)):  # must actually contain "progress"/"status"
+        return False
+    return all(tok in _CORE or tok in _FILLER for tok in tokens)
 
 
 def _fmt_pct(x: float) -> str:
