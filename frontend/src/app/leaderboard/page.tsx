@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { api, API_CONFIGURED } from "@/lib/api";
+import MODEL_CARDS from "@/data/model-cards.json";
 import {
   LEADERBOARD_MODELS,
   LEADERBOARD_TOTAL_TRIALS,
@@ -133,31 +133,31 @@ function buildOssRows(): ModelRow[] {
 // --------------------------------------------------------------------------
 
 /**
- * Best-effort `target_model → deployment_config_id` map from the live all-time
- * matrix, so the "worst family" cell can deep-link into /matrix/cell (which keys
- * on the config id). Never throws: on any failure the map is empty and the
- * worst-family column renders as plain text — the board itself stays static.
+ * slug → {family, config} — the SAME static map `/m/<slug>` and the breach cards use. Every
+ * leaderboard row deep-links to its CORRESPONDING /matrix/cell drill-down through it, which works
+ * for the open-source rows too (their `fl-*` cells are persisted in the matrix), not just
+ * production. Static + bundled, so the board needs no live API call to wire the links.
  */
-async function fetchConfigIdMap(): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (!API_CONFIGURED) return map;
-  try {
-    const matrix = await api.breachMatrix(undefined, "alltime_baseline");
-    for (const c of matrix.cells) {
-      if (c.target_model && c.deployment_config_id) map.set(c.target_model, c.deployment_config_id);
-    }
-  } catch {
-    /* leave empty → worst-family degrades to plain text */
-  }
-  return map;
+type CardEntry = { family: string; config: string };
+const CARD_MAP = MODEL_CARDS as Record<string, CardEntry>;
+
+function slugFor(modelLabel: string): string {
+  return modelLabel.toLowerCase().replace(/\//g, "-");
 }
 
-export default async function LeaderboardPage() {
-  const configIdByModel = await fetchConfigIdMap();
-  return <Board configIdByModel={configIdByModel} />;
+/** The /matrix/cell deep-link for a row's worst family × its config, or null if unmapped. */
+function cellHrefFor(row: ModelRow): string | null {
+  const entry = CARD_MAP[slugFor(row.model_label)];
+  if (!entry) return null;
+  const family = row.worst_family ?? entry.family;
+  return `/matrix/cell?family=${encodeURIComponent(family)}&config=${encodeURIComponent(entry.config)}&scope=all-time&attacker=augmented&from=leaderboard`;
 }
 
-function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
+export default function LeaderboardPage() {
+  return <Board />;
+}
+
+function Board() {
   const rows = buildRows();
   const ossRows = buildOssRows();
   const tested = rows.length;
@@ -223,7 +223,6 @@ function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
         ) : (
           <div className="grid gap-6 lg:grid-cols-2 items-start animate-rogue-fade-up">
             <MiniBoard
-              variant="main"
               kicker="closed · deep pipeline · measured 2026-06-07"
               kickerClass="text-rogue-green"
               borderClass="border-border"
@@ -236,10 +235,8 @@ function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
                 </>
               }
               rows={rows}
-              configIdByModel={configIdByModel}
             />
             <MiniBoard
-              variant="oss"
               kicker={`open-weight · single-shot · measured ${LEADERBOARD_OSS_MEASURED}`}
               kickerClass="text-rogue-orange"
               borderClass="border-rogue-orange/30"
@@ -285,27 +282,23 @@ function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
  * One ranked board panel (production OR open-source), compact enough to sit side-by-side with the
  * other on desktop (`lg:grid-cols-2`) and stack on mobile. The two panels are ALWAYS separate
  * methodologies — never one merged ranking — so each carries its own kicker + methodology blurb and
- * ranks within itself. The /matrix/cell deep-link is only wired for the production board (OSS rows
- * were scanned out-of-band and have no matrix config id).
+ * ranks within itself. Each row links to its CORRESPONDING /matrix/cell (via `cellHrefFor`), for
+ * the open-source rows too — their `fl-*` cells are persisted in the matrix.
  */
 function MiniBoard({
-  variant,
   kicker,
   kickerClass,
   borderClass,
   title,
   blurb,
   rows,
-  configIdByModel,
 }: {
-  variant: "main" | "oss";
   kicker: string;
   kickerClass: string;
   borderClass: string;
   title: string;
   blurb: ReactNode;
   rows: ModelRow[];
-  configIdByModel?: Map<string, string>;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -316,38 +309,24 @@ function MiniBoard({
         <p className="text-xs text-muted-foreground leading-relaxed">{blurb}</p>
       </header>
       <div className={`rogue-card border ${borderClass} rounded-lg overflow-hidden bg-card/40`}>
-        {rows.map((row, i) => {
-          const cfgId = variant === "main" ? configIdByModel?.get(row.target_model) : undefined;
-          const cellHref =
-            cfgId && row.worst_family
-              ? `/matrix/cell?family=${encodeURIComponent(row.worst_family)}&config=${encodeURIComponent(cfgId)}&scope=all-time&attacker=augmented&from=leaderboard`
-              : null;
-          return <CompactRow key={row.config_id} row={row} rank={i + 1} index={i} cellHref={cellHref} />;
-        })}
+        {rows.map((row, i) => (
+          <CompactRow key={row.config_id} row={row} rank={i + 1} index={i} />
+        ))}
       </div>
     </section>
   );
 }
 
 /**
- * One compact ranked row: rank badge + a model block that stacks the label, the breach-rate bar,
- * and a muted subline (worst family — a /matrix/cell deep-link when available — · trials · the
- * shareable per-model card). Stacking vertically keeps it readable in a half-width column.
+ * One compact ranked row: rank badge + a model block that stacks the model name (a link into the
+ * model's CORRESPONDING /matrix/cell drill-down, which itself surfaces the breach card), the
+ * breach-rate bar, and a muted subline (worst family · trials · the direct shareable card).
+ * Stacking vertically keeps it readable in a half-width column.
  */
-function CompactRow({
-  row,
-  rank,
-  index,
-  cellHref,
-}: {
-  row: ModelRow;
-  rank: number;
-  index: number;
-  /** Deep-link into the (redacted) /matrix/cell drill-down for this model × worst family, or null. */
-  cellHref: string | null;
-}) {
+function CompactRow({ row, rank, index }: { row: ModelRow; rank: number; index: number }) {
   const tier = rateTier(row.mean_breach_rate);
-  const slug = row.model_label.toLowerCase().replace(/\//g, "-");
+  const slug = slugFor(row.model_label);
+  const cellHref = cellHrefFor(row);
   return (
     <div
       className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 items-start px-3 py-3 border-b border-border/50 last:border-b-0 hover:bg-card/60 transition-colors animate-rogue-fade-up"
@@ -357,29 +336,26 @@ function CompactRow({
         <RankBadge rank={rank} />
       </div>
       <div className="min-w-0 space-y-1.5">
-        <p className="font-mono text-sm font-semibold truncate" title={row.config_name}>
-          {row.model_label}
-        </p>
+        {cellHref ? (
+          <Link
+            href={cellHref}
+            className="block font-mono text-sm font-semibold truncate text-foreground transition-colors hover:text-rogue-green"
+            title={`Drill into ${row.model_label}'s breaches in the matrix`}
+          >
+            {row.model_label}
+          </Link>
+        ) : (
+          <p className="font-mono text-sm font-semibold truncate" title={row.config_name}>
+            {row.model_label}
+          </p>
+        )}
         <BreachBar mean={row.mean_breach_rate} tier={tier} />
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-muted-foreground min-w-0">
           {row.worst_family ? (
-            cellHref ? (
-              <Link
-                href={cellHref}
-                className="group/wf inline-flex min-w-0 items-baseline gap-1 truncate transition-colors hover:text-foreground"
-                title={`See the attacks that breached ${row.model_label} via ${row.worst_family} (payloads redacted)`}
-              >
-                <span className="truncate text-foreground/80 underline-offset-2 group-hover/wf:underline">
-                  {row.worst_family}
-                </span>
-                <span className="shrink-0 text-rogue-red/80">{Math.round(row.worst_breach_rate * 100)}%</span>
-              </Link>
-            ) : (
-              <span className="inline-flex min-w-0 items-baseline gap-1 truncate" title={row.worst_family}>
-                <span className="truncate text-foreground/80">{row.worst_family}</span>
-                <span className="shrink-0 text-rogue-red/80">{Math.round(row.worst_breach_rate * 100)}%</span>
-              </span>
-            )
+            <span className="inline-flex min-w-0 items-baseline gap-1 truncate" title={row.worst_family}>
+              <span className="truncate text-foreground/80">{row.worst_family}</span>
+              <span className="shrink-0 text-rogue-red/80">{Math.round(row.worst_breach_rate * 100)}%</span>
+            </span>
           ) : (
             <span className="text-rogue-green">none breached</span>
           )}
