@@ -30,6 +30,7 @@ from .delivery import SlackSurface1Delivery, make_slack_channel_sender
 from .diff_post import build_security_post, post_breach_diff
 from .harvest_hook import newly_landed_primitives
 from .inbound import handle_inbound_message
+from .progress import build_progress_report, is_progress_command
 from .policy import ensure_client_policy
 from .signing import verify_slack_signature
 from .registration import (
@@ -71,4 +72,6 @@ __all__ = [
     "score_inbound",
     "verify_slack_signature",
     "handle_inbound_message",
+    "is_progress_command",
+    "build_progress_report",
 ]
