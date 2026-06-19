@@ -135,13 +135,29 @@ class FetcherRegistry:
         return len(self._fetchers)
 
 
+def _brightdata_client_usable(client: object) -> bool:
+    """True iff ``client`` carries the REQUIRED Bright Data credentials (API key + three zones).
+
+    The optional dataset_ids (reddit/x/hf) may be unset — those capabilities simply error at call
+    time, but a key+zones client is still the right default for unlock/serp/browser/image/redirect.
+    A keyless client (``api_key == ""``, as produced by ``from_env`` with no BD env) is NOT usable:
+    registering it would route UNLOCK/SERP through the BD backend, which then sends an empty Bearer
+    header → ``LocalProtocolError`` crash. Returning False here is what makes the keyless path fall
+    through to the free backends (direct/firecrawl for UNLOCK, ddg for SERP) instead.
+    """
+    return bool(
+        getattr(client, "api_key", "")
+        and getattr(client, "serp_zone", "")
+        and getattr(client, "unlocker_zone", "")
+        and getattr(client, "browser_zone", "")
+    )
+
+
 def _brightdata_available() -> bool:
     """True iff the Bright Data env credentials are present enough to construct a usable client.
 
     Reuses the client's own ``from_env`` env-detection (which scrubs the ``.env`` inline-comment
-    footgun) and checks the REQUIRED fields are non-empty: API key + the three zones. The optional
-    dataset_ids (reddit/x/hf) may be unset — those capabilities simply error at call time, but the
-    backend is still the right default for unlock/serp/browser/image/redirect.
+    footgun) and the shared :func:`_brightdata_client_usable` key check.
     """
     from rogue.harvest.bright_data_client import BrightDataClient
 
@@ -149,12 +165,7 @@ def _brightdata_available() -> bool:
         client = BrightDataClient.from_env()
     except Exception:  # noqa: BLE001 — any construction failure → BD self-excludes
         return False
-    return bool(
-        client.api_key
-        and client.serp_zone
-        and client.unlocker_zone
-        and client.browser_zone
-    )
+    return _brightdata_client_usable(client)
 
 
 def build_default_registry(
@@ -181,9 +192,21 @@ def build_default_registry(
 
     registry = FetcherRegistry()
 
-    if brightdata_client is not None:
+    if brightdata_client is not None and _brightdata_client_usable(brightdata_client):
         registry.register(BrightDataFetcher(brightdata_client, session=session))  # type: ignore[arg-type]
         logger.debug("registered fetcher backend: brightdata (injected client)")
+    elif brightdata_client is not None:
+        # A client was injected but it carries no usable BD credentials (e.g.
+        # ``BrightDataClient.from_env()`` in a keyless CI run, where harvest_once
+        # always constructs+passes one). Registering it would make BD the
+        # first-preference UNLOCK/SERP backend and every call would crash on the
+        # empty Bearer header. Skip it so resolution falls through to the free
+        # keyless backends (direct/firecrawl for UNLOCK, ddg for SERP).
+        logger.warning(
+            "Bright Data client injected without credentials (no API key / zones) — "
+            "'brightdata' backend NOT registered; keyless free backends will serve "
+            "UNLOCK/SERP. Set BRIGHTDATA_* keys for the full Bright Data path."
+        )
     elif _brightdata_available():
         registry.register(BrightDataFetcher.from_env(session=session))
         logger.debug("registered fetcher backend: brightdata")
