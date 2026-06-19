@@ -280,6 +280,7 @@ def _resolve_judge(args: argparse.Namespace, out: Any) -> Any:
 def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
     persist = getattr(args, "persist", False)
     config_name = getattr(args, "config_name", None)
+    deep = getattr(args, "deep", False)
 
     if persist:
         # Persist path: route directly through scan_endpoint so every judged trial lands in
@@ -326,6 +327,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
                 system_prompt=_resolve_system_prompt(args, target),
                 n_trials=n_trials,
                 judge=_resolve_judge(args, out),
+                deep=deep,
                 persist=True,
                 database_url=database_url,
                 config_id=slug,
@@ -344,13 +346,37 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
     # `_judge` straight to run_scan; None means run_scan builds the calibrated JudgeAgent itself.
     client._judge = _resolve_judge(args, out)
     attacks = [a.strip() for a in args.attacks.split(",") if a.strip()] if args.attacks else None
-    report = client.scan(
-        attacks=attacks,
-        max_tests=_scan_default(args, "max_tests", 100),
-        budget=_scan_default(args, "budget", None),
-        pack=_scan_default(args, "pack", "default"),
-        n_trials=_scan_default(args, "n_trials", 1),
-    )
+    if deep:
+        # Deep scan threads `deep=True` into run_scan (persona-wrap + the multi-turn/escalation
+        # seams). Client.scan has no deep flag, so call run_scan directly with the client's resolved
+        # config/judge — same stateless path, just with the extra stages enabled.
+        import asyncio
+
+        from rogue.packs import filter_attacks, load_pack
+        from rogue.scan import run_scan
+
+        pack = _scan_default(args, "pack", "default")
+        primitives = filter_attacks(load_pack(pack), attacks)[: _scan_default(args, "max_tests", 100)]
+        report = asyncio.run(
+            run_scan(
+                client.config,
+                primitives,
+                n_trials=_scan_default(args, "n_trials", 1),
+                budget=_scan_default(args, "budget", None),
+                adapter_extra=client._adapter_extra,
+                judge=client._judge,
+                judge_model=client._judge_model,
+                deep=True,
+            )
+        )
+    else:
+        report = client.scan(
+            attacks=attacks,
+            max_tests=_scan_default(args, "max_tests", 100),
+            budget=_scan_default(args, "budget", None),
+            pack=_scan_default(args, "pack", "default"),
+            n_trials=_scan_default(args, "n_trials", 1),
+        )
     if args.output:
         _write_output(report, args.output)
     _emit(report, as_json=args.json, out=out)
@@ -704,6 +730,16 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=("heuristic", "calibrated"),
         default="heuristic",
         help="grader: 'heuristic' (keyless, default) or 'calibrated' (LLM v3 judge — needs a key)",
+    )
+    p_scan.add_argument(
+        "--deep",
+        action="store_true",
+        default=False,
+        help=(
+            "opt-in deep scan: adds persona-wrap (a persuasion frame per attack) on top of true "
+            "multi-turn back-and-forth, plus the PAIR + escalation seams. COSTS MORE — many more "
+            "model calls (and an LLM persona-wrap call per attack) than the default fast scan"
+        ),
     )
     p_scan.add_argument("--output", default=None, metavar="PATH", help="write report to .html or .json")
     p_scan.add_argument("--no-card", dest="no_card", action="store_true", help="skip the shareable breach card")

@@ -1,0 +1,102 @@
+# Continuous FREE / KEYLESS open-web harvest.
+#
+# This is what makes ROGUE's "continuously harvest the open web" claim literally
+# true: the harvest runs on a real recurring schedule, using ONLY the free /
+# keyless fetcher backends (crawl4ai + Chromium, keyless Firecrawl, DuckDuckGo,
+# direct httpx, local PDF). It NEVER uses Bright Data — no BRIGHTDATA_* secrets
+# are provided to this job, so `build_default_registry()` cannot register the
+# 'brightdata' backend and resolution falls through to the free path
+# (src/rogue/harvest/fetchers/registry.py:160-232, `is_keyless_harvest`).
+#
+# COST: no paid Bright Data spend. The only per-run cost is the cheap extraction
+# LLM call (anthropic Haiku, ~$0.001/doc) + OpenAI embeddings (text-embedding-3-
+# small) for dedup — a few cents per run at ~30-60 docs/day. Per CLAUDE.md this
+# is safe to run unattended because there is NO Bright Data money-gated call in
+# the keyless path. (The PAID reproduce sweep is in reproduce-refresh.yml and is
+# manual-dispatch ONLY — it is deliberately never put on a schedule.)
+#
+# It persists new attack primitives straight to the live Neon DB via the
+# DATABASE_URL secret (set it to the Neon connection string).
+
+name: harvest-keyless
+
+on:
+  schedule:
+    # Every 8 hours (00:17 / 08:17 / 16:17 UTC). Off-the-hour minute so we don't
+    # collide with the top-of-hour GitHub Actions scheduler backlog. ~3 runs/day
+    # honours the "continuous" claim without hammering the free Firecrawl per-IP
+    # daily cap.
+    - cron: "17 0,8,16 * * *"
+  workflow_dispatch: {} # allow a manual run from the Actions tab
+
+# Never let two harvests overlap — they write the same Neon tables and share the
+# bandit state. Queue (don't cancel) so a manually-triggered run still completes.
+concurrency:
+  group: harvest-keyless
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      # Live Neon DB (the production target). Required.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Extraction + embedding LLM keys (cheap; NOT Bright Data). Extraction runs
+      # anthropic Haiku; dedup embeddings run OpenAI text-embedding-3-small.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Belt-and-braces: even if a BRIGHTDATA_* secret ever exists in the repo,
+      # this job does NOT map it into the env, so the BD backend self-excludes
+      # (registry.py `_brightdata_available()` returns False on empty creds).
+      # Keep the keyless Firecrawl free tier on (default behaviour, explicit here).
+      FIRECRAWL_KEYLESS: "1"
+      # Optional: regenerate the cached dashboard pages after new data lands.
+      FRONTEND_REVALIDATE_URL: ${{ secrets.FRONTEND_REVALIDATE_URL }}
+      REVALIDATE_TOKEN: ${{ secrets.REVALIDATE_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install deps (with the crawl4ai free-scraper extra)
+        # crawl4ai is the robust, free, UNLIMITED local UNLOCK/BROWSER backend —
+        # preferred over keyless Firecrawl (which is per-IP/day rate-limited), so
+        # installing it keeps the scheduled run from 429-ing. It needs a Chromium
+        # binary, installed in the next step.
+        run: uv sync --extra crawl4ai --extra pdf
+
+      - name: Install Chromium for crawl4ai
+        # crawl4ai's Playwright-driven browser needs a Chromium binary. Without
+        # this, Crawl4AIFetcher.is_available() returns False and the harvest
+        # silently falls back to keyless Firecrawl / direct + ddg (still works,
+        # just rate-limited). Installing it makes the scheduled run robust.
+        run: uv run playwright install --with-deps chromium
+
+      - name: Run keyless harvest (NO Bright Data — free path only)
+        # --since 8h matches the cron cadence so each run covers exactly the
+        # window since the previous one (no gaps, minimal re-fetch — the
+        # fetch_cache ledger dedups any overlap anyway).
+        run: uv run python scripts/harvest/harvest_once.py --since 8h
+
+      - name: Notify Slack on failure
+        # Uses the Slack BOT TOKEN (chat.postMessage → #security), NOT the legacy webhook — that env
+        # var was a dead placeholder that 404'd, so failures went silent. The bot token is verified.
+        if: failure() && env.SLACK_BOT_TOKEN != ''
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          curl -fsS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" -H 'Content-type: application/json' \
+            --data '{"channel":"#security","text":":rotating_light: ROGUE keyless harvest FAILED — see GitHub Actions run '"${{ github.run_id }}"'"}' || true

@@ -76,10 +76,14 @@ def is_retryable_exception(exc: BaseException) -> bool:
     return False
 
 
-# Apply to an adapter's inner provider call: 3 attempts, exp backoff 1→10s, reraise on exhaustion.
+# Apply to an adapter's inner provider call: 6 attempts, exp backoff 2→30s (~60s total patience),
+# reraise on exhaustion. The longer patience rides out SUSTAINED provider rate-throttle windows
+# (e.g. Featherless 429/503 bursts under a flat-fee plan) that the old 3-attempt/10s ceiling
+# exhausted on — turning a transient throttle into a hard ERROR trial. Deterministic 4xx (≠429)
+# still fail fast (not retryable), so this only lengthens recovery for genuinely transient errors.
 with_provider_retry = retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
+    stop=stop_after_attempt(6),
+    wait=wait_exponential(multiplier=2, min=2, max=30),
     retry=retry_if_exception(is_retryable_exception),
     reraise=True,
 )

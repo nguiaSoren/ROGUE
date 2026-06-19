@@ -38,7 +38,7 @@ Structured JSON out of the box, zero lines of anti-bot code. Without this,
 roughly two weeks of scraper engineering.
 
 **SERP API** — Google + Bing novel-attack discovery. The DiscoveryAgent runs
-an ε-greedy bandit over 36 candidate queries across 19 sources, learning
+an ε-greedy bandit over 36 candidate queries across 15 sources, learning
 per-query yield in *novel attacks per Bright Data dollar*. The spread is
 dramatic: `site:github.com/elder-plinius` returns ~60 novel primitives per
 dollar; `site:reddit.com/r/LocalLLaMA "uncensor"` returns ~1 — a ~60×
@@ -62,7 +62,7 @@ results *back* through MCP — a loop no other red-team tool closes.
 
 ## Results (v1, verified against the live database)
 
-- **358 attack primitives** (298 harvested-canonical) across **15 families**,
+- **459 attack primitives** (298 harvested-canonical from the open web) across **15 families**,
   deduplicated via pgvector cosine clustering.
 - **8,321 reproduced + judged trials** across **6 deployment configs**;
   **252 attacks breached** at least one config (**619 breaching
@@ -76,9 +76,10 @@ results *back* through MCP — a loop no other red-team tool closes.
 - **Cost:** **$276.70 all-in** ($92.48 Bright Data + $184.22 LLM) —
   **≈ $0.15 of Bright Data spend per detected breach**. The daily open-web
   harvest runs on **$0.05–$0.30** of Bright Data, allocated by the bandit.
-- **Judge credibility:** **91.8%** agreement with independent human refusal
-  labels (WildGuardTest, n=196); a StrongREJECT cross-check confirms the
-  breach rates are *not* inflated by an over-eager grader.
+- **Judge credibility:** **89.3%** agreement with human-majority labels on
+  JailbreakBench ([withheld]), plus **88.5%** on WildGuardTest's
+  harm axis; a StrongREJECT cross-check confirms the breach rates are *not*
+  inflated by an over-eager grader.
 - **Public dataset:** 298 MIT-licensed attack primitives exported for
   HuggingFace.
 

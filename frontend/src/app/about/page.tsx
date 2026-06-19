@@ -119,7 +119,7 @@ export default function AboutPage() {
               Surface one, the model. ROGUE harvests, reproduces, and judges
               LLM jailbreaks and prompt-injection from the open web,{" "}
               <span className="text-foreground font-medium">
-                19 sources across 5 Bright Data products
+                15 sources across 5 Bright Data products
               </span>
               , then surfaces the vulnerabilities and exactly how to fix them
               before attackers exploit them. This surface is mature and

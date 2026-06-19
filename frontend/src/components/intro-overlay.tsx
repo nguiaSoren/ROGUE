@@ -60,7 +60,7 @@ const PANELS: Panel[] = [
     ),
     body: (
       <>
-        All 5 Bright Data products fan out across 19 open-web sources; a
+        All 5 Bright Data products fan out across 15 open-web sources; a
         self-tuning bandit spends the next dollar where the most-novel attacks
         live, and replays every one against your exact stack.
       </>
@@ -336,7 +336,7 @@ function HarvestVisual() {
       </div>
       <div className="space-y-1.5">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          19 open-web sources
+          15 open-web sources
         </p>
         <div className="flex flex-wrap gap-1.5">
           {sources.map((s, i) => (

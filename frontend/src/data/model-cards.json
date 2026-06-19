@@ -7,9 +7,21 @@
     "family": "indirect_prompt_injection",
     "config": "acme-claudeopus-20260531"
   },
+  "deepseek-r1-distill-llama-70b": {
+    "family": "multi_turn_gradient",
+    "config": "fl-deepseek-r1-distill-llama-70b"
+  },
+  "deepseek-v3.1": {
+    "family": "tool_use_hijack",
+    "config": "fl-deepseek-v3-1"
+  },
   "gemini-3.1-flash-lite": {
     "family": "training_data_extraction",
     "config": "acme-geminiflashlite-20260526"
+  },
+  "glm-4-9b-0414": {
+    "family": "tool_use_hijack",
+    "config": "fl-glm-4-9b-0414"
   },
   "gpt-5.4-nano": {
     "family": "training_data_extraction",
@@ -23,9 +35,61 @@
     "family": "training_data_extraction",
     "config": "acme-llama3-20260526"
   },
+  "meta-llama-3.1-70b-instruct": {
+    "family": "direct_instruction_override",
+    "config": "fl-meta-llama-3-1-70b-instruct"
+  },
+  "meta-llama-3.1-8b-instruct": {
+    "family": "tool_use_hijack",
+    "config": "fl-meta-llama-3-1-8b-instruct"
+  },
+  "meta-llama-3.1-8b-instruct-abliterated": {
+    "family": "tool_use_hijack",
+    "config": "fl-meta-llama-3-1-8b-instruct-abliterate"
+  },
+  "minimax-m2": {
+    "family": "tool_use_hijack",
+    "config": "fl-minimax-m2"
+  },
+  "mistral-7b-instruct-v0.2": {
+    "family": "multi_turn_gradient",
+    "config": "fl-mistral-7b-instruct-v0-2"
+  },
+  "mistral-nemo-instruct-2407": {
+    "family": "tool_use_hijack",
+    "config": "fl-mistral-nemo-instruct-2407"
+  },
+  "mistral-small-24b-instruct-2501": {
+    "family": "obfuscation_encoding",
+    "config": "fl-mistral-small-24b-instruct-2501"
+  },
   "mistral-small-2603": {
     "family": "training_data_extraction",
     "config": "acme-mistralsm-20260526"
+  },
+  "qwen2.5-72b-instruct": {
+    "family": "indirect_prompt_injection",
+    "config": "fl-qwen2-5-72b-instruct"
+  },
+  "qwen2.5-7b-instruct": {
+    "family": "tool_use_hijack",
+    "config": "fl-qwen2-5-7b-instruct"
+  },
+  "qwen2.5-7b-instruct-abliterated": {
+    "family": "tool_use_hijack",
+    "config": "fl-qwen2-5-7b-instruct-abliterated"
+  },
+  "qwen3-235b-a22b": {
+    "family": "tool_use_hijack",
+    "config": "fl-qwen3-235b-a22b"
+  },
+  "qwen3-32b": {
+    "family": "tool_use_hijack",
+    "config": "fl-qwen3-32b"
+  },
+  "qwq-32b": {
+    "family": "tool_use_hijack",
+    "config": "fl-qwq-32b"
   },
   "voxtral-small-24b-2507": {
     "family": "dan_persona",

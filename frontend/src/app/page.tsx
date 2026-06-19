@@ -31,7 +31,7 @@ export const revalidate = 1800;
  * Reading order:
  *   1. CINEMATIC HERO, rotating-word headline (states the offer), stat trio, CTA.
  *  1b. THREE SURFACES, the v2 breadth (model / human gate / agent memory).
- *   2. SOURCES MARQUEE, 19 sources × 5 BD products.
+ *   2. SOURCES MARQUEE, 15 sources × 5 BD products.
  *   3. AHA MOMENT, "freshest threats" ticker + mini-matrix side-by-side.
  *   4. USE CASES, who uses ROGUE (problem/solution personas).
  *   5. WORKFLOW WALKTHROUGH, the concrete end-to-end story (endpoint → report).

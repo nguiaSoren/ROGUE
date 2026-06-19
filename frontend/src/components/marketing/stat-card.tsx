@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 
 interface StatCardProps {
-  /** Big mono headline value, e.g. "358" or "−41%". */
+  /** Big mono headline value, e.g. "459" or "−41%". */
   value: string
   /** Short label under the value. */
   label: string

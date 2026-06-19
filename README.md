@@ -22,7 +22,7 @@ ROGUE measures **every place a high-stakes AI agent can go wrong** — whether t
 
 - **Dashboard:** https://rogue-eosin.vercel.app — live, deployed.
 - **Trailer:** [watch the 45-second trailer on YouTube](https://youtu.be/pVOQYJvMC6w) (preview below).
-- **Dataset:** [358 attack primitives across 15 families](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05), MIT-licensed and access-gated (defensive-research-only terms — see [`RESPONSIBLE_RELEASE.md`](RESPONSIBLE_RELEASE.md)).
+- **Dataset:** [298 harvested attack primitives across 15 families](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05) (the open-web–harvested slice of a 459-primitive live corpus), MIT-licensed and access-gated (defensive-research-only terms — see [`RESPONSIBLE_RELEASE.md`](RESPONSIBLE_RELEASE.md)).
 - **In Slack:** point a Slack incoming webhook at ROGUE and the daily threat brief + every new HIGH/CRITICAL breach post straight to your workspace (the platform integration also files findings to Jira). ROGUE comes to where your team already triages.
 
 https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 
 Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
 
-- **Harvests live, every day** — new jailbreaks and prompt-injections pulled from 15+ open-web sources (via all 5 Bright Data products), so your report is never older than yesterday.
+- **Harvests on a schedule** — new jailbreaks and prompt-injections pulled from 15 open-web sources (via all 5 Bright Data products) on a recurring keyless harvest cron, so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately — not a continuously-updating number.)
 - **Reproduces against *your* exact config** — your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the hosted roadmap).
 - **Is queryable over MCP, both ways** — it *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
 - **Measures three surfaces, signed** — the model, the human approval gate, and the shared skill-pool — each scored against an independent answer key and emitted as a tamper-evident attestation.
@@ -47,7 +47,7 @@ pip install rogue-live-redteam
 rogue try        # 20s, offline, zero keys — real breach rates + a shareable card
 rogue setup      # one command → run the live open-web harvest yourself (free, no signup)
 ```
-`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates against 8 production models** (11,973 calibrated-judge trials) and drops a shareable breach card:
+`rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal — fully offline, zero keys — then overlays ROGUE's **real measured breach rates across 6 production text models + 2 audio targets** (11,973 calibrated-judge trials; the two audio targets are sampled lighter, ~185 trials each) and drops a shareable breach card:
 
 <p align="center"><img src="assets/card/marketing/breach-card.png" alt="ROGUE breach card — mistral-small-2603, 668/2189 breached, calibrated judge" width="620"></p>
 
@@ -159,7 +159,7 @@ ROGUE meets your team where it already works:
 
 Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
-1. **Harvest** — 19 open-web sources fetched via 5 Bright Data products.
+1. **Harvest** — 15 open-web sources fetched via 5 Bright Data products.
 2. **Extract** — an LLM agent structures each fetched document into an `AttackPrimitive`.
 3. **Dedupe** — pgvector cosine similarity clusters near-duplicate attacks.
 4. **Reproduce** — each canonical primitive runs against your `DeploymentConfig` × 5 trials.
@@ -195,7 +195,7 @@ The mechanics behind the pipeline, each on its own page:
 - **Bright Data integration.** Five BD products end-to-end, plus a self-tuning ε-greedy SERP bandit that allocates the daily harvest budget by yield (novel primitives per dollar) at $0.05–$0.30 per harvest. → [docs/bright-data.md](docs/bright-data.md)
 - **Multimodal red-team.** Refused text jailbreaks become real images and audio via deterministic black-box renderers, climbing an autonomous escalation ladder that stops at the first breach; Bright Data sources real carrier images to composite onto. → [docs/multimodal.md](docs/multimodal.md)
 - **Self-growing attack repertoire.** ROGUE harvests reusable *techniques*, not just payloads — classifying, routing, and graduating / retiring / resurrecting them on live breach evidence, with a governed renderer registry and grammar-driven planning (the planner-willingness finding: 22% → 100% by changing only the planner). → [docs/self-growing-repertoire.md](docs/self-growing-repertoire.md)
-- **Judge calibration.** Every breach number is an LLM verdict, so the judge is validated against independent human labels four ways — in-distribution FP 2.56%, WildGuardTest harm 88.5%, StrongREJECT −26% inflation, JBB **91.0%** human agreement (top of field, reproducible from `data/calibration/`), up from a 70.3% v1 judge after a diagnosed recalibration. → [docs/judge-calibration.md](docs/judge-calibration.md)
+- **Judge calibration.** Every breach number is an LLM verdict, so the judge is validated against independent human labels four ways — in-distribution FP 2.56%, WildGuardTest harm 88.5%, StrongREJECT −26% inflation, JBB **89.3%** human agreement ([withheld] — tied with the frontier LLM-as-judge baselines, reproducible from `data/calibration/`), up from a 70.3% v1 judge after a diagnosed recalibration. → [docs/judge-calibration.md](docs/judge-calibration.md)
 - **Benchmark — coverage over time.** Frozen AdvBench / JBB goal sets run through ROGUE's own graduated ladder against a fixed target, to answer "is this month's ROGUE better than last month's?" (honest caveat: still N=1, pre-recalibration). → [docs/benchmark.md](docs/benchmark.md)
 - **Dashboard tour.** A 5-second pitch and a 5-minute deep-dive: cinematic home, `/feed` war room (attacks replayed as ATTACKER → MODEL → JUDGE), `/matrix` breach heatmap, `/brief` threat brief. → [docs/dashboard.md](docs/dashboard.md)
 
@@ -203,8 +203,8 @@ The mechanics behind the pipeline, each on its own page:
 
 - 15-family attack taxonomy (OWASP LLM Top 10 + MITRE ATLAS aligned) — see [`docs/taxonomy.md`](docs/taxonomy.md).
 - 14-slot payload-template vocabulary for cross-deployment reproduction.
-- 19-source open-web harvest list — see [`docs/sources.md`](docs/sources.md). Not a fixed set: add your own with a ~30-line plugin → [`docs/adding-sources.md`](docs/adding-sources.md).
-- 8-model target panel (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B, Mistral Small, Gemini 3.1 Flash-Lite, Claude Opus 4.8, + two audio targets) — cheap-tier models per lab, an open-weight reliability anchor, a frontier reference, and audio endpoints for multimodal coverage.
+- 15-source open-web harvest list — see [`docs/sources.md`](docs/sources.md). Not a fixed set: add your own with a ~30-line plugin → [`docs/adding-sources.md`](docs/adding-sources.md).
+- Target panel of 6 production text models (GPT-5.4 Nano, Claude Haiku 4.5, Llama-3.1-8B, Mistral Small, Gemini 3.1 Flash-Lite, Claude Opus 4.8) + 2 audio targets (sampled lighter) — cheap-tier models per lab, an open-weight reliability anchor, a frontier reference, and audio endpoints for multimodal coverage.
 - Judge-model verdict pipeline (REFUSED / EVADED / PARTIAL_BREACH / FULL_BREACH), human-validated four ways — see [Judge calibration](docs/judge-calibration.md).
 - Daily threat brief (markdown + JSON) + Slack webhook.
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf.

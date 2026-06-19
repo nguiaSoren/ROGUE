@@ -138,7 +138,10 @@ async def test_scan_routes_through_custom_adapter_with_bare_model():
         _ENDPOINT, _MODEL, _goldens()[:1], n_trials=2, panel=_panel_with(client),
         judge=_FakeJudge(JudgeVerdict.FULL_BREACH),
     )
-    assert len(client.calls) == 2  # one per trial
+    # Golden #1 is a 3-turn multi-turn primitive, now driven as a REAL back-and-forth: each trial
+    # issues one request per user turn (3), so 2 trials × 3 turns = 6 endpoint calls. (Before the
+    # multi-turn fix these were stacked into one request/trial — the bug this exercises the fix for.)
+    assert len(client.calls) == 6
     assert all(c["model"] == _MODEL for c in client.calls)  # no "custom/" prefix leaked to the wire
 
 

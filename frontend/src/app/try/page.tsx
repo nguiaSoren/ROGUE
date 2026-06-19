@@ -71,7 +71,7 @@ export default function TryPage() {
         <Section className="animate-rogue-fade-up">
           <p className="text-[15px] text-muted-foreground leading-relaxed max-w-3xl mx-auto text-center">
             This was one recorded run. The same engine harvests live jailbreaks
-            and reproduces them continuously, see the{" "}
+            on a schedule and reproduces them in periodic measured runs, see the{" "}
             <Link
               href="/matrix"
               className="text-rogue-green hover:underline underline-offset-4"

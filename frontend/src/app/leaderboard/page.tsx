@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_CONFIGURED } from "@/lib/api";
-import { LEADERBOARD_MODELS, LEADERBOARD_TOTAL_TRIALS } from "@/lib/leaderboard-data";
+import {
+  LEADERBOARD_MODELS,
+  LEADERBOARD_TOTAL_TRIALS,
+  LEADERBOARD_OSS_MODELS,
+  LEADERBOARD_OSS_MEASURED,
+  LEADERBOARD_OSS_METHOD,
+} from "@/lib/leaderboard-data";
 
 /**
  * /leaderboard, the public model-resistance board (VIRAL_LAUNCH_SPEC Decision #4).
@@ -29,7 +35,7 @@ export const revalidate = 86400;
 export const metadata: Metadata = {
   title: "Leaderboard, ROGUE — models ranked by jailbreak resistance",
   description:
-    "Every model ROGUE continuously red-teams, ranked by resistance. Lower breach rate = higher rank, measured against ROGUE's open-web attack corpus and scored by a calibrated judge ([withheld — under anonymized review]). Reproducible and signed.",
+    "Every model ROGUE red-teams, ranked by resistance — a periodic measured snapshot (as of 2026-06-07), not a live-updating feed. Lower breach rate = higher rank, measured against ROGUE's open-web attack corpus and scored by a calibrated judge ([withheld — under anonymized review]). Reproducible and signed.",
   openGraph: {
     title: "ROGUE Leaderboard — models ranked by jailbreak resistance",
     description:
@@ -92,6 +98,33 @@ function buildRows(): ModelRow[] {
   return rows;
 }
 
+/**
+ * Roll the OSS open-weight snapshot up to ranked rows. SAME row shape + SAME
+ * resistance sort as the main board so the row UI is reused verbatim — but these
+ * are a SEPARATE, lighter methodology (single-shot jailbreak pack, ~40 trials
+ * each) and are rendered in their own section, never merged into the main rank.
+ */
+function buildOssRows(): ModelRow[] {
+  const rows: ModelRow[] = LEADERBOARD_OSS_MODELS.map((m) => ({
+    config_id: m.target_model,
+    model_label: m.model_label,
+    config_name: m.target_model,
+    target_model: m.target_model,
+    mean_breach_rate: m.mean_breach_rate,
+    worst_breach_rate: m.worst_breach_rate,
+    worst_family: m.worst_breach_rate > 0 ? m.worst_family : null,
+    n_trials: m.n_trials,
+    n_breached_families: m.n_families,
+  }));
+  rows.sort(
+    (a, b) =>
+      a.mean_breach_rate - b.mean_breach_rate ||
+      a.worst_breach_rate - b.worst_breach_rate ||
+      b.n_trials - a.n_trials,
+  );
+  return rows;
+}
+
 // --------------------------------------------------------------------------
 
 /**
@@ -133,18 +166,21 @@ function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
         <header className="flex items-start justify-between gap-6 flex-wrap animate-rogue-fade-up">
           <div className="space-y-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-              /leaderboard · all-time
+              /leaderboard · all-time · measured as of 2026-06-07
             </p>
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
               Model Resistance Leaderboard
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-              Every model ROGUE continuously red-teams, ranked by resistance.{" "}
+              Every model ROGUE red-teams, ranked by resistance.{" "}
               <span className="text-rogue-green">Lower breach rate</span> ={" "}
               <span className="text-foreground">higher rank</span>. Each model is hit with the
               same open-web attack corpus and graded by a calibrated judge.{" "}
               <span className="text-foreground">{tested} models</span> ·{" "}
-              <span className="text-foreground tabular-nums">{totalTrials.toLocaleString()}</span> trials.
+              <span className="text-foreground tabular-nums">{totalTrials.toLocaleString()}</span> trials.{" "}
+              A periodic measured snapshot of the all-time matrix (measured as of{" "}
+              <span className="text-foreground tabular-nums">2026-06-07</span>) — real historical
+              measurements, not a live-updating feed.
             </p>
           </div>
 
@@ -208,6 +244,7 @@ function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
           <p>{"// breach rate is the model's mean across all attack families; the worst single family is in the column at right"}</p>
           <p>{"// every row scored by the calibrated v3 judge — 89.3% agreement with human labels on JailbreakBench"}</p>
           <p>{`// ROGUE all-time corpus, ${totalTrials.toLocaleString()} trials — the same numbers \`rogue try\` prints in your terminal`}</p>
+          <p>{"// periodic measured snapshot — committed standings as of 2026-06-07, refreshed when ROGUE re-reproduces; not a live-updating feed"}</p>
           <p>
             {"// for the live per-family × config breakdown, see the "}
             <Link href="/matrix" className="text-rogue-green hover:underline">
@@ -215,8 +252,69 @@ function Board({ configIdByModel }: { configIdByModel: Map<string, string> }) {
             </Link>
           </p>
         </section>
+
+        {/* Open-source models — SEPARATE, lighter methodology (single-shot pack). Never merged
+            into the deep-pipeline board above; rendered as its own ranked section. */}
+        <OssBoard />
       </div>
     </main>
+  );
+}
+
+/**
+ * Open-source / open-weight models, scanned via the lighter single-shot jailbreak
+ * pack — a DIFFERENT methodology from the deep-escalation board above (which runs
+ * ~2,000 trials per model). Same row UI + same resistance sort, but kept in its
+ * own section with an explicit "not directly comparable" caveat so a reader can
+ * never mistake these single-shot numbers for the deep-pipeline standings.
+ *
+ * Cell deep-link is intentionally OMITTED for these rows: they were scanned out-of-band
+ * (Featherless single-shot) and have no deployment_config_id in the all-time matrix, so a
+ * /matrix/cell link would 404. The share-card link follows the SAME slug pattern as the main board.
+ */
+function OssBoard() {
+  const rows = buildOssRows();
+  if (rows.length === 0) return null;
+  return (
+    <section className="space-y-5 animate-rogue-fade-up" style={{ animationDelay: "0.35s" }}>
+      <header className="space-y-2 border-t border-border/60 pt-8">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-orange">
+          /leaderboard · open-weight · measured {LEADERBOARD_OSS_MEASURED}
+        </p>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Open-source models</h2>
+        <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+          {rows.length} open-weight models · {LEADERBOARD_OSS_METHOD} · ~40 trials each · measured{" "}
+          <span className="text-foreground tabular-nums">{LEADERBOARD_OSS_MEASURED}</span>. This is a{" "}
+          <span className="text-rogue-orange">lighter, separate methodology</span> from the
+          deep-pipeline board above —{" "}
+          <span className="text-foreground">not directly comparable</span>. Lower breach rate still
+          ranks higher within this list.
+        </p>
+      </header>
+
+      <div className="rogue-card border border-rogue-orange/30 rounded-lg overflow-hidden bg-card/40">
+        {/* Column header (mirrors the main board) */}
+        <div className="hidden sm:grid grid-cols-[3rem_minmax(0,1fr)_11rem_5rem_minmax(0,9rem)_6rem] gap-3 px-4 py-3 border-b border-border bg-background/60 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="text-center">#</span>
+          <span>Model</span>
+          <span>Breach rate</span>
+          <span className="text-right">Trials</span>
+          <span>Worst family</span>
+          <span className="text-right">Method</span>
+        </div>
+
+        {rows.map((row, i) => (
+          <Row key={row.config_id} row={row} rank={i + 1} index={i} cellHref={null} variant="oss" />
+        ))}
+      </div>
+
+      {/* Method footnote — OSS-specific, kept distinct from the main board's footnote */}
+      <div className="text-xs text-muted-foreground font-mono space-y-1">
+        <p>{`// open-weight models scanned via the curated single-shot aggressive jailbreak pack (~40 trials each), measured ${LEADERBOARD_OSS_MEASURED}`}</p>
+        <p>{"// breach rate = primitive-level any-breach across the pack — a lighter, separate methodology from the deep-escalation board above"}</p>
+        <p>{"// NOT directly comparable to the top board (~2,000 deep-pipeline trials/model); the two are ranked independently"}</p>
+      </div>
+    </section>
   );
 }
 
@@ -227,12 +325,15 @@ function Row({
   rank,
   index,
   cellHref,
+  variant = "main",
 }: {
   row: ModelRow;
   rank: number;
   index: number;
   /** Deep-link into the (redacted) /matrix/cell drill-down for this model × worst family, or null. */
   cellHref: string | null;
+  /** "main" = deep-pipeline board (calibrated judge); "oss" = single-shot open-weight board. */
+  variant?: "main" | "oss";
 }) {
   const tier = rateTier(row.mean_breach_rate);
   return (
@@ -299,14 +400,23 @@ function Row({
         )}
       </div>
 
-      {/* Calibrated judge */}
+      {/* Method / judge — calibrated for the main board, single-shot for OSS */}
       <div className="hidden sm:flex items-center justify-end">
-        <span
-          className="font-mono text-[10px] text-rogue-green inline-flex items-center gap-1"
-          title="Scored by the calibrated v3 judge (89.3% agreement with human labels)"
-        >
-          calibrated <span aria-hidden>✓</span>
-        </span>
+        {variant === "oss" ? (
+          <span
+            className="font-mono text-[10px] text-rogue-orange/90 inline-flex items-center gap-1"
+            title="Lighter, separate methodology — single-shot aggressive jailbreak pack (not the calibrated deep-pipeline judge)"
+          >
+            single-shot
+          </span>
+        ) : (
+          <span
+            className="font-mono text-[10px] text-rogue-green inline-flex items-center gap-1"
+            title="Scored by the calibrated v3 judge (89.3% agreement with human labels)"
+          >
+            calibrated <span aria-hidden>✓</span>
+          </span>
+        )}
       </div>
     </div>
   );

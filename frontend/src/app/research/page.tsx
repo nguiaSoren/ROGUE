@@ -154,7 +154,7 @@ export default function ResearchPage() {
 
             <p className="text-base text-muted-foreground leading-relaxed">
               The same pattern shows up as a reproduction funnel. Across 301
-              techniques harvested from 19 open-web sources and reproduced on a
+              techniques harvested from 15 open-web sources and reproduced on a
               five-model panel, the &ldquo;works on at least one of five
               models&rdquo; rate{" "}
               <span className="text-foreground font-medium">(40%)</span> is
@@ -436,7 +436,7 @@ export default function ResearchPage() {
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric value="91.0%" label="harm · top-of-field" accent="green" />
+                <Metric value="89.3%" label="harm · 3rd of 5" accent="green" />
                 <Metric value="97.35%" label="info-disclosure v2" accent="green" />
                 <Metric value="98.89%" label="unauth · tool-trace" accent="green" />
                 <Metric value="100%" label="fabricated · new type" accent="green" />
@@ -448,8 +448,9 @@ export default function ResearchPage() {
                   repeatable discipline for calibrating breach judges across
                   four breach classes
                 </span>{" "}
-                from one gate template: harm (91.0%, top-of-field, above Llama-3
-                90.7% and GPT-4 90.3%), information-disclosure (v2: 97.35%
+                from one gate template: harm (89.3%, 3rd of 5 — tied with the
+                frontier baselines Llama-3 90.7% and GPT-4 90.3%),
+                information-disclosure (v2: 97.35%
                 agreement, 100% recall, 0% false-positive mode), unauthorized-action
                 (v3 tool-trace: 98.89%, 100% recall, false-positive mode driven
                 9.38 to 6.25 to 3.12%), and the new fabricated-sensitive-value
