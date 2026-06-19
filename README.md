@@ -4,12 +4,12 @@
 
 <h1 align="center">ROGUE — Red-team every way a high-stakes AI agent can fail</h1>
 <p align="center"><b><i>The Red-Team That Never Sleeps.</i></b></p>
-<p align="center"><sub>Powered end-to-end by 5 Bright Data products · built for the Bright Data real-time AI-agents hackathon (results pending)</sub></p>
+<p align="center"><sub>Continuous open-web red-team · queryable over MCP · free/keyless harvest, with Bright Data as an optional premium backend.</sub></p>
 
-ROGUE measures **every place a high-stakes AI agent can go wrong** — whether the **model** can be broken, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe — each against an independent, continuously-refreshed standard, with a reproducible **signed** record. And it closes the loop: it doesn't just find the break, it **generates and verifies the fix** (you own the runtime — ROGUE never sits in your request path). The continuous open-web harvest behind the model surface runs on just **$0.05–$0.30 of Bright Data** a day.
+ROGUE measures **every place a high-stakes AI agent can go wrong** — whether the **model** can be broken, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe — each against an independent, continuously-refreshed standard, with a reproducible **signed** record. And it closes the loop: it doesn't just find the break, it **generates and verifies the fix** (you own the runtime — ROGUE never sits in your request path). The continuous open-web harvest behind the model surface runs **free and keyless** by default — Bright Data is an optional premium backend for the hardest anti-bot targets (~$0.05–$0.30/day when enabled).
 
 > ### 🥇 The first continuous open-web red-team you can query over MCP.
-> ROGUE harvests new jailbreaks **through Bright Data's MCP**, reproduces each one against **your** config, and serves the results **back through its own MCP server** — so you can ask Claude / Cursor *"which live attacks breach my config?"* from your editor. A two-way MCP loop — harvest *and* distribution — that no other red-team tool closes.
+> ROGUE harvests new jailbreaks from the open web, reproduces each one against **your** config, and serves the results **back through its own MCP server** — so you can ask Claude / Cursor *"which live attacks breach my config?"* from your editor. (The harvest can run *through* Bright Data's MCP as one optional backend; distribution is always through ROGUE's own MCP server — the loop no other red-team closes.)
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
 [![Trailer](https://img.shields.io/badge/%E2%96%B6%20trailer-watch-red)](https://youtu.be/pVOQYJvMC6w)
@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 
 Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
 
-- **Harvests on a schedule** — new jailbreaks and prompt-injections pulled from 15 open-web sources (via all 5 Bright Data products) on a recurring keyless harvest cron, so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately — not a continuously-updating number.)
+- **Harvests on a schedule** — new jailbreaks and prompt-injections pulled from 15 open-web sources on a recurring **keyless** harvest cron (free backends by default; Bright Data optional for the hardest targets), so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately — not a continuously-updating number.)
 - **Reproduces against *your* exact config** — your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the hosted roadmap).
 - **Is queryable over MCP, both ways** — it *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
 - **Measures three surfaces, signed** — the model, the human approval gate, and the shared skill-pool — each scored against an independent answer key and emitted as a tamper-evident attestation.
@@ -159,7 +159,7 @@ ROGUE meets your team where it already works:
 
 Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
-1. **Harvest** — 15 open-web sources fetched via 5 Bright Data products.
+1. **Harvest** — 15 open-web sources via a backend-agnostic fetcher (free/keyless by default; Bright Data optional for the hardest targets).
 2. **Extract** — an LLM agent structures each fetched document into an `AttackPrimitive`.
 3. **Dedupe** — pgvector cosine similarity clusters near-duplicate attacks.
 4. **Reproduce** — each canonical primitive runs against your `DeploymentConfig` × 5 trials.
@@ -192,7 +192,7 @@ ROGUE's findings are written up as papers and posts — **[PAPERS.md](PAPERS.md)
 
 The mechanics behind the pipeline, each on its own page:
 
-- **Bright Data integration.** Five BD products end-to-end, plus a self-tuning ε-greedy SERP bandit that allocates the daily harvest budget by yield (novel primitives per dollar) at $0.05–$0.30 per harvest. → [docs/bright-data.md](docs/bright-data.md)
+- **Bright Data integration (optional premium backend).** All five BD products wired end-to-end for the hardest anti-bot targets + structured X, plus a self-tuning ε-greedy SERP bandit that allocates the harvest budget by yield (novel primitives per dollar) at $0.05–$0.30 per harvest when enabled — the default harvest path is free/keyless. → [docs/bright-data.md](docs/bright-data.md)
 - **Multimodal red-team.** Refused text jailbreaks become real images and audio via deterministic black-box renderers, climbing an autonomous escalation ladder that stops at the first breach; Bright Data sources real carrier images to composite onto. → [docs/multimodal.md](docs/multimodal.md)
 - **Self-growing attack repertoire.** ROGUE harvests reusable *techniques*, not just payloads — classifying, routing, and graduating / retiring / resurrecting them on live breach evidence, with a governed renderer registry and grammar-driven planning (the planner-willingness finding: 22% → 100% by changing only the planner). → [docs/self-growing-repertoire.md](docs/self-growing-repertoire.md)
 - **Judge calibration.** Every breach number is an LLM verdict, so the judge is validated against independent human labels four ways — in-distribution FP 2.56%, WildGuardTest harm 88.5%, StrongREJECT −26% inflation, JBB **89.3%** human agreement (3rd of 5 field classifiers — tied with the frontier LLM-as-judge baselines, reproducible from `data/calibration/`), up from a 70.3% v1 judge after a diagnosed recalibration. → [docs/judge-calibration.md](docs/judge-calibration.md)
@@ -272,9 +272,26 @@ That installs **crawl4ai** + its Chromium — and that's all most people need: i
 
 Add **residential scale** with any cheap proxy (Webshare, IPRoyal, your own) — one var, applied to all scrapers: `ROGUE_PROXY_URL=http://user:pass@host:port`. Full matrix + preference order: [`docs/harvest-backends.md`](docs/harvest-backends.md).
 
+**Add your own backend.** A new backend — the ones above, or anything else (ScrapeGraphAI, context.dev, a house proxy, a paid SERP API) — is a single `Fetcher` file plus one line in the preference order (`ROGUE_FETCHER_ORDER`). Sources, the harvest pipeline, and the scan never change. PRs welcome.
+
+> **What "free" means, honestly:** the open-web *scraping* is free. The *extraction* and the *scan judge* still call an LLM — point them at any OpenAI-compatible endpoint (including a local **Ollama** model) to keep the whole loop ~$0.
+
+## Bring your own LLM — including a local one
+
+ROGUE is **not locked to one model or API**. The target you scan, the extraction step (scraped page → attack primitive), and the judge (grades each response) are each a configurable `provider/model` — Anthropic, OpenAI, OpenRouter, Groq, Gemini, or an OpenAI-compatible local endpoint:
+
+```bash
+# Run the judge on a local model (Ollama) — the OpenAI SDK honors OPENAI_BASE_URL:
+JUDGE_MODEL=openai/llama3.1
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=ollama
+```
+
+> **Honest caveat on a local judge:** ROGUE's judge is *calibrated* — its verdict credibility (89.3% agreement vs human labels, the κ / SHIP gate in [`docs/judge-calibration.md`](docs/judge-calibration.md)) is validated against the **default** judge. A local/open judge is **uncalibrated** and tends to *under-report* breaches until you re-run the calibration harness (`scripts/calibration/`) against it. Free judge: yes. Trusted judge: re-calibrate first.
+
 ## Pipeline CLI reference
 
-The two `$`-billed driver scripts spend Bright Data + LLM credit and write the live DB — run them deliberately. All flags are optional.
+The two `$`-billed driver scripts spend LLM credit (and Bright Data, if you've configured it as the scrape backend) and write the live DB — run them deliberately. All flags are optional.
 
 <details><summary><b><code>harvest_once.py</code> — harvest → extract → dedup → persist</b></summary>
 
