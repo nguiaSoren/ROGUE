@@ -318,37 +318,29 @@ function MiniBoard({
 }
 
 /**
- * One compact ranked row: rank badge + a model block that stacks the model name (a link into the
- * model's CORRESPONDING /matrix/cell drill-down, which itself surfaces the breach card), the
- * breach-rate bar, and a muted subline (worst family · trials · the direct shareable card).
- * Stacking vertically keeps it readable in a half-width column.
+ * One compact ranked row. The WHOLE row is the click target → the model's CORRESPONDING
+ * /matrix/cell drill-down (which itself surfaces the breach card), with a chevron affordance so it
+ * reads as interactive. Stacks the model name, the breach-rate bar, and a muted subline (worst
+ * family · trials). Falls back to a non-interactive div if the model has no mapped cell.
  */
 function CompactRow({ row, rank, index }: { row: ModelRow; rank: number; index: number }) {
   const tier = rateTier(row.mean_breach_rate);
-  const slug = slugFor(row.model_label);
   const cellHref = cellHrefFor(row);
-  return (
-    <div
-      className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 items-start px-3 py-3 border-b border-border/50 last:border-b-0 hover:bg-card/60 transition-colors animate-rogue-fade-up"
-      style={{ animationDelay: `${Math.min(index * 0.03, 0.4)}s` }}
-    >
+  const cls =
+    "group grid grid-cols-[1.75rem_minmax(0,1fr)_0.75rem] gap-3 items-start px-3 py-3 border-b border-border/50 last:border-b-0 hover:bg-card/60 transition-colors animate-rogue-fade-up";
+  const style = { animationDelay: `${Math.min(index * 0.03, 0.4)}s` };
+  const inner = (
+    <>
       <div className="flex items-center justify-center pt-0.5">
         <RankBadge rank={rank} />
       </div>
       <div className="min-w-0 space-y-1.5">
-        {cellHref ? (
-          <Link
-            href={cellHref}
-            className="block font-mono text-sm font-semibold truncate text-foreground transition-colors hover:text-rogue-green"
-            title={`Drill into ${row.model_label}'s breaches in the matrix`}
-          >
-            {row.model_label}
-          </Link>
-        ) : (
-          <p className="font-mono text-sm font-semibold truncate" title={row.config_name}>
-            {row.model_label}
-          </p>
-        )}
+        <p
+          className="font-mono text-sm font-semibold truncate transition-colors group-hover:text-rogue-green"
+          title={row.config_name}
+        >
+          {row.model_label}
+        </p>
         <BreachBar mean={row.mean_breach_rate} tier={tier} />
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-muted-foreground min-w-0">
           {row.worst_family ? (
@@ -360,17 +352,28 @@ function CompactRow({ row, rank, index }: { row: ModelRow; rank: number; index: 
             <span className="text-rogue-green">none breached</span>
           )}
           <span className="shrink-0 opacity-60">· n={row.n_trials.toLocaleString()}</span>
-          <a
-            href={`/cards/${slug}.png`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 text-rogue-green/70 hover:text-rogue-green hover:underline transition-colors"
-            title={`Open ${row.model_label}'s shareable breach card`}
-          >
-            ↗ card
-          </a>
         </div>
       </div>
+      <span
+        aria-hidden
+        className="self-center font-mono text-muted-foreground transition-colors group-hover:text-rogue-green"
+      >
+        ›
+      </span>
+    </>
+  );
+  return cellHref ? (
+    <Link
+      href={cellHref}
+      className={cls}
+      style={style}
+      title={`Drill into ${row.model_label}'s breaches in the matrix`}
+    >
+      {inner}
+    </Link>
+  ) : (
+    <div className={cls} style={style}>
+      {inner}
     </div>
   );
 }
