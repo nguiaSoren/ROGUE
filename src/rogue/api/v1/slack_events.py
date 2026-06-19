@@ -28,6 +28,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from rogue.config import get_settings
 from rogue.integrations.slack.inbound import handle_inbound_message
+from rogue.integrations.slack.progress import is_progress_command
 from rogue.integrations.slack.signing import verify_slack_signature
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,29 @@ async def _dispatch_advisory(text: str, channel_id: str) -> None:
         )
     except Exception as exc:  # noqa: BLE001 - background advisory is best-effort
         logger.warning("slack inbound: advisory dispatch failed for channel %s: %s", channel_id, exc)
+
+
+async def _dispatch_progress(channel_id: str) -> None:
+    """Background `progress`/`status` reply: read a pipeline snapshot from the DB (in a thread, off
+    the event loop) and post it back to the SAME channel the command came from. Unlike the advisory
+    path this is operator-facing and channel-agnostic — it answers wherever it was asked (typically
+    `#security`). Best-effort — never raises (it runs after the route has already acked Slack)."""
+    import asyncio
+
+    from rogue.integrations.slack import make_slack_channel_sender
+    from rogue.integrations.slack.progress import build_progress_report
+
+    try:
+        settings = get_settings()
+        bot_token = settings.slack_bot_token
+        if bot_token is None:
+            logger.warning("slack progress: SLACK_BOT_TOKEN unset — cannot post snapshot")
+            return
+        payload = await asyncio.to_thread(build_progress_report, settings.database_url)
+        sender = make_slack_channel_sender(bot_token.get_secret_value())
+        await sender(channel_id, payload)
+    except Exception as exc:  # noqa: BLE001 - background reply is best-effort
+        logger.warning("slack progress: dispatch failed for channel %s: %s", channel_id, exc)
 
 
 @router.post("/slack/events")
@@ -101,7 +125,12 @@ async def slack_events(request: Request, background_tasks: BackgroundTasks) -> d
             channel_id = event.get("channel") or ""
             if text and channel_id:
                 # Schedule in the background so Slack gets a fast 200 (it retries after ~3s).
-                background_tasks.add_task(_dispatch_advisory, text, channel_id)
+                # A bare `progress`/`status` command gets an operator snapshot in-channel; anything
+                # else falls through to the sandbox-only Tripwire/RedlineGuard advisory.
+                if is_progress_command(text):
+                    background_tasks.add_task(_dispatch_progress, channel_id)
+                else:
+                    background_tasks.add_task(_dispatch_advisory, text, channel_id)
 
     return {"ok": True}
 
