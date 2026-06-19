@@ -32,7 +32,7 @@ https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
 
 - **Harvests on a schedule** — new jailbreaks and prompt-injections pulled from 15 open-web sources on a recurring **keyless** harvest cron (free backends by default; Bright Data optional for the hardest targets), so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately — not a continuously-updating number.)
-- **Reproduces against *your* exact config** — your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the hosted roadmap).
+- **Reproduces against *your* exact config** — your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the roadmap).
 - **Is queryable over MCP, both ways** — it *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
 - **Measures three surfaces, signed** — the model, the human approval gate, and the shared skill-pool — each scored against an independent answer key and emitted as a tamper-evident attestation.
 - **Runs on the LLM you choose** — the judge and extraction models are configurable (`JUDGE_MODEL`), any provider or a local model (Ollama via `OPENAI_BASE_URL`); not locked to one vendor.
@@ -74,8 +74,8 @@ https://rogue-private.onrender.com/mcp/
 
 The [dashboard home](https://rogue-eosin.vercel.app) has one-click **Add to Cursor** / **Add to VS Code** buttons; for Claude Desktop, add it as a custom connector. It exposes ~19 tools — read-only corpus/breach queries plus scan / report / benchmark actions. Full tool list + local install: [MCP integration](#mcp-integration) below.
 
-### Submit an endpoint, get a report — hosted API
-`POST /v1/scans` with a target → ROGUE queues it for the same scan engine behind the dashboard and MCP, returning a scored report as **JSON, HTML, or a CISO-ready PDF** on completion. The hosted `/v1` API is **live and key-authorized today** (private beta), but the background worker that drains the scan queue isn't deployed yet, so a queued scan does not complete on the host. For a graded report today, run it locally (below) or point the SDK at your own target — the identical engine, the identical report.
+### Get a scored report — locally, no account
+The CLI and Python SDK run a full scan against your own target **today** and emit a scored report — `report.to_html()` / JSON from the SDK, plus a CISO-ready PDF via the report service — the same engine as the dashboard, no signup, nothing to buy. A FastAPI `/v1` server (`POST /v1/scans` + OpenAPI spec) is included in the self-hosted stack (below) for programmatic access.
 
 ### Run it locally — the full app (dashboard + API)
 Self-host the whole thing — Postgres + API + the Next.js dashboard — with one command. It migrates and seeds a **redacted snapshot of the real all-time breach matrix** on startup, so every surface is fully populated on first boot — no scan, no keys. (The attack payloads + model responses are redacted to `[redacted]`, exactly like the public site; the verdicts/rates are the real ones.)
@@ -150,10 +150,9 @@ ROGUE meets your team where it already works:
 
 | Surface | Status | What you get |
 |---|---|---|
-| **Your IDE** — MCP | ✅ **Available now** · keyless | One config block in Claude Desktop / Cursor / Windsurf / VS Code; the editor's agent queries the live threat DB on the spot. Add an account to launch full scans without leaving your work. `https://rogue-private.onrender.com/mcp` |
-| **Your chat & tracker** — Slack + Jira | ✅ Slack alerts now · ⏳ auto-fan-out rolling out | Point a Slack incoming webhook (`SLACK_WEBHOOK_URL`) at ROGUE and the daily threat brief + new CRITICAL/HIGH breaches post to your workspace automatically — **works today**. Or connect Slack + Jira as per-org integrations (Fernet-encrypted creds) and file findings via the MCP action tools (`send_slack_alert` / `create_jira_ticket`); automatic fan-out on every scan completion is rolling out with the hosted worker. [Setup](docs/platform/integrations/slack-github-jira.md) |
-| **API & SDK** — REST `/v1` + Python | ✅ live · ⏳ hosted scans rolling out | The `/v1` REST API + OpenAPI spec are live and key-authorized at `https://rogue-private.onrender.com/v1`. The **Python SDK runs real scans today** against your own target (`pip install rogue-live-redteam`; `from rogue import Client` — see [`docs/SDK.md`](docs/SDK.md)). *Hosted* scan execution (a `POST /v1/scans` that completes server-side) is rolling out. |
-| **Security tooling** — SOAR / SIEM | 🔜 **Coming soon** | Splunk / Palo Alto Cortex connectors to pipe findings into your existing security stack. On the roadmap, not available today. |
+| **Your IDE** — MCP | ✅ **Available now** · keyless | One config block in Claude Desktop / Cursor / Windsurf / VS Code; the editor's agent queries the live threat DB on the spot — read-only corpus/breach queries plus scan / report / benchmark action tools. `https://rogue-private.onrender.com/mcp` |
+| **Your chat & tracker** — Slack + Jira | ✅ Slack alerts now | Point a Slack incoming webhook (`SLACK_WEBHOOK_URL`) at ROGUE and the daily threat brief + new CRITICAL/HIGH breaches post to your workspace automatically. Jira findings file via the MCP action tools (`send_slack_alert` / `create_jira_ticket`). [Setup](docs/platform/integrations/slack-github-jira.md) |
+| **API & SDK** — REST `/v1` + Python | ✅ runs locally | The **Python SDK runs real scans today** against your own target (`pip install rogue-live-redteam`; `from rogue import Client` — see [`docs/SDK.md`](docs/SDK.md)). A FastAPI `/v1` server + OpenAPI spec ship in the self-hosted stack. |
 
 ## What ROGUE does
 
@@ -214,10 +213,8 @@ The mechanics behind the pipeline, each on its own page:
 ## Roadmap
 
 - **Expand source coverage** — deeper Web Scraper API integration brings the next ~100 open-web sources online.
-- **Tool-aware scans** — supply your agent's tool schemas so a reproduction exercises the full model × system-prompt × **tools** surface (today's self-serve scan covers model × system-prompt; tool-call scoping lands with the hosted path).
-- **Customer SDK** — a drop-in SDK that lands ROGUE verdicts in the workflows teams already run (private beta; SOAR/SIEM connectors planned).
+- **Tool-aware scans** — supply your agent's tool schemas so a reproduction exercises the full model × system-prompt × **tools** surface (today's scan covers model × system-prompt).
 - **Break bandit** — a second, contextual Thompson-sampling bandit that learns *how to break* (which escalation strategy to try first per attack-family × target); the control surface and reward log are already built and instrumented in prod.
-- **Enterprise** — RBAC, audit logs, and compliance reporting for teams that need them.
 
 ---
 
