@@ -46,6 +46,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 from rogue.harvest.fetchers.base import Fetcher
+from rogue.harvest.fetchers.capabilities import Capability
 
 if TYPE_CHECKING:
     from rogue.harvest.bandit import EpsilonGreedyBandit
@@ -546,12 +547,45 @@ class DiscoveryAgent:
         # attribution can read them.
         _picked = self.serp_queries(since)
 
-        coros = [self._safe_fetch(plugin, since) for plugin in self.plugins]
+        # Capability pre-check (the documented orchestrator contract on
+        # SourcePlugin.required_capabilities): a plugin whose required
+        # capabilities have no registered backend is SKIPPED CLEANLY here —
+        # with an info log + a report so it's visible in telemetry — instead
+        # of being run only to raise (e.g. on a keyless harvest the
+        # REDDIT/HF/X capabilities have no free backend, so reddit_subreddit /
+        # huggingface_discussion would otherwise hard-error with
+        # "BRIGHTDATA_*_DATASET_ID not set"). When no registry was wired
+        # (older callers / tests), every plugin runs as before.
+        runnable: list[SourcePlugin] = []
+        skipped_reports: list[PluginRunReport] = []
+        for plugin in self.plugins:
+            missing = self._unmet_capabilities(plugin)
+            if missing:
+                missing_names = ", ".join(sorted(c.name for c in missing))
+                logger.info(
+                    "harvest plugin %s skipped: needs %s — no registered backend "
+                    "(keyless mode; set BRIGHTDATA_* for this source)",
+                    plugin.name, missing_names,
+                )
+                skipped_reports.append(
+                    PluginRunReport(
+                        plugin_name=plugin.name,
+                        source_type=str(plugin.source_type),
+                        bright_data_product=str(plugin.bright_data_product),
+                        n_docs=0,
+                        error=None,
+                        call_errors=(f"skipped: needs Bright Data ({missing_names})",),
+                    )
+                )
+            else:
+                runnable.append(plugin)
+
+        coros = [self._safe_fetch(plugin, since) for plugin in runnable]
         results = await asyncio.gather(*coros)
 
         flat_docs: list[RawDocument] = []
-        reports: list[PluginRunReport] = []
-        for plugin, (docs, err) in zip(self.plugins, results, strict=True):
+        reports: list[PluginRunReport] = list(skipped_reports)
+        for plugin, (docs, err) in zip(runnable, results, strict=True):
             flat_docs.extend(docs)
             # Pull per-call errors if the plugin maintains them (the new
             # error-visibility contract, 2026-05-26). Snapshot defensively.
@@ -638,6 +672,24 @@ class DiscoveryAgent:
                 )
 
         return flat_docs
+
+    def _unmet_capabilities(self, plugin: SourcePlugin) -> frozenset[Capability]:
+        """The subset of ``plugin.required_capabilities`` that no backend can serve.
+
+        Empty when the plugin's needs are fully met OR when no registry was wired
+        (``self._registry is None`` — older callers / tests resolve nothing and
+        run every plugin, preserving prior behavior). Reddit/HF/X capabilities
+        have no free backend, so on a keyless harvest those plugins land here and
+        are skipped cleanly by :meth:`run` rather than run-then-raised.
+        """
+        if self._registry is None:
+            return frozenset()
+        required = getattr(plugin, "required_capabilities", frozenset())
+        if not required:
+            return frozenset()
+        return frozenset(
+            cap for cap in required if self._registry.for_capability(cap) is None
+        )
 
     async def _safe_fetch(
         self,

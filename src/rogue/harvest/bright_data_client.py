@@ -348,12 +348,20 @@ class BrightDataClient:
         / type-checking this module never requires network or credentials.
         """
         if self._http is None:
+            # Only send the Authorization header when we actually have a key.
+            # An empty key would build ``Authorization: Bearer `` (trailing
+            # space, no token) which httpx rejects at send time with
+            # ``LocalProtocolError: Illegal header value b'Bearer '`` — the
+            # keyless-harvest crash. The keyless path should never reach a BD
+            # call (the registry doesn't register this backend without keys),
+            # but guard here as defense-in-depth so a stray call degrades to a
+            # clean 401 from BD rather than a header-encoding crash.
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
             self._http = httpx.AsyncClient(
                 timeout=httpx.Timeout(30.0, connect=10.0),
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
             )
         return self._http
 

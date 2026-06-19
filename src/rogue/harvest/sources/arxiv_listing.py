@@ -59,7 +59,19 @@ DEFAULT_LISTINGS = [
 # `href="..."` with no whitespace and silently returned 0 hits on every
 # harvest. Allow optional whitespace either side of `=` so both old- and
 # new-vintage HTML keep matching.
-ABS_HREF_RE = re.compile(r'href\s*=\s*"/abs/([0-9]{4}\.[0-9]{4,6}(?:v\d+)?)"')
+#
+# 2026-06-19 fix (keyless harvest): the relative-only form returned 0 IDs on
+# the keyless path because Firecrawl/crawl4ai emit ABSOLUTE hrefs
+# (`href="https://arxiv.org/abs/2606.19474"`) where Bright Data's raw HTML had
+# relative ones (`href="/abs/..."`). Make the `https://(www.)arxiv.org` host
+# prefix OPTIONAL so the same regex matches both backends' output. Also accept
+# markdown link targets `](https://arxiv.org/abs/...)` that a markdown-only
+# fetch produces, via the same optional-host prefix + a `(` or `"` left edge.
+ABS_HREF_RE = re.compile(
+    r'(?:href\s*=\s*"|\]\()'
+    r'(?:https?://(?:www\.)?arxiv\.org)?/abs/'
+    r'([0-9]{4}\.[0-9]{4,6}(?:v\d+)?)'
+)
 
 
 class ArxivListingPlugin(SourcePlugin):
