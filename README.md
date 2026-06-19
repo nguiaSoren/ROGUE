@@ -153,6 +153,23 @@ ROGUE meets your team where it already works:
 | **Your IDE** — MCP | ✅ **Available now** · keyless | One config block in Claude Desktop / Cursor / Windsurf / VS Code; the editor's agent queries the live threat DB on the spot — read-only corpus/breach queries plus scan / report / benchmark action tools. `https://rogue-private.onrender.com/mcp` |
 | **Your chat & tracker** — Slack + Jira | ✅ Slack alerts now | Point a Slack incoming webhook (`SLACK_WEBHOOK_URL`) at ROGUE and the daily threat brief + new CRITICAL/HIGH breaches post to your workspace automatically. Jira findings file via the MCP action tools (`send_slack_alert` / `create_jira_ticket`). [Setup](docs/platform/integrations/slack-github-jira.md) |
 | **API & SDK** — REST `/v1` + Python | ✅ runs locally | The **Python SDK runs real scans today** against your own target (`pip install rogue-live-redteam`; `from rogue import Client` — see [`docs/SDK.md`](docs/SDK.md)). A FastAPI `/v1` server + OpenAPI spec ship in the self-hosted stack. |
+| **Your CI** — GitHub Action | ✅ shift-left gate | Add one `uses:` block to a `pull_request` workflow; ROGUE red-teams your deployment on every PR and **fails the merge on any HIGH/CRITICAL breach** (overridable). [Setup](docs/ci-action.md) |
+
+### Gate your CI
+
+Red-team your model on every pull request and block the merge on a HIGH/CRITICAL breach. Drop this into `.github/workflows/rogue-scan.yml`:
+
+```yaml
+- uses: nguiaSoren/ROGUE@v1
+  with:
+    endpoint: https://gateway.your-company.com/v1
+    model: your-deployed-model
+    system-prompt-file: prompts/production-system-prompt.txt
+    fail-on: high
+    api-key: ${{ secrets.ROGUE_TARGET_KEY }}
+```
+
+Inputs, fail policy, and the security note are in [`docs/ci-action.md`](docs/ci-action.md); a full copy-paste workflow is at [`examples/github-action/rogue-scan.yml`](examples/github-action/rogue-scan.yml).
 
 ## What ROGUE does
 

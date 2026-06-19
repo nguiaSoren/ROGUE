@@ -1,0 +1,149 @@
+# ROGUE — shift-left LLM red-team gate for CI (composite GitHub Action).
+#
+# Add `uses: nguiaSoren/ROGUE@v1` to a `pull_request` workflow to red-team YOUR model on every PR
+# and FAIL the merge on any HIGH/CRITICAL breach (overridable via `fail-on` / `max-breach-rate`).
+# It installs the published `rogue-live-redteam` package and runs a Python gate (scripts/ci/rogue_gate.py)
+# that scans the target with the SDK and inspects findings by severity. See docs/ci-action.md and the
+# copy-paste consumer workflow at examples/github-action/rogue-scan.yml.
+#
+# Secrets: pass the TARGET endpoint key (and optional calibrated-judge key) as repo secrets. They are
+# read from the environment by name and NEVER logged or echoed.
+
+name: "ROGUE red-team gate"
+description: "Red-team your LLM deployment on every PR and fail on any HIGH/CRITICAL breach."
+author: "Soren Obounou Nguia"
+branding:
+  icon: "shield"
+  color: "green"
+
+inputs:
+  # --- target: an OpenAI-compatible endpoint, OR a known provider + model -----------------------
+  endpoint:
+    description: "OpenAI-compatible base URL of your deployment (e.g. https://gateway.acme.com/v1). Use this OR provider+model."
+    required: false
+    default: ""
+  provider:
+    description: "Known provider when not using a custom endpoint: openai / anthropic / openrouter / gemini / groq."
+    required: false
+    default: ""
+  model:
+    description: "Target model id. Required in provider mode; optional for an endpoint (uses the endpoint default)."
+    required: false
+    default: ""
+  system-prompt:
+    description: "Inline system prompt of your deployment — red-team your REAL config, not a bare model."
+    required: false
+    default: ""
+  system-prompt-file:
+    description: "Path (in the consumer repo) to a file holding the system prompt. Alternative to system-prompt."
+    required: false
+    default: ""
+  # --- scan shape -------------------------------------------------------------------------------
+  pack:
+    description: "Bundled attack pack: aggressive / default / compliance."
+    required: false
+    default: "aggressive"
+  max-tests:
+    description: "Cap on the number of attacks run."
+    required: false
+    default: "50"
+  judge:
+    description: "Grader: 'keyless' (heuristic, default, no key) or 'calibrated' (LLM judge — requires judge-key)."
+    required: false
+    default: "keyless"
+  budget:
+    description: "Optional USD cost cap; the scan stops after this much target-call spend."
+    required: false
+    default: ""
+  # --- secrets (pass via GitHub repo secrets; never hard-code) ----------------------------------
+  api-key:
+    description: "Credential for the TARGET endpoint/provider. Pass via a repo secret."
+    required: false
+    default: ""
+  judge-key:
+    description: "Credential for the calibrated judge (only used when judge: calibrated). Pass via a repo secret."
+    required: false
+    default: ""
+  # --- gate policy ------------------------------------------------------------------------------
+  fail-on:
+    description: "Minimum breached-finding severity that fails the PR: high (default) | critical | medium | low | none."
+    required: false
+    default: "high"
+  max-breach-rate:
+    description: "Optional float 0-1; also fail when the overall breach rate exceeds it (e.g. 0.2 = 20%)."
+    required: false
+    default: ""
+  # --- runner -----------------------------------------------------------------------------------
+  python-version:
+    description: "Python used to install and run the gate."
+    required: false
+    default: "3.11"
+  card-dir:
+    description: "Directory the breach-card artifact is written to."
+    required: false
+    default: "rogue-scan"
+
+outputs:
+  breaches:
+    description: "Number of breached findings."
+    value: ${{ steps.gate.outputs.breaches }}
+  breach-rate:
+    description: "Overall breach rate (0-1)."
+    value: ${{ steps.gate.outputs.breach_rate }}
+  failed:
+    description: "'true' if the gate failed, else 'false'."
+    value: ${{ steps.gate.outputs.failed }}
+  card:
+    description: "Path to the breach-card artifact (PNG, or SVG fallback)."
+    value: ${{ steps.gate.outputs.card }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install ROGUE
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install rogue-live-redteam
+
+    - name: Run ROGUE scan + gate
+      id: gate
+      shell: bash
+      # The TARGET and JUDGE credentials are exported under stable names and read by the gate from the
+      # environment — they are never passed on the command line and never echoed.
+      env:
+        ROGUE_TARGET_KEY: ${{ inputs.api-key }}
+        ROGUE_JUDGE_KEY: ${{ inputs.judge-key }}
+      run: |
+        set -euo pipefail
+        args=(
+          "${{ github.action_path }}/scripts/ci/rogue_gate.py"
+          --pack "${{ inputs.pack }}"
+          --max-tests "${{ inputs.max-tests }}"
+          --judge "${{ inputs.judge }}"
+          --fail-on "${{ inputs.fail-on }}"
+          --card-dir "${{ inputs.card-dir }}"
+          --api-key-env ROGUE_TARGET_KEY
+          --judge-key-env ROGUE_JUDGE_KEY
+        )
+        [ -n "${{ inputs.endpoint }}" ]            && args+=( --endpoint "${{ inputs.endpoint }}" )
+        [ -n "${{ inputs.provider }}" ]            && args+=( --provider "${{ inputs.provider }}" )
+        [ -n "${{ inputs.model }}" ]               && args+=( --model "${{ inputs.model }}" )
+        [ -n "${{ inputs.system-prompt }}" ]       && args+=( --system-prompt "${{ inputs.system-prompt }}" )
+        [ -n "${{ inputs.system-prompt-file }}" ]  && args+=( --system-prompt-file "${{ inputs.system-prompt-file }}" )
+        [ -n "${{ inputs.budget }}" ]              && args+=( --budget "${{ inputs.budget }}" )
+        [ -n "${{ inputs.max-breach-rate }}" ]     && args+=( --max-breach-rate "${{ inputs.max-breach-rate }}" )
+        python "${args[@]}"
+
+    - name: Upload breach card
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rogue-breach-card
+        path: ${{ inputs.card-dir }}/
+        if-no-files-found: ignore
