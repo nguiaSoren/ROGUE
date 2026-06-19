@@ -290,7 +290,7 @@ export default function DeckPage() {
             </div>
             <div className="mt-8">
               <Link
-                href="/early-access"
+                href="/try"
                 className="inline-flex items-center gap-2 font-mono text-sm font-bold tracking-[0.12em] uppercase text-rogue-green hover:underline"
               >
                 Run ROGUE on your stack <ArrowRight className="h-4 w-4" />
@@ -328,13 +328,12 @@ export default function DeckPage() {
             <div className="mt-8 flex items-center gap-3">
               <Boxes className="h-5 w-5 text-rogue-green shrink-0" />
               <p className="text-sm text-muted-foreground">
-                Onboarding a handful of early partners now, bring your stack and
-                threat model.{" "}
+                Point ROGUE at your stack and threat model.{" "}
                 <Link
-                  href="/early-access"
+                  href="/try"
                   className="text-rogue-green font-mono uppercase tracking-[0.1em] text-xs hover:underline"
                 >
-                  Apply for early access →
+                  Try the demo →
                 </Link>
               </p>
             </div>

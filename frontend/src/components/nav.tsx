@@ -93,16 +93,16 @@ export function Nav() {
             ▶ try
           </Link>
           <Link
+            href="/scan"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded bg-rogue-green px-3 py-1 font-medium text-black transition-opacity hover:opacity-90"
+          >
+            scan your model
+          </Link>
+          <Link
             href="/scans"
             className="hidden sm:inline-block rounded border border-rogue-green/50 px-3 py-1 text-rogue-green transition-colors hover:bg-rogue-green/10"
           >
             dashboard
-          </Link>
-          <Link
-            href="/early-access"
-            className="rounded bg-rogue-green px-3 py-1 font-semibold text-[#050508] transition-opacity hover:opacity-90"
-          >
-            early access
           </Link>
           {/* Hamburger, only below md, where the inline link groups are hidden */}
           <button
@@ -130,6 +130,7 @@ export function Nav() {
         >
           <div className="max-w-7xl mx-auto px-6 py-2 flex flex-col text-xs uppercase tracking-widest">
             <MobileLink href="/try" active={pathname === "/try"} onClick={closeMenu}>▶ try the demo</MobileLink>
+            <MobileLink href="/scan" active={pathname === "/scan"} onClick={closeMenu}>scan your model</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/feed" active={pathname === "/feed"} onClick={closeMenu}>/feed</MobileLink>
             <MobileLink href="/matrix" active={pathname === "/matrix"} onClick={closeMenu}>/matrix</MobileLink>
@@ -143,13 +144,6 @@ export function Nav() {
             <MobileLink href="/about" active={pathname === "/about"} onClick={closeMenu}>about</MobileLink>
             <div className="my-1 border-t border-border" />
             <MobileLink href="/scans" active={pathname === "/scans"} onClick={closeMenu}>dashboard</MobileLink>
-            <Link
-              href="/early-access"
-              onClick={closeMenu}
-              className="mt-2 mb-1 rounded bg-rogue-green px-3 py-3 text-center font-semibold text-[#050508] transition-opacity hover:opacity-90"
-            >
-              early access
-            </Link>
           </div>
         </nav>
       )}
