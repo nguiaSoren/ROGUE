@@ -40,7 +40,18 @@ for _p in (str(_ROOT / "src"),):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from rogue.report_card import BG, GREEN, RED, _INK, _MONO, _MUTE, _load_mono_font  # noqa: E402
+from rogue.report_card import (  # noqa: E402
+    BG,
+    GREEN,
+    RED,
+    _INK,
+    _MONO,
+    _MUTE,
+    _QR_URL,
+    _load_mono_font,
+    _qr_png_b64,
+    _styled_qr_image,
+)
 
 
 def _hex(c: str) -> tuple[int, int, int]:
@@ -77,8 +88,12 @@ BAR_INSET = 30  # bar left offset from the panel edge (room for the rank index)
 BAR_RIGHT_PAD = 96  # room for the right-aligned pct
 BAR_H = 18
 _MEASURED = "2026-06-19"
-_URL = "rogue-eosin.vercel.app/leaderboard"
 _CHAR_W = 0.6  # monospace advance ≈ 0.6em, for char-count clipping in the SVG path
+# Clean brand QR (rounded modules + ROGUE logomark, EC-H) → the live leaderboard, top-right header.
+QR_PX = 150
+QR_X = W - PAD - QR_PX
+QR_Y = 40
+_QR_LABEL = "scan → leaderboard"
 
 
 def _load(name: str) -> list[dict]:
@@ -156,6 +171,18 @@ def _build_svg(prod: list[dict], oss: list[dict]) -> str:
         f'<text x="{PAD}" y="{206}" font-family="{e(_MONO)}" font-size="24" fill="{_MUTE}">'
         f'24 models red-teamed on the live open-web corpus  ·  measured {_MEASURED}</text>'
     )
+    # QR (top-right) → live leaderboard
+    qr_b64 = _qr_png_b64(_QR_URL, QR_PX)
+    if qr_b64:
+        parts.append(
+            f'<image x="{QR_X}" y="{QR_Y}" width="{QR_PX}" height="{QR_PX}" '
+            f'href="data:image/png;base64,{qr_b64}"/>'
+        )
+        parts.append(
+            f'<text x="{W - PAD}" y="{QR_Y + QR_PX + 20}" text-anchor="end" '
+            f'font-family="{e(_MONO)}" font-size="15" letter-spacing="1" fill="{GREEN}">'
+            f'{e(_QR_LABEL)}</text>'
+        )
 
     # --- panels ---
     parts.append(_svg_panel(LEFT_X, oss, "OPEN-SOURCE  ·  16 models",
@@ -174,10 +201,6 @@ def _build_svg(prod: list[dict], oss: list[dict]) -> str:
     parts.append(
         f'<text x="{PAD}" y="{fy + 62}" font-family="{e(_MONO)}" font-size="18" fill="{_MUTE}">'
         f'continuous open-web LLM red-team</text>'
-    )
-    parts.append(
-        f'<text x="{W - PAD}" y="{fy + 62}" text-anchor="end" font-family="{e(_MONO)}" '
-        f'font-size="18" fill="{GREEN}">{_URL}</text>'
     )
     parts.append("</svg>")
     return "".join(parts)
@@ -273,6 +296,13 @@ def _render_png(prod: list[dict], oss: list[dict]) -> Image.Image:
     d.text((PAD, 116), "LLM BREACH LEADERBOARD", font=f_title, fill=_INK_RGB)
     d.text((PAD, 186), f"24 models red-teamed on the live open-web corpus  ·  measured {_MEASURED}",
            font=f_sub, fill=_MUTE_RGB)
+    # QR (top-right) → live leaderboard
+    qr = _styled_qr_image(_QR_URL, QR_PX)
+    if qr is not None:
+        img.paste(qr, (QR_X, QR_Y))
+        f_qr = _load_mono_font(15)
+        lw = d.textlength(_QR_LABEL, font=f_qr)
+        d.text((W - PAD - lw, QR_Y + QR_PX + 6), _QR_LABEL, font=f_qr, fill=_GREEN)
 
     fonts = {"kick": f_kick, "method": f_method, "row": f_row, "pct": f_pct, "rank": f_rank}
     _png_panel(d, LEFT_X, oss, "OPEN-SOURCE  ·  16 models",
@@ -286,8 +316,6 @@ def _render_png(prod: list[dict], oss: list[dict]) -> Image.Image:
            "Two methodologies — not directly comparable. Each panel ranks within itself; bar = breach rate (red) vs defended (green).",
            font=f_foot, fill=_MUTE_RGB)
     d.text((PAD, fy + 48), "continuous open-web LLM red-team", font=f_foot, fill=_MUTE_RGB)
-    uw = d.textlength(_URL, font=f_foot)
-    d.text((W - PAD - uw, fy + 48), _URL, font=f_foot, fill=_GREEN)
     return img
 
 
