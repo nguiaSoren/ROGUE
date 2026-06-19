@@ -51,6 +51,7 @@ def _now_ts() -> int:
 @pytest.mark.parametrize(
     "text,expected",
     [
+        # bare command (+ casing / whitespace / mention / trailing punctuation)
         ("progress", True),
         ("status", True),
         ("  Progress ", True),
@@ -58,9 +59,20 @@ def _now_ts() -> int:
         ("<@U12AB3CD> progress", True),  # bot-mention prefix
         ("progress.", True),  # trailing punctuation
         ("status!", True),
-        ("progress please scan now", False),  # extra words
-        ("how is progress going", False),
-        ("statuses", False),  # word boundary — not a bare command
+        # natural command phrasings — the broadened matcher accepts these
+        ("check progress", True),
+        ("show status", True),
+        ("get the status", True),
+        ("progress report", True),
+        ("status update", True),
+        ("what's the status", True),  # apostrophe-stripped → "whats"
+        ("give me the status please", True),  # 5 tokens, all core/filler
+        ("<@U12AB3CD> check progress please", True),
+        # real sentences that merely mention the word — rejected
+        ("progress please scan now", False),  # "scan" not filler
+        ("how is progress going", False),  # "how"/"is"/"going" not filler
+        ("what's the status of the Q3 onboarding doc", False),  # too long + non-filler tokens
+        ("statuses", False),  # not the core word
         ("progressbar", False),
         ("", False),
         ("jailbreak now", False),
