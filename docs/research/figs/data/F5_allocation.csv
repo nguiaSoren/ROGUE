@@ -1,7 +1,0 @@
-model,ladder_win_share,unbiased_breach_rate,n_trials
-anthropic/claude-haiku-4-5,0.0,0.0539,2114
-google/gemini-3.1-flash-lite,0.0,0.2801,2103
-openai/gpt-5.4-nano,0.625,0.1088,2113
-meta-llama/llama-3.1-8b-instruct,0.25,0.1618,2034
-mistralai/mistral-small-2603,0.125,0.4856,2080
-anthropic/claude-opus-4-8,0.0,0.0047,428
