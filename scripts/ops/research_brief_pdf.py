@@ -335,8 +335,8 @@ def build() -> Path:
         b("The gate is not harm-specific, it is a calibration discipline.") + " An established practice taken "
         "rigorously, not a new method. One consummation-gate template, "
         "re-instantiated per breach type, now calibrates " + b("four structurally different breach classes") +
-        ": a <i>harm</i> breach (capability transfer, re-confirmed at " + b("91.0% agreement, 273 of 300") +
-        ", top-of-field); a <i>content</i> breach (information-disclosure, did the protected datum appear), "
+        ": a <i>harm</i> breach (capability transfer) at " + b("89.3% agreement on JBB-300") +
+        "; a <i>content</i> breach (information-disclosure, did the protected datum appear), "
         "whose v2 rubric defines a materially-revealing threshold and reaches " + b("97.35% agreement") +
         ", 100% recall, 0% FP-mode (up from 94.74%); an <i>action</i> breach (unauthorized-action, did the "
         "agent execute), whose v3 tool-trace rubric reaches " + b("98.89% agreement") + ", 100% recall, "
@@ -354,7 +354,7 @@ def build() -> Path:
         + b("a repeatable discipline for calibrating breach judges across breach classes") + ", "
         "not a single judge.", S["body"])]
     F += [Spacer(1, 4), _chips([
-        ("91.0%", "harm (capability transfer)"),
+        ("89.3%", "harm (capability transfer)"),
         ("97.35%", "info-disclosure v2"),
         ("98.89%", "unauth-action v3 (tool-trace)"),
         ("100%", "fabricated-value (new)"),

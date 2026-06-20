@@ -85,7 +85,7 @@ export const PROOF_POINTS: ReadonlyArray<{
   {
     value: "459",
     label: "attack primitives",
-    sublabel: "298 open-web–harvested · 15 families · 15 sources",
+    sublabel: "298 open-web–harvested · 15 families · 15 primary sources (19 total)",
   },
   {
     value: "89.3%",
