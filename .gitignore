@@ -232,9 +232,10 @@ tests/fixtures/memory/_raw/*
 tests/fixtures/memory/_raw_tasks/*
 !tests/fixtures/memory/_raw_tasks/_index.json
 
-# §08 judge-calibration labelable case fixtures — committed so a labeler's labels tie to a fixed set
-# (the harvester's Groq capture is non-deterministic and can't be regenerated identically).
-!data/calibration/leakage_label_cases.json
-!data/calibration/net_effect_label_cases.json
-!data/calibration/net_effect_synthetic_cases.json
-!data/calibration/net_effect_report.json
+# §08 judge-calibration labelable case fixtures (P4 skill-leak/agent-memory) — PULLED from public
+# 2026-06-21 during P4's blind review (de-anonymizing submission-adjacent material). Kept local-only;
+# re-allowlist + restore post-decision. ROGUE's own synthetic fixtures — no licensing constraint.
+# !data/calibration/leakage_label_cases.json
+# !data/calibration/net_effect_label_cases.json
+# !data/calibration/net_effect_synthetic_cases.json
+# !data/calibration/net_effect_report.json
