@@ -1,5 +1,7 @@
 # Multi-objective neutral panel — design (p3 inferential-validity gate)
 
+> ⚠️ **SUPERSEDED 2026-06-21.** This cross-objective panel was **cut** from P3 in the reframe: the study is a mixed-objective harm-ASR reproduction audit, not a neutral-carrier one, so the "does carrier viability generalize across neutral objectives" gate below is moot. Retained as a historical design record; see `reproducibility_gap_study.md` (REFRAME block) for the corrected framing.
+
 **Status:** design / not built. Local-WIP. This is the TDSC/TOPS gate for `p3_reproducibility_gap`:
 it converts p3's load-bearing inferential warrant from *asserted* to *measured*. Nothing here
 spends until the design is signed off. **The decision rule (§Pre-registration) is committed before

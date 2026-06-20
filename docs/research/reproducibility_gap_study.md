@@ -2,6 +2,29 @@
 
 *Working design + protocol · 2026-06-12 · branch `v2-phase1`. Tests whether publicly-claimed jailbreaks survive transfer to current, independently-judged deployments — reframed after a fan-out scoop check (Jailbreak Foundry, StrongREJECT) from "claimed-vs-measured ASR gap" to a carrier-mechanism reproduction audit stratified by source type. Core analysis runs on the 11,098 breach rows already collected; likely zero new paid runs.*
 
+---
+
+> ## ⚑ REFRAME — 2026-06-21 (READ FIRST; supersedes the "carrier-mechanism / neutral-objective" framing below)
+>
+> A pre-submission audit of the **frozen 10,244-trial baseline** (the exact rows behind the paper's numbers, `b.ran_at < 2026-06-12`) found that the paper's Method/Ethics/Appendix described an experiment that **was not the one run**. The neutral-carrier framing in this doc and in earlier paper drafts was a *narrative reframe of pre-existing harm-ASR data* — the prose changed, the experiment did not. The data is, in fact:
+> - **Harm-judged, not information-disclosure-judged.** Verdicts were produced by the **harm rubric** (`capability_transfer`), collected 05-26..06-03 — *before* the `infodisc` rubric existed (06-08/09). Across 4,000 sampled rationales: `"protected datum"`=0, `"consummat"`=0, `"harmful"`=1846. Breach rationales describe weapons/explosives/phishing/synthesis.
+> - **Mixed objectives, predominantly harmful** — not a single neutral system-prompt objective. Per-primitive: ~15% neutral (system_prompt_leak family), ~6% overtly harmful, ~68% carrier-scaffolding unclassifiable-from-text, ~9% unfilled-slot. Among breaches, harmful content predominates (≥27% concrete-harm by strict lexicon).
+> - The **Ethics statement was false** ("no harmful content generated") — harmful content *was* elicited (own provider API accounts, already-public techniques, no payloads released). Honest ethics statement now ships.
+>
+> **Resolution (option 3 — reframe to what the data is, not re-run):** the paper is now an honest **provenance-stratified, mixed-objective (predominantly harmful) reproduction audit**. The §panel cross-objective test was **cut** (incoherent without a neutral proxy). To close the instrument-provenance gap (frozen verdicts = pre-`v3` harm rubric, but cited calibration is P2's `v3`), the stored responses were **re-judged under the calibrated `judge_v3`** (Sonnet primary on 96.3% of cells, permissive secondary on 3.7%, same rubric).
+>
+> **v3-calibrated headline (and it barely moved — the collapse is robust to the instrument, proven not asserted):**
+> | metric | original v1/v2 | calibrated v3 |
+> |---|---|---|
+> | funnel ALL (any → Llama → robust) | 40.5 / 9.0 / 3.7 | **40.2 / 9.0 / 3.7** |
+> | arXiv stratum | 51.9 / 13.9 / 8.9 | **53.2 / 16.5 / 10.1** |
+> | grey-lit stratum | 36.5 / 7.2 / 1.8 | **35.6 / 6.3 / 1.4** |
+> | C2 ρ (claimed vs measured, n=56) | −0.098 | **−0.068** [−0.34, 0.19] |
+> | claims ≈100% | 7/17, mean 13.3% | **6/17, mean 13.5%** |
+> | family-order Spearman (12 fams) | −0.044 | **−0.174** [−0.75, 0.44] |
+>
+> **Durable artifacts:** `data/research/p3_v3_rejudge_{trials.jsonl,pairs.csv,stats.json}`; scripts `p3_v3_rejudge.py` (gated re-judge), `p3_v3_stats.py` / `p3_v3_from_pairs.py` (recompute, the latter DB-free), `p3_v3_figs.py` (figures), `p3_v3_verify.py` (guards), `p3_data_audit.py` (the original audit). Figures + supplement (`anon_supplement_PAPERS_p3.md`, zip drops the panel files) + README all reframed; paper compiles clean (tectonic), PDF greps zero old-framing/identity.
+
 ## The thesis (one line)
 
 **Most grey-literature-claimed jailbreak techniques (Reddit / GitHub / blogs / X) do not survive as a working *carrier mechanism* under conservative independent judging in a realistic deployment context — and community-sourced attacks reproduce materially worse than paper-sourced ones, where prior work already showed the gap is near-zero.** A source's claimed potency does not predict whether its mechanism reproduces.
