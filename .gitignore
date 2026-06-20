@@ -87,6 +87,10 @@ data/research/*
 !data/research/reextracted_claims.json
 !data/research/reproducibility_gap_pairs.csv
 !data/research/coverage_validity_results.json
+# Deliberately-public P3 evidence backing the /research page (re-included past data/research/*)
+!data/research/p3_v3_rejudge_trials.jsonl
+!data/research/p3_v3_rejudge_pairs.csv
+!data/research/p3_v3_rejudge_stats.json
 # Blind-submission material — NEVER public during review (paper sources, overleaf zips,
 # supplements, build/publication plans). Removed from public 2026-06-21; keep local-only.
 docs/research/publishing/
@@ -187,6 +191,7 @@ assets/trailer/
 docs/research/adaptive_orchestration_systems.md
 docs/research/scheduler_allocation_study.md
 docs/research/adaptive_orchestration_paper.md
+docs/research/judge_calibration_paper.md
 docs/research/paper_figures.md
 docs/research/figs/
 scripts/paper_figs.py

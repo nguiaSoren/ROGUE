@@ -1,9 +1,0 @@
-GRID: 24 models on featherless (https://api.featherless.ai/v1); 4 templates, paraphrase_judge=True
-
-[Qwen/Qwen2.5-0.5B-Instruct] firing 4 templates x 20 canaries + 8 controls = ~112 calls…
-  rate=45% (9/20)  CI=[25%,70%]  controls_fp=0  live=112/112 (OK)
-  judge-decidability: marker-only=45% (9/20)  +judge increment=0% (0)  → headline rests on markers (judge adds 0)
-[Qwen/Qwen2.5-1.5B-Instruct] firing 4 templates x 20 canaries + 8 controls = ~112 calls…
-  rate=75% (15/20)  CI=[55%,95%]  controls_fp=0  live=112/112 (OK)
-  judge-decidability: marker-only=75% (15/20)  +judge increment=0% (0)  → headline rests on markers (judge adds 0)
-[Qwen/Qwen2.5-3B-Instruct] firing 4 templates x 20 canaries + 8 controls = ~112 calls…

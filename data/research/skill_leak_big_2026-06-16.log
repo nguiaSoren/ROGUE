@@ -1,3 +1,0 @@
-GRID: 3 models on featherless (https://api.featherless.ai/v1); 4 templates, paraphrase_judge=False
-
-[Qwen/Qwen2.5-72B-Instruct] firing 4 templates x 20 canaries + 6 controls = ~104 calls…
