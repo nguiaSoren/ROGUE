@@ -346,21 +346,21 @@ export function BreachRejudgeFig() {
 // --------------------------------------------------------------------------
 
 export function ReproductionFunnelFig() {
-  // Carrier reproduction at tau=0.4, from scripts/research/reproducibility_gap.py
-  // (301 baseline primitives, 10,244 baseline rows). See
-  // docs/research/reproducibility_gap_study.md.
+  // Reproduction at tau=0.4, calibrated judge_v3 re-judge (301 baseline primitives,
+  // 10,244 rows). From data/research/p3_v3_rejudge_pairs.csv; see
+  // docs/research/reproducibility_gap_study.md (REFRAME block).
   const stages: { label: string; arxiv: number; grey: number }[] = [
-    { label: "≥1 of 5 models", arxiv: 0.519, grey: 0.365 },
-    { label: "frozen Llama-8B", arxiv: 0.139, grey: 0.072 },
-    { label: "robust Claude-Haiku", arxiv: 0.089, grey: 0.018 },
+    { label: "≥1 of 5 models", arxiv: 0.532, grey: 0.356 },
+    { label: "frozen Llama-8B", arxiv: 0.165, grey: 0.063 },
+    { label: "robust Claude-Haiku", arxiv: 0.101, grey: 0.014 },
   ];
   const AXIS_MAX = 0.55;
   const w = (r: number) => `${(r / AXIS_MAX) * 100}%`;
 
   return (
-    <Figure caption="Carrier reproduction at τ=0.4 across 301 baseline primitives. The 'best of 5 models' rate is inflated by the weakest target; on a fixed, frozen open-weight model only ~9% reproduce, and ~4% on the most robust model. Paper-sourced techniques degrade more slowly than grey-literature ones.">
+    <Figure caption="Reproduction at τ=0.4 across 301 baseline primitives (calibrated judge_v3). The 'best of 5 models' rate is inflated by the weakest target; on a fixed, frozen open-weight model only ~9% reproduce, and ~4% on the most robust model. Paper-sourced techniques degrade more slowly than grey-literature ones.">
       <figcaption className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green mb-4">
-        Carrier reproduction as the target hardens →
+        Reproduction as the target hardens →
       </figcaption>
       <div className="space-y-4">
         {stages.map((s) => (
