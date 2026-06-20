@@ -138,7 +138,7 @@ export default function ResearchPage() {
               <p className="text-[17px] text-foreground leading-relaxed">
                 Of 17 harvested techniques whose source claimed{" "}
                 <span className="text-foreground font-medium">~100% success</span>,
-                only <span className="text-foreground font-medium">7</span>{" "}
+                only <span className="text-foreground font-medium">6</span>{" "}
                 reproduce at all, and their mean measured breach rate is{" "}
                 <span className="text-foreground font-medium">13%</span>. Across the
                 56 techniques that publish a number, claimed success and measured
