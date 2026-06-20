@@ -70,7 +70,7 @@ export default function ResearchPage() {
               href="#finding-01"
               eyebrow="01 · reproduction"
               headline="100% → 13%"
-              desc="A source's claimed success rate doesn't predict what reproduces against your deployment (ρ ≈ −0.10). ROGUE re-measures every technique."
+              desc="A source's claimed success rate doesn't predict what reproduces against your deployment (ρ ≈ −0.07). ROGUE re-measures every technique."
               accent="red"
             />
             <GlanceCard
@@ -144,7 +144,7 @@ export default function ResearchPage() {
                 56 techniques that publish a number, claimed success and measured
                 reproduction are{" "}
                 <span className="text-foreground font-medium">
-                  uncorrelated (Spearman −0.10, 95% CI [−0.37, +0.17])
+                  uncorrelated (Spearman −0.07, 95% CI [−0.34, +0.19])
                 </span>
                 {" "}— a claimed rate is not portable signal, which is why ROGUE
                 re-measures every technique against your model and system prompt,
@@ -176,7 +176,7 @@ export default function ResearchPage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <Metric value="−0.10" label="claimed vs measured (ρ, n=56)" accent="red" />
+              <Metric value="−0.07" label="claimed vs measured (ρ, n=56)" accent="red" />
               <Metric value="100% → 13%" label="claimed ~100%, mean measured" accent="red" />
               <Metric value="~9%" label="reproduce on a frozen model" accent="red" />
               <Metric value="$0" label="on already-collected data" accent="green" />
@@ -186,11 +186,11 @@ export default function ResearchPage() {
               Method, 301 baseline techniques × a five-model panel,{" "}
               <span className="text-foreground/90">10,244 trials already collected</span>;
               breach = the calibrated v3 judge (tuned to under-count) at
-              any_breach_rate ≥ 0.4; reproduction is measured as whether the{" "}
-              <em>carrier mechanism</em> still bypasses alignment toward a neutral
-              objective (system-prompt disclosure), not the original harmful
-              payload; the panel is anchored by a frozen open-weight model so
-              non-reproduction isn&rsquo;t confounded by silent vendor patching.
+              any_breach_rate ≥ 0.4; reproduction is measured as whether the
+              technique still produces a consummated breach against a current model,
+              toward whatever objective it natively carries (a mixed corpus,
+              predominantly harmful); the panel is anchored by a frozen open-weight
+              model so non-reproduction isn&rsquo;t confounded by silent vendor patching.
               A stronger-model re-extraction (Sonnet 4.6, Batch API) of all 148
               candidate sources confirmed the null is not an extraction
               artifact, it recovered a claimed rate for only 1 of 94
@@ -208,11 +208,12 @@ export default function ResearchPage() {
               {" "}(measured ρ ≈ 0). The value is the re-measurement against your
               model, system prompt, and tools, under a judge calibrated to
               under-count. Honest caveats, &ldquo;reproduction&rdquo; means the
-              delivery mechanism still bypasses toward a neutral goal (harmful
-              payloads are deliberately not reproduced); the paper-vs-forum gap is
+              technique still defeats alignment toward its native objective (a mixed
+              corpus, predominantly harmful, the audit elicited harmful content against
+              our own API accounts and releases none); the paper-vs-forum gap is
               directional (borderline-significant); temperature was checked and is
               not a confound (the funnel holds across temperature subsets); and the
-              claimed rates carry ~17% extraction noise, so −0.10 reads as &ldquo;no
+              claimed rates carry ~17% extraction noise, so −0.07 reads as &ldquo;no
               predictive signal,&rdquo; not a precise estimate.{" "}
               <span className="text-rogue-green">⚑</span>
             </NovelNote>

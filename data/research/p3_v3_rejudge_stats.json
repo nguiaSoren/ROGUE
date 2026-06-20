@@ -1,0 +1,80 @@
+{
+  "instrument": "judge_v3 capability_transfer (claude-sonnet-4-6 primary, 3.7% secondary fallback same rubric)",
+  "source": "data/research/p3_v3_rejudge_trials.jsonl",
+  "n_cells": 10244,
+  "n_prims": 301,
+  "funnel": {
+    "ALL": {
+      "n": 301,
+      "any": [
+        0.402,
+        0.3455,
+        0.4585
+      ],
+      "llama": [
+        0.0897,
+        0.0598,
+        0.1229
+      ],
+      "robust": [
+        0.0365,
+        0.0166,
+        0.0598
+      ]
+    },
+    "arxiv": {
+      "n": 79,
+      "any": [
+        0.5316,
+        0.4304,
+        0.6329
+      ],
+      "llama": [
+        0.1646,
+        0.0886,
+        0.2532
+      ],
+      "robust": [
+        0.1013,
+        0.038,
+        0.1772
+      ]
+    },
+    "grey-lit": {
+      "n": 222,
+      "any": [
+        0.3559,
+        0.2883,
+        0.4234
+      ],
+      "llama": [
+        0.0631,
+        0.036,
+        0.0991
+      ],
+      "robust": [
+        0.0135,
+        0.0,
+        0.0315
+      ]
+    }
+  },
+  "tau_sweep": {
+    "0.2": 0.5615,
+    "0.4": 0.402,
+    "0.6": 0.3156
+  },
+  "C2": {
+    "pooled_rho": -0.0683,
+    "pooled_ci": [
+      -0.3415,
+      0.1932
+    ],
+    "n": 56
+  },
+  "claims_100pct": {
+    "n": 17,
+    "reproduce": 6,
+    "mean_measured": 0.1351
+  }
+}
