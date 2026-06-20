@@ -8,7 +8,7 @@ The single home for **our own** research writeups (manuscripts, focused studies,
 |---|---|---|
 | `judge_calibration_paper.md` | **Judge calibration + generalization** (the v3 content-transfer gate → per-rule consummation judges). Seeded 2026-06-08. | tracked · draft |
 | `coverage_validity_study.md` | **Attack-coverage calibration** validity study — does coverage predict breach-detection power? (ρ=0.35, validated modest). 2026-06-08. | tracked |
-| `reproducibility_gap_study.md` | **Grey-literature reproducibility gap** study skeleton — do community-claimed jailbreaks reproduce as carrier mechanisms in deployment context? (C1/C2/C3, n=56 claimed+measured, core runs on collected data). 2026-06-12. | tracked · skeleton |
+| `reproducibility_gap_study.md` | **Grey-literature reproducibility gap** study — do community-claimed jailbreaks reproduce in deployment context? (C1/C2/C3, n=56 claimed+measured; reframed 2026-06-21 to a mixed-objective harm-ASR audit — see its REFRAME block). 2026-06-12. | tracked |
 | `measured_remediation_finding.md` | **Surface-1b measured remediation** lab note — catching a fix that *doesn't hold* (RA06 + the accept-loop hardening). 2026-06-09. | tracked |
 | `grammar_efficacy.md` | The grammar-component predictive-power **null result** study (#TRS-C). | tracked |
 | `bandit_for_humans.md` | The discovery/yield-bandit write-up (live-vs-observational honesty). | tracked |

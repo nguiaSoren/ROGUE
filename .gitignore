@@ -87,6 +87,9 @@ data/research/*
 !data/research/reextracted_claims.json
 !data/research/reproducibility_gap_pairs.csv
 !data/research/coverage_validity_results.json
+# Blind-submission material — NEVER public during review (paper sources, overleaf zips,
+# supplements, build/publication plans). Removed from public 2026-06-21; keep local-only.
+docs/research/publishing/
 !data/research/scheduler_results.json
 !data/research/skill_leak_curve_2026-06-13_REDO.log
 !data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md
