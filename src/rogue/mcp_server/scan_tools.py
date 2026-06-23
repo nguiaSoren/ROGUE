@@ -273,6 +273,16 @@ def register_scan_tools(
     ) -> dict[str, Any]:
         """Start a red-team scan against your model endpoint. Returns immediately — poll get_scan_status.
 
+        CALLER PROTOCOL (read before calling): this is the one tool here that spends real money and
+        hits a live endpoint, so do NOT auto-run it on a vague question. First answer "am I exposed?"
+        with the free ``query_worst_attacks`` lookup; only run a fresh scan when the user explicitly
+        wants THEIR endpoint tested. Then: (1) call ``validate_target`` first (cheap pre-flight), and
+        (2) tell the user — and get explicit confirmation — that a live scan spends real money: it
+        sends many attack prompts to THEIR own endpoint (billed to their provider account) plus
+        ROGUE's judge calls, unless they are on a ROGUE managed/subscription plan that covers it.
+        Name the target being scanned. After it is queued, poll ``get_scan_status`` yourself until it
+        completes, then ``get_report`` — the user should only have to wait, not drive the tools.
+
         Provide EITHER ``endpoint`` (a custom OpenAI-compatible URL) OR ``provider`` (e.g.
         "openai", "anthropic"). ``model`` and ``api_key`` are optional; ``api_key`` is the target's
         credential — it is redacted before the scan is persisted and never logged. The scan is
