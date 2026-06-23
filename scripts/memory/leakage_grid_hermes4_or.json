@@ -1,0 +1,4 @@
+{"_doc":"Recency check for the model-vintage limitation: a 2025-era cross-provider alignment contrast. Llama-3.1-70B-instruct vs Nous Hermes-4-70B (released Aug 2025, a reduced-refusal finetune of the same base), both on OpenRouter. Directional, like the Hermes-3 check, but on a more recent finetune.","provider":"openrouter","base_url":"https://openrouter.ai/api/v1","models":[
+ {"id":"meta-llama/llama-3.1-70b-instruct","family":"llama3","params_b":70,"alignment":"instruct","reasoning":false,"arms":["recent_align_or"]},
+ {"id":"nousresearch/hermes-4-70b","family":"llama3","params_b":70,"alignment":"permissive","reasoning":false,"arms":["recent_align_or"]}
+]}

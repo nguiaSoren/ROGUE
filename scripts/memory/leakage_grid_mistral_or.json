@@ -1,0 +1,10 @@
+{
+  "_doc": "Third SIZE ladder for the canary-leakage curve (the third-family size-ladder robustness check: 'add a third family's size ladder'). A clean single-family, single-provider ladder on OpenRouter: the Ministral-2512 release at 3B/8B/14B, all instruct, all non-reasoning, served on ONE provider (OpenRouter) so it stays within-provider per the no-pooling rule. Holds alignment+family+release fixed and varies only size, to test whether scale REDUCES leakage in a third family beyond the Featherless-Qwen (rising) and OpenRouter-Llama (flat) ladders. arm G_scale_mistral.",
+  "provider": "openrouter",
+  "base_url": "https://openrouter.ai/api/v1",
+  "models": [
+    {"id": "mistralai/ministral-3b-2512",  "family": "ministral", "params_b": 3,  "alignment": "instruct", "reasoning": false, "arms": ["G_scale_mistral"]},
+    {"id": "mistralai/ministral-8b-2512",  "family": "ministral", "params_b": 8,  "alignment": "instruct", "reasoning": false, "arms": ["G_scale_mistral"]},
+    {"id": "mistralai/ministral-14b-2512", "family": "ministral", "params_b": 14, "alignment": "instruct", "reasoning": false, "arms": ["G_scale_mistral"]}
+  ]
+}

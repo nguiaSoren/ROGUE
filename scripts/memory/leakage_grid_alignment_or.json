@@ -1,0 +1,9 @@
+{
+  "_doc": "Second-provider alignment contrast to de-confound the alignment axis from the Featherless serving stack (the main external concern). Same base (Llama-3.1-70B), alignment varied, both on OpenRouter: Meta's safety-aligned instruct vs Nous's Hermes-3 (a reduced-refusal / steerable full finetune of the same base). If the permissive finetune leaks more than the aligned instruct HERE, the alignment ordering reproduces off Featherless. NOTE: Hermes-3 is a finetune, not a surgical abliteration, so this is directional corroboration on a second provider, not a clean isolator -- which is exactly the claim needed (the ordering is not Featherless-specific). Run against the DEFAULT synthetic canary panel so it is directly comparable to the Featherless instruct-vs-abliterated arm.",
+  "provider": "openrouter",
+  "base_url": "https://openrouter.ai/api/v1",
+  "models": [
+    {"id": "meta-llama/llama-3.1-70b-instruct",      "family": "llama3", "params_b": 70, "alignment": "instruct",   "reasoning": false, "arms": ["H_align_or"]},
+    {"id": "nousresearch/hermes-3-llama-3.1-70b",    "family": "llama3", "params_b": 70, "alignment": "permissive", "reasoning": false, "arms": ["H_align_or"]}
+  ]
+}
