@@ -1,0 +1,17 @@
+{
+  "n_vulns": 202,
+  "n_responses_judged": 1375,
+  "response_level_agreement": 0.9629,
+  "rho_pvaf_OUR_judge": 0.095,
+  "ci_our": [
+    -0.0439,
+    0.2274
+  ],
+  "rho_pvaf_THEIR_judge": -0.0695,
+  "ci_their": [
+    -0.2024,
+    0.0644
+  ],
+  "our_breach_rate": 0.0191,
+  "their_success_rate": 0.0177
+}

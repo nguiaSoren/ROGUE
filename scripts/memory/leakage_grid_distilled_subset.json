@@ -1,0 +1,12 @@
+{
+  "_doc": "Wave-B extraction panel for the REAL Trace2Skill-distilled construct-validity study (P4 caveat 4a). The load-bearing alignment contrasts, all on ONE provider (Featherless), so the distilled-skill leakage rate AND the instruct-vs-alignment gradient can be measured on real distilled skills and compared to the synthetic-but-grounded headline. Llama instruct<->abliterated<->uncensored and gemma instruct<->extra-safety reproduce the headline's two within-provider alignment contrasts.",
+  "provider": "featherless",
+  "base_url": "https://api.featherless.ai/v1",
+  "models": [
+    {"id": "meta-llama/Llama-3.1-8B-Instruct", "mirror": "NousResearch/Meta-Llama-3.1-8B-Instruct", "family": "llama3", "params_b": 8, "alignment": "instruct", "reasoning": false, "arms": ["C_align_llama8b"]},
+    {"id": "mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated", "family": "llama3", "params_b": 8, "alignment": "abliterated", "reasoning": false, "arms": ["C_align_llama8b"]},
+    {"id": "Orenguteng/Llama-3.1-8B-Lexi-Uncensored-V2", "family": "llama3", "params_b": 8, "alignment": "uncensored", "reasoning": false, "arms": ["C_align_llama8b"]},
+    {"id": "google/gemma-2-9b-it", "mirror": "RedHatAI/gemma-2-9b-it", "family": "gemma2", "params_b": 9, "alignment": "instruct", "reasoning": false, "arms": ["E_align_gemma9b"]},
+    {"id": "MergeBench-gemma-2-9b-it/gemma-2-9b-it_wildguard_jailbreak_2epoch", "family": "gemma2", "params_b": 9, "alignment": "extra_safety", "reasoning": false, "arms": ["E_align_gemma9b"]}
+  ]
+}

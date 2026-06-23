@@ -1,0 +1,18 @@
+{
+  "model": "qwen/qwen-2.5-72b-instruct",
+  "construct": "consummation (harmful-capability delivery)",
+  "n_judged": 9611,
+  "fails": 633,
+  "n_primitives": 301,
+  "monotone": true,
+  "funnel": {
+    "panel": 38.5,
+    "anchor": 6.3,
+    "robust": 2.7
+  },
+  "judge_v3_funnel": {
+    "panel": 40.2,
+    "anchor": 9.0,
+    "robust": 3.7
+  }
+}
