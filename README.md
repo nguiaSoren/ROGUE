@@ -177,7 +177,7 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 1. **Harvest.** 15 open-web sources via a backend-agnostic fetcher (free/keyless by default; Bright Data optional for the hardest targets).
 2. **Extract.** An LLM agent structures each fetched document into an `AttackPrimitive`.
-3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks.
+3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks, with surface-obfuscation canonicalization (leetspeak/homoglyph/zero-width/Unicode folds) so an attack clusters by *technique*, not by spelling: `1gn0r3 pr3v10us` and `ignore previous` land in one cluster instead of re-entering the corpus once per skin.
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
 5. **Diff.** A separate judge model verdicts each trial; the daily diff ships to Slack, MCP, and the dashboard.
 
@@ -199,10 +199,10 @@ One engine, one independent standard, the same operation each time: fire inputs 
 
 ROGUE's findings are written up as papers and posts. **[PAPERS.md](PAPERS.md)** is the index, and each entry links to its preprint plus the code and data *in this repo* that reproduces it.
 
-- **Allocation Is a Capability-Growth Mechanism.** In a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · *arXiv `cs.CR`×`cs.LG`, preprint posting soon*
-- **[withheld — under anonymized review].** One gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · *arXiv `cs.CR`×`cs.CL`, preprint posting soon*
-- **[withheld — under anonymized review] Don't Reproduce in Deployment.** Most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.10). · *arXiv `cs.CR` (lead paper), preprint posting soon*
-- **[withheld — under anonymized review].** Canary leakage from shared agent skill pools tracks *alignment*, not model size. · *arXiv `cs.CR`, also a workshop/blog candidate, posting soon*
+- **Allocation Is a Capability-Growth Mechanism.** In a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · *arXiv `cs.CL`×`cs.CR`, preprint posting soon*
+- **[withheld — under anonymized review].** One gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · *arXiv `cs.CL`×`cs.CR`, preprint posting soon*
+- **[withheld — under anonymized review] Don't Reproduce in Deployment.** Most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.10). · *arXiv `cs.CL`×`cs.CR` (lead paper), preprint posting soon*
+- **[withheld — under anonymized review].** Canary leakage from shared agent skill pools tracks *alignment*, not model size. · *arXiv `cs.CL`×`cs.CR`, also a workshop/blog candidate, posting soon*
 
 ## Deep dives
 
@@ -225,6 +225,7 @@ The mechanics behind the pipeline, each on its own page:
 - Daily threat brief (markdown + JSON) + Slack webhook.
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf.
 - True multimodal red-team and a self-growing technique repertoire (see [Deep dives](#deep-dives)).
+- Deterministic obfuscation augmentation: 10 labelled, zero-LLM-cost transforms (leetspeak, homoglyph, zero-width, fullwidth, zalgo + base64 / ROT13 / hex / Unicode-escape / HTML-entity decode-wraps) skin a defended attack to measure a **flip-rate-per-transform**, separating "the target pattern-matches the surface string" from "the target understands the technique."
 - External benchmark layer against frozen AdvBench / JailbreakBench goal sets.
 
 ## Roadmap
