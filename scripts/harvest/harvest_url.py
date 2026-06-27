@@ -130,7 +130,12 @@ async def harvest_url(url: str, database_url: str, source_type: str | None) -> i
         with SessionLocal() as session:
             primitive = _ensure_primitive_has_provenance(primitive, doc)
             orm = _to_orm_primitive(primitive)
-            Deduplicator(session=session, embed_fn=_default_openai_embed_fn()).assign_cluster(orm)
+            from rogue.obfuscation import canonicalize
+            Deduplicator(
+                session=session,
+                embed_fn=_default_openai_embed_fn(),
+                canonicalize_fn=canonicalize,
+            ).assign_cluster(orm)
             session.add(orm)
             session.commit()
             logger.info("persisted primitive_id=%s canonical=%s cluster=%s",

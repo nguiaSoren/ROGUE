@@ -77,10 +77,22 @@ class Deduplicator:
         session: Session,
         embed_fn: EmbedFn,
         threshold: float = DEFAULT_COSINE_THRESHOLD,
+        canonicalize_fn: Optional[Callable[[str], str]] = None,
     ) -> None:
         self.session = session
         self.embed_fn = embed_fn
         self.threshold = threshold
+        # Optional surface-obfuscation fold applied to the payload BEFORE
+        # embedding (rogue.obfuscation.canonicalize). With it wired,
+        # `1gn0r3 pr3v10us` and `ignore previous` embed to the same point and
+        # cluster together instead of re-entering the corpus once per skin.
+        # Default identity keeps behaviour unchanged for callers that don't
+        # opt in. NOTE: stored `payload_embedding` becomes the canonical-form
+        # embedding, so canonical seeds and new arrivals must be compared on
+        # the same basis — wire this on the harvest path uniformly, not per
+        # call (already-stored raw embeddings of *clean* seeds are unaffected
+        # since canonicalize is identity on clean prose).
+        self.canonicalize_fn = canonicalize_fn or (lambda s: s)
 
     # ------------------------------------------------------------------
     # Public API
@@ -104,7 +116,7 @@ class Deduplicator:
         primitives over the daily budget threshold are forced to
         ``canonical = False`` regardless of whether they clustered.
         """
-        embedding = self.embed_fn(primitive.payload_template)
+        embedding = self.embed_fn(self.canonicalize_fn(primitive.payload_template))
         primitive.payload_embedding = embedding
 
         existing_cluster = self.find_cluster(embedding)

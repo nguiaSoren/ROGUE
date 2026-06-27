@@ -689,7 +689,10 @@ async def run_harvest(
 
         with SessionLocal() as session:
             spend = daily_bd_spend_usd(session)
-            dedup = Deduplicator(session=session, embed_fn=embed_fn)
+            from rogue.obfuscation import canonicalize
+            dedup = Deduplicator(
+                session=session, embed_fn=embed_fn, canonicalize_fn=canonicalize,
+            )
 
             # §11.7 Tier A — universal pre-extraction skip. Drop docs whose body
             # is byte-identical to what we already extracted (same url +
