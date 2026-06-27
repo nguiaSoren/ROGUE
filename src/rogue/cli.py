@@ -710,6 +710,49 @@ def _cmd_setup(args: argparse.Namespace, out: Any) -> int:
     return 0
 
 
+def _cmd_harvest(args: argparse.Namespace, out: Any) -> int:
+    """Run the open-web harvest (scrape → extract → dedupe → persist).
+
+    The harvest *orchestrator* lives in ``scripts/harvest/harvest_once.py``, which is NOT bundled in
+    the pip wheel (only ``src/rogue`` ships). So this command runs the pipeline when invoked from a
+    repo clone, and — honestly — tells a pip-only user to clone the repo otherwise, rather than
+    pretending to harvest. Scraping is free/keyless; extraction calls an LLM you choose
+    (``--extraction-model``), so set the matching provider key (e.g. ``OPENAI_API_KEY``).
+    """
+    import os
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parents[2]  # src/rogue/cli.py → repo root
+    script = repo_root / "scripts" / "harvest" / "harvest_once.py"
+    if not script.exists():
+        print(
+            "rogue harvest: the open-web harvest pipeline isn't bundled in the pip package "
+            "(only the scan/try engine is). Run it from a repo clone:\n"
+            "  git clone https://github.com/nguiaSoren/ROGUE && cd ROGUE\n"
+            "  rogue harvest --since 1d --extraction-model openai/gpt-5.4-nano\n"
+            "Scraping is free/keyless; extraction needs an LLM key for the provider you pick.",
+            file=out,
+        )
+        return 2
+
+    cmd = [sys.executable, str(script), "--since", args.since]
+    if args.extraction_model:
+        cmd += ["--extraction-model", args.extraction_model]
+    if args.database_url:
+        cmd += ["--database-url", args.database_url]
+    if args.x_only:
+        cmd += ["--x-only"]
+    if args.multimodal_only:
+        cmd += ["--multimodal-only"]
+
+    # The script may import sibling `scripts.*` modules — put the repo root on PYTHONPATH and run
+    # from there, the same contract as `uv run python scripts/harvest/harvest_once.py`.
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(repo_root) + os.pathsep + env.get("PYTHONPATH", "")
+    print(f"[rogue harvest] {' '.join(cmd[1:])}", file=out)
+    return subprocess.call(cmd, cwd=str(repo_root), env=env)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rogue", description="ROGUE red-team SDK command-line interface.")
     sub = parser.add_subparsers(dest="command", metavar="<command>")
@@ -795,6 +838,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_setup.add_argument("--no-browser", dest="no_browser", action="store_true", help="skip the one-time Chromium download")
     p_setup.add_argument("--dry-run", dest="dry_run", action="store_true", help="print the commands without running them")
     p_setup.set_defaults(func=_cmd_setup)
+
+    p_harvest = sub.add_parser(
+        "harvest",
+        help="run the open-web harvest (scrape → extract → dedupe → persist) — needs a repo clone + an LLM extraction key",
+    )
+    p_harvest.add_argument("--since", default="1d", help="time window to harvest (e.g. '1d', '14d', '6h'). Default: 1d.")
+    p_harvest.add_argument("--extraction-model", default=None,
+                           help="provider-prefixed extraction model, e.g. 'openai/gpt-5.4-nano' (default: anthropic/claude-haiku-4-5)")
+    p_harvest.add_argument("--database-url", default=None, help="SQLAlchemy URL (default: $DATABASE_URL)")
+    p_harvest.add_argument("--x-only", action="store_true", help="harvest only X/Twitter handles")
+    p_harvest.add_argument("--multimodal-only", action="store_true", help="harvest only the multimodal SERP arms")
+    p_harvest.set_defaults(func=_cmd_harvest)
 
     return parser
 

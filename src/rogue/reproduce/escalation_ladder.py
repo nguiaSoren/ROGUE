@@ -794,6 +794,18 @@ async def run_escalation_ladder_one(
     probe_first: tuple | None = None
     probe_attempted: set[str] = set()
 
+    # TODO(batch the quota window): during the suppressed window the judge
+    # verdict does NOT gate the loop -- _quota_met() is a pure attempt count and
+    # _breach_or_continue() records-and-continues regardless of verdict -- so
+    # these judge calls are batchable (Anthropic Batch API, 50% off) without
+    # changing early-stop semantics. Deferred deliberately: only the judge
+    # qualifies (the target panel is multi-provider), the win is ~$8-15 per
+    # K-sweep, and capturing it is a ~100 LOC refactor (split target-dispatch
+    # from deferred judge-grade, one JudgeBatch submit, then graduate on the
+    # verdicts) on the money path -- not worth it for a one-off curve, worth it
+    # once the K-sweep is recurring (the powered multi-deployment study). Reuse
+    # judge_batch.JudgeBatch + judge.anthropic_grade_kwargs (already
+    # prompt-cached). See docs/research/k_saturation_run_spec.md sec.5.
     def _quota_met() -> bool:
         # Met when the quota is satisfied OR there are no more candidates to attempt.
         if candidate_attempt_quota <= 0:
@@ -1250,7 +1262,11 @@ async def run_escalation_ladder(
                 session.execute(
                     text(
                         "SELECT DISTINCT derived_from_primitive_id FROM attack_primitives "
-                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL"
+                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL "
+                        # Exclude obfuscation-augmentation children (a separate,
+                        # deterministic augmentation) so they don't alter this
+                        # ladder's pre-existing idempotency behaviour.
+                        "AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')"
                     ),
                 ).scalars(),
             )
@@ -1380,6 +1396,10 @@ async def run_synthesis(
                         FROM attack_primitives
                         WHERE synthesized = true
                           AND derived_from_primitive_id IS NOT NULL
+                          -- Exclude obfuscation-augmentation children (a separate
+                          -- deterministic augmentation) so they don't alter this
+                          -- ladder's pre-existing idempotency behaviour.
+                          AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')
                         """
                     ),
                 ).scalars(),

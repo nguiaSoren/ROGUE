@@ -322,6 +322,7 @@ class SyntacticMutator:
         variants: list[str],
         embed_fn: Any,
         threshold: float = DEFAULT_DEDUP_COSINE_THRESHOLD,
+        canonicalize_fn: Any | None = None,
     ) -> tuple[list[str], list[tuple[str, float]]]:
         """Drop variants whose embedding cosine to ``parent`` is ≥ threshold.
 
@@ -334,15 +335,22 @@ class SyntacticMutator:
         vectors (OpenAI's text-embedding-3 are unit-norm by default; other
         providers vary). ``embed_fn`` shape mirrors
         `dedupe.embeddings.Deduplicator.embed_fn` — ``Callable[[str], list[float]]``.
+
+        ``canonicalize_fn`` (optional, ``rogue.obfuscation.canonicalize``):
+        applied to both parent and variant before embedding so an obfuscated
+        rewrite (leetspeak/homoglyph/zero-width) of the parent collapses
+        instead of masquerading as novel. Default identity preserves prior
+        behaviour. Mirrors the same hook on ``Deduplicator``.
         """
         if not variants:
             return [], []
 
-        parent_vec = _normalize(embed_fn(parent.payload_template))
+        canon = canonicalize_fn or (lambda s: s)
+        parent_vec = _normalize(embed_fn(canon(parent.payload_template)))
         surviving: list[str] = []
         dropped: list[tuple[str, float]] = []
         for variant in variants:
-            v_vec = _normalize(embed_fn(variant))
+            v_vec = _normalize(embed_fn(canon(variant)))
             sim = sum(a * b for a, b in zip(parent_vec, v_vec))
             if sim >= threshold:
                 dropped.append((variant, sim))

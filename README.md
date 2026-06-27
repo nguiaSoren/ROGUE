@@ -4,19 +4,31 @@
 
 <h1 align="center">ROGUE: Red-team every way a high-stakes AI agent can fail</h1>
 <p align="center"><b><i>The Red-Team That Never Sleeps.</i></b></p>
-<p align="center"><sub>Continuous open-web red-team · queryable over MCP · free/keyless harvest, with Bright Data as an optional premium backend.</sub></p>
+<p align="center"><sub>Independent, reproducible evidence of how an AI agent fails — <b>before</b> you ship it. Open-source, runs in 2 minutes, no vendor lock-in.</sub></p>
 
-ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the **model** can be broken, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe. Each surface is scored against an independent, continuously-refreshed standard, with a reproducible **signed** record. And it closes the loop: it doesn't just find the break, it **generates and verifies the fix** (you own the runtime, so ROGUE never sits in your request path). The continuous open-web harvest behind the model surface runs **free and keyless** by default; Bright Data is an optional premium backend for the hardest anti-bot targets (~$0.05–$0.30/day when enabled).
+**ROGUE red-teams your AI agent against live open-web jailbreaks, grades each with a human-calibrated judge, and hands you signed, reproducible evidence — before you deploy.** Backed by **11,973 calibrated-judge trials across 8 production models**, with a counterintuitive measured finding: most *claimed* jailbreaks don't survive a real deployment — reproduction collapses **40% → 4%**.
 
-> ### 🥇 The first continuous open-web red-team you can query over MCP.
-> ROGUE harvests new jailbreaks from the open web, reproduces each one against **your** config, and serves the results **back through its own MCP server**, so you can ask Claude / Cursor *"which live attacks breach my config?"* from your editor. (The harvest can run *through* Bright Data's MCP as one optional backend; distribution is always through ROGUE's own MCP server, the loop no other red-team closes.)
+ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the **model** can be broken by a live jailbreak or prompt-injection, whether the **human oversight** around it is meaningful, and whether the **memory it accumulates** stays contained. Each is scored against an independent, continuously-refreshed standard and emitted as a reproducible **signed** record — and it closes the loop, **generating and verifying the fix** before you deploy (you own the runtime, so ROGUE never sits in your request path).
+
+> ### ▶ See a real breach in 20 seconds — no key, no signup
+> ```bash
+> pip install rogue-live-redteam && rogue try
+> ```
+> A live **ATTACKER → MODEL → JUDGE** red-team in your terminal, then ROGUE's real measured breach rates across 8 production models. Then point it at **your own** deployment — `rogue scan --endpoint <your-api> --system-prompt <yours>` — for a scored report of exactly which attacks break it: the exact attack, your model's response, and a remediation hook for each finding.
+>
+> → **Full 5-minute walkthrough, clean machine to `report.html`:** [QUICKSTART.md](QUICKSTART.md)
 
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rogue-eosin.vercel.app)
 [![Trailer](https://img.shields.io/badge/%E2%96%B6%20trailer-watch-red)](https://youtu.be/pVOQYJvMC6w)
 [![Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-gated-yellow)](https://huggingface.co/datasets/soren19/rogue-attacks-2026-05)
-[![Research](https://img.shields.io/badge/research-papers-blueviolet)](PAPERS.md)
+[![Research](https://img.shields.io/badge/research-4_papers-b31b1b?logo=arxiv)](PAPERS.md)
+[![Tests](https://img.shields.io/badge/tests-3026-brightgreen)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+
+> **📄 Research** — ROGUE's findings are **four papers**, each reproducible from this repo (frozen data + a script per result): open-web jailbreaks mostly don't reproduce in deployment (**40% → 4%**); a per-type judge gate reaching **91% human agreement** (top of field); evaluation *allocation* as a capability lever (**8/20 vs 0/20** candidates graduate, Fisher *p* = 0.003); and canary leakage from shared agent memory that tracks **alignment, not model size** (85% on a weak model). → **[PAPERS.md](PAPERS.md)**
+
+> **🔒 Security & Trust** — ROGUE generates and verifies fixes but **never sits in your request path** — you own the runtime. Scans run **locally** against your own endpoint; your prompts, system prompts, and keys never leave your machine. Released data is **derived-only**, never raw scraped corpora ([RESPONSIBLE_RELEASE.md](RESPONSIBLE_RELEASE.md)). Found a security issue? [SECURITY.md](SECURITY.md).
 
 ## See it live
 
@@ -31,21 +43,30 @@ https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 
 Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
 
-- **Harvests on a schedule.** New jailbreaks and prompt-injections pulled from 15 open-web sources on a recurring **keyless** harvest cron (free backends by default; Bright Data optional for the hardest targets), so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately, not a continuously-updating number.)
+- **Harvests on a schedule.** New jailbreaks and prompt-injections pulled from 15 open-web sources on a recurring cron — **scraping is free and keyless** (scraper-agnostic, no scraper is a dependency; extraction runs on any LLM you choose, incl. a local one), so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately, not a continuously-updating number.)
 - **Reproduces against *your* exact config.** Your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the roadmap).
 - **Is queryable over MCP, both ways.** It *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
-- **Measures three surfaces, signed.** The model, the human approval gate, and the shared skill-pool, each scored against an independent answer key and emitted as a tamper-evident attestation.
+- **Measures three surfaces, signed.** The **model** surface is deep and paper-backed; the **human approval gate** and the **shared skill-pool** are two further instruments at proof-of-concept scale. Each is scored against an independent answer key and emitted as a tamper-evident attestation.
 - **Runs on the LLM you choose.** The judge and extraction models are configurable (`JUDGE_MODEL`): any provider or a local model (Ollama via `OPENAI_BASE_URL`), not locked to one vendor.
 
 Each ingredient exists somewhere; **no competitor does the whole combination.** That is what makes ROGUE a continuous, queryable, multi-surface red-team rather than a one-off scan.
 
 ## Use it in 30 seconds
 
+**What needs a key — straight answer:** the demo is genuinely keyless; scanning a *real* model needs that model's key, and grading/harvesting need an LLM you choose (any provider, or a local Ollama → ~$0). The open-web *scraping* is always free and keyless.
+
+| Action | What it needs |
+|---|---|
+| `rogue try` | **Nothing** — mock target + keyless heuristic judge, fully offline |
+| `rogue scan` | your **target model's** API key (the heuristic judge stays keyless) |
+| `rogue scan --judge calibrated` | target key **+ a judge LLM key** |
+| Harvest (clone the repo) | free, keyless **scraping** **+ an LLM extraction key** (any provider, incl. local) |
+
 ### See your first breach in 20 seconds (no key, no signup)
 ```bash
 pip install rogue-live-redteam
 rogue try        # 20s, offline, zero keys: real breach rates + a shareable card
-rogue setup      # one command → run the live open-web harvest yourself (free, no signup)
+rogue setup      # install the best free scraper (crawl4ai) — prep for harvesting from a repo clone
 ```
 `rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal, fully offline and zero keys, then overlays ROGUE's **real measured breach rates across 6 production text models + 2 audio targets** (11,973 calibrated-judge trials; the two audio targets are sampled lighter, ~185 trials each) and drops a shareable breach card:
 
@@ -61,7 +82,7 @@ rogue scan --provider openai --model gpt-5.4-nano --judge calibrated   # …or a
 Every scan drops the same **shareable breach card** as `rogue try` (`--no-card` to skip), now with *your* model's real numbers.
 
 - **Judge:** defaults to a **keyless heuristic** (no API key). `--judge calibrated` grades with the v3 LLM judge, and that one uses **your** judge key (e.g. `ANTHROPIC_API_KEY` / `JUDGE_MODEL`'s provider).
-- **Attacks:** the scan fires a **bundled attack pack** (`--pack default|aggressive|compliance`), frozen at this release: fresh as of `pip install`, *not* live-updating. The continuously-harvested live corpus drives the hosted dashboard plus the [public corpus](corpus/); to run that live open-web harvest locally, use **`rogue setup`** (above) and see [Run the harvest free](#run-the-harvest-free-no-bright-data-no-keys).
+- **Attacks:** the scan fires a **bundled attack pack** (`--pack default|aggressive|compliance`), frozen at this release: fresh as of `pip install`, *not* live-updating. The continuously-harvested live corpus drives the hosted dashboard plus the [public corpus](corpus/); to run that live open-web harvest locally, use **`rogue setup`** (above) and see [Run the harvest free](#run-the-harvest-free-keyless-scraping).
 
 Compare any model on the public **[leaderboard](https://rogue-eosin.vercel.app/leaderboard)**, or browse the measured **[attack corpus](corpus/)** (every attack tagged with *which models it actually breaches*, not an unverified prompt dump).
 
@@ -175,7 +196,7 @@ Inputs, fail policy, and the security note are in [`docs/ci-action.md`](docs/ci-
 
 Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
-1. **Harvest.** 15 open-web sources via a backend-agnostic fetcher (free/keyless by default; Bright Data optional for the hardest targets).
+1. **Harvest.** 15 open-web sources via a fully scraper-agnostic fetcher (scraping is free/keyless, bring any scraper — none required; the extraction step calls an LLM you choose).
 2. **Extract.** An LLM agent structures each fetched document into an `AttackPrimitive`.
 3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks, with surface-obfuscation canonicalization (leetspeak/homoglyph/zero-width/Unicode folds) so an attack clusters by *technique*, not by spelling: `1gn0r3 pr3v10us` and `ignore previous` land in one cluster instead of re-entering the corpus once per skin.
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
@@ -188,8 +209,8 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the agent can be **broken**, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe. Each is scored against an independent, continuously-refreshed standard, and each is backed by a result rather than a claim:
 
 - **The model.** Does a live jailbreak or prompt-injection break *your* deployment? The daily breach matrix replays open-web attacks against your model × system-prompt, graded by a [human-calibrated judge](docs/judge-calibration.md). Finding: most *claimed* jailbreaks don't even reproduce ([Claimed Potency Does Not Predict Reproduction](PAPERS.md)).
-- **The human gate.** When a person "approves" an AI action, does that approval mean anything? ROGUE measures a reviewer's **false-approve rate** against an independent answer key, the rubber-stamping failure mode regulators now care about ([oversight](PAPERS.md)).
-- **The agent's memory.** Does a shared agent skill-pool leak one user's secrets to the next? ROGUE plants canaries in scrubbed skills and measures recovery: 85% leaked on a weak model despite an explicit never-reveal instruction ([Scrubbing Is Not Containment](PAPERS.md)).
+- **The human gate.** When a person "approves" an AI action, does that approval mean anything? ROGUE measures a reviewer's **false-approve rate** against an independent answer key — the rubber-stamping failure mode regulators now care about. *Early instrument, demonstrated at proof-of-concept scale (n=1)* ([oversight](PAPERS.md)).
+- **The agent's memory.** Does a shared agent skill-pool leak one user's secrets to the next? ROGUE plants canaries in scrubbed skills and measures recovery: 85% leaked on a weak model despite an explicit never-reveal instruction. *Measured on a small canary set (wide, overlapping CIs) — an early result, not a benchmark* ([Scrubbing Is Not Containment](PAPERS.md)).
 
 …and it **closes the loop (assurance-native remediation).** Finding a breach is half the job. ROGUE *generates* a verified mitigation (a system-prompt patch, a tool-permission scope, distilled fine-tuning data) and **re-tests it against the same live corpus to prove it actually closed the breach without over-blocking** (measured with the same calibrated judge). ROGUE generates and verifies the fix; **you own the runtime, so it never sits in your request path.**
 
@@ -208,8 +229,8 @@ ROGUE's findings are written up as papers and posts. **[PAPERS.md](PAPERS.md)** 
 
 The mechanics behind the pipeline, each on its own page:
 
-- **Bright Data integration (optional premium backend).** All five BD products wired end-to-end for the hardest anti-bot targets + structured X, plus a self-tuning ε-greedy SERP bandit that allocates the harvest budget by yield (novel primitives per dollar) at $0.05–$0.30 per harvest when enabled. The default harvest path stays free/keyless. → [docs/bright-data.md](docs/bright-data.md)
-- **Multimodal red-team.** Refused text jailbreaks become real images and audio via deterministic black-box renderers, climbing an autonomous escalation ladder that stops at the first breach; Bright Data sources real carrier images to composite onto. → [docs/multimodal.md](docs/multimodal.md)
+- **Scraper-agnostic harvest.** A `Fetcher` registry picks the best backend per capability (page fetch, JS render, search, PDF), so the *scraping* runs free and keyless out of the box and any scraper or proxy slots in behind one env var — none is a dependency (extraction calls an LLM you choose). Plus a self-tuning ε-greedy bandit that allocates harvest budget by yield (novel primitives per dollar). → [docs/harvest-backends.md](docs/harvest-backends.md)
+- **Multimodal red-team.** Refused text jailbreaks become real images and audio via deterministic black-box renderers, climbing an autonomous escalation ladder that stops at the first breach. → [docs/multimodal.md](docs/multimodal.md)
 - **Self-growing attack repertoire.** ROGUE harvests reusable *techniques*, not just payloads, classifying, routing, and graduating / retiring / resurrecting them on live breach evidence, with a governed renderer registry and grammar-driven planning (the planner-willingness finding: 22% → 100% by changing only the planner). → [docs/self-growing-repertoire.md](docs/self-growing-repertoire.md)
 - **Judge calibration.** Every breach number is an LLM verdict, so the judge is validated against independent human labels four ways: in-distribution FP 2.56%, WildGuardTest harm 88.5%, StrongREJECT −26% inflation, JBB **89.3%** human agreement (3rd of 5 field classifiers, tied with the frontier LLM-as-judge baselines, reproducible from `data/calibration/`), up from a 70.3% v1 judge after a diagnosed recalibration. → [docs/judge-calibration.md](docs/judge-calibration.md)
 - **Benchmark, coverage over time.** Frozen AdvBench / JBB goal sets run through ROGUE's own graduated ladder against a fixed target, to answer "is this month's ROGUE better than last month's?" (honest caveat: still N=1, pre-recalibration). → [docs/benchmark.md](docs/benchmark.md)
@@ -230,7 +251,7 @@ The mechanics behind the pipeline, each on its own page:
 
 ## Roadmap
 
-- **Expand source coverage.** Deeper Web Scraper API integration brings the next ~100 open-web sources online.
+- **Expand source coverage.** More source plugins bring the next ~100 open-web sources online.
 - **Tool-aware scans.** Supply your agent's tool schemas so a reproduction exercises the full model × system-prompt × **tools** surface (today's scan covers model × system-prompt).
 - **Break bandit.** A second, contextual Thompson-sampling bandit that learns *how to break* (which escalation strategy to try first per attack-family × target); the control surface and reward log are already built and instrumented in prod.
 
@@ -268,9 +289,9 @@ ROGUE_MCP_TRANSPORT=streamable-http uv run python -m rogue.mcp_server.server
 # serves http://127.0.0.1:8001/mcp  (ROGUE_MCP_HOST / ROGUE_MCP_PORT override the bind)
 ```
 
-## Run the harvest free (no Bright Data, no keys)
+## Run the harvest free (keyless scraping)
 
-ROGUE runs the **entire harvest for free**. Bright Data is *optional* (a premium tier for the hardest anti-bot targets + structured X), **not a dependency**. One command sets up the best free scraper:
+ROGUE's **scraping** is free and **fully scraper-agnostic** — a `Fetcher` registry picks the best backend per capability, so no scraper is ever a dependency. (The extraction step still calls an LLM you choose — see "what 'free' means, honestly" below.) One command sets up the best free scraper:
 
 ```bash
 rogue setup
@@ -306,7 +327,7 @@ OPENAI_API_KEY=ollama
 
 ## Pipeline CLI reference
 
-The two `$`-billed driver scripts spend LLM credit (and Bright Data, if you've configured it as the scrape backend) and write the live DB, so run them deliberately. All flags are optional.
+The two `$`-billed driver scripts spend LLM credit (plus whatever your chosen scrape backend costs, if any) and write the live DB, so run them deliberately. All flags are optional.
 
 <details><summary><b><code>harvest_once.py</code>: harvest → extract → dedup → persist</b></summary>
 
@@ -317,7 +338,7 @@ uv run python scripts/harvest/harvest_once.py --since 1d
 | Flag | Default | What it does |
 |---|---|---|
 | `--since` | `1d` | Harvest window (`1d`, `14d`, `6h`). |
-| `--x-handles` | off | Comma-separated X handles to scrape this run (X is off by default; BD's profile scraper is slow). |
+| `--x-handles` | off | Comma-separated X handles to scrape this run (X is off by default; profile scraping is slow). |
 | `--database-url` | `$DATABASE_URL` | Target SQLAlchemy URL. |
 | `--extraction-model` | Claude Haiku 4.5 | Provider-prefixed extraction model (prompt-cached). |
 | `--embedding-model` | `text-embedding-3-small` | Embedding model for dedup. |
@@ -364,11 +385,7 @@ frontend/      # Next.js dashboard
 
 ## Built by
 
-Benaja Soren Obounou Lekogo Nguia, AI Systems Engineer; previously Grand-Prize winner at Yonsei University for LLM security tooling (GPTFuzz optimization), adversarial-ML research at AIM Intelligence (HWARANG red-team series).
-
-> "I built ROGUE solo in 6 days because Bright Data abstracted away 5 different anti-bot stacks I'd otherwise have spent weeks on. The MCP Server plus pre-built Reddit / X scrapers turned a 6-week project into a 6-day project."
->
-> **Benaja Soren Obounou Lekogo Nguia**
+Benaja Soren Obounou Lekogo Nguia, AI Systems Engineer; previously Grand-Prize winner at Yonsei University for LLM security tooling (GPTFuzz optimization).
 
 ## License
 
