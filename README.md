@@ -26,7 +26,7 @@ ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the 
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 
-> **📄 Research** — ROGUE's findings are **four papers**, each reproducible from this repo (frozen data + a script per result): open-web jailbreaks mostly don't reproduce in deployment (**40% → 4%**); a per-type judge gate reaching **91% human agreement** (top of field); evaluation *allocation* as a capability lever (**8/20 vs 0/20** candidates graduate, Fisher *p* = 0.003); and canary leakage from shared agent memory that tracks **alignment, not model size** (85% on a weak model). → **[PAPERS.md](PAPERS.md)**
+> **📄 Research** — ROGUE's findings are **four papers**, each reproducible from this repo (frozen data + a script per result): open-web jailbreaks mostly don't reproduce in deployment (**40% → 4%**); a per-type judge gate reaching **89.3% human agreement** (3rd of 5, tied with the frontier classifiers); evaluation *allocation* as a capability lever (**8/20 vs 0/20** candidates graduate, Fisher *p* = 0.003); and canary leakage from shared agent memory that tracks **alignment, not model size** (85% on a weak model). → **[PAPERS.md](PAPERS.md)**
 
 > **🔒 Security & Trust** — ROGUE generates and verifies fixes but **never sits in your request path** — you own the runtime. Scans run **locally** against your own endpoint; your prompts, system prompts, and keys never leave your machine. Released data is **derived-only**, never raw scraped corpora ([RESPONSIBLE_RELEASE.md](RESPONSIBLE_RELEASE.md)). Found a security issue? [SECURITY.md](SECURITY.md).
 
