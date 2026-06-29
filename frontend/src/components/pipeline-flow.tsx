@@ -26,7 +26,7 @@ export function PipelineFlow({
       key: "sources",
       label: "open-web sources",
       value: nSources,
-      sub: "5 Bright Data products",
+      sub: "scraper-agnostic, keyless",
       color: "var(--rogue-green)",
       x: 60,
     },

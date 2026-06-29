@@ -60,9 +60,9 @@ const PANELS: Panel[] = [
     ),
     body: (
       <>
-        All 5 Bright Data products fan out across 15 open-web sources; a
-        self-tuning bandit spends the next dollar where the most-novel attacks
-        live, and replays every one against your exact stack.
+        A scraper-agnostic harvest fans out across 15 open-web sources, keyless
+        by default; a self-tuning bandit spends the next dollar where the
+        most-novel attacks live, and replays every one against your exact stack.
       </>
     ),
     tint: "rgba(0, 255, 136, 0.15)",
@@ -309,18 +309,12 @@ function ProblemVisual() {
 
 function HarvestVisual() {
   const sources = ["Reddit", "X", "GitHub", "HuggingFace", "arXiv", "leak mirrors"];
-  const products = [
-    "Web Scraper API",
-    "SERP API",
-    "Web Unlocker",
-    "Scraping Browser",
-    "MCP Server",
-  ];
+  const products = ["scrape", "search", "fetch", "render", "MCP"];
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-          5 Bright Data products
+          scraper-agnostic backends
         </p>
         <div className="flex flex-wrap gap-1.5">
           {products.map((p, i) => (

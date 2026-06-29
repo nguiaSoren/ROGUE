@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AttackPrimitive } from "@/lib/api";
 import { useSseFeed } from "@/components/sse-feed-provider";
+import { sourceBackendLabel } from "@/lib/source-backend";
 
 /**
  * Live-streaming attack ticker for the home page hero.
@@ -12,7 +13,7 @@ import { useSseFeed } from "@/components/sse-feed-provider";
  * slides any new ones in from the top with a fade-up + brief green-glow flash.
  *
  * Renders 5 rows max, anything older just falls off the bottom. Each row is
- * a tinted-severity card with title, family, source product, and a clickable
+ * a tinted-severity card with title, family, source backend, and a clickable
  * link to the source.
  */
 export function LiveAttackTicker({
@@ -117,7 +118,7 @@ function TickerRow({
             {attack.family} · {attack.vector}
             {product && (
               <span className="ml-2 text-rogue-green/80 uppercase tracking-wider">
-                {product}
+                {sourceBackendLabel(product)}
               </span>
             )}
           </p>

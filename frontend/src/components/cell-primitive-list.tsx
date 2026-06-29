@@ -2,6 +2,7 @@
 
 import type { CellPrimitive } from "@/lib/api";
 import { CopyButton, PayloadImage, VerdictBar } from "@/components/matrix-drawer";
+import { sourceBackendLabel } from "@/lib/source-backend";
 
 /**
  * Full list of EVERY breaching primitive in one (family × config) cell, the
@@ -120,7 +121,7 @@ function CellCard({ p, rank }: { p: CellPrimitive; rank: number }) {
               <li key={s.url} className="text-[11px] font-mono">
                 {s.bright_data_product && (
                   <span className="text-[10px] px-1.5 py-0.5 border border-rogue-green/40 text-rogue-green rounded-sm uppercase tracking-wider mr-2">
-                    {s.bright_data_product}
+                    {sourceBackendLabel(s.bright_data_product)}
                   </span>
                 )}
                 <a

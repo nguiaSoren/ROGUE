@@ -41,7 +41,7 @@ export const AUGMENTATION_COPY: Record<
     whatItIs:
       "An online learner that rates each jailbreak-hunting query by how many novel attacks per dollar it surfaces.",
     whyItMatters:
-      "Stops you from wasting Bright Data budget on queries that no longer find anything new, the hot arm gets the next 90% of pulls automatically.",
+      "Stops you from wasting harvest budget on queries that no longer find anything new, the hot arm gets the next 90% of pulls automatically.",
   },
   persona: {
     eyebrow: "Persona susceptibility",

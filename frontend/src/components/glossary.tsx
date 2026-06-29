@@ -43,12 +43,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   MCP: {
     expansion: "Model Context Protocol",
     plain:
-      "Anthropic's open standard for connecting AI assistants to tools and data. ROGUE both consumes MCP (via Bright Data's MCP server) and exposes its own MCP server that Claude Desktop can query directly.",
+      "Anthropic's open standard for connecting AI assistants to tools and data. ROGUE both consumes MCP (from an external data-provider's MCP server) and exposes its own MCP server that Claude Desktop can query directly.",
   },
   SERP: {
     expansion: "Search Engine Results Page",
     plain:
-      "What you see when you Google something. Bright Data's SERP API returns those results as structured JSON. ROGUE uses it to discover new attack-discussion URLs across the open web.",
+      "What you see when you Google something. A SERP API returns those results as structured JSON. ROGUE uses it to discover new attack-discussion URLs across the open web.",
   },
   LLM: {
     expansion: "Large Language Model",

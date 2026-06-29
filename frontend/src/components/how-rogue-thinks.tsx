@@ -60,7 +60,7 @@ export function HowRogueThinks({
               />
               Hugging Face,{" "}
               <SourceLogo source="arXiv" className="text-foreground/55 mr-0.5" />
-              arXiv, leaks, fanned out through 5 Bright Data products. New
+              arXiv, leaks, fanned out across 15 open-web sources. New
               attacks land in the DB within minutes of being posted.
             </>
           }

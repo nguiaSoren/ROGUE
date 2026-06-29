@@ -67,14 +67,14 @@ export function plainifyPattern(score: number): string {
 }
 
 /**
- * "2.4 / $" → "2-3 novel attacks for every dollar of Bright Data spend"
+ * "2.4 / $" → "2-3 novel attacks for every dollar of harvest spend"
  */
 export function plainifyYield(novelPerDollar: number): string {
   if (novelPerDollar >= 10) return "extremely cost-efficient, 10+ novel attacks per $";
   if (novelPerDollar >= 3)
-    return `~${Math.round(novelPerDollar)} novel attacks for every $1 of BD spend`;
+    return `~${Math.round(novelPerDollar)} novel attacks for every $1 of harvest spend`;
   if (novelPerDollar >= 1)
-    return `${novelPerDollar.toFixed(1)} novel attacks per $1 of BD spend`;
+    return `${novelPerDollar.toFixed(1)} novel attacks per $1 of harvest spend`;
   if (novelPerDollar > 0)
     return `${(1 / novelPerDollar).toFixed(0)} dollars per novel attack`;
   return "no novel attacks yet (warming up)";

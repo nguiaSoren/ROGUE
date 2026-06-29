@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { api, type AttacksResponse } from "@/lib/api";
 import { AttackRow } from "@/components/attack-row";
+import { sourceBackendLabel } from "@/lib/source-backend";
 
 /**
  * Client-side time-window control for the /feed attack stream.
@@ -54,11 +55,17 @@ export function FeedStream({
 
   const list = useMemo(() => attacks.attacks ?? [], [attacks]);
 
-  // Family + Bright Data product histograms for the left ribbon, recomputed
+  // Family + source-backend histograms for the left ribbon, recomputed
   // from whatever window is currently loaded.
   const familyCounts = useMemo(() => topCounts(list.map((a) => a.family), 8), [list]);
   const productCounts = useMemo(
-    () => topCounts(list.map((a) => a.sources?.[0]?.bright_data_product ?? null)),
+    () =>
+      topCounts(
+        list.map((a) => {
+          const p = a.sources?.[0]?.bright_data_product;
+          return p ? sourceBackendLabel(p) : null;
+        }),
+      ),
     [list],
   );
 
@@ -78,7 +85,7 @@ export function FeedStream({
           empty="no attacks in window"
         />
         <IntelRibbon
-          title="by Bright Data product"
+          title="by source backend"
           data={productCounts}
           accent="#22d3ee"
           empty="no provenance yet"

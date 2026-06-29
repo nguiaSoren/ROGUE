@@ -153,7 +153,7 @@ export default async function Home() {
           </div>
         </Section>
 
-        {/* 2. BRIGHT DATA SPOTLIGHT ------------------------------------ */}
+        {/* 2. SCRAPER-AGNOSTIC HARVEST ---------------------------------- */}
         <SourcesMarquee bandit={bandit} />
 
         {/* 4. AHA MOMENT, fresh threats + mini-matrix ----------------- */}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AttackPrimitive } from "@/lib/api";
 import { AttackReplay } from "@/components/attack-replay";
+import { sourceBackendLabel } from "@/lib/source-backend";
 
 /**
  * Expandable attack-feed row.
@@ -82,7 +83,7 @@ export function AttackRow({
               </span>
               {primarySource?.bright_data_product && (
                 <span className="text-[10px] px-1.5 py-0.5 border border-rogue-green/40 text-rogue-green rounded-sm uppercase tracking-wider">
-                  {primarySource.bright_data_product}
+                  {sourceBackendLabel(primarySource.bright_data_product)}
                 </span>
               )}
               {attack.requires_multi_turn && (
