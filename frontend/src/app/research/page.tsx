@@ -55,6 +55,53 @@ export default function ResearchPage() {
           </a>
         </Section>
 
+        {/* PAPERS ------------------------------------------------------- */}
+        <Section eyebrow="papers" title="Written up, and openly archived.">
+          <p className="-mt-2 mb-5 max-w-3xl text-[15px] text-muted-foreground leading-relaxed">
+            The findings below are written up as solo-authored papers, each
+            openly archived as a citable Zenodo preprint. Three are under peer
+            review at <span className="text-foreground/90">TMLR</span>; two are
+            headed to <span className="text-foreground/90">NDSS</span> (submission
+            planned August&nbsp;2026). Full manuscripts on request.
+          </p>
+          <div className="space-y-3 max-w-3xl">
+            <PaperLink
+              title="Open-Web Jailbreaks Mostly Don't Reproduce in Deployment: A Provenance-Stratified Audit Against a Patch-Immune Anchor"
+              venue="NDSS · planned Aug 2026"
+              finding="finding 01"
+              doi="10.5281/zenodo.21016390"
+            />
+            <PaperLink
+              title="Allocation Is a Capability-Growth Mechanism: Telemetry and Scheduling in a Self-Growing LLM Red-Team"
+              venue="Preprint"
+              finding="finding 02"
+              doi="10.5281/zenodo.21016849"
+            />
+            <PaperLink
+              title="Calibrating LLM-as-Judge Breach Detectors: A Per-Type Consummation Gate and an Independence Discipline for Operator-Labeled Ground Truth"
+              venue="Under review · TMLR 2026"
+              finding="finding 03"
+              doi="10.5281/zenodo.21016697"
+            />
+            <PaperLink
+              title="A Dead Call Cannot Leak: Liveness-Guarded Measurement of Canary Leakage from Shared Agent Skill Pools"
+              venue="NDSS · planned Aug 2026"
+              finding="finding 06"
+              doi="10.5281/zenodo.21016278"
+            />
+            <PaperLink
+              title="Measuring Verifier Leakage for LLM Judges: Strict Breach Rates Are a Lower Bound on Payment Errors"
+              venue="Under review · TMLR 2026"
+              doi="10.5281/zenodo.21017684"
+            />
+            <PaperLink
+              title="When Does Agent Shape Matter, Per Instance? A Calibrated, Abstaining Study of Coordination-Architecture Selection"
+              venue="Under review · TMLR 2026"
+              doi="10.5281/zenodo.21030368"
+            />
+          </div>
+        </Section>
+
         {/* AT A GLANCE -------------------------------------------------- */}
         <Section eyebrow="at a glance" title="Eight findings, in about a minute.">
           <p className="-mt-2 mb-5 max-w-3xl text-[15px] text-muted-foreground leading-relaxed">
@@ -458,32 +505,38 @@ export default function ResearchPage() {
                 type (100%, 0% false-positive mode, first pass). The harness
                 exposes type-dependent failure modes, then resolves them by
                 upgrading the evidence, not the rubric.{" "}
-                <span className="text-rogue-green">⚑</span> The one measured angle
-                we could not find stated directly: provenance-dependent breach
-                types need an evidence trace, and the independence check names the
-                missing evidence. Shown twice, on
-                unauthorized-action (a tool-call trace lifted second-labeler κ
-                from 0.746 to 0.917) and on fabricated-value (a retrieval trace
-                lifted κ from 0.723 to 0.909). The building blocks here are
+                <span className="text-rogue-green">⚑</span> Then the discipline
+                turned on its own headline. A single second labeler suggested a
+                trace-modality ceiling — supplying the captured trace appeared to
+                lift inter-rater κ (unauthorized-action 0.746→0.917,
+                fabricated-value 0.723→0.909; Δκ +0.171). An independent{" "}
+                <span className="text-foreground/90">
+                  6-labeler panel did not replicate it
+                </span>{" "}
+                (raw Δκ +0.011, divergences in both directions). The cross-class
+                calibration holds; the trace-modality boost does not — and we
+                report that null on our own result, not the post-hoc subset it
+                could be tuned to (all 45 panel divergences released for
+                case-by-case adjudication). The building blocks here are
                 established (trace-grounded agent evaluation, κ-gated calibration,
-                provenance attribution, cross-type judge generalization such as
-                CompliBench); the contribution is the rigor, an
-                independence-invariant discipline and a self-diagnosing harness,
-                plus the measured cross-type result, not a new mechanism.
+                cross-type judge generalization such as CompliBench); the
+                contribution is the rigor, an independence-invariant discipline, a
+                self-diagnosing harness, and a null reported on its own headline,
+                not a new mechanism.
               </NovelNote>
 
               <MethodNote>
                 Method: per-type designed-label corpora with independent
                 second-labeler κ checks (information-disclosure κ 0.80 base /
-                0.786 boundary, unauthorized-action κ 0.746 pre-trace then 0.917
-                with the tool-trace; harm uses JailbreakBench human-majority
-                agreement, not a κ); single-operator calibration and synthetic
-                designed-label corpora throughout. The fabricated-value
-                retrieval-trace lifts its human κ from 0.723 to 0.909 (the judge
-                ships 96.88%); in calibration the traces are
-                embedded in the graded text, the production seam being the scan
-                engine&apos;s Capture. Descriptive measurements, not validated
-                generalizations.
+                0.786 boundary; unauthorized-action κ 0.746, with a single second
+                labeler reading 0.917 under the tool-trace; harm uses
+                JailbreakBench human-majority agreement, not a κ). The
+                single-labeler trace-modality lift (Δκ +0.171) did not survive an
+                independent 6-labeler panel (raw Δκ +0.011), reported as a
+                disclosed null; the fabricated-value retrieval-trace single-labeler
+                reading is 0.723→0.909 (the judge ships 96.88%). Single-operator
+                calibration and synthetic designed-label corpora throughout.
+                Descriptive measurements, not validated generalizations.
               </MethodNote>
             </div>
             </FindingCard>
@@ -703,21 +756,30 @@ export default function ResearchPage() {
             </p>
 
             <p className="text-base text-muted-foreground leading-relaxed">
-              The same canary pack across four targets shows the surprise:
-              leakage doesn&rsquo;t fall with size or capability, it falls with{" "}
-              <span className="text-foreground font-medium">alignment</span>. A 32B
-              reasoning model leaks every canary (100%), a 70B instruct model 65%,
-              and the smallest, safety-tuned 20B model resists best (35%), so the
-              size ordering and the leak ordering have nothing to do with each
-              other. A skill-pool leakage audit can&rsquo;t be waved off by
-              pointing at how big or capable the model is.
+              A 22-model census (23 runs across two providers) makes the surprise
+              precise: leakage doesn&rsquo;t fall with size or capability, it
+              tracks{" "}
+              <span className="text-foreground font-medium">alignment</span>.
+              Within a family, scale doesn&rsquo;t contain it — Qwen2.5-instruct
+              rises 0.5B 45% → 32B 100%, and Llama-3.x-instruct is flat (8B ≈ 70B).
+              What moves leakage is alignment: a safety-tuned gemma-2-9b leaks 65%
+              where its instruct sibling leaks 100%, and stripping the refusal
+              direction from identical Llama-3.1-8B weights (abliteration) raises
+              leakage 83% → 97%. The reasoning trace is a distinct leak surface —
+              gpt-oss returns 0% in its answer but{" "}
+              <span className="text-foreground font-medium">
+                87% once the reasoning channel is counted
+              </span>{" "}
+              (DeepSeek-R1-70B mirrors it). A skill-pool leakage audit
+              can&rsquo;t be waved off by pointing at how big or capable the model
+              is.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <Metric value="100%" label="qwen3-32b · reasoning" accent="red" />
-              <Metric value="85%" label="llama-3.1-8b · instruct" accent="red" />
-              <Metric value="65%" label="llama-3.3-70b · instruct" accent="red" />
-              <Metric value="35%" label="gpt-oss-20b · safety-tuned" accent="green" />
+              <Metric value="45 → 100%" label="qwen2.5 · 0.5B → 32B (scale ≠ safety)" accent="red" />
+              <Metric value="83 → 97%" label="llama-8b · instruct → abliterated" accent="red" />
+              <Metric value="65%" label="gemma-2-9b · safety-tuned (vs 100% instruct)" accent="green" />
+              <Metric value="0 → 87%" label="gpt-oss · answer → reasoning channel" accent="red" />
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
@@ -735,7 +797,11 @@ export default function ResearchPage() {
               </span>{" "}
               (deterministic ground truth, not a judge estimate); the target is a
               deliberately weak open model, the pack is standard (4 templates),
-              n = 20. Verified-promotion runs each skill with vs without injection
+              n = 20. The 22-model alignment census is a separate sweep (23 runs,
+              2 providers, 3-run t-intervals on the alignment arms); rates are
+              per-model exact-marker recovery, never pooled across providers (a
+              15-pt serving-stack gap on the same Llama-8B). Verified-promotion
+              runs each skill with vs without injection
               over a held-out set, graded by a net-effect judge calibrated to human
               labels (100% agreement on a 20-case set built to be hard, ship gate);
               a skill promotes only if its repair-fraction CI clears 0.5.
@@ -1096,5 +1162,44 @@ function FindingCard({
       <h2 className="mt-3 text-2xl font-bold tracking-tight">{title}</h2>
       <div className="mt-6 space-y-5">{children}</div>
     </div>
+  );
+}
+
+/** A single paper row linking out to its Zenodo DOI. */
+function PaperLink({
+  title,
+  venue,
+  finding,
+  doi,
+}: {
+  title: string;
+  venue: string;
+  finding?: string;
+  doi: string;
+}) {
+  return (
+    <a
+      href={`https://doi.org/${doi}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="rogue-card border border-border rounded-xl p-4 bg-card/40 backdrop-blur-sm block group hover:border-rogue-green/50 transition-colors"
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-rogue-green">
+          {venue}
+        </span>
+        {finding ? (
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            · {finding}
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1.5 text-[15px] font-medium text-foreground leading-snug group-hover:text-rogue-green transition-colors">
+        {title}
+      </p>
+      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+        Zenodo · {doi}
+      </p>
+    </a>
   );
 }
