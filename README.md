@@ -208,9 +208,9 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the agent can be **broken**, whether the **human oversight** around it is meaningful, and whether the **knowledge it accumulates** is safe. Each is scored against an independent, continuously-refreshed standard, and each is backed by a result rather than a claim:
 
-- **The model.** Does a live jailbreak or prompt-injection break *your* deployment? The daily breach matrix replays open-web attacks against your model × system-prompt, graded by a [human-calibrated judge](docs/judge-calibration.md). Finding: most *claimed* jailbreaks don't even reproduce ([Claimed Potency Does Not Predict Reproduction](PAPERS.md)).
+- **The model.** Does a live jailbreak or prompt-injection break *your* deployment? The daily breach matrix replays open-web attacks against your model × system-prompt, graded by a [human-calibrated judge](docs/judge-calibration.md). Finding: most *claimed* jailbreaks don't even reproduce ([Open-Web Jailbreaks Mostly Don't Reproduce in Deployment](PAPERS.md)).
 - **The human gate.** When a person "approves" an AI action, does that approval mean anything? ROGUE measures a reviewer's **false-approve rate** against an independent answer key — the rubber-stamping failure mode regulators now care about. *Early instrument, demonstrated at proof-of-concept scale (n=1)* ([oversight](PAPERS.md)).
-- **The agent's memory.** Does a shared agent skill-pool leak one user's secrets to the next? ROGUE plants canaries in scrubbed skills and measures recovery: 85% leaked on a weak model despite an explicit never-reveal instruction. *Measured on a small canary set (wide, overlapping CIs) — an early result, not a benchmark* ([Scrubbing Is Not Containment](PAPERS.md)).
+- **The agent's memory.** Does a shared agent skill-pool leak one user's secrets to the next? ROGUE plants canaries in scrubbed skills and measures recovery: 85% leaked on a weak model despite an explicit never-reveal instruction. *Measured on a small canary set (wide, overlapping CIs) — an early result, not a benchmark* ([A Dead Call Cannot Leak](PAPERS.md)).
 
 …and it **closes the loop (assurance-native remediation).** Finding a breach is half the job. ROGUE *generates* a verified mitigation (a system-prompt patch, a tool-permission scope, distilled fine-tuning data) and **re-tests it against the same live corpus to prove it actually closed the breach without over-blocking** (measured with the same calibrated judge). ROGUE generates and verifies the fix; **you own the runtime, so it never sits in your request path.**
 
@@ -222,7 +222,7 @@ ROGUE's findings are written up as papers and posts. **[PAPERS.md](PAPERS.md)** 
 
 - **Allocation Is a Capability-Growth Mechanism.** In a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · *arXiv `cs.CL`×`cs.CR`, preprint posting soon*
 - **Calibrating LLM-as-Judge Breach Detectors.** One gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · *arXiv `cs.CL`×`cs.CR`, preprint posting soon*
-- **Open-Web Jailbreaks Mostly Don't Reproduce in Deployment.** Most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.10). · *arXiv `cs.CL`×`cs.CR` (lead paper), preprint posting soon*
+- **Open-Web Jailbreaks Mostly Don't Reproduce in Deployment.** Most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.07). · *arXiv `cs.CL`×`cs.CR` (lead paper), preprint posting soon*
 - **A Dead Call Cannot Leak.** Canary leakage from shared agent skill pools tracks *alignment*, not model size. · *arXiv `cs.CL`×`cs.CR`, also a workshop/blog candidate, posting soon*
 
 ## Deep dives
