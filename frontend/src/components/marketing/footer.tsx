@@ -72,7 +72,7 @@ export function Footer() {
             © ROGUE
           </p>
           <p className="font-mono text-[11px] tracking-[0.12em] text-muted-foreground/70">
-            Built on Bright Data
+            Scraper-agnostic by default
           </p>
         </div>
       </div>

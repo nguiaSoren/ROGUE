@@ -22,7 +22,7 @@ import {
 export const metadata = {
   title: "ROGUE, Pitch",
   description:
-    "ROGUE in ten slides: one engine that measures every way a high-stakes AI agent goes wrong — model, human oversight, accumulated knowledge — against an independent, signed standard, before your users do. Built on Bright Data, queryable over MCP.",
+    "ROGUE in ten slides: one engine that measures every way a high-stakes AI agent goes wrong — model, human oversight, accumulated knowledge — against an independent, signed standard, before your users do. Scraper-agnostic harvest, queryable over MCP.",
 };
 
 /**
@@ -174,7 +174,7 @@ export default function DeckPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <PipelineCard
                 phase="Harvest"
-                headline={`${CORPUS.sources} sources · ${CORPUS.bdProducts} Bright Data products`}
+                headline={`${CORPUS.sources} open-web sources · scraper-agnostic`}
                 desc="Continuously collect fresh jailbreaks and prompt-injection from across the open web, normalized into a structured threat corpus of attack primitives."
               />
               <PipelineCard

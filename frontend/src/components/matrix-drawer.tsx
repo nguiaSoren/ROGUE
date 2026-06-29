@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { BreachCell } from "@/lib/api";
 import { ProviderLogo } from "@/components/ui/provider-logo";
+import { sourceBackendLabel } from "@/lib/source-backend";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -367,7 +368,7 @@ export function MatrixCellDrawer({
                         <li key={s.url} className="text-[11px] font-mono">
                           {s.bright_data_product && (
                             <span className="text-[10px] px-1.5 py-0.5 border border-rogue-green/40 text-rogue-green rounded-sm uppercase tracking-wider mr-2">
-                              {s.bright_data_product}
+                              {sourceBackendLabel(s.bright_data_product)}
                             </span>
                           )}
                           <a

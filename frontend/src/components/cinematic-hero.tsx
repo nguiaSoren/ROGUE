@@ -38,7 +38,7 @@ export function CinematicHero({
       />
 
       <div className="relative max-w-7xl mx-auto w-full py-20 md:py-28 space-y-10">
-        {/* Live pill + Bright Data pill */}
+        {/* Live pill + harvest pill */}
         <div className="flex flex-wrap items-center gap-2 animate-rogue-reveal">
           <div className="inline-flex items-center gap-2 px-3 py-1 border border-rogue-green/40 rounded-full bg-rogue-green/5 font-mono text-[10px] uppercase tracking-[0.22em] text-rogue-green">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-rogue-green animate-rogue-pulse-green" />
@@ -46,7 +46,7 @@ export function CinematicHero({
           </div>
           <div className="inline-flex items-center gap-2 px-3 py-1 border border-foreground/30 rounded-full bg-foreground/5 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-foreground/70" />
-            powered by Bright Data · 5 / 5 products · cost-optimized
+            scraper-agnostic harvest · keyless by default · cost-optimized
           </div>
         </div>
 

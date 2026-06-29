@@ -21,7 +21,6 @@ export const CORPUS = {
   harvested: 298, // README.md:25, public HuggingFace dataset (the open-web–harvested slice)
   families: 15, // canonical, OWASP LLM Top 10 + MITRE ATLAS aligned
   sources: 15, // docs/sources.md, open-web sources that actually fire (15 primary)
-  bdProducts: 5, // README.md, Bright Data products
   modelsTested: 6, // 6 production text models (+ 2 audio targets sampled lighter)
   reproductionTrials: 8321, // ROGUE_PLAN.md:2560, reproduction trials run
 } as const
@@ -98,8 +97,8 @@ export const PROOF_POINTS: ReadonlyArray<{
     sublabel: "adaptive ladder vs fixed order",
   },
   {
-    value: "5",
-    label: "Bright Data products",
-    sublabel: "continuous open-web harvest",
+    value: "$0",
+    label: "default harvest cost",
+    sublabel: "scraper-agnostic, keyless by default",
   },
 ] as const
