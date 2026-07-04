@@ -99,7 +99,11 @@ from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
 from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # noqa: E402
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.discovery_agent import DiscoveryAgent  # noqa: E402
-from rogue.harvest.fetch_cache import FetchCache, load_snapshot  # noqa: E402
+from rogue.harvest.fetch_cache import (  # noqa: E402
+    FetchCache,
+    load_extracted_urls,
+    load_snapshot,
+)
 from rogue.harvest.fetchers import (  # noqa: E402
     RoutingFetcher,
     build_default_registry,
@@ -245,6 +249,8 @@ class HarvestRunStats:
     extracted: int = 0
     skipped_commentary: int = 0
     skipped_unchanged: int = 0
+    # Tier A′ — re-harvest of a single-technique URL (arxiv) we already have.
+    skipped_known_source: int = 0
     extract_errors: int = 0
     dedup_errors: int = 0
     new_clusters: int = 0
@@ -258,6 +264,7 @@ class HarvestRunStats:
             f"raw_docs={self.raw_docs} extracted={self.extracted} "
             f"skipped_commentary={self.skipped_commentary} "
             f"skipped_unchanged={self.skipped_unchanged} "
+            f"skipped_known_source={self.skipped_known_source} "
             f"extract_errors={self.extract_errors} "
             f"dedup_errors={self.dedup_errors} "
             f"new_clusters={self.new_clusters} duplicates={self.duplicates} "
@@ -700,18 +707,30 @@ async def run_harvest(
             # re-derives the primitive we already have, then cosine-dedups it
             # away. Skipping here saves the LLM extraction call (the wall-clock
             # + $ bottleneck). Works for every source.
-            fetch_cache = FetchCache(session)
+            # Tier A′ URL-level idempotency set (single-technique sources we
+            # already have a primitive for) loaded once, passed in explicitly so
+            # a bare FetchCache(session) stays decoupled from source_provenances.
+            fetch_cache = FetchCache(
+                session, extracted_urls=load_extracted_urls(session)
+            )
             docs_to_extract: list[RawDocument] = []
             for d in raw_docs:
                 if fetch_cache.should_skip_extract(str(d.url), d.archive_hash):
                     stats.skipped_unchanged += 1
+                elif fetch_cache.should_skip_extract_url(str(d.url), str(d.source_type)):
+                    # Tier A′ — already have this single-technique URL's primitive;
+                    # re-extraction only re-derives it into a fresh singleton the
+                    # cosine gate would miss (the paraphrase-drift dup leak).
+                    stats.skipped_known_source += 1
                 else:
                     docs_to_extract.append(d)
 
             logger.info(
-                "extracting %d raw_docs (%d skipped as unchanged; concurrency=%d)",
+                "extracting %d raw_docs (%d skipped as unchanged, %d skipped "
+                "as known single-technique URLs; concurrency=%d)",
                 len(docs_to_extract),
                 stats.skipped_unchanged,
+                stats.skipped_known_source,
                 EXTRACTION_CONCURRENCY,
             )
             extract_results = await asyncio.gather(

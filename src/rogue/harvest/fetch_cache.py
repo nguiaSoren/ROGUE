@@ -33,8 +33,29 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from rogue.db.models import FetchCache as FetchCacheORM
+from rogue.db.models import SourceProvenance as SourceProvenanceORM
 
-__all__ = ["CachedVersion", "FetchCache", "load_snapshot"]
+__all__ = [
+    "SINGLE_TECHNIQUE_SOURCE_TYPES",
+    "CachedVersion",
+    "FetchCache",
+    "load_extracted_urls",
+    "load_snapshot",
+]
+
+
+# Source types where one URL == one technique: an arxiv paper describes a single
+# method, so re-harvesting the same abstract page only re-derives the primitive
+# we already stored. Extraction re-words it enough on each pass to slip past the
+# cosine-dedup gate in ``dedupe/embeddings.py`` and seed a fresh singleton
+# cluster (measured: the arxiv stratum ran ~36% redundant this way). The byte
+# Tier A skip does NOT catch it because arxiv pages are not byte-stable across
+# days (rotating timestamps/counters shift ``archive_hash``). We therefore skip
+# re-extraction of these at the URL level. Deliberately NOT multi-artifact
+# sources (github jailbreak dumps, reddit/listing pages) where one URL
+# legitimately yields several distinct primitives and a later fetch can surface
+# genuinely new content.
+SINGLE_TECHNIQUE_SOURCE_TYPES: frozenset[str] = frozenset({"arxiv"})
 
 
 class CachedVersion(NamedTuple):
@@ -61,12 +82,40 @@ def load_snapshot(
     }
 
 
+def load_extracted_urls(
+    session: Session,
+    source_types: frozenset[str] = SINGLE_TECHNIQUE_SOURCE_TYPES,
+) -> set[str]:
+    """URLs that already back at least one stored primitive from a
+    single-technique source type — the set to skip re-extracting.
+
+    Read from ``source_provenances`` (the corpus of record), not the fetch
+    ledger, so it reflects what we actually have a primitive for regardless of
+    byte-hash drift.
+    """
+    if not source_types:
+        return set()
+    stmt = (
+        select(SourceProvenanceORM.url)
+        .where(SourceProvenanceORM.source_type.in_(tuple(source_types)))
+        .distinct()
+    )
+    return {url for (url,) in session.execute(stmt)}
+
+
 class FetchCache:
     """In-memory snapshot of the ``fetch_cache`` ledger + skip/record helpers.
 
     Construct with a live ``session`` to load from the DB, or with an explicit
     ``snapshot`` dict for offline unit tests (no DB needed for the skip logic).
     ``record`` requires a ``session``.
+
+    ``extracted_urls`` backs the URL-level idempotency skip
+    (``should_skip_extract_url``) for single-technique sources. It is NOT loaded
+    automatically (that would couple every ``FetchCache(session)`` to the
+    ``source_provenances`` table); the harvest caller loads it once via
+    ``load_extracted_urls(session)`` and passes it in. Absent, the URL-level skip
+    is inert.
     """
 
     def __init__(
@@ -75,6 +124,7 @@ class FetchCache:
         source_type: Optional[str] = None,
         *,
         snapshot: Optional[Mapping[str, CachedVersion]] = None,
+        extracted_urls: Optional[set[str]] = None,
     ) -> None:
         self.session = session
         if snapshot is not None:
@@ -83,6 +133,7 @@ class FetchCache:
             self._snapshot = load_snapshot(session, source_type)
         else:
             self._snapshot = {}
+        self._extracted_urls: set[str] = set(extracted_urls or ())
 
     def __len__(self) -> int:
         return len(self._snapshot)
@@ -103,6 +154,16 @@ class FetchCache:
             return False
         row = self._snapshot.get(url)
         return row is not None and row.content_hash == content_hash
+
+    def should_skip_extract_url(self, url: str, source_type: str) -> bool:
+        """Tier A′ (URL-level) — skip the LLM extraction when this URL already
+        backs a stored primitive AND the source is single-technique (one URL ==
+        one technique, e.g. arxiv). Independent of ``content_hash``: these pages
+        are not byte-stable across days, so re-extraction would otherwise re-word
+        the same technique into a fresh singleton cluster that the cosine gate
+        misses. A no-op for multi-artifact sources not in
+        ``SINGLE_TECHNIQUE_SOURCE_TYPES``."""
+        return source_type in SINGLE_TECHNIQUE_SOURCE_TYPES and url in self._extracted_urls
 
     def record(
         self,

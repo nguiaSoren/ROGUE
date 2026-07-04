@@ -419,6 +419,60 @@ def test_cell_missing_required_params_422(client: TestClient) -> None:
     assert client.get("/api/breaches/cell", params={"family": FAM_A}).status_code == 422
 
 
+def test_cell_collapses_same_cluster_reharvests(client: TestClient, seeded_db: str) -> None:
+    """Two primitives sharing a cluster (a re-harvested paper) show as ONE cell
+    row — the worst-breaching member — not two. Guards the arxiv-dup fix."""
+    from sqlalchemy import create_engine, delete
+    from sqlalchemy.orm import Session
+
+    from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
+    from rogue.db.models import BreachResult as BreachResultORM
+
+    fam = "role_hijack"  # a family no other test in this module touches
+    cluster = "01DASHCLUSTERC" + "0" * 12
+    c_worst = "01DASHPRIMC1" + "0" * 14  # 2/2 breach — the representative
+    c_dup = "01DASHPRIMC2" + "0" * 14    # 1/2 breach — same cluster, non-canonical
+    eng = create_engine(seeded_db)
+    try:
+        with Session(eng) as s:
+            for pid, canon in ((c_worst, True), (c_dup, False)):
+                s.add(
+                    AttackPrimitiveORM(
+                        primitive_id=pid, cluster_id=cluster, canonical=canon,
+                        family=fam, secondary_families=[], vector="user_turn",
+                        title=f"collapse test {pid[-1]}", short_description="d",
+                        payload_template="ignore previous and {x}", payload_slots={"x": "go"},
+                        multi_turn_sequence=None, target_models_claimed=[],
+                        claimed_success_rate=None, claimed_first_seen=None,
+                        reproducibility_score=7, requires_multi_turn=False,
+                        requires_system_prompt_access=False, requires_tools=[],
+                        requires_multimodal=False, discovered_at=RUN_DATE,
+                        base_severity="high", severity_rationale="r", notes=None,
+                    )
+                )
+            s.add(_breach_row(primitive_id=c_worst, trial_index=0, verdict="full_breach"))
+            s.add(_breach_row(primitive_id=c_worst, trial_index=1, verdict="full_breach"))
+            s.add(_breach_row(primitive_id=c_dup, trial_index=0, verdict="full_breach"))
+            s.add(_breach_row(primitive_id=c_dup, trial_index=1, verdict="evaded"))
+            s.commit()
+
+        r = client.get(
+            "/api/breaches/cell",
+            params={"family": fam, "config": CONFIG_ID, "scope": "all-time", "attacker": "baseline"},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["n_primitives"] == 1, body["primitives"]
+        assert body["primitives"][0]["primitive_id"] == c_worst  # worst member wins
+    finally:
+        with Session(eng) as s:
+            s.execute(delete(BreachResultORM).where(
+                BreachResultORM.primitive_id.in_([c_worst, c_dup])))
+            s.execute(delete(AttackPrimitiveORM).where(
+                AttackPrimitiveORM.primitive_id.in_([c_worst, c_dup])))
+            s.commit()
+
+
 # --------------------------------------------------------------------------- #
 # /api/brief
 # --------------------------------------------------------------------------- #

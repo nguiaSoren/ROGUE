@@ -50,6 +50,34 @@ def test_no_skip_extract_when_hash_is_none() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Tier A′ — should_skip_extract_url (URL-level, single-technique sources)
+# --------------------------------------------------------------------------- #
+
+
+def test_skip_extract_url_for_known_arxiv() -> None:
+    # We already have a primitive from this arxiv URL; a re-harvest only
+    # re-derives it (paraphrase-drift dup), so skip regardless of byte hash.
+    fc = FetchCache(snapshot={}, extracted_urls={"https://arxiv.org/abs/2510.05699"})
+    assert fc.should_skip_extract_url("https://arxiv.org/abs/2510.05699", "arxiv") is True
+
+
+def test_no_skip_extract_url_for_new_arxiv() -> None:
+    fc = FetchCache(snapshot={}, extracted_urls={"https://arxiv.org/abs/2510.05699"})
+    assert fc.should_skip_extract_url("https://arxiv.org/abs/2605.99999", "arxiv") is False
+
+
+def test_no_skip_extract_url_for_multi_artifact_source() -> None:
+    # A github jailbreak dump legitimately yields many primitives per URL and can
+    # grow across fetches — URL-level skip must NOT fire for it even if seen.
+    fc = FetchCache(snapshot={}, extracted_urls={"https://raw.githubusercontent.com/x/JB.mkd"})
+    assert fc.should_skip_extract_url("https://raw.githubusercontent.com/x/JB.mkd", "github") is False
+
+
+def test_no_skip_extract_url_when_unset() -> None:
+    assert FetchCache(snapshot={}).should_skip_extract_url("https://arxiv.org/abs/1", "arxiv") is False
+
+
+# --------------------------------------------------------------------------- #
 # Tier B — should_skip_fetch (version token)
 # --------------------------------------------------------------------------- #
 

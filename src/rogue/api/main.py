@@ -1030,6 +1030,7 @@ def breach_cell(
                 WITH per_tech AS (
                     SELECT
                         br.primitive_id,
+                        ap.cluster_id,
                         CASE
                             WHEN br.pair_attacker_total_cost_usd IS NOT NULL THEN 'pair'
                             WHEN br.persona_used IS NOT NULL THEN 'persona'
@@ -1051,7 +1052,7 @@ def breach_cell(
                       AND br.deployment_config_id = :cfg
                       {date_filter}
                       {technique_filter}
-                    GROUP BY br.primitive_id, technique
+                    GROUP BY br.primitive_id, ap.cluster_id, technique
                 ),
                 ranked AS (
                     SELECT *,
@@ -1064,8 +1065,17 @@ def breach_cell(
                     SELECT DISTINCT ON (primitive_id) *
                     FROM ranked
                     ORDER BY primitive_id, any_breach_rate DESC, full_breach_rate DESC
+                ),
+                -- Collapse same-source re-harvests: one row per cluster (the
+                -- worst-breaching member), so a paper re-extracted N times shows
+                -- once. Clusters are set by dedupe/embeddings + the arxiv URL
+                -- repair; distinct techniques carry distinct cluster_ids.
+                by_cluster AS (
+                    SELECT DISTINCT ON (cluster_id) *
+                    FROM worst
+                    ORDER BY cluster_id, any_breach_rate DESC, full_breach_rate DESC
                 )
-                SELECT * FROM worst
+                SELECT * FROM by_cluster
                 WHERE n_breach > 0
                 ORDER BY any_breach_rate DESC, full_breach_rate DESC
                 """
@@ -1077,24 +1087,32 @@ def breach_cell(
         rows = db.execute(
             text(
                 """
-                SELECT bm.primitive_id, bm.n_trials, bm.any_breach_rate,
-                       bm.full_breach_rate, bm.avg_confidence,
-                       COALESCE(jr.refused, false) AS refused
-                FROM breach_matrix bm
-                JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
-                LEFT JOIN (
-                    SELECT primitive_id, deployment_config_id, ran_at::date AS rd,
-                           bool_or(judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
-                    FROM breach_results GROUP BY 1, 2, 3
-                ) jr
-                  ON jr.primitive_id = bm.primitive_id
-                 AND jr.deployment_config_id = bm.deployment_config_id
-                 AND jr.rd = bm.run_date
-                WHERE bm.run_date = :d
-                  AND ap.family = :fam
-                  AND bm.deployment_config_id = :cfg
-                  AND bm.any_breach_rate > 0
-                ORDER BY bm.any_breach_rate DESC, bm.full_breach_rate DESC
+                -- Collapse same-source re-harvests to one row per cluster (worst
+                -- member) so a re-extracted paper shows once, not N times.
+                SELECT primitive_id, n_trials, any_breach_rate,
+                       full_breach_rate, avg_confidence, refused
+                FROM (
+                    SELECT DISTINCT ON (ap.cluster_id)
+                           bm.primitive_id, bm.n_trials, bm.any_breach_rate,
+                           bm.full_breach_rate, bm.avg_confidence,
+                           COALESCE(jr.refused, false) AS refused
+                    FROM breach_matrix bm
+                    JOIN attack_primitives ap ON ap.primitive_id = bm.primitive_id
+                    LEFT JOIN (
+                        SELECT primitive_id, deployment_config_id, ran_at::date AS rd,
+                               bool_or(judge_rationale LIKE '[JUDGE_REFUSED%') AS refused
+                        FROM breach_results GROUP BY 1, 2, 3
+                    ) jr
+                      ON jr.primitive_id = bm.primitive_id
+                     AND jr.deployment_config_id = bm.deployment_config_id
+                     AND jr.rd = bm.run_date
+                    WHERE bm.run_date = :d
+                      AND ap.family = :fam
+                      AND bm.deployment_config_id = :cfg
+                      AND bm.any_breach_rate > 0
+                    ORDER BY ap.cluster_id, bm.any_breach_rate DESC, bm.full_breach_rate DESC
+                ) s
+                ORDER BY any_breach_rate DESC, full_breach_rate DESC
                 """
             ),
             {"d": target, "fam": family, "cfg": config_id},
