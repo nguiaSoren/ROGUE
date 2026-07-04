@@ -118,11 +118,15 @@ def demo_deployment_configs() -> list[DeploymentConfig]:
     # retry per Day-1 STATUS), swap back to `groq/llama-3.1-8b-instant`
     # to reclaim the ~30% cost saving.
     models = [
-        ("acme-gpt54nano", "openai/gpt-5.4-nano", "Acme · GPT-5.4 Nano"),
-        ("acme-claudehaiku", "anthropic/claude-haiku-4-5", "Acme · Claude Haiku"),
-        ("acme-llama3", "meta-llama/llama-3.1-8b-instruct", "Acme · Llama-3.1-8B-Instruct"),
-        ("acme-mistralsm", "mistralai/mistral-small-2603", "Acme · Mistral Small 4"),
-        ("acme-geminiflashlite", "google/gemini-3.1-flash-lite", "Acme · Gemini 3.1 Flash-Lite"),
+        # Display `name` is the model label only — no placeholder customer.
+        # (The config_id slug + customer_id stay "acme-"/"acme" as internal
+        # identifiers behind QR links / FKs; the deployment context lives in
+        # the support-assistant system_prompt, not a fake company name.)
+        ("acme-gpt54nano", "openai/gpt-5.4-nano", "GPT-5.4 Nano"),
+        ("acme-claudehaiku", "anthropic/claude-haiku-4-5", "Claude Haiku"),
+        ("acme-llama3", "meta-llama/llama-3.1-8b-instruct", "Llama-3.1-8B-Instruct"),
+        ("acme-mistralsm", "mistralai/mistral-small-2603", "Mistral Small 4"),
+        ("acme-geminiflashlite", "google/gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite"),
     ]
     return [
         DeploymentConfig(
