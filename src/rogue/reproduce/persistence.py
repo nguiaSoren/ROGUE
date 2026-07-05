@@ -113,6 +113,35 @@ def persist_breach_rows(
     return persisted, failed
 
 
+def persist_agent_exec_rows(database_url: str, rows: list) -> tuple[int, int]:
+    """Persist agent-exec results — ``[(BreachResultORM, AgentTranscriptORM, [TraceFindingORM])]``
+    from ``reproduce.agent.tier.to_persistence_rows`` — with the FK chain intact (breach → 1:1
+    transcript → N findings, per CRIT-2). Relational ``add`` (not bulk insert) so the CASCADE FKs
+    resolve. Best-effort: logs + returns ``(persisted, failed)``; NEVER raises — a persistence
+    failure must not break the customer's scan. Returns row-SETS committed/failed."""
+    if not rows:
+        return 0, 0
+    engine = create_engine(database_url, pool_pre_ping=True)
+    persisted = failed = 0
+    try:
+        with Session(engine) as session:
+            for breach, transcript, findings in rows:
+                try:
+                    session.add(breach)
+                    session.add(transcript)
+                    session.add_all(findings)
+                    session.commit()
+                    persisted += 1
+                except Exception as exc:  # noqa: BLE001 — one bad row-set must not sink the rest
+                    session.rollback()
+                    failed += 1
+                    logger.warning("agent-exec persist failed for %s: %s", getattr(breach, "breach_id", "?"), exc)
+    finally:
+        engine.dispose()
+    logger.info("agent-exec persist: %d row-set(s) committed, %d failed", persisted, failed)
+    return persisted, failed
+
+
 def upsert_deployment_config(config: DeploymentConfig, database_url: str) -> None:
     """Insert-or-update the deployment-config row so the dashboard can show this target as a
     /matrix column. `base_url` is excluded — it has no ORM column (ephemeral scan-time routing
@@ -125,7 +154,10 @@ def upsert_deployment_config(config: DeploymentConfig, database_url: str) -> Non
                 .filter_by(config_id=config.config_id)
                 .first()
             )
-            fields = config.model_dump(exclude={"base_url"})
+            # base_url + live_tool_target are ephemeral scan-time routing/target fields with no
+            # (or intentionally no) ORM column — live_tool_target carries auth-header secrets we do
+            # not persist. tool_specs (Level 1 BYO schema, no secrets) DOES persist.
+            fields = config.model_dump(exclude={"base_url", "live_tool_target"})
             if existing is None:
                 session.add(DeploymentConfigORM(**fields))
             else:

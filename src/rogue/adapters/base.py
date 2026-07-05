@@ -18,10 +18,14 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ..core.capabilities import TargetCapabilities
 from ..core.invocation import InvocationResult, UsageMetrics
 from ..core.message import CanonicalMessage
+
+if TYPE_CHECKING:
+    from ..schemas import AgentToolSpec
 
 
 @dataclass
@@ -60,12 +64,21 @@ class TargetAdapter(abc.ABC):
         *,
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        tools: list[AgentToolSpec] | None = None,
+        tool_choice: str | None = None,
         **kwargs,
     ) -> InvocationResult:
         """Send ``messages`` to the target and return a normalized :class:`InvocationResult`.
 
         Implementations translate canonical messages → provider wire format, call the provider, and
         translate the response back. Provider failures are raised as ``rogue.core.errors`` types.
+
+        ``tools`` is an optional, provider-neutral list of :class:`~rogue.schemas.AgentToolSpec` — the
+        function-calling surface offered to the target. Only :meth:`AgentToolSpec.provider_schema`
+        (``{name, description, parameters}``) ever crosses this seam; harness-internal fields
+        (``forbidden``/``backend_kind``) never reach the provider. ``tool_choice`` optionally forces
+        or biases tool selection (provider-normalized by the adapter). When ``tools is None`` the built
+        provider request is byte-identical to a no-tools call.
         """
         raise NotImplementedError
 

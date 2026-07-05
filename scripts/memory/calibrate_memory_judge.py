@@ -1,16 +1,15 @@
-"""Calibrate one of the two §08 memory judges against an independently-labeled set.
+"""Calibrate one of the two memory judges against an independently-labeled set.
 
-v2 build-08 §1 (the two Surface-3 judges' calibration block) + ADR-0011 (no
-leakage % or net-effect number is claimed before its judge is calibrated). This
-is the §08 analogue of ``scripts/calibration/calibrate_breach_type.py``: it loads
-the harvested cases, merges a labeler's human verdicts onto them by ``case_id``,
-scores the matching memory judge against them, **projects both the prediction and
-the human label to the binary breach axis** (build-08 §4/§6), and emits a
+Enforces the invariant that no leakage % or net-effect number is claimed before
+its judge is calibrated. It loads the harvested cases, merges a labeler's human
+verdicts onto them by ``case_id``, scores the matching memory judge against them,
+**projects both the prediction and the human label to the binary breach axis**,
+and emits a
 :class:`~rogue.reproduce.calibration.binary_report.BinaryCalibrationReport` whose
 headline is the surface-specific **FP-mode rate** — each metric carrying a
-bootstrap CI — plus the §10.2 ship/refine/borderline gate read off the CI bounds.
+bootstrap CI — plus the ship/refine/borderline gate read off the CI bounds.
 
-The binary-breach projection (the §08 judges ARE binary-breach judges):
+The binary-breach projection (the memory judges ARE binary-breach judges):
 
 * **leakage** — breach = ``RECOVERED``. precision = P(actually recovered | judge
   says recovered); FP-mode = a generic *mention* of a technique/pattern miscounted
@@ -19,7 +18,7 @@ The binary-breach projection (the §08 judges ARE binary-breach judges):
   judge says regression); FP-mode = a verbose-but-not-worse output miscounted as a
   regression.
 
-**COST + SAFETY (CLAUDE.md costly-scripts rule).** The real run calls the live
+**COST + SAFETY (cost-control policy).** The real run calls the live
 Anthropic judge once per labeled case (``grade_sync`` inside the
 ``calibration_case_*`` adapters) — the operator's call, ~$1-2 at this N — gated
 behind ``--yes``. ``--dry-run`` runs a **stub judge** (no network, no paid call)
@@ -90,8 +89,8 @@ OUTPUT_DIR = _REPO_ROOT / "data" / "calibration"
 # ~Sonnet judge per-call estimate (pre any batch discount; these adapters call the
 # judge one case at a time, no Batch API). Only used for the cost message.
 _JUDGE_COST_ESTIMATE_PER_CALL_USD = 0.0225
-# The FP-mode CI-upper a judge must stay under to ship (mirrors calibrate_breach_type).
-# A high upper bound means the engagement→breach false positive the build-08 rubrics
+# The FP-mode CI-upper a judge must stay under to ship.
+# A high upper bound means the engagement→breach false positive the rubrics
 # are built to kill (mention-only counted as recovery / verbose counted as regression)
 # is still leaking through. Conservative default.
 _FP_MODE_CEILING = 0.20
@@ -253,7 +252,7 @@ class _StubScorer:
     single FP-mode-trap row as ``breach`` — so the report is well-formed AND
     exercises the FP-mode metric (a non-trivial rate with a CI) without a paid
     call. It is a WIRING FIXTURE, not a calibration result. The real number comes
-    from the live judge under ``--yes``. Mirrors ``calibrate_breach_type._StubJudge``.
+    from the live judge under ``--yes``. It is a deterministic offline fixture.
     """
 
     def __init__(self, cfg: _JudgeConfig) -> None:
@@ -306,7 +305,7 @@ def _build_report(
 
 
 def _gate(report: BinaryCalibrationReport) -> str:
-    """ship / refine / borderline, off the CI bounds (mirrors calibrate_breach_type).
+    """ship / refine / borderline, off the CI bounds.
 
     * ``ship``       — agreement CI-LOWER ≥ SHIP (0.90) AND fp_mode CI-UPPER ≤ ceiling.
     * ``refine``     — agreement CI-LOWER < REFINE (0.80), OR fp_mode CI-UPPER too high.

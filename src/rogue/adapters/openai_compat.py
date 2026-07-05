@@ -14,16 +14,24 @@ Wire-format note: ``_to_openai_messages`` reproduces the panel's exact shape —
 STRING for text-only turns (the legacy ``{role, content:str}`` form the panel sent), and a content
 LIST (text part first, then media parts) only when an image/audio/tool block is present. See
 ``target_panel._attach_image_to_last_user`` / ``_attach_audio_to_last_user`` for the original.
+
+Tool-calling: the agent execution harness (docs/v2/agent_harness/DESIGN.md) offers targets a REAL
+function-calling surface. When ``invoke`` is given ``tools``, each :class:`AgentToolSpec` is translated
+via :meth:`AgentToolSpec.provider_schema` into the OpenAI ``{"type":"function","function":{...}}`` wire
+shape; the response's ``message.tool_calls`` are parsed back into :class:`ToolCallBlock`s. When
+``tools`` is ``None``/empty the request body is byte-identical to a no-tools call.
 """
 
 from __future__ import annotations
 
+import json
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import (
     AudioBlock,
     CanonicalMessage,
+    ContentBlock,
     ImageBlock,
     InvocationResult,
     StopReason,
@@ -36,6 +44,16 @@ from ..core.capabilities import TargetCapabilities
 from . import model_specs
 from ._provider_errors import map_provider_exception, with_provider_retry
 from .base import AdapterConfig, TargetAdapter
+
+if TYPE_CHECKING:
+    from ..schemas import AgentToolSpec
+
+# Marker key stashed in ``ToolCallBlock.arguments`` when the provider returned tool-call arguments
+# that were not a valid JSON object. We keep ``arguments`` a plain dict (no OpenAI-specific sentinel
+# type crossing the seam) and record the raw payload under this key, so the harness can DETECT the
+# malformed call (``MALFORMED_ARGS_KEY in block.arguments``) and inspect the raw string, rather than
+# silently treating it as an empty-args call.
+MALFORMED_ARGS_KEY = "_malformed"
 
 
 class OpenAICompatAdapter(TargetAdapter):
@@ -110,9 +128,12 @@ class OpenAICompatAdapter(TargetAdapter):
         (plain string), while a message carrying image/audio becomes ``{role, content: [parts...]}``
         with the text part first (only if there is text) and one media part per block.
 
-        Tool blocks are translated best-effort (ROGUE does not send tools to targets): a
-        :class:`ToolCallBlock` is emitted as an ``assistant`` ``tool_calls`` entry and a
-        :class:`ToolResultBlock` as a separate ``{"role": "tool", ...}`` message.
+        Tool blocks close the multi-turn agent loop: a :class:`ToolCallBlock` is emitted as an
+        ``assistant`` ``tool_calls`` entry, and a :class:`ToolResultBlock` as a separate
+        ``{"role": "tool", "tool_call_id", ...}`` message. A message carrying ONLY tool results is
+        fully emitted by the tool-result loop and MUST NOT fall through to the text branch (which
+        would append a spurious ``{"role": "tool", "content": ""}`` with no ``tool_call_id`` — an
+        OpenAI 400 on every feedback turn).
         """
         out: list[dict[str, Any]] = []
         for m in messages:
@@ -130,10 +151,14 @@ class OpenAICompatAdapter(TargetAdapter):
                     {"role": "tool", "tool_call_id": tr.tool_call_id, "content": tr.result}
                 )
 
+            # A message carrying only tool results is fully emitted above; don't fall through to the
+            # text branch (mirrors the tool_calls `continue`) — it would append an empty, id-less
+            # {"role": "tool", "content": ""} that OpenAI rejects with a 400 (M1).
+            if tool_results and not (joined_text or images or audios or tool_calls):
+                continue
+
             # ToolCallBlocks attach to an assistant message as `tool_calls`.
             if tool_calls:
-                import json  # noqa: PLC0415 - only needed on the rare tool-call path
-
                 entry: dict[str, Any] = {
                     "role": role,
                     "content": joined_text or None,
@@ -177,6 +202,52 @@ class OpenAICompatAdapter(TargetAdapter):
                 out.append({"role": role, "content": joined_text})
         return out
 
+    @staticmethod
+    def _tools_to_openai(tools: list[AgentToolSpec]) -> list[dict[str, Any]]:
+        """Translate provider-neutral :class:`AgentToolSpec`s to OpenAI ``tools`` wire dicts.
+
+        Only :meth:`AgentToolSpec.provider_schema` (``{name, description, parameters}``) crosses the
+        seam — harness-internal fields (``forbidden``/``backend_kind``) never reach the provider.
+        """
+        wire: list[dict[str, Any]] = []
+        for spec in tools:
+            fn = spec.provider_schema()
+            wire.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": fn["name"],
+                        "description": fn["description"],
+                        "parameters": fn["parameters"],
+                    },
+                }
+            )
+        return wire
+
+    @staticmethod
+    def _parse_tool_calls(message: Any) -> list[ToolCallBlock]:
+        """Parse an OpenAI response message's ``tool_calls`` into :class:`ToolCallBlock`s.
+
+        Each entry's ``function.arguments`` is a JSON *string*; we decode it to a dict. If it is not
+        valid JSON (or not a JSON object), we record it under :data:`MALFORMED_ARGS_KEY` instead of
+        leaking an OpenAI-specific sentinel up the stack (M10).
+        """
+        raw_calls = getattr(message, "tool_calls", None) or []
+        blocks: list[ToolCallBlock] = []
+        for tc in raw_calls:
+            fn = getattr(tc, "function", None)
+            name = getattr(fn, "name", None) or ""
+            raw_args = getattr(fn, "arguments", None) or ""
+            try:
+                parsed = json.loads(raw_args) if raw_args else {}
+            except (ValueError, TypeError):
+                parsed = None
+            arguments = parsed if isinstance(parsed, dict) else {MALFORMED_ARGS_KEY: raw_args}
+            blocks.append(
+                ToolCallBlock(id=getattr(tc, "id", None) or "", name=name, arguments=arguments)
+            )
+        return blocks
+
     # ----- Public API -------------------------------------------------------------------------
 
     async def invoke(
@@ -185,11 +256,16 @@ class OpenAICompatAdapter(TargetAdapter):
         *,
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        tools: list[AgentToolSpec] | None = None,
+        tool_choice: str | None = None,
         **kwargs,
     ) -> InvocationResult:
         client = self._client()
         msgs = self._to_openai_messages(messages)
         wire_model = self._wire_model
+        # Only build the tools payload when tools are actually offered — an empty/None list must
+        # leave the request body byte-identical to a no-tools call (shared contract §1).
+        wire_tools = self._tools_to_openai(tools) if tools else None
 
         @with_provider_retry
         async def _do_call() -> Any:
@@ -202,6 +278,12 @@ class OpenAICompatAdapter(TargetAdapter):
             # provider-specific (OpenAI gpt-5.x wants max_completion_tokens; see _max_tokens_param).
             if max_output_tokens:
                 create_kwargs[self._max_tokens_param] = max_output_tokens
+            if wire_tools:
+                create_kwargs["tools"] = wire_tools
+                # OpenAI accepts "auto"/"none"/"required" (or a specific function); pass through
+                # only when the caller set it AND we are actually sending tools.
+                if tool_choice is not None:
+                    create_kwargs["tool_choice"] = tool_choice
             return await client.chat.completions.create(**create_kwargs)
 
         t0 = time.perf_counter()
@@ -220,11 +302,21 @@ class OpenAICompatAdapter(TargetAdapter):
 
         content_text = ""
         finish_reason: str | None = None
+        tool_call_blocks: list[ToolCallBlock] = []
         choices = getattr(response, "choices", None)
         if choices:
             message = choices[0].message
             content_text = getattr(message, "content", None) or ""
             finish_reason = getattr(choices[0], "finish_reason", None)
+            tool_call_blocks = self._parse_tool_calls(message)
+
+        # Text first, then tool calls, in order. Preserve the legacy no-tools shape exactly: a
+        # response with no tool calls always yields a single (possibly empty) TextBlock; a response
+        # with tool calls omits the empty TextBlock and carries only the tool-call blocks.
+        blocks: list[ContentBlock] = []
+        if content_text or not tool_call_blocks:
+            blocks.append(TextBlock(text=content_text))
+        blocks.extend(tool_call_blocks)
 
         try:
             raw = response.model_dump()
@@ -232,7 +324,7 @@ class OpenAICompatAdapter(TargetAdapter):
             raw = {}
 
         return InvocationResult(
-            content=[TextBlock(text=content_text)],
+            content=blocks,
             usage=UsageMetrics.from_io(
                 tokens_in,
                 tokens_out,
@@ -246,11 +338,14 @@ class OpenAICompatAdapter(TargetAdapter):
         )
 
     async def capabilities(self) -> TargetCapabilities:
+        # Tool support is a per-model fact, not a blanket provider claim — delegate to the spec
+        # table so unknown models correctly report False (fixes the old hardcoded over-claim).
+        tools_ok = model_specs.supports_tools(self.model)
         return model_specs.capabilities_for(
             self._price_key,
-            supports_tools=True,
+            supports_tools=tools_ok,
             supports_json_mode=True,
-            supports_function_calling=True,
+            supports_function_calling=tools_ok,
         )
 
     async def healthcheck(self) -> bool:
@@ -269,4 +364,4 @@ class OpenAICompatAdapter(TargetAdapter):
         return UsageMetrics.from_io(tokens_in, tokens_out, estimated_cost_usd=cost)
 
 
-__all__ = ["OpenAICompatAdapter"]
+__all__ = ["OpenAICompatAdapter", "MALFORMED_ARGS_KEY"]

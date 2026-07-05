@@ -227,6 +227,12 @@ async def run_scan(
     escalate_planner: Any = None,
     escalate_n_trials: int = 1,
     escalate_max_spend: float | None = 2.00,
+    agent_exec: bool = True,
+    agent_exec_seeds: int = 3,
+    agent_exec_framing: str = "raw",
+    agent_exec_runner: Any = None,
+    agent_exec_adapter: Any = None,
+    agent_exec_database_url: str | None = None,
 ) -> ScanReport:
     """Run ``primitives`` against the target described by ``config`` and grade the responses.
 
@@ -416,6 +422,33 @@ async def run_scan(
             await persona.aclose()
         if owns_planner and escalate_planner is not None:
             await escalate_planner.aclose()
+
+    # AGENT_EXEC stage (Phase 7-live) — for a tool-bearing customer config, run the agentic tier
+    # over the agentic primitives and fold breaches in as (agentic) Findings. INERT when the config
+    # declares no tools (every text-only customer) → existing scans byte-identical. Custom endpoints
+    # (base_url) are attempted fail-soft; known models are gated on model_specs.supports_tools.
+    if agent_exec and (config.declared_tools or config.live_tool_target is not None):
+        from .adapters import model_specs  # noqa: PLC0415 — lazy
+        if config.base_url or model_specs.supports_tools(config.target_model):
+            from .reproduce.agent.scan_stage import run_agent_exec_stage  # noqa: PLC0415
+            from .reproduce.agent.tier import AgentExecConfig, AgentExecRunner  # noqa: PLC0415
+
+            _runner = agent_exec_runner or AgentExecRunner(
+                AgentExecConfig(enabled=True), adapter_extra=adapter_extra
+            )
+            stage = await run_agent_exec_stage(
+                config, primitives, runner=_runner, seeds=agent_exec_seeds,
+                framing=agent_exec_framing, adapter=agent_exec_adapter,
+                want_persist=bool(agent_exec_database_url),
+            )
+            findings.extend(stage.findings)
+            n_breaches += stage.n_breaching
+            total_cost += stage.cost_usd
+            # Phase 7-live-e: persist the transcript + trace-findings chain (best-effort, never
+            # raises) when a DB is provided. Report-only (SDK) path leaves it None → no DB write.
+            if agent_exec_database_url and stage.persist_rows:
+                from .reproduce.persistence import persist_agent_exec_rows  # noqa: PLC0415
+                persist_agent_exec_rows(agent_exec_database_url, stage.persist_rows)
 
     findings.sort(key=lambda f: f.success_rate, reverse=True)
     target = config.base_url or config.target_model

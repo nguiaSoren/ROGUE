@@ -480,6 +480,10 @@ class DefaultScanEngine(ScanEngine):
             judge=self._judge,
             judge_model=self._judge_model,
             progress=progress,
+            # Agent-exec is auto-on for tool-bearing configs; a ScanSpec may override per-scan.
+            agent_exec=getattr(spec, "agent_exec", True),
+            agent_exec_seeds=getattr(spec, "agent_exec_seeds", 3),
+            agent_exec_framing=getattr(spec, "agent_exec_framing", "raw"),
         )
 
     # --- operation #2: validate ---------------------------------------------------------------

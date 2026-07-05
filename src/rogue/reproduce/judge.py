@@ -479,6 +479,15 @@ class JudgeAgent:
         self.fallback_model: str = fallback_model or os.environ.get(
             "JUDGE_FALLBACK_MODEL", "deepseek/deepseek-v4-flash"
         )
+        # Provider's echoed served-model (response.model / completion.model),
+        # captured per grade as a remap-integrity check — it records which model
+        # actually answered. NOT necessarily a dated snapshot: model lines that
+        # ship flat (e.g. claude-sonnet-4-6) echo the same string as the alias,
+        # so this pins weights only as far as the provider versions them.
+        self._last_resolved_model: str | None = None
+        # OpenRouter routes to a backend per call; we record which provider served
+        # each grade (and can pin it via env) so an open-judge result reproduces.
+        self._last_resolved_provider: str | None = None
 
         prompt_path = Path(__file__).parent / "prompts" / rubric_filename
         if not prompt_path.exists():
@@ -777,6 +786,7 @@ class JudgeAgent:
         response = await self._anthropic_client.messages.create(
             **self.anthropic_grade_kwargs(user_message)
         )
+        self._last_resolved_model = getattr(response, "model", None)
 
         if getattr(response, "stop_reason", None) == "refusal":
             # Hard model-safety refusal (empty output). Deterministic — do NOT
@@ -831,16 +841,51 @@ class JudgeAgent:
                 max_retries=_MAX_RETRIES,
             )
 
-        completion = await self._openrouter_client.chat.completions.create(
+        # Reproducibility pin: OpenRouter routes to a backend per call, so pin the
+        # provider and/or quantization from env when set (JUDGE_OPENROUTER_PROVIDER,
+        # JUDGE_OPENROUTER_QUANT; the legacy ROGUE_OPENROUTER_* names are still honored
+        # as a fallback) and record what actually served. Without a pin the behaviour
+        # is unchanged; with one, "re-run our open judge" is bit-exact.
+        _create: dict[str, Any] = dict(
             model=model_id,  # OpenRouter id used verbatim
             max_tokens=1024,
             messages=[
                 {"role": "system", "content": self.prompt},
-                {
-                    "role": "user",
-                    "content": user_message + _SECONDARY_JUDGE_INSTRUCTION,
-                },
+                {"role": "user", "content": user_message + _SECONDARY_JUDGE_INSTRUCTION},
             ],
+        )
+        _pin: dict[str, Any] = {}
+
+        def _pin_env(suffix: str) -> str:
+            # Neutral JUDGE_OPENROUTER_* prefix, falling back to legacy ROGUE_OPENROUTER_*.
+            return (
+                os.environ.get("JUDGE_OPENROUTER_" + suffix)
+                or os.environ.get("ROGUE_OPENROUTER_" + suffix)
+                or ""
+            ).strip()
+
+        _order = _pin_env("PROVIDER")
+        _quant = _pin_env("QUANT")
+        if _order:
+            _pin["order"] = [p.strip() for p in _order.split(",") if p.strip()]
+            _pin["allow_fallbacks"] = False
+        if _quant:
+            _pin["quantizations"] = [q.strip() for q in _quant.split(",") if q.strip()]
+        if _pin:
+            _create["extra_body"] = {"provider": _pin}
+        # Opt-in deterministic decoding: with a provider+quant pin above, setting
+        # JUDGE_OPENROUTER_TEMPERATURE (legacy ROGUE_OPENROUTER_TEMPERATURE honored)
+        # makes "re-run our open judge" stable rather than a ±sampling-noise draw.
+        # Unset → provider default sampling, so the production / secondary-judge path
+        # is unchanged.
+        _temp = _pin_env("TEMPERATURE")
+        if _temp:
+            _create["temperature"] = float(_temp)
+        completion = await self._openrouter_client.chat.completions.create(**_create)
+        self._last_resolved_model = getattr(completion, "model", None)
+        self._last_resolved_provider = (
+            getattr(completion, "provider", None)
+            or (getattr(completion, "model_extra", None) or {}).get("provider")
         )
 
         text = completion.choices[0].message.content or ""
@@ -883,6 +928,7 @@ class JudgeAgent:
             ],
             response_format=_JudgeResultRaw,
         )
+        self._last_resolved_model = getattr(completion, "model", None)
 
         parsed = completion.choices[0].message.parsed
         if parsed is None:

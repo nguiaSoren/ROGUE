@@ -65,6 +65,7 @@ sanitize() {  # scrub known identity strings in the STAGED COPIES only (repo ori
       -e 's/# P[1-4] /# /g' \
       -e 's# (P[1-4])##g' \
       -e 's#(P[1-4] #(#g' \
+      -e 's#[[:<:]]P\([0-4]\)[[:>:]]#Sev-\1#g' \
       -e 's#p2_kappa#kappa#g' \
       -e 's#CLAUDE\.md costly-scripts rule#an internal cost-control policy#g' \
       -e 's#CLAUDE\.md#an internal policy doc#g' \
@@ -135,6 +136,26 @@ build p2 anon_supplement_PAPERS_p2.md \
   "data/calibration/agentdojo_unauth_corpus.jsonl" \
   "data/calibration/agentdojo_unauth_judge_items.jsonl" \
   "data/calibration/agentdojo_unauth_divergences.json" \
+  "data/calibration/agentdojo_unauth_corpus_travel.jsonl" \
+  "data/calibration/agentdojo_unauth_judge_items_travel.jsonl" \
+  "data/calibration/agentdojo_unauth_divergences_travel.json" \
+  "data/calibration/agentdojo_unauth_corpus_workspace.jsonl" \
+  "data/calibration/agentdojo_unauth_judge_items_workspace.jsonl" \
+  "data/calibration/agentdojo_unauth_divergences_workspace.json" \
+  "data/calibration/injecagent_unauth_corpus.jsonl" \
+  "data/calibration/injecagent_unauth_judge_items_exec.jsonl" \
+  "data/calibration/injecagent_unauth_judge_items.jsonl" \
+  "data/calibration/injecagent_unauth_divergences.json" \
+  "data/calibration/unauthorized_action_injecagent_report.json" \
+  "data/calibration/jbb_judge_report_v3_qwen3-32b.json" \
+  "data/calibration/jbb_judge_report_v3_gpt-oss-120b.json" \
+  "data/calibration/jbb_judge_report_v3_kimi-k2.json" \
+  "data/calibration/jbb_judge_report_v3_gemma-3-27b-it.json" \
+  "data/calibration/jbb_judge_report_v3_deepseek-chat-v3-1.json" \
+  "data/calibration/jbb_judge_report_v3_llama-3-3-70b-instruct.json" \
+  "data/calibration/jbb_judge_report_v3_llama-3-1-8b-instruct.json" \
+  "data/calibration/jbb_judge_report_v3_hermes-3-llama-3-1-70b.json" \
+  "data/calibration/jbb_judge_report_v3_mistral-small-3-2-24b-instruct.json" \
   "data/calibration/jbb_judge_report_v3_gpt-5-4.json" \
   "data/calibration/frozen_cited/jbb_judge_report_v3_qwen-2-5-72b-instruct.json" \
   "data/calibration/frozen_cited/jbb_judge_report_v3_qwen-2-5-72b-instruct.anchor-deepinfra-fp8-t0.json" \
@@ -154,6 +175,8 @@ build p2 anon_supplement_PAPERS_p2.md \
   scripts/calibration/calibrate_breach_type.py \
   scripts/calibration/recompute_p2_calibration.py \
   scripts/calibration/mint_agentdojo_corpus.py \
+  scripts/calibration/mint_injecagent_corpus.py \
+  scripts/calibration/injecagent_wedge.py \
   scripts/calibration/freeze_designed_per_case.py \
   scripts/calibration/eval_jbb_judge_2nd.py \
   scripts/calibration/build_kappa_relabel_html.py \
@@ -189,6 +212,17 @@ build p3 anon_supplement_PAPERS_p3.md \
   scripts/research/p3_objective_classify.py \
   scripts/research/p3_objective_decompose.py \
   scripts/research/p3_reviewer_recomputes.py \
+  data/research/p3_contested_readjudication_evaded.json \
+  data/research/p3_contested_readjudication_partial.json \
+  data/research/p3_contested_index_evaded.json \
+  data/research/p3_contested_index_partial.json \
+  data/research/p3_contested_evaded_sonnet.json \
+  data/research/p3_contested_evaded_qwen.json \
+  data/research/p3_contested_evaded_deepseek.json \
+  data/research/p3_contested_partial_sonnet.json \
+  data/research/p3_contested_partial_qwen.json \
+  data/research/p3_contested_partial_deepseek.json \
+  scripts/research/p3_contested_readjudication.py \
   scripts/research/p3_unfilled_sensitivity.py \
   scripts/research/p3_corpus_table.py \
   scripts/research/p3_v3_from_pairs.py \
@@ -243,6 +277,15 @@ build p4 anon_supplement_PAPERS_p4.md \
   "data/research/skill_leak_alignment_or.json" \
   scripts/memory/leakage_grid_hermes4_or.json \
   "data/research/skill_leak_hermes4_or.json" \
+  scripts/memory/leakage_grid_alignment_or3.json \
+  "data/research/skill_leak_alignment_n100_2026-06-28.json" \
+  tests/fixtures/memory/leakage_canaries_n100.json \
+  scripts/memory/crawl_realskill_canaries.py \
+  tests/fixtures/memory/leakage_canaries_realskill.json \
+  scripts/memory/leakage_grid_isolator_8b_n100.json \
+  "data/research/skill_leak_isolator_8b_n100_2026-06-28.json" \
+  scripts/memory/reconstruction_control.py \
+  scripts/research/skill_leak_alignment_fig.py \
   scripts/memory/trace2skill_pilot.py \
   scripts/memory/assemble_distilled_fixture.py \
   scripts/memory/pin_distilled_sources.py \

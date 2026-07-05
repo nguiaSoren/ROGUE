@@ -1262,11 +1262,7 @@ async def run_escalation_ladder(
                 session.execute(
                     text(
                         "SELECT DISTINCT derived_from_primitive_id FROM attack_primitives "
-                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL "
-                        # Exclude obfuscation-augmentation children (a separate,
-                        # deterministic augmentation) so they don't alter this
-                        # ladder's pre-existing idempotency behaviour.
-                        "AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')"
+                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL"
                     ),
                 ).scalars(),
             )
@@ -1396,10 +1392,6 @@ async def run_synthesis(
                         FROM attack_primitives
                         WHERE synthesized = true
                           AND derived_from_primitive_id IS NOT NULL
-                          -- Exclude obfuscation-augmentation children (a separate
-                          -- deterministic augmentation) so they don't alter this
-                          -- ladder's pre-existing idempotency behaviour.
-                          AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')
                         """
                     ),
                 ).scalars(),

@@ -1028,7 +1028,7 @@ class ExtractionAgent:
         payload = {k: v for k, v in data.items() if k != "is_attack"}
 
         try:
-            return AttackPrimitive.model_validate(payload)
+            primitive = AttackPrimitive.model_validate(payload)
         except ValidationError as exc:
             logger.error(
                 "extraction primitive failed Pydantic validation: model=%s error_count=%d",
@@ -1036,3 +1036,19 @@ class ExtractionAgent:
                 exc.error_count(),
             )
             raise
+
+        # Surface taxonomy misfits as human-review / taxonomy-extension
+        # candidates. The extractor is enum-locked, so a novel technique is
+        # shoehorned into the nearest (family, vector) silently unless flagged.
+        if primitive.taxonomy_fit != "clear":
+            logger.warning(
+                "taxonomy_fit=%s for %r (family=%s vector=%s) emergent_label=%s: %s",
+                primitive.taxonomy_fit,
+                primitive.title,
+                primitive.family.value,
+                primitive.vector.value,
+                primitive.emergent_label or "(none)",
+                primitive.taxonomy_fit_note or "(no note)",
+            )
+
+        return primitive

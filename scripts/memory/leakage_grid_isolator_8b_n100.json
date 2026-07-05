@@ -1,0 +1,9 @@
+{
+  "_doc": "Power the CLEAN alignment isolator (the load-bearing primary arm) to the N=100 real-document canary panel. Same Meta-Llama-3.1-8B base weights with the refusal direction surgically removed (abliteration), on Featherless (the only host for abliterated open weights). Instruct vs its abliterated twin holds size, family, and base weights fixed. 8B has more headroom than the 70B finetune arm, so this both powers the load-bearing contrast (n=20 -> n=100) AND de-ceilings it. Liveness-guarded: a Featherless cold/rate-limited call must ABORT, never fake a 0%.",
+  "provider": "featherless",
+  "base_url": "https://api.featherless.ai/v1",
+  "models": [
+    {"id": "NousResearch/Meta-Llama-3.1-8B-Instruct",            "family": "llama3", "params_b": 8, "alignment": "instruct",    "reasoning": false, "arms": ["isolator_8b_n100"]},
+    {"id": "mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated",    "family": "llama3", "params_b": 8, "alignment": "abliterated", "reasoning": false, "arms": ["isolator_8b_n100"]}
+  ]
+}

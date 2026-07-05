@@ -220,10 +220,10 @@ One engine, one independent standard, the same operation each time: fire inputs 
 
 ROGUE's findings are written up as papers and posts. **[PAPERS.md](PAPERS.md)** is the index, and each entry links to its preprint plus the code and data *in this repo* that reproduces it.
 
-- **Allocation Is a Capability-Growth Mechanism.** In a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · *arXiv `cs.CL`×`cs.CR`, preprint posting soon*
-- **[withheld — under anonymized review].** One gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · *arXiv `cs.CL`×`cs.CR`, preprint posting soon*
-- **[withheld — under anonymized review] Don't Reproduce in Deployment.** Most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.07). · *arXiv `cs.CL`×`cs.CR` (lead paper), preprint posting soon*
-- **[withheld — under anonymized review].** Canary leakage from shared agent skill pools tracks *alignment*, not model size. · *arXiv `cs.CL`×`cs.CR`, also a workshop/blog candidate, posting soon*
+- **Allocation Is a Capability-Growth Mechanism.** In a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · [Zenodo preprint](https://doi.org/10.5281/zenodo.21016849) · *arXiv on conference acceptance*
+- **[withheld — under anonymized review].** One gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · [Zenodo preprint](https://doi.org/[withheld]) · *arXiv on conference acceptance*
+- **[withheld — under anonymized review] Don't Reproduce in Deployment.** Most open-web jailbreaks don't survive as working carriers in deployment context, and a source's claimed rate carries no usable signal (Spearman −0.07). · [Zenodo preprint](https://doi.org/[withheld]) · *arXiv on conference acceptance*
+- **[withheld — under anonymized review].** Canary leakage from shared agent skill pools tracks *alignment*, not model size. · [Zenodo preprint](https://doi.org/[withheld]) · *arXiv on conference acceptance*
 
 ## Deep dives
 

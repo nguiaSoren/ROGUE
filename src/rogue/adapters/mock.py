@@ -9,8 +9,16 @@ every error path without a real provider.
   - ``capabilities``: a :class:`TargetCapabilities` to return (else a sensible text+image+tools default)
   - ``fail``: one of ``rate_limit|auth|timeout|provider|content_policy|validation`` → ``invoke`` raises
   - ``unhealthy``: truthy → ``healthcheck`` returns False
-  - ``emit_tool_call``: truthy → response includes a :class:`ToolCallBlock`
+  - ``emit_tool_call``: truthy → response includes a static ``noop`` :class:`ToolCallBlock`
   - ``reply``: override the canned reply text
+  - ``scripted_tool_calls``: ``list[list[ToolCallBlock]]`` — a deterministic multi-turn script. Each
+    ``invoke`` advances one entry: a non-empty inner list emits those tool calls with
+    ``StopReason.TOOL_CALL``; an empty list (or running off the end of the script) emits a normal text
+    turn with ``StopReason.COMPLETE``. Lets a loop test drive "turn N calls tools, final turn answers"
+    without a real provider. Also settable as the ``scripted_tool_calls=`` constructor argument.
+
+The mock is deterministic and re-runnable: pass ``seed=`` to ``invoke`` (recorded in ``raw_response``)
+when a caller wants an explicit determinism handle; behavior does not depend on wall-clock or RNG.
 """
 
 from __future__ import annotations
@@ -66,8 +74,20 @@ def _estimate_tokens(text: str) -> int:
 class MockAdapter(TargetAdapter):
     """A conformant, deterministic, network-free adapter."""
 
-    def __init__(self, config: AdapterConfig | None = None):
+    def __init__(
+        self,
+        config: AdapterConfig | None = None,
+        *,
+        scripted_tool_calls: list[list[ToolCallBlock]] | None = None,
+    ):
         super().__init__(config or AdapterConfig(model="mock/mock-1"))
+        # A scripted multi-turn tool-call program. The constructor argument wins; otherwise fall back
+        # to config.extra so a mock built purely from an AdapterConfig can still be scripted.
+        script = scripted_tool_calls
+        if script is None:
+            script = self.config.extra.get("scripted_tool_calls")
+        self._scripted_tool_calls: list[list[ToolCallBlock]] | None = script
+        self._turn_index = 0  # advances once per invoke while a script is active
 
     async def invoke(
         self,
@@ -75,6 +95,9 @@ class MockAdapter(TargetAdapter):
         *,
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        tools: list | None = None,
+        tool_choice: str | None = None,
+        seed: int | None = None,
         **kwargs,
     ) -> InvocationResult:
         fail = self.config.extra.get("fail")
@@ -85,6 +108,14 @@ class MockAdapter(TargetAdapter):
 
         if not messages:
             raise ValidationError("invoke requires at least one message", provider="mock")
+
+        # Advance the scripted program (if any) by one turn. A non-empty entry drives a tool-call
+        # turn; an empty entry or running off the end falls through to the normal text turn.
+        scripted_turn: list[ToolCallBlock] | None = None
+        if self._scripted_tool_calls is not None:
+            if self._turn_index < len(self._scripted_tool_calls):
+                scripted_turn = self._scripted_tool_calls[self._turn_index]
+            self._turn_index += 1
 
         last_user_text = next(
             (m.text for m in reversed(messages) if m.text), ""
@@ -100,7 +131,10 @@ class MockAdapter(TargetAdapter):
             stop = StopReason.COMPLETE
 
         content: list = [TextBlock(text=reply)]
-        if self.config.extra.get("emit_tool_call"):
+        if scripted_turn:  # non-empty scripted tool-call turn takes precedence
+            content.extend(scripted_turn)
+            stop = StopReason.TOOL_CALL
+        elif self.config.extra.get("emit_tool_call"):
             content.append(ToolCallBlock(id="call_mock_1", name="noop", arguments={}))
             stop = StopReason.TOOL_CALL
 
@@ -121,6 +155,8 @@ class MockAdapter(TargetAdapter):
                 "model": self.model,
                 "n_messages": len(messages),
                 "temperature": clamped,
+                "seed": seed,
+                "turn": self._turn_index,
             },
         )
 

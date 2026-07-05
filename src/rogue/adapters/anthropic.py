@@ -23,16 +23,19 @@ from __future__ import annotations
 
 import os
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import (
     AudioBlock,
     CanonicalMessage,
+    ContentBlock,
     ImageBlock,
     InvocationResult,
     MessageRole,
     StopReason,
     TextBlock,
+    ToolCallBlock,
+    ToolResultBlock,
     UsageMetrics,
 )
 from ..core.capabilities import TargetCapabilities
@@ -40,6 +43,9 @@ from ..core.errors import ValidationError
 from . import model_specs
 from ._provider_errors import map_provider_exception, with_provider_retry
 from .base import AdapterConfig, TargetAdapter
+
+if TYPE_CHECKING:
+    from ..schemas import AgentToolSpec
 
 _DEFAULT_MAX_TOKENS = 4096  # Anthropic Messages API requires an explicit max_tokens
 _MAX_TEMP = 1.0  # the SDK rejects higher temps on some Claude lines (panel clamps to 1.0)
@@ -95,16 +101,25 @@ class AnthropicAdapter(TargetAdapter):
 
         Text-only → the plain joined string (the panel's text path). With an :class:`ImageBlock` →
         a list of parts: a ``{"type": "text", ...}`` part followed by one Anthropic ``image`` block
-        per image. An :class:`AudioBlock` is a misroute (Anthropic takes no audio) → ValidationError.
+        per image. A :class:`ToolCallBlock` (assistant tool call) → an Anthropic ``tool_use`` part;
+        a :class:`ToolResultBlock` (fed back on a ``tool``/``user`` turn) → a ``tool_result`` part
+        (Anthropic has no ``tool`` role — see :meth:`_split_messages`). An :class:`AudioBlock` is a
+        misroute (Anthropic takes no audio) → ValidationError.
         """
-        images = msg.blocks_of(ImageBlock)
         if msg.blocks_of(AudioBlock):
             raise ValidationError(
                 "anthropic dispatch: audio is not supported by Anthropic", provider="anthropic"
             )
-        if not images:
+        images = msg.blocks_of(ImageBlock)
+        tool_calls = msg.blocks_of(ToolCallBlock)
+        tool_results = msg.blocks_of(ToolResultBlock)
+        if not (images or tool_calls or tool_results):
             return msg.text
-        parts: list[dict[str, Any]] = [{"type": "text", "text": msg.text}]
+        parts: list[dict[str, Any]] = []
+        # Text leads the parts list. Preserve the image path's historical shape (a text part is
+        # always present for an image turn, even when empty); a pure tool turn carries no text part.
+        if msg.text or images:
+            parts.append({"type": "text", "text": msg.text})
         for img in images:
             parts.append(
                 {
@@ -116,7 +131,48 @@ class AnthropicAdapter(TargetAdapter):
                     },
                 }
             )
+        for call in tool_calls:
+            parts.append(
+                {"type": "tool_use", "id": call.id, "name": call.name, "input": call.arguments}
+            )
+        for res in tool_results:
+            parts.append(
+                {"type": "tool_result", "tool_use_id": res.tool_call_id, "content": res.result}
+            )
         return parts
+
+    @staticmethod
+    def _to_anthropic_tool(spec: AgentToolSpec) -> dict[str, Any]:
+        """Translate one provider-neutral tool spec to the Anthropic tool wire shape.
+
+        Only :meth:`AgentToolSpec.provider_schema` (``{name, description, parameters}``) crosses the
+        seam; Anthropic names the argument schema ``input_schema`` (OpenAI calls it ``parameters``).
+        """
+        schema = spec.provider_schema()
+        return {
+            "name": schema["name"],
+            "description": schema["description"],
+            "input_schema": schema["parameters"],
+        }
+
+    @staticmethod
+    def _to_anthropic_tool_choice(tool_choice: str | None) -> dict[str, Any] | None:
+        """Map the neutral ``tool_choice`` string to Anthropic's ``{"type": ...}`` object.
+
+        ``None`` → omit (Anthropic defaults to ``auto`` when tools are present). ``"auto"``,
+        ``"any"``/``"required"``, and ``"none"`` map to the matching ``type``; any other value is
+        treated as a specific tool name → ``{"type": "tool", "name": <value>}``.
+        """
+        if tool_choice is None:
+            return None
+        choice = tool_choice.strip()
+        if choice == "auto":
+            return {"type": "auto"}
+        if choice in ("any", "required"):
+            return {"type": "any"}
+        if choice == "none":
+            return {"type": "none"}
+        return {"type": "tool", "name": choice}
 
     def _split_messages(
         self, messages: list[CanonicalMessage]
@@ -129,8 +185,11 @@ class AnthropicAdapter(TargetAdapter):
                 if m.text:
                     system_parts.append(m.text)
             else:
+                # Anthropic has no `tool` role: a tool result rides a `user` turn as a
+                # `tool_result` content block (H8). Every other role passes through verbatim.
+                role = "user" if m.role == MessageRole.TOOL else m.role.value
                 chat_messages.append(
-                    {"role": m.role.value, "content": self._to_anthropic_content(m)}
+                    {"role": role, "content": self._to_anthropic_content(m)}
                 )
         if not chat_messages:
             raise ValidationError(
@@ -146,6 +205,8 @@ class AnthropicAdapter(TargetAdapter):
         *,
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        tools: list[AgentToolSpec] | None = None,
+        tool_choice: str | None = None,
         **kwargs,
     ) -> InvocationResult:
         system_prompt, chat_messages = self._split_messages(messages)
@@ -153,6 +214,16 @@ class AnthropicAdapter(TargetAdapter):
         client = self._client()
         wire_model = self._wire_model
         max_tokens = max_output_tokens or _DEFAULT_MAX_TOKENS
+
+        # Tool params are added ONLY when tools are offered, so a no-tools call builds a request
+        # byte-identical to the pre-harness one (contract §1). ``tool_choice`` is omitted (None)
+        # ⇒ Anthropic's default ``auto`` when a tool set is present.
+        extra_params: dict[str, Any] = {}
+        if tools is not None:
+            extra_params["tools"] = [self._to_anthropic_tool(t) for t in tools]
+            choice = self._to_anthropic_tool_choice(tool_choice)
+            if choice is not None:
+                extra_params["tool_choice"] = choice
 
         @with_provider_retry
         async def _do_call() -> Any:
@@ -162,6 +233,7 @@ class AnthropicAdapter(TargetAdapter):
                 temperature=anthropic_temp,
                 system=system_prompt or "",
                 messages=chat_messages,
+                **extra_params,
             )
 
         t0 = perf_counter()
@@ -178,18 +250,28 @@ class AnthropicAdapter(TargetAdapter):
         tokens_in = int(getattr(usage, "input_tokens", 0) or 0) if usage else 0
         tokens_out = int(getattr(usage, "output_tokens", 0) or 0) if usage else 0
 
-        content = "".join(
-            getattr(block, "text", "")
-            for block in (getattr(response, "content", None) or [])
-            if getattr(block, "type", None) == "text"
-        )
+        # Preserve provider block order: each Anthropic ``text`` block → a TextBlock, each
+        # ``tool_use`` block → a ToolCallBlock, interleaved exactly as returned (contract §3).
+        content_blocks: list[ContentBlock] = []
+        for block in getattr(response, "content", None) or []:
+            btype = getattr(block, "type", None)
+            if btype == "text":
+                content_blocks.append(TextBlock(text=getattr(block, "text", "") or ""))
+            elif btype == "tool_use":
+                content_blocks.append(
+                    ToolCallBlock(
+                        id=getattr(block, "id", "") or "",
+                        name=getattr(block, "name", "") or "",
+                        arguments=getattr(block, "input", None) or {},
+                    )
+                )
         stop_reason = StopReason.from_provider(getattr(response, "stop_reason", None))
 
         dump = getattr(response, "model_dump", None)
         raw_response = dump() if callable(dump) else {}
 
         return InvocationResult(
-            content=[TextBlock(text=content)],
+            content=content_blocks,
             usage=UsageMetrics.from_io(
                 tokens_in,
                 tokens_out,
@@ -201,8 +283,11 @@ class AnthropicAdapter(TargetAdapter):
         )
 
     async def capabilities(self) -> TargetCapabilities:
+        # supports_tools is NOT hardcoded — it delegates to the model spec so a Claude line that
+        # doesn't honor tool calling is never over-claimed (contract §4).
+        tools_ok = model_specs.supports_tools(self._price_key)
         return model_specs.capabilities_for(
-            self._price_key, supports_tools=True, supports_function_calling=True
+            self._price_key, supports_tools=tools_ok, supports_function_calling=tools_ok
         )
 
     async def healthcheck(self) -> bool:

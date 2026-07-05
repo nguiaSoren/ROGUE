@@ -1,0 +1,8 @@
+{
+  "_doc": "Single-model save run: Llama-3.1-8B-Instruct on the real-distilled canary panel (n=20), 3 runs, so the construct-validity headline rate is persisted to JSON (not living only in a smoke log) and carries an across-run CI. --prefer-mirror -> NousResearch open mirror on Featherless.",
+  "provider": "featherless",
+  "base_url": "https://api.featherless.ai/v1",
+  "models": [
+    {"id": "meta-llama/Llama-3.1-8B-Instruct", "mirror": "NousResearch/Meta-Llama-3.1-8B-Instruct", "family": "llama3", "params_b": 8, "alignment": "instruct", "reasoning": false, "arms": ["C_align_llama8b"]}
+  ]
+}

@@ -360,14 +360,11 @@ async def run_mutation_synthesis(
 
             primitives = [_orm_to_pydantic_primitive(o) for o in orms]
 
-            # Idempotency: skip parents that already have MUTATION children
-            # (derived rows with requires_multi_turn=False since escalation
-            # children are multi-turn). We exclude obfuscation-augmentation
-            # children (scripts/reproduce/synthesize_obfuscations.py), which are
-            # also synthesized+single-turn+derived but a DIFFERENT augmentation
-            # — counting them here would wrongly skip a parent that has only
-            # obfuscation children from ever getting LLM mutations. The plan
-            # cache also makes this cheap; this is the second safety net.
+            # Idempotency: skip parents that already have synthesized children
+            # (specifically mutation children — derived rows with
+            # requires_multi_turn=False since escalation children are
+            # multi-turn). The plan cache also makes this cheap; this is the
+            # second safety net.
             existing_mutation_parents = set(
                 session.execute(
                     text(
@@ -377,7 +374,6 @@ async def run_mutation_synthesis(
                         WHERE synthesized = true
                           AND derived_from_primitive_id IS NOT NULL
                           AND requires_multi_turn = false
-                          AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')
                         """
                     ),
                 ).scalars(),

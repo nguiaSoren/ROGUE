@@ -174,7 +174,27 @@ def _build_client(args: argparse.Namespace) -> Client:
         provider=provider,
         model=model,
         system_prompt=_resolve_system_prompt(args, target),
+        tools=_tools_list(args, target),
     )
+
+
+def _tools_list(args: argparse.Namespace, target: dict | None = None) -> list[str] | None:
+    """Declared tool names from --tools (comma-separated), else config ``target.tools``."""
+    raw = getattr(args, "tools", None)
+    if raw:
+        return [t.strip() for t in raw.split(",") if t.strip()]
+    if target and target.get("tools"):
+        return list(target["tools"])
+    return None
+
+
+def _agent_exec_kwargs(args: argparse.Namespace) -> dict:
+    """The agent-exec knobs from CLI flags, forwarded to run_scan / client.scan / scan_endpoint."""
+    return {
+        "agent_exec": not getattr(args, "no_agent_exec", False),
+        "agent_exec_seeds": getattr(args, "agent_exec_seeds", None) or 3,
+        "agent_exec_framing": "amplified" if getattr(args, "agent_exec_stress", False) else "raw",
+    }
 
 
 def _scan_default(args: argparse.Namespace, key: str, fallback: Any) -> Any:
@@ -332,6 +352,8 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
                 database_url=database_url,
                 config_id=slug,
                 config_name=config_name,
+                declared_tools=_tools_list(args, target),
+                **_agent_exec_kwargs(args),
             )
         )
         if args.output:
@@ -367,6 +389,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
                 judge=client._judge,
                 judge_model=client._judge_model,
                 deep=True,
+                **_agent_exec_kwargs(args),
             )
         )
     else:
@@ -376,6 +399,7 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
             budget=_scan_default(args, "budget", None),
             pack=_scan_default(args, "pack", "default"),
             n_trials=_scan_default(args, "n_trials", 1),
+            **_agent_exec_kwargs(args),
         )
     if args.output:
         _write_output(report, args.output)
@@ -786,6 +810,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_scan.add_argument("--output", default=None, metavar="PATH", help="write report to .html or .json")
     p_scan.add_argument("--no-card", dest="no_card", action="store_true", help="skip the shareable breach card")
+    # Agent-exec (tool-use / indirect-injection) stage — auto-on when --tools declares tools.
+    p_scan.add_argument("--tools", default=None, help="comma-separated tool names the target agent exposes (enables the agentic stage)")
+    p_scan.add_argument("--no-agent-exec", dest="no_agent_exec", action="store_true", help="skip the agentic tool-execution stage")
+    p_scan.add_argument("--agent-exec-seeds", dest="agent_exec_seeds", type=int, default=None, help="trials per agentic attack (default 3)")
+    p_scan.add_argument("--agent-exec-stress", dest="agent_exec_stress", action="store_true", help="amplified injection framing (upper-bound ASR), else raw harvested attack")
     p_scan.add_argument("--out-dir", dest="out_dir", default=None, metavar="DIR", help="where to write the breach card (default: ./rogue-scan)")
     p_scan.add_argument(
         "--persist",

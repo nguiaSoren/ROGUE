@@ -48,6 +48,8 @@ class Client:
         model: str | None = None,
         *,
         system_prompt: str = "",
+        tools: list[str] | None = None,
+        forbidden_tools: list[str] | None = None,
         judge_model: str | None = None,
         _adapter_extra: dict[str, Any] | None = None,
         _judge: Any = None,
@@ -85,6 +87,8 @@ class Client:
             name=base_url or target_model,
             target_model=target_model,
             system_prompt=system_prompt,
+            declared_tools=tools or [],
+            forbidden_tools=forbidden_tools or [],
             base_url=base_url,
         )
         # adapter_extra is threaded into every adapter (api_key, or an injected client for tests).
@@ -147,6 +151,9 @@ class Client:
         *,
         pack: str = "default",
         n_trials: int = 1,
+        agent_exec: bool = True,
+        agent_exec_seeds: int = 3,
+        agent_exec_framing: str = "raw",
     ) -> ScanReport:
         """Run an attack pack against the target and return a :class:`ScanReport`.
 
@@ -154,6 +161,11 @@ class Client:
         :param max_tests: cap on the number of attacks run.
         :param budget: stop once this many USD of target-call cost is spent.
         :param pack: which bundled pack to load (default ``"default"``).
+        :param agent_exec: run the tool-execution stage when the config declares tools (auto,
+            inert otherwise). Set ``False`` to skip it.
+        :param agent_exec_seeds: trials per agentic primitive (for a stable rate).
+        :param agent_exec_framing: ``"raw"`` (real harvested attack, default) or ``"amplified"``
+            (upper-bound: adds an authoritative "important_instructions" wrapper).
         """
         from .packs import filter_attacks, load_pack
         from .scan import run_scan
@@ -168,6 +180,9 @@ class Client:
                 adapter_extra=self._adapter_extra,
                 judge=self._judge,
                 judge_model=self._judge_model,
+                agent_exec=agent_exec,
+                agent_exec_seeds=agent_exec_seeds,
+                agent_exec_framing=agent_exec_framing,
             )
         )
 

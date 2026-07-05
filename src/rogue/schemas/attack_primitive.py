@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -231,6 +231,33 @@ class AttackPrimitive(BaseModel):
         default_factory=list, description="tool names this attack requires the target to expose"
     )
     requires_multimodal: bool = False
+
+    # ----- Taxonomy-fit (misfit detection; never auto-mutates the frozen enums) -----
+    taxonomy_fit: Literal["clear", "weak", "novel"] = Field(
+        default="clear",
+        description=(
+            "How well this technique maps to the assigned (family, vector). 'clear' = a natural fit. "
+            "'weak' = shoehorned into the nearest slot. 'novel' = the mechanism/channel isn't really "
+            "covered by any existing family/vector — a candidate for a HUMAN-approved taxonomy "
+            "extension (never auto-added; the extractor is enum-locked). Set by the extraction agent."
+        ),
+    )
+    taxonomy_fit_note: str | None = Field(
+        default=None,
+        max_length=400,
+        description="one-line justification when taxonomy_fit is 'weak'/'novel' (what doesn't fit and why)",
+    )
+    emergent_label: str | None = Field(
+        default=None,
+        max_length=60,
+        description=(
+            "Emergent-taxonomy layer: a short free-text name (2-4 words, snake_case-ish) the extractor "
+            "PROPOSES for this technique's mechanism/channel when taxonomy_fit is 'weak'/'novel'. UNLIKE "
+            "family/vector this is not enum-locked, so novelty is captured automatically with no migration. "
+            "Recurring labels are auto-clustered (rogue.extract.emergent_taxonomy) into promotion "
+            "candidates; the actual enum extension stays human-approved. Null when taxonomy_fit='clear'."
+        ),
+    )
 
     # ----- Provenance -----
     sources: list[SourceProvenance] = Field(

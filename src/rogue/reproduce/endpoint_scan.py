@@ -124,6 +124,8 @@ def make_endpoint_config(
     *,
     system_prompt: str = "",
     forbidden_topics: list[str] | None = None,
+    declared_tools: list[str] | None = None,
+    forbidden_tools: list[str] | None = None,
     config_id: str = "adhoc-endpoint-scan",
     name: str | None = None,
 ) -> DeploymentConfig:
@@ -141,7 +143,8 @@ def make_endpoint_config(
         name=name if name is not None else f"endpoint:{model}",
         target_model=model,
         system_prompt=system_prompt,
-        declared_tools=[],
+        declared_tools=declared_tools or [],
+        forbidden_tools=forbidden_tools or [],
         forbidden_topics=forbidden_topics or [],
         base_url=base_url,
     )
@@ -174,6 +177,14 @@ async def scan_endpoint(
     database_url: str | None = None,
     config_id: str = "adhoc-endpoint-scan",
     config_name: str | None = None,
+    # --- opt-in agent-exec (tool-use / indirect-injection) — auto-on when declared_tools≠[] ---
+    declared_tools: list[str] | None = None,
+    forbidden_tools: list[str] | None = None,
+    agent_exec: bool = True,
+    agent_exec_seeds: int = 3,
+    agent_exec_framing: str = "raw",
+    agent_exec_runner: object | None = None,
+    agent_exec_adapter: object | None = None,
 ) -> EndpointScanReport:
     """Reproduce ``primitives`` against an OpenAI-compatible endpoint and grade the responses.
 
@@ -213,6 +224,8 @@ async def scan_endpoint(
     config = make_endpoint_config(
         base_url, model,
         system_prompt=system_prompt,
+        declared_tools=declared_tools,
+        forbidden_tools=forbidden_tools,
         config_id=config_id,
         name=config_name,
     )
@@ -372,6 +385,33 @@ async def scan_endpoint(
             await persona.aclose()
         if owns_planner and escalate_planner is not None:
             await escalate_planner.aclose()
+
+    # AGENT_EXEC stage (Phase 7-live) — a tool-bearing endpoint gets the agentic tool-use /
+    # indirect-injection test. INERT when declared_tools=[] (no --tools) → today's behaviour.
+    if agent_exec and (config.declared_tools or config.live_tool_target is not None):
+        from rogue.adapters import model_specs  # noqa: PLC0415
+
+        if config.base_url or model_specs.supports_tools(config.target_model):
+            from rogue.reproduce.agent.scan_stage import run_agent_exec_stage  # noqa: PLC0415
+            from rogue.reproduce.agent.tier import AgentExecConfig, AgentExecRunner  # noqa: PLC0415
+
+            runner = agent_exec_runner or AgentExecRunner(
+                AgentExecConfig(enabled=True), adapter_extra={"api_key": api_key} if api_key else None
+            )
+            stage = await run_agent_exec_stage(
+                config, primitives, runner=runner, seeds=agent_exec_seeds,
+                framing=agent_exec_framing, want_persist=persist, adapter=agent_exec_adapter,
+            )
+            for f in stage.findings:
+                findings.append(EndpointFinding(
+                    primitive_id=f.primitive_id or "agent-exec", title=f.title, family=f.family,
+                    vector=f.vector, base_severity=f.severity, n_trials=f.n_trials,
+                    n_breach=f.n_breach, any_breach_rate=f.success_rate, breached=f.breached,
+                ))
+            if persist and database_url and stage.persist_rows:
+                from rogue.reproduce.persistence import persist_agent_exec_rows  # noqa: PLC0415
+
+                persist_agent_exec_rows(database_url, stage.persist_rows)
 
     if persist and orm_rows:
         if not database_url:

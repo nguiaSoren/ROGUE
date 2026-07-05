@@ -16,10 +16,25 @@ visibly tagged, never a silent ''— which would fake a 0% leak).
 from __future__ import annotations
 
 import re
+import signal
 import time
 from dataclasses import dataclass
 
 import httpx
+
+
+class _HardTimeout(Exception):
+    """Raised by a SIGALRM wall-clock guard when a single HTTP call hangs past the cap.
+
+    httpx's read-timeout resets on every byte received, so a server that trickles
+    keepalive bytes can hold a socket open indefinitely without the timeout ever firing
+    (this is exactly what stalled a multi-hour run at 0%% CPU on one model). The alarm is
+    an absolute wall-clock backstop that fires regardless of what the socket is doing.
+    """
+
+
+def _on_alarm(signum, frame):  # noqa: ARG001
+    raise _HardTimeout("hard wall-clock timeout")
 
 # OpenAI-compatible base URLs (the path /chat/completions is appended).
 PROVIDER_BASE_URLS = {
@@ -82,6 +97,7 @@ def openai_chat(
     temperature: float = 0.7,
     max_retries: int = 5,
     base_pace_s: float = 0.4,
+    hard_timeout_s: int = 75,
     error_tag: str = "call-error",
 ) -> ChatResult:
     """One chat completion against an OpenAI-compatible endpoint, channels kept separate.
@@ -95,19 +111,28 @@ def openai_chat(
     last = "unknown"
     for attempt in range(max_retries):
         try:
-            r = client.post(
-                url,
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                },
-            )
+            armed = False
+            try:  # absolute wall-clock backstop (main thread only); httpx timeout still applies
+                signal.signal(signal.SIGALRM, _on_alarm); signal.alarm(hard_timeout_s); armed = True
+            except (ValueError, AttributeError):
+                pass  # not main thread / no SIGALRM (Windows) -> rely on httpx timeout alone
+            try:
+                r = client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                    },
+                )
+            finally:
+                if armed:
+                    signal.alarm(0)
             if r.status_code == 429 or r.status_code >= 500:
                 last = f"http {r.status_code}"
                 retry_after = r.headers.get("retry-after")

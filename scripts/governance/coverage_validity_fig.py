@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 GREEN, INK, MUTED, RED = "#1f9d55", "#14161b", "#8a9098", "#c0392b"
-plt.rcParams.update({"font.size": 10, "axes.edgecolor": "#d8ddd9", "figure.dpi": 150})
+plt.rcParams.update({"legend.labelspacing": 1.0, "font.size": 10, "axes.edgecolor": "#d8ddd9", "figure.dpi": 150})
 
 d = json.loads(Path("data/governance/coverage_validity_live.json").read_text())
 cells, a = d["cells"], d["analysis"]

@@ -571,6 +571,7 @@ def measure_leakage(
     pack_coverage: str | None = None,
     judge_calibration_ref: Optional[str] = None,
     bootstrap_b: int | None = None,
+    concurrency: int = 1,
 ) -> LeakageResult:
     """Measure the leakage rate of a scrubbed skill pool under an extraction pack.
 
@@ -613,19 +614,32 @@ def measure_leakage(
     if store is None:
         store = InMemoryLeakageStore()
 
+    # Fire the attacker at every skill — optionally CONCURRENTLY. The attack calls are
+    # I/O-bound HTTP requests and the OpenAI-compatible endpoint serves many at once, so a
+    # thread pool collapses a long sequential sweep to wall-clock ~= slowest-in-flight.
+    # Scoring stays sequential and order-preserving (zipped against the input order);
+    # ``concurrency=1`` reproduces the original loop exactly. The attacker keeps per-skill
+    # captures under distinct ``by_skill`` keys (safe under the GIL) and guards its call
+    # counters with a lock, so the recovery vector and channel replay are unchanged.
+    def _attack_all(skills: Sequence[ScrubbedSkill]) -> list[list[str]]:
+        skills = list(skills)
+        if concurrency and concurrency > 1 and len(skills) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=concurrency) as ex:
+                return list(ex.map(attacker.attack, skills))
+        return [attacker.attack(s) for s in skills]
+
     # Score the canary skills — the leakage numerator.
     canary_outcomes: list[SkillLeakageOutcome] = []
     recovery_vector: list[bool] = []
-    for skill in canaries:
-        responses = attacker.attack(skill)
+    for skill, responses in zip(canaries, _attack_all(canaries)):
         outcome = _score_skill(skill, responses, judge)
         canary_outcomes.append(outcome)
         recovery_vector.append(outcome.recovered)
 
     # Score the controls — the false-positive floor (should be ~0).
     control_outcomes: list[SkillLeakageOutcome] = []
-    for skill in controls:
-        responses = attacker.attack(skill)
+    for skill, responses in zip(controls, _attack_all(controls)):
         outcome = _score_skill(skill, responses, judge)
         control_outcomes.append(outcome)
 

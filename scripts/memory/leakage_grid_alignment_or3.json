@@ -1,0 +1,10 @@
+{
+  "_doc": "Three-model alignment contrast on a single base (Llama-3.1-70B), all on OpenRouter, run against the N=100 real-doc canary panel (leakage_canaries_n100.json) to POWER the 'alignment, not scale' paired test. One safety-aligned instruct (Meta) vs two permissive Nous finetunes of the SAME base (Hermes-3 and the newer Hermes-4). Holding the base + provider fixed and varying only alignment isolates the alignment axis from both the scale axis and the Featherless serving stack. Two permissive points (not one) give the paired contrast more discordant pairs and a recency check. As with the 2-model arm, these are finetunes, not surgical abliterations -- directional corroboration that the ordering is not Featherless-specific, on a much larger canary panel.",
+  "provider": "openrouter",
+  "base_url": "https://openrouter.ai/api/v1",
+  "models": [
+    {"id": "meta-llama/llama-3.1-70b-instruct",   "family": "llama3", "params_b": 70, "alignment": "instruct",   "reasoning": false, "arms": ["H_align_or3"]},
+    {"id": "nousresearch/hermes-3-llama-3.1-70b", "family": "llama3", "params_b": 70, "alignment": "permissive", "reasoning": false, "arms": ["H_align_or3"]},
+    {"id": "nousresearch/hermes-4-70b",           "family": "llama3", "params_b": 70, "alignment": "permissive", "reasoning": false, "arms": ["H_align_or3"]}
+  ]
+}

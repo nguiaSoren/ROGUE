@@ -113,13 +113,16 @@ def test_models_metadata_has_expected_tables() -> None:
     migration 0036) added 2026-06-10. ``skills``, ``skill_edges`` and
     ``skill_verifications`` (ROGUE v2 Surface 3 agent-memory skill pool —
     org/cohort-scoped assured substrate, combination-risk adjacency graph, and
-    the verification audit spine, migration 0037) added 2026-06-11. Add new
-    entries here when migrations add tables.
+    the verification audit spine, migration 0037) added 2026-06-11.
+    ``agent_transcripts`` and ``trace_findings`` (agent execution harness Phase 0 —
+    replayable tool-loop trace + per-signal findings, migration 0039) added
+    2026-07-05. Add new entries here when migrations add tables.
     """
     import rogue.platform.models  # noqa: F401 — register the platform tables on Base
     from rogue.db.models import Base
 
     assert sorted(Base.metadata.tables.keys()) == [
+        "agent_transcripts",
         "api_keys",
         "attack_primitives",
         "attack_strategies",
@@ -159,6 +162,7 @@ def test_models_metadata_has_expected_tables() -> None:
         "source_provenances",
         "target_embeddings",
         "technique_embeddings",
+        "trace_findings",
         "users",
     ]
 

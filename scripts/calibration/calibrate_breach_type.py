@@ -277,6 +277,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="confirm the PAID live-judge sweep (operator only)",
     )
+    parser.add_argument(
+        "--out-suffix",
+        default="",
+        help="suffix for the report filename, e.g. '_agentdojo' writes "
+        "<breach_type>_agentdojo_report.json — keeps an external-corpus run from "
+        "clobbering the operator-labeled <breach_type>_report.json",
+    )
     args = parser.parse_args(argv)
 
     # Validate the breach type loudly before anything else.
@@ -349,7 +356,7 @@ def main(argv: list[str] | None = None) -> int:
         tier_run = "full"
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = OUTPUT_DIR / f"{args.breach_type}_report.json"
+    out_path = OUTPUT_DIR / f"{args.breach_type}{args.out_suffix}_report.json"
     payload = _serialize(report, tier=tier_run, dry_run=args.dry_run)
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 

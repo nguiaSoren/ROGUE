@@ -404,6 +404,10 @@ class Finding:
     n_breach: int
     example_attack: str | None = None
     example_response: str | None = None
+    # True for findings from the agent-execution stage (tool-hijack / indirect injection observed
+    # from the structured tool-call trace) — lets the report split them into their own section.
+    agentic: bool = False
+    primitive_id: str | None = None  # set by the agent-exec stage so callers can map back to the attack
 
     @property
     def success_pct(self) -> str:
@@ -450,6 +454,11 @@ class ScanReport:
 
     def breached_findings(self) -> list[Finding]:
         return [f for f in self.findings if f.breached]
+
+    @property
+    def agentic_findings(self) -> list[Finding]:
+        """Findings from the agent-execution stage (tool-hijack / indirect injection)."""
+        return [f for f in self.findings if getattr(f, "agentic", False)]
 
     def families_covered(self) -> list[str]:
         """Distinct human attack-family labels exercised in this scan, in stable first-seen order."""
@@ -509,6 +518,12 @@ class ScanReport:
         if breached:
             top = max(breached, key=lambda f: (f.success_rate, _SEVERITY_RANK.get(f.severity, 0)))
             lines += ["  " + top.breach_label]
+        # Additive: a distinct tool-use / agentic line, only when the agent-exec stage ran (so a
+        # text-only scan's summary is byte-identical to before).
+        agentic = self.agentic_findings
+        if agentic:
+            n_ab = sum(1 for f in agentic if f.breached)
+            lines += ["Tool-use / agentic:", f"  {n_ab}/{len(agentic)} agentic attacks breached (tool-hijack / indirect injection)"]
         lines += [
             "Cost:",
             f"  {_fmt_usd(self.cost_usd)}",
@@ -551,6 +566,15 @@ class ScanReport:
             "cost_usd": round(self.cost_usd, 6),
             "findings": findings,
         }
+        # Additive: agentic (tool-use) summary, only when the agent-exec stage produced findings —
+        # so every text-only scan's dict is byte-identical to before.
+        agentic = self.agentic_findings
+        if agentic:
+            out["agentic_summary"] = {
+                "n_agentic_findings": len(agentic),
+                "n_agentic_breaching": sum(1 for f in agentic if f.breached),
+                "worst_agentic_rate": round(max(f.success_rate for f in agentic), 4),
+            }
         # Additive: carry the per-rule policy report through to the persisted payload ONLY when a
         # policy-mode scan set it, so every other report's dict is unchanged.
         if self.rule_breach_report is not None:

@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from .agent_tool import AgentToolSpec, LiveToolTarget
+
 
 class DeploymentConfig(BaseModel):
     """A specific (model × system_prompt × tools) configuration of a customer."""
@@ -49,6 +51,35 @@ class DeploymentConfig(BaseModel):
     forbidden_topics: list[str] = Field(
         default_factory=list,
         description="topics the customer wants the deployment to refuse, useful for severity scoring and for slot defaults",
+    )
+    forbidden_tools: list[str] = Field(
+        default_factory=list,
+        description=(
+            "tool names the model must NOT invoke in this deployment. Looked up by "
+            "name (may name a tool not in declared_tools), so signal (a) of the agent "
+            "execution harness — 'forbidden tool invoked' — is decidable. Empty list "
+            "= no tool is forbidden. See docs/v2/agent_harness/DESIGN.md."
+        ),
+    )
+    tool_specs: list[AgentToolSpec] | None = Field(
+        default=None,
+        description=(
+            "Level 1 (bring-your-own tool schema): full function-calling specs for the customer's "
+            "REAL tools — name, description, JSON-Schema parameters, category, sensitivity. When set, "
+            "the agent-exec backend presents THESE to the model instead of synthesizing specs from "
+            "declared_tools names, so the model is tested against its actual production surface. "
+            "Returns stay ROGUE-simulated (honeytoken/emulator) — safe, zero side effects. "
+            "None = today's behaviour (synthesize from declared_tools)."
+        ),
+    )
+    live_tool_target: LiveToolTarget | None = Field(
+        default=None,
+        description=(
+            "Level 2 (bring-your-own execution target): route agent-exec tool calls to the customer's "
+            "OWN authorized MCP server — real tools run, real returns come back. Requires "
+            "live_tool_target.authorized=True. Destructive tools listed in forbidden_tools are still "
+            "recorded-not-executed by the harness, so they never actually fire. None = simulated tools."
+        ),
     )
     base_url: str | None = Field(
         default=None,

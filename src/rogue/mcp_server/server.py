@@ -132,21 +132,6 @@ When to use each tool:
 • query_attack_detail — one attack's full record + its per-config breach aggregates
   (n_full / n_partial / n_refused / n_evaded).
 
-Running a LIVE scan of the user's OWN endpoint (only when this server exposes the scan
-tools — validate_target / start_scan; the public read-only deployment does not):
-• "which live attacks breach my config?" is answered FIRST by query_worst_attacks — a free,
-  instant lookup over already-measured results. That is NOT a fresh scan of the user's
-  endpoint; it returns the closest known config. Lead with it.
-• If the user wants their ACTUAL endpoint tested, OFFER a live scan, then run this order:
-  collect the target (endpoint URL, or provider + model, + the target api_key) →
-  validate_target (cheap pre-flight) → start_scan → poll get_scan_status until completed →
-  get_report. You do the polling; the user just waits for the answer.
-• COST DISCLOSURE — say this and get explicit confirmation BEFORE calling start_scan: a live
-  scan spends real money. It sends many attack prompts to the user's OWN endpoint (billed to
-  THEIR provider account) plus ROGUE's judge calls — unless they are on a ROGUE
-  managed/subscription plan that covers it. State the target being scanned by name. Never
-  auto-fire start_scan on a vague question; confirm the target and the spend first.
-
 Attack families follow ROGUE's taxonomy (jailbreak, indirect_prompt_injection,
 multimodal_injection, …); breach rates are MAX any-breach over N=5 trials per cell.
 """

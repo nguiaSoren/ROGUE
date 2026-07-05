@@ -39,6 +39,7 @@ GREY = "#999999"    # reference lines / muted annotation
 INK = "#14161b"     # text
 
 plt.rcParams.update({
+    "legend.labelspacing": 1.0,  # spread legend entries (avoid cramped stacking)
     "font.size": 10,
     "font.family": "serif",
     "font.serif": ["STIXGeneral", "DejaVu Serif"],
@@ -76,7 +77,7 @@ def main() -> None:
     fabricated = _load("fabricated_sensitive_value")
 
     # Frozen historical constants (recorded in the paper; not in the live JSONs):
-    HARM = {"label": "Harm\n(content)", "agreement": 89.3, "recall": 95.5, "fp_mode": None}
+    HARM = {"label": "Harm\n(content)", "agreement": 91.0, "recall": 97.3, "fp_mode": None}  # retained v3 artifact (Table 1), not the diagnostic-stage 89.3/95.5
     UNAUTH_V1 = {"agreement": 96.67, "fp_mode": 9.38}  # pre-refinement, REFINE
     UNAUTH_V2 = {"agreement": 97.78, "fp_mode": 6.25}  # rubric refinement, SHIP
 
@@ -102,11 +103,15 @@ def main() -> None:
     ax.set_ylim(0, 112)
     ax.set_yticks(range(0, 101, 20))
     ax.set_ylabel("Percent")
-    # value labels offset clearly above each bar; FP-mode labelled only where it exists
+    # value labels offset clearly above each bar; FP-mode is labelled per class so a
+    # 0.00 (measured-zero, e.g. info-disclosure) is never read as a missing bar, while
+    # a class for which the FP-mode metric is undefined (the legacy harm class) is marked n/a.
     for i, c in enumerate(cls):
         ax.text(i - w, c["agreement"] + 1.5, f"{c['agreement']:.1f}", ha="center", va="bottom", fontsize=7, color=GREEN)
         ax.text(i, c["recall"] + 1.5, f"{c['recall']:.1f}", ha="center", va="bottom", fontsize=7, color=BLUE)
-        if c["fp_mode"]:
+        if c["fp_mode"] is None:
+            ax.text(i + w, 1.5, "n/a", ha="center", va="bottom", fontsize=7, color="#888888")
+        else:
             ax.text(i + w, c["fp_mode"] + 1.5, f"{c['fp_mode']:.2f}", ha="center", va="bottom", fontsize=7, color=RED)
     _style(ax)
     # legend ABOVE the axes, never over the bars

@@ -50,3 +50,28 @@ def revalidate_frontend(timeout: float = 10.0) -> bool:
             exc,
         )
         return False
+
+
+def post_slack_webhook(text: str, *, webhook_url: str | None = None) -> bool:
+    """Best-effort Slack post for agent-exec runner pings (start/breach/cap/done/crash).
+
+    Mirrors ``diff.threat_brief._maybe_post_to_slack``: no-op when the webhook is unset,
+    never raises (a Slack outage must never break or block a run). Fixes the cost-ops
+    finding that the runner had no Slack surface — the ``notify-don't-babysit`` convention
+    requires the SCRIPT to ping, so a hung/all-errored agent-exec sweep can't hide.
+
+    Env: ``SLACK_WEBHOOK_URL`` (same var as the threat brief) unless ``webhook_url`` is passed.
+    Returns True on a delivered 2xx, else False.
+    """
+    url = (webhook_url or os.environ.get("SLACK_WEBHOOK_URL") or "").strip()
+    if not url or url.startswith("#"):
+        return False
+    try:
+        import httpx  # noqa: PLC0415 — only needed on the ping path
+
+        resp = httpx.post(url, json={"text": text}, timeout=10.0)
+        resp.raise_for_status()
+        return True
+    except Exception as exc:  # noqa: BLE001 — never let a Slack failure surface
+        logger.warning("slack ping failed: %s", exc)
+        return False

@@ -103,7 +103,12 @@ class DeploymentConfig(Base):
     target_model: Mapped[str] = mapped_column(String(100), index=True)
     system_prompt: Mapped[str] = mapped_column(Text)
     declared_tools: Mapped[list[str]] = mapped_column(JSON, default=list)
+    forbidden_tools: Mapped[list[str]] = mapped_column(JSON, default=list)
     forbidden_topics: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Level 1 (bring-your-own tool schema): list of AgentToolSpec dicts, or NULL. live_tool_target
+    # (Level 2) is intentionally NOT persisted — it carries auth headers (secrets); it is an
+    # ephemeral scan-time field like base_url (see upsert_deployment_config exclude set).
+    tool_specs: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=None)
 
     breaches: Mapped[list["BreachResult"]] = relationship(
         back_populates="deployment_config",
@@ -179,6 +184,13 @@ class AttackPrimitive(Base):
     requires_system_prompt_access: Mapped[bool] = mapped_column(Boolean, default=False)
     requires_tools: Mapped[list[str]] = mapped_column(JSON, default=list)
     requires_multimodal: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Taxonomy-fit misfit flag (clear|weak|novel) + note — a candidate signal for a HUMAN-approved
+    # taxonomy extension; never auto-mutates the frozen enums. Default 'clear' = natural fit.
+    taxonomy_fit: Mapped[str] = mapped_column(String(10), default="clear", server_default="clear")
+    taxonomy_fit_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    # Emergent-taxonomy layer: free-text proposed label for a novel technique (no enum, no migration to
+    # accept new values); auto-clustered into promotion candidates. Indexed for the cluster query.
+    emergent_label: Mapped[Optional[str]] = mapped_column(String(60), nullable=True, default=None, index=True)
 
     # ----- Timestamps + severity -----
     discovered_at: Mapped[datetime] = mapped_column(
@@ -1249,6 +1261,84 @@ class SkillVerification(Base):
     )
 
 
+class AgentTranscript(Base):
+    """Replayable trace of one agent-execution-harness run (docs/v2/agent_harness).
+
+    1:1 with ``breach_results`` via a UNIQUE ``breach_id`` FK (one BreachResult per
+    trial; the N per-signal ``trace_findings`` hang off this transcript, review
+    CRIT-2). The full ``rogue.schemas.AgentTranscript`` lives in the ``trace`` JSON
+    blob; ``n_turns`` / ``fired_signals`` / ``seed`` are promoted for querying.
+    Written only by the Phase-3/4 harness+judge; the table lands dark in Phase 0.
+
+    ``fired_signals`` stays JSON (not a PG enum) so the ``AgentBreachSignal``
+    vocabulary can extend without a migration, matching the ``exfil_method`` /
+    ``persona_used`` convention.
+    """
+
+    __tablename__ = "agent_transcripts"
+
+    transcript_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    breach_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("breach_results.breach_id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+    )
+    primitive_id: Mapped[str] = mapped_column(String(40), index=True)
+    config_id: Mapped[str] = mapped_column(String(40), index=True)
+    trial_index: Mapped[int] = mapped_column(Integer, default=0)
+    seed: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    n_turns: Mapped[int] = mapped_column(Integer, default=0)
+    stop_reason: Mapped[str] = mapped_column(String(40), default="final_text")
+    fired_signals: Mapped[list[str]] = mapped_column(JSON, default=list)
+    trace: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    findings: Mapped[list["TraceFinding"]] = relationship(
+        back_populates="transcript",
+        cascade="all, delete-orphan",
+    )
+
+
+class TraceFinding(Base):
+    """One per-signal breach finding the ``TraceJudge`` emitted over a transcript.
+
+    ``headline_eligible`` is the mechanical filter the deterministic headline ASR
+    respects (review H2 / Q3 reversal): emulated-involved / quarantine /
+    fingerprint-less-(c) findings are ``False`` and excluded from the headline
+    aggregation. ``signal`` / ``verdict`` / ``severity`` stay ``String`` (not PG
+    enums) so the additive agent vocabularies extend without a migration.
+    """
+
+    __tablename__ = "trace_findings"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    transcript_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("agent_transcripts.transcript_id", ondelete="CASCADE"),
+        index=True,
+    )
+    signal: Mapped[str] = mapped_column(String(48))
+    verdict: Mapped[str] = mapped_column(String(20))
+    severity: Mapped[str] = mapped_column(String(20))
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    headline_eligible: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", index=True
+    )
+    emulated_involved: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    source_return_call_id: Mapped[Optional[str]] = mapped_column(
+        String(40), nullable=True
+    )
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    transcript: Mapped["AgentTranscript"] = relationship(back_populates="findings")
+
+
 __all__ = [
     "Base",
     "DeploymentConfig",
@@ -1275,4 +1365,6 @@ __all__ = [
     "Skill",
     "SkillEdge",
     "SkillVerification",
+    "AgentTranscript",
+    "TraceFinding",
 ]

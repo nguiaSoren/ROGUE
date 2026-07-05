@@ -161,6 +161,35 @@ combine 2–3 families (e.g. INDIRECT_PROMPT_INJECTION + TOOL_USE_HIJACK).
 6. `multimodal_image`
 7. `multimodal_audio`
 
+### Taxonomy fit — flag misfits, never invent a value
+
+The family/vector lists above are closed. You **cannot** add a value; always
+classify to the nearest existing one. But when the nearest one is a poor fit,
+say so via `taxonomy_fit` so a human can decide whether the taxonomy needs
+extending:
+
+- `taxonomy_fit: "clear"` (default) — the technique maps naturally onto the
+  `family` and `vector` you chose. Leave `taxonomy_fit_note` null.
+- `taxonomy_fit: "weak"` — it works, but you shoehorned it into the nearest slot
+  (e.g. the mechanism half-matches the family, or the delivery channel isn't
+  quite any vector). Write one line in `taxonomy_fit_note` naming what doesn't
+  fit.
+- `taxonomy_fit: "novel"` — the mechanism or delivery channel genuinely isn't
+  covered by **any** family/vector (a new attack class). Still pick the closest
+  existing values for `family`/`vector`, and in `taxonomy_fit_note` state in one
+  line why no existing value covers it.
+
+Only escalate above `"clear"` when the misfit is real — a technique that is
+simply a fresh instance of a listed family is `"clear"`.
+
+When `taxonomy_fit` is `"weak"` or `"novel"`, also set `emergent_label`: a short
+(2–4 word) name for the *pattern itself*, phrased so that two papers describing
+the same new class would land on the same label. Use lowercase, concrete nouns —
+e.g. `calendar_invite_injection`, `tool_chaining_privilege_escalation`,
+`memory_poisoning`. This is a free-text proposal (not a taxonomy value); recurring
+labels are clustered automatically into candidates a human can promote later.
+Leave `emergent_label` null when `taxonomy_fit` is `"clear"`.
+
 ---
 
 ## Slot vocabulary

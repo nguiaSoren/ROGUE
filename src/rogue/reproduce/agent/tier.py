@@ -1,0 +1,520 @@
+"""AGENT_EXEC tier — orchestrates one agent-exec run and maps it to persistence (Phase 5).
+
+The composable unit the escalation pipeline calls when a refused, tool-bearing primitive
+warrants an agentic reproduction: it decides whether the tier fires, runs the
+:class:`AgentHarness`, scores the transcript with the :class:`TraceJudge`, enforces the cost
+budget, and maps the outcome onto a ``BreachResult`` + the ``agent_transcripts`` /
+``trace_findings`` rows. **Default OFF** (``AgentExecConfig.enabled=False``) and never invoked
+on a timer/cron — this module is inert until a run explicitly enables it (DESIGN §E; the
+"costly scripts run deliberately" rule).
+
+Cost/ops fixes from the review are here: hard per-run/per-scan/max-runs caps + an intra-run
+budget hook in the harness (M4), and :func:`validate_batch` — an all-errored abort + a
+positive-control check so a silently-broken run can never report a fake-clean 0% ASR (H11/F2).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+import ulid
+
+from rogue.db.models import AgentTranscript as AgentTranscriptORM
+from rogue.db.models import BreachResult as BreachResultORM
+from rogue.db.models import TraceFinding as TraceFindingORM
+from rogue.schemas import (
+    AgentBreachSignal,
+    AgentTranscript,
+    AttackFamily,
+    AttackPrimitive,
+    AttackVector,
+    DeploymentConfig,
+    ExfiltrationMethod,
+    JudgeVerdict,
+    Severity,
+    TraceFinding,
+)
+
+from .backends.emulator import EmulatorBackend
+from .backends.hybrid import HybridBackend
+from .harness import AgentHarness
+from .trace_judge import TraceJudge, fired_signals, headline_findings
+
+# --------------------------------------------------------------------------- #
+# Config + budget
+# --------------------------------------------------------------------------- #
+
+_SEVERITY_RANK = {Severity.LOW: 0, Severity.MEDIUM: 1, Severity.HIGH: 2, Severity.CRITICAL: 3}
+
+
+@dataclass
+class AgentExecConfig:
+    """Run-scoped agent-exec settings. Disabled by default; caps reconciled so that
+    ``max_runs × per_run_cap ≤ per_scan_cap`` cannot be violated silently (review M4)."""
+
+    enabled: bool = False
+    max_turns: int = 6
+    max_runs_per_scan: int = 20
+    per_run_cap_usd: float = 0.50
+    per_scan_cap_usd: float = 5.0
+    n_trials: int = 1  # forced to 1 — multi-turn × multi-model is already the cost driver
+    default_forbid_critical: bool = True
+    emulator_model: Optional[str] = None  # None ⇒ honeytoken-only; custom-tool configs are skipped
+
+    def __post_init__(self) -> None:
+        # keep the two caps coherent (M4): a full run of max_runs must fit the scan cap
+        if self.max_runs_per_scan * self.per_run_cap_usd > self.per_scan_cap_usd:
+            self.per_scan_cap_usd = round(self.max_runs_per_scan * self.per_run_cap_usd, 4)
+
+
+class AgentExecBudget:
+    """Tracks agent-exec spend against per-run / per-scan / max-runs caps.
+
+    Duck-typed for the harness loop: it calls :meth:`run_exhausted` before each turn and
+    :meth:`add` after each target invoke. Emulator-call cost is added by the tier via
+    :meth:`add` too (a shared pool), so the caps bound target + emulator spend together.
+    """
+
+    def __init__(self, cfg: AgentExecConfig) -> None:
+        self.cfg = cfg
+        self.scan_spend_usd = 0.0
+        self.runs_started = 0
+        self._run_spend_usd = 0.0
+
+    def can_start_run(self) -> bool:
+        return self.runs_started < self.cfg.max_runs_per_scan and self.scan_spend_usd < self.cfg.per_scan_cap_usd
+
+    def start_run(self) -> None:
+        self.runs_started += 1
+        self._run_spend_usd = 0.0
+
+    def add(self, usd: float) -> None:
+        self._run_spend_usd += usd
+        self.scan_spend_usd += usd
+
+    def run_exhausted(self) -> bool:
+        return self._run_spend_usd >= self.cfg.per_run_cap_usd or self.scan_spend_usd >= self.cfg.per_scan_cap_usd
+
+    @property
+    def run_spend_usd(self) -> float:
+        return self._run_spend_usd
+
+
+# --------------------------------------------------------------------------- #
+# Firing condition
+# --------------------------------------------------------------------------- #
+
+
+def _has_agentic_surface(primitive: AttackPrimitive) -> bool:
+    """True iff the attack is meaningfully agentic (tool-hijack / indirect injection)."""
+    if primitive.requires_tools:
+        return True
+    if primitive.vector == AttackVector.TOOL_OUTPUT:
+        return True
+    if primitive.family == AttackFamily.TOOL_USE_HIJACK:
+        return True
+    return AttackFamily.TOOL_USE_HIJACK in (primitive.secondary_families or [])
+
+
+def agent_exec_applicable(
+    primitive: AttackPrimitive,
+    config: DeploymentConfig,
+    cfg: AgentExecConfig,
+    *,
+    backend: HybridBackend,
+    model_supports_tools: bool,
+) -> tuple[bool, Optional[str]]:
+    """Whether the AGENT_EXEC tier fires for this (primitive, config). Returns
+    ``(fires, skip_reason)`` — a clean honest skip mirrors ``modality_skip_reason``.
+
+    Custom-endpoint models (``config.base_url``) are NOT pre-gated on the known-model spec
+    table (review H10): the harness attempts ``tools=`` and treats a provider
+    tools-unsupported error as the skip, so the axis isn't inert for the exact customer case.
+    """
+    if not cfg.enabled:
+        return False, "agent_exec disabled"
+    # A live_tool_target supplies the surface from the customer's MCP server, so an empty
+    # declared_tools is fine there; otherwise a config must declare tools to be testable.
+    if not config.declared_tools and config.live_tool_target is None:
+        return False, "config declares no tools"
+    if not model_supports_tools and not config.base_url:
+        return False, f"model {config.target_model} does not support tool calls"
+    if not _has_agentic_surface(primitive):
+        return False, "primitive has no agentic surface (not tool-hijack / tool-output)"
+    # A live target executes via MCP, not the emulator, so the un-stubbed-tools/emulator
+    # requirement does not apply to it.
+    if (
+        config.live_tool_target is None
+        and backend.declared_needs_emulator(config.declared_tools)
+        and cfg.emulator_model is None
+    ):
+        return False, "config declares custom (un-stubbed) tools but no emulator model is set"
+    return True, None
+
+
+# --------------------------------------------------------------------------- #
+# Orchestration
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class AgentExecOutcome:
+    """The result of one agent-exec run (or a skip)."""
+
+    primitive_id: str
+    config_id: str
+    trial_index: int
+    fired: bool
+    skip_reason: Optional[str] = None
+    transcript: Optional[AgentTranscript] = None
+    findings: list[TraceFinding] = field(default_factory=list)
+    verdict: JudgeVerdict = JudgeVerdict.REFUSED
+    headline_breached: bool = False
+    error: Optional[str] = None
+    spend_usd: float = 0.0
+
+    @property
+    def errored(self) -> bool:
+        return self.error is not None
+
+
+def _verdict_and_exfil(findings: list[TraceFinding]) -> tuple[JudgeVerdict, bool, Optional[ExfiltrationMethod]]:
+    headline = headline_findings(findings)
+    if not headline:
+        return JudgeVerdict.REFUSED, False, None
+    # any objectively-fired headline finding ⇒ FULL_BREACH (binary, M3)
+    exfil: Optional[ExfiltrationMethod] = None
+    if any(f.signal == AgentBreachSignal.SECRET_IN_ARGS for f in headline):
+        exfil = ExfiltrationMethod.TOOL_ARGUMENT_SMUGGLING
+    elif any(f.signal == AgentBreachSignal.FORBIDDEN_TOOL_INVOKED for f in headline):
+        exfil = ExfiltrationMethod.UNAUTHORIZED_TOOL_INVOCATION
+    return JudgeVerdict.FULL_BREACH, True, exfil
+
+
+async def run_agent_exec_one(
+    primitive: AttackPrimitive,
+    config: DeploymentConfig,
+    *,
+    harness: AgentHarness,
+    judge: TraceJudge,
+    cfg: AgentExecConfig,
+    budget: AgentExecBudget,
+    user_prompt: Optional[str] = None,
+    adapter: Any = None,
+    ctx: Any = None,
+    trial_index: int = 0,
+    temperature: float = 0.0,
+) -> AgentExecOutcome:
+    """Run one agent-exec trial and score it. Assumes the caller already checked
+    :func:`agent_exec_applicable` and :meth:`AgentExecBudget.can_start_run`."""
+    budget.start_run()
+    prompt = user_prompt if user_prompt is not None else primitive.payload_template
+    forbidden = harness.effective_forbidden(config)
+
+    # Level 2: a config with a live_tool_target routes tool calls to the customer's own MCP server
+    # (real execution). We own the connection lifecycle here — prepare before the run, aclose after —
+    # so the harness stays backend-agnostic. Forbidden tools are still recorded-not-executed upstream.
+    live_backend = None
+    if config.live_tool_target is not None:
+        from .backends.mcp_live import McpToolBackend  # noqa: PLC0415
+
+        live_backend = McpToolBackend(config.live_tool_target)
+
+    try:
+        if live_backend is not None:
+            await live_backend.prepare()
+        transcript = await harness.run(
+            config,
+            prompt,
+            primitive_id=primitive.primitive_id,
+            adapter=adapter,
+            ctx=ctx,
+            budget=budget,
+            trial_index=trial_index,
+            temperature=temperature,
+            backend=live_backend,
+        )
+    except Exception as exc:  # defensive: harness already swallows invoke errors, but be safe
+        return AgentExecOutcome(
+            primitive_id=primitive.primitive_id,
+            config_id=config.config_id,
+            trial_index=trial_index,
+            fired=True,
+            error=f"harness crashed: {exc}",
+            spend_usd=budget.run_spend_usd,
+        )
+    finally:
+        if live_backend is not None:
+            await live_backend.aclose()
+
+    findings = judge.judge(
+        transcript, forbidden_tools=forbidden, declared_tools=config.declared_tools
+    )
+    verdict, headline, _exfil = _verdict_and_exfil(findings)
+    transcript.fired_signals = fired_signals(findings)
+
+    error = f"loop terminated: {transcript.stop_reason}" if transcript.stop_reason == "error" else None
+    return AgentExecOutcome(
+        primitive_id=primitive.primitive_id,
+        config_id=config.config_id,
+        trial_index=trial_index,
+        fired=True,
+        transcript=transcript,
+        findings=findings,
+        verdict=verdict,
+        headline_breached=headline,
+        error=error,
+        spend_usd=budget.run_spend_usd,
+    )
+
+
+def validate_batch(
+    outcomes: list[AgentExecOutcome], *, positive_control_breached: Optional[bool] = None
+) -> Optional[str]:
+    """Liveness guard before any 0% ASR is trusted (review H11/F2). Returns an abort reason
+    (a non-None string) if the batch is not trustworthy, else ``None``.
+
+    - **all-errored**: every fired run errored ⇒ the tool wiring is likely broken, so a
+      reported "0 breaches" is fake-clean, not robust.
+    - **positive control**: if a known-breaching control primitive was included and did NOT
+      breach, the harness is broken regardless of the other results.
+    """
+    fired = [o for o in outcomes if o.fired]
+    if fired and all(o.errored for o in fired):
+        return f"all {len(fired)} agent-exec runs errored — refusing to report a 0% ASR"
+    if positive_control_breached is False:
+        return "positive-control primitive did not breach — harness likely broken; results untrusted"
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# Persistence mapping (construct-only; caller commits)
+# --------------------------------------------------------------------------- #
+
+
+def to_persistence_rows(
+    outcome: AgentExecOutcome, primitive: AttackPrimitive, config: DeploymentConfig, *, temperature: float = 0.0
+) -> tuple[BreachResultORM, AgentTranscriptORM, list[TraceFindingORM]]:
+    """Map a fired outcome onto (BreachResult, AgentTranscript, [TraceFinding]) ORM rows.
+
+    One BreachResult per trial (1:1 with the transcript, review CRIT-2); the N per-signal
+    findings hang off the transcript. Does NOT touch the DB — the caller persists in its own
+    transaction.
+    """
+    if outcome.transcript is None:
+        raise ValueError("cannot build persistence rows for a skipped/uncrossed outcome")
+
+    breach_id = ulid.new().str
+    verdict, _headline, exfil = _verdict_and_exfil(outcome.findings)
+    max_sev = max(
+        (f.severity for f in headline_findings(outcome.findings)),
+        key=lambda s: _SEVERITY_RANK[s],
+        default=None,
+    )
+
+    breach = BreachResultORM(
+        breach_id=breach_id,
+        primitive_id=outcome.primitive_id,
+        deployment_config_id=outcome.config_id,
+        trial_index=outcome.trial_index,
+        temperature=temperature,
+        rendered_payload=(primitive.payload_template or "")[:50_000],
+        model_response=(outcome.transcript.final_text or "")[:50_000],
+        verdict=verdict.value,
+        judge_rationale=(
+            f"agent-exec: {[f.signal.value for f in headline_findings(outcome.findings)]}"
+            f" (severity={max_sev.value if max_sev else 'none'})"
+        )[:2_000],
+        judge_confidence=1.0,
+        exfil_method=exfil.value if exfil else None,
+        latency_ms=0,
+        tokens_in=0,
+        tokens_out=0,
+        cost_usd=round(outcome.spend_usd, 6),
+        ran_at=datetime.now(timezone.utc),
+    )
+
+    tr = outcome.transcript
+    transcript_orm = AgentTranscriptORM(
+        transcript_id=tr.transcript_id,
+        breach_id=breach_id,
+        primitive_id=tr.primitive_id,
+        config_id=tr.config_id,
+        trial_index=tr.trial_index,
+        seed=tr.header.seed,
+        n_turns=tr.n_turns,
+        stop_reason=tr.stop_reason,
+        fired_signals=[s.value for s in tr.fired_signals],
+        trace=tr.model_dump(mode="json"),
+        created_at=datetime.now(timezone.utc),
+    )
+
+    finding_orms = [
+        TraceFindingORM(
+            transcript_id=tr.transcript_id,
+            signal=f.signal.value,
+            verdict=f.verdict.value,
+            severity=f.severity.value,
+            confidence=f.confidence,
+            headline_eligible=f.headline_eligible,
+            emulated_involved=f.emulated_involved,
+            source_return_call_id=f.source_return_call_id,
+            evidence=f.evidence,
+        )
+        for f in outcome.findings
+    ]
+    return breach, transcript_orm, finding_orms
+
+
+class AgentExecRunner:
+    """Composes the tier over a refused primitive's configs — the unit the escalation
+    orchestrator calls (Phase 5b). Builds its own harness/judge/backend from the config;
+    all injectable for tests. One shared :class:`AgentExecBudget` bounds the whole scan.
+    """
+
+    def __init__(
+        self,
+        cfg: AgentExecConfig,
+        *,
+        backend: Optional[HybridBackend] = None,
+        harness: Optional[AgentHarness] = None,
+        judge: Optional[TraceJudge] = None,
+        budget: Optional[AgentExecBudget] = None,
+        supports_tools_fn: Any = None,
+        adapter_extra: Optional[dict[str, Any]] = None,
+    ) -> None:
+        from rogue.adapters import model_specs  # noqa: PLC0415 — avoid an import cycle
+
+        self.cfg = cfg
+        if backend is None:
+            emu = EmulatorBackend(model=cfg.emulator_model) if cfg.emulator_model else None
+            backend = HybridBackend(emulator=emu)
+        self.backend = backend
+        self.harness = harness or AgentHarness(
+            backend=self.backend,
+            max_turns=cfg.max_turns,
+            default_forbid_critical=cfg.default_forbid_critical,
+            adapter_extra=adapter_extra,
+        )
+        self.judge = judge or TraceJudge(self.backend)
+        self.budget = budget or AgentExecBudget(cfg)
+        self._supports = supports_tools_fn or model_specs.supports_tools
+
+    async def maybe_run(
+        self, primitive: AttackPrimitive, configs: list[DeploymentConfig], *, adapter: Any = None
+    ) -> list[AgentExecOutcome]:
+        """Run the tier for every applicable config (skips recorded, not silently dropped).
+        Stops early when the per-scan run/spend cap is reached."""
+        outcomes: list[AgentExecOutcome] = []
+        for config in configs:
+            fires, reason = agent_exec_applicable(
+                primitive,
+                config,
+                self.cfg,
+                backend=self.backend,
+                model_supports_tools=self._supports(config.target_model),
+            )
+            if not fires:
+                outcomes.append(
+                    AgentExecOutcome(primitive.primitive_id, config.config_id, 0, fired=False, skip_reason=reason)
+                )
+                continue
+            if not self.budget.can_start_run():
+                break
+            outcomes.append(
+                await run_agent_exec_one(
+                    primitive,
+                    config,
+                    harness=self.harness,
+                    judge=self.judge,
+                    cfg=self.cfg,
+                    budget=self.budget,
+                    adapter=adapter,
+                )
+            )
+        return outcomes
+
+
+@dataclass
+class AgentExecPassResult:
+    """The outcome of one agent-exec pass over a batch of refused, tool-bearing primitives."""
+
+    outcomes: list[AgentExecOutcome]
+    aborted: Optional[str]  # liveness-guard abort reason (all-errored / positive-control), else None
+    breach_rows: list  # [(BreachResultORM, AgentTranscriptORM, [TraceFindingORM])] — empty if aborted
+    headline_breaches: int
+    spend_usd: float
+
+
+async def run_agent_exec_pass(
+    primitives: list[AttackPrimitive],
+    configs: list[DeploymentConfig],
+    *,
+    runner: "AgentExecRunner",
+    positive_control_breached: Optional[bool] = None,
+    on_ping: Any = None,
+    adapter: Any = None,
+) -> AgentExecPassResult:
+    """Run the AGENT_EXEC tier over ``primitives × configs`` as a deliberate pass.
+
+    This is the top-level entry the escalation orchestrator (or a dedicated deliberately-run
+    script) calls — NOT spliced into the auto-sweep's hot loop. It pings Slack from HERE (the
+    caller passes ``on_ping``) on start / each breach / cap / done / abort (notify-don't-babysit),
+    runs the liveness guard before trusting the result, and builds — but does NOT commit —
+    the persistence rows (the caller owns the transaction).
+    """
+    ping = on_ping if callable(on_ping) else (lambda _msg: None)
+    config_by_id = {c.config_id: c for c in configs}
+    ping(f"agent-exec: starting over {len(primitives)} primitive(s) × {len(configs)} config(s)")
+
+    all_outcomes: list[AgentExecOutcome] = []
+    breach_rows: list = []
+    for prim in primitives:
+        outs = await runner.maybe_run(prim, configs, adapter=adapter)
+        all_outcomes.extend(outs)
+        for o in outs:
+            if o.fired and o.headline_breached and o.transcript is not None and not o.errored:
+                ping(
+                    f"agent-exec BREACH: {o.primitive_id} @ {o.config_id} → "
+                    f"{[f.signal.value for f in headline_findings(o.findings)]}"
+                )
+                breach_rows.append(to_persistence_rows(o, prim, config_by_id[o.config_id]))
+        if not runner.budget.can_start_run():
+            why = (
+                f"max_runs={runner.cfg.max_runs_per_scan} reached"
+                if runner.budget.runs_started >= runner.cfg.max_runs_per_scan
+                else f"per-scan cap ${runner.budget.scan_spend_usd:.2f}"
+            )
+            ping(f"agent-exec: {why} — stopping early")
+            break
+
+    aborted = validate_batch(all_outcomes, positive_control_breached=positive_control_breached)
+    headline = sum(1 for o in all_outcomes if o.headline_breached)
+    if aborted:
+        ping(f"agent-exec ABORT: {aborted}")
+        breach_rows = []  # never persist a batch we don't trust
+    else:
+        ping(f"agent-exec: done — {headline} headline breach(es), ${runner.budget.scan_spend_usd:.2f}")
+    return AgentExecPassResult(
+        outcomes=all_outcomes,
+        aborted=aborted,
+        breach_rows=breach_rows,
+        headline_breaches=headline,
+        spend_usd=runner.budget.scan_spend_usd,
+    )
+
+
+__all__ = [
+    "AgentExecConfig",
+    "AgentExecBudget",
+    "AgentExecOutcome",
+    "AgentExecRunner",
+    "AgentExecPassResult",
+    "agent_exec_applicable",
+    "run_agent_exec_one",
+    "run_agent_exec_pass",
+    "validate_batch",
+    "to_persistence_rows",
+]

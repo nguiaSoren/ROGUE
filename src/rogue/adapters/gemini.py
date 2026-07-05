@@ -147,8 +147,13 @@ class GeminiAdapter(TargetAdapter):
         *,
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        tools: list[Any] | None = None,
+        tool_choice: str | None = None,
         **kwargs,
     ) -> InvocationResult:
+        # Phase 1: `tools`/`tool_choice` are accepted for a uniform adapter signature but NOT wired
+        # into the Gemini request yet (Gemini tool-calling lands in a later phase). Passing tools= here
+        # is a silent no-op, not an error.
         contents, system_instruction = self._build_contents(messages)
         client = self._client()
         wire_model = self._wire_model

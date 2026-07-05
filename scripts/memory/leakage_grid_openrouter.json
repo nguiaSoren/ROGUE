@@ -1,0 +1,15 @@
+{
+  "_doc": "OpenRouter half of the hybrid P4 regen: the F_reasoning models (slow on Featherless's low concurrency) + the cross-provider checks (same model, different serving stack = the serving-stack-gap finding). OpenRouter ids; the harness liveness guard skips any id that does not serve. Featherless runs arms A/B/C/D/E (kept on one provider for scale-ladder consistency).",
+  "provider": "openrouter",
+  "base_url": "https://openrouter.ai/api/v1",
+  "models": [
+    {"id": "openai/gpt-oss-20b", "family": "gpt-oss", "params_b": 20, "alignment": "instruct", "reasoning": true, "arms": ["F_reasoning"]},
+    {"id": "qwen/qwen3-32b", "family": "qwen3", "params_b": 32, "alignment": "instruct", "reasoning": true, "arms": ["F_reasoning"]},
+    {"id": "qwen/qwq-32b", "family": "qwq", "params_b": 32, "alignment": "instruct", "reasoning": true, "arms": ["F_reasoning"]},
+    {"id": "deepseek/deepseek-r1-distill-llama-8b", "family": "r1-distill", "params_b": 8, "alignment": "instruct", "reasoning": true, "arms": ["F_reasoning"]},
+    {"id": "deepseek/deepseek-r1-distill-llama-70b", "family": "r1-distill", "params_b": 70, "alignment": "instruct", "reasoning": true, "arms": ["F_reasoning"]},
+    {"id": "meta-llama/llama-3.1-8b-instruct", "family": "llama3", "params_b": 8, "alignment": "instruct", "reasoning": false, "arms": ["cross_provider"]},
+    {"id": "meta-llama/llama-3.1-70b-instruct", "family": "llama3", "params_b": 70, "alignment": "instruct", "reasoning": false, "arms": ["cross_provider"]},
+    {"id": "qwen/qwen-2.5-72b-instruct", "family": "qwen2.5", "params_b": 72, "alignment": "instruct", "reasoning": false, "arms": ["cross_provider"]}
+  ]
+}

@@ -30,8 +30,8 @@ INSTRUCT = "NousResearch/Meta-Llama-3.1-8B-Instruct"
 ABLITERATED = "mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated"
 
 
-def _universe() -> list[str]:
-    return [r["skill_id"] for r in json.loads(CANARIES.read_text())]
+def _universe(path: Path = CANARIES) -> list[str]:
+    return [r["skill_id"] for r in json.loads(Path(path).read_text())]
 
 
 def _rates(path: Path, model: str, skills: list[str], runs: int) -> dict[str, float]:
@@ -79,7 +79,7 @@ def _signflip_p(diffs: list[float]) -> tuple[float, str]:
     obs = abs(sum(diffs))
     if k == 0:
         return 1.0, "no nonzero pairs"
-    if k <= 22:  # 2^22 ~ 4M, fine
+    if k <= 22:  # 2^22 ~ 4M, exact full enumeration is tractable
         ge = 0
         total = 0
         base = 0.0  # ties contribute 0 to the statistic
@@ -88,11 +88,22 @@ def _signflip_p(diffs: list[float]) -> tuple[float, str]:
             ge += stat >= obs - 1e-12
             total += 1
         return ge / total, f"exact, 2^{k} flips"
-    return 1.0, "k too large"
+    # Large k (e.g. the N=100 panel): exact 2^k is infeasible, so sample the sign-flip
+    # null with a FIXED seed (deterministic, reproducible). Add-one estimator (ge+1)/(B+1)
+    # so the p-value is never an impossible 0.
+    import random
+    rng = random.Random(0)
+    B = 200_000
+    ge = 0
+    for _ in range(B):
+        stat = abs(sum((v if rng.random() < 0.5 else -v) for v in nz))
+        ge += stat >= obs - 1e-12
+    return (ge + 1) / (B + 1), f"sampled, {B} flips (k={k}, seed=0)"
 
 
-def run(tag: str, path: Path, aligned: str = INSTRUCT, less_aligned: str = ABLITERATED) -> None:
-    skills = _universe()
+def run(tag: str, path: Path, aligned: str = INSTRUCT, less_aligned: str = ABLITERATED,
+        canaries: Path = CANARIES) -> None:
+    skills = _universe(canaries)
     ins = _rates(path, aligned, skills, 3)
     abl = _rates(path, less_aligned, skills, 3)
     diffs = [abl[s] - ins[s] for s in skills]  # >0 means the less-aligned model leaks more
@@ -122,6 +133,17 @@ def main() -> int:
         DATA / "skill_leak_hermes4_or.json",
         aligned="meta-llama/llama-3.1-70b-instruct",
         less_aligned="nousresearch/hermes-4-70b")
+    # Powered panel: N=100 REAL-doc canaries (20 bundled + 18 distilled + 62 crawled upstream
+    # SKILL.md), same Llama-3.1-70B base, alignment varied. Lifts the paired test off n=20.
+    N100 = ROOT / "tests" / "fixtures" / "memory" / "leakage_canaries_n100.json"
+    run("POWERED panel N=100 (OpenRouter, Llama-3.1-70B instruct vs Hermes-3 permissive)",
+        DATA / "skill_leak_alignment_n100_2026-06-28.json",
+        aligned="meta-llama/llama-3.1-70b-instruct",
+        less_aligned="nousresearch/hermes-3-llama-3.1-70b", canaries=N100)
+    run("POWERED panel N=100 (OpenRouter, Llama-3.1-70B instruct vs Hermes-4 permissive)",
+        DATA / "skill_leak_alignment_n100_2026-06-28.json",
+        aligned="meta-llama/llama-3.1-70b-instruct",
+        less_aligned="nousresearch/hermes-4-70b", canaries=N100)
     return 0
 
 

@@ -29,6 +29,7 @@ class ModelSpec:
     output_price_per_m: float | None
     supports_image: bool = False
     supports_audio: bool = False
+    supports_tools: bool = False
     max_context_tokens: int | None = None
     max_output_tokens: int | None = None
     max_temperature: float | None = None
@@ -36,31 +37,38 @@ class ModelSpec:
 
 # Keyed by full "provider/model" id. Pricing tuple = (input $/M, output $/M).
 _SPECS: dict[str, ModelSpec] = {
-    "openai/gpt-5.4-nano": ModelSpec("openai/gpt-5.4-nano", 0.20, 1.25, supports_image=True),
-    "openai/gpt-5.4": ModelSpec("openai/gpt-5.4", 2.50, 15.00, supports_image=True),
-    "openai/gpt-audio-mini": ModelSpec("openai/gpt-audio-mini", 0.60, 2.40, supports_audio=True),
+    "openai/gpt-5.4-nano": ModelSpec(
+        "openai/gpt-5.4-nano", 0.20, 1.25, supports_image=True, supports_tools=True
+    ),
+    "openai/gpt-5.4": ModelSpec(
+        "openai/gpt-5.4", 2.50, 15.00, supports_image=True, supports_tools=True
+    ),
+    "openai/gpt-audio-mini": ModelSpec(
+        "openai/gpt-audio-mini", 0.60, 2.40, supports_audio=True, supports_tools=True
+    ),
     "anthropic/claude-haiku-4-5": ModelSpec(
-        "anthropic/claude-haiku-4-5", 1.00, 5.00, supports_image=True,
+        "anthropic/claude-haiku-4-5", 1.00, 5.00, supports_image=True, supports_tools=True,
         max_output_tokens=_ANTHROPIC_MAX_OUTPUT, max_temperature=_ANTHROPIC_MAX_TEMP,
     ),
     "anthropic/claude-sonnet-4-6": ModelSpec(
-        "anthropic/claude-sonnet-4-6", 3.00, 15.00, supports_image=True,
+        "anthropic/claude-sonnet-4-6", 3.00, 15.00, supports_image=True, supports_tools=True,
         max_output_tokens=_ANTHROPIC_MAX_OUTPUT, max_temperature=_ANTHROPIC_MAX_TEMP,
     ),
     "anthropic/claude-opus-4-8": ModelSpec(
-        "anthropic/claude-opus-4-8", 15.00, 75.00,
+        "anthropic/claude-opus-4-8", 15.00, 75.00, supports_tools=True,
         max_output_tokens=_ANTHROPIC_MAX_OUTPUT, max_temperature=_ANTHROPIC_MAX_TEMP,
     ),
     "groq/llama-3.1-8b-instant": ModelSpec("groq/llama-3.1-8b-instant", 0.05, 0.08),
     "meta-llama/llama-3.1-8b-instruct": ModelSpec("meta-llama/llama-3.1-8b-instruct", 0.02, 0.05),
     "mistralai/mistral-small-2603": ModelSpec(
-        "mistralai/mistral-small-2603", 0.15, 0.60, supports_image=True
+        "mistralai/mistral-small-2603", 0.15, 0.60, supports_image=True, supports_tools=True
     ),
     "mistralai/voxtral-small-24b-2507": ModelSpec(
-        "mistralai/voxtral-small-24b-2507", 0.10, 0.30, supports_audio=True
+        "mistralai/voxtral-small-24b-2507", 0.10, 0.30, supports_audio=True, supports_tools=True
     ),
     "google/gemini-3.1-flash-lite": ModelSpec(
-        "google/gemini-3.1-flash-lite", 0.25, 1.50, supports_image=True, supports_audio=True
+        "google/gemini-3.1-flash-lite", 0.25, 1.50,
+        supports_image=True, supports_audio=True, supports_tools=True,
     ),
 }
 
@@ -138,6 +146,17 @@ def supports_audio(model: str) -> bool:
     return bool(spec and spec.supports_audio)
 
 
+def supports_tools(model: str) -> bool:
+    """True iff ``model`` honors function/tool calling (unknown models → False, fail-safe).
+
+    THE capability source for the agent harness: adapters delegate ``capabilities().supports_tools``
+    here rather than hardcoding, so a model that doesn't actually honor ``tools=`` (e.g. meta-llama/*)
+    is never over-claimed.
+    """
+    spec = _SPECS.get(model)
+    return bool(spec and spec.supports_tools)
+
+
 def estimate_cost(model: str, tokens_in: int, tokens_out: int) -> float:
     """USD cost for one call; 0.0 + warn on an unknown model (preserves panel behavior).
 
@@ -188,6 +207,7 @@ __all__ = [
     "get_spec",
     "supports_image",
     "supports_audio",
+    "supports_tools",
     "estimate_cost",
     "capabilities_for",
     "extract_vendor",

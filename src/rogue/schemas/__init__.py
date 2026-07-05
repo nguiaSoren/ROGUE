@@ -66,6 +66,28 @@ from .grammar_node import (
     GRAMMAR_NODE_META,
     GrammarLabel,
 )
+from .agent_tool import (
+    AgentToolSpec,
+    InjectionGoal,
+    InjectionGoalKind,
+    LiveToolTarget,
+    ToolBackendKind,
+    ToolCategory,
+    ToolSensitivity,
+)
+from .agent_transcript import (
+    AgentBreachSignal,
+    AgentTranscript,
+    AgentTurn,
+    DeterminismHeader,
+    PlantedSecret,
+    ReturnProvenance,
+    ToolCallRecord,
+    ToolResultRecord,
+    TraceFinding,
+    TranscriptEvent,
+    TurnRole,
+)
 
 __all__ = [
     # attack primitive
@@ -112,4 +134,23 @@ __all__ = [
     "GrammarNode",
     "GRAMMAR_NODE_META",
     "GrammarLabel",
+    # agent execution harness — tool surface + replayable trace (docs/v2/agent_harness)
+    "AgentToolSpec",
+    "LiveToolTarget",
+    "ToolCategory",
+    "ToolSensitivity",
+    "ToolBackendKind",
+    "InjectionGoal",
+    "InjectionGoalKind",
+    "AgentTranscript",
+    "AgentTurn",
+    "TurnRole",
+    "ToolCallRecord",
+    "ToolResultRecord",
+    "ReturnProvenance",
+    "PlantedSecret",
+    "DeterminismHeader",
+    "TranscriptEvent",
+    "TraceFinding",
+    "AgentBreachSignal",
 ]

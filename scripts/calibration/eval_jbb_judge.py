@@ -182,8 +182,11 @@ def main(argv: list[str] | None = None) -> int:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / f"jbb_judge_report_{args.prompt_version}.json"
+    _payload = _serialize(report, seed=args.seed, limit=args.limit)
+    _payload["judge_model"] = judge.model
+    _payload["resolved_model"] = judge._last_resolved_model
     out_path.write_text(
-        json.dumps(_serialize(report, seed=args.seed, limit=args.limit), indent=2),
+        json.dumps(_payload, indent=2),
         encoding="utf-8",
     )
     items_path = OUTPUT_DIR / "jbb_judge_items.jsonl"
