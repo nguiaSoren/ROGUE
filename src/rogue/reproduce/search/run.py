@@ -10,6 +10,7 @@ from typing import Optional
 
 from .actions import cheap_mutation_actions
 from .coverage import NoveltyReward
+from .goal_preservation import make_goal_check
 from .harden import HardenCheckResult, harden_check
 from .live import make_refine_action, make_rollout
 from .mcts import MCTSSearcher
@@ -20,11 +21,15 @@ async def search_escalate(
     primitive, config, panel, judge, *,
     searcher: Optional[Searcher] = None, budget: Optional[Budget] = None,
     refine_attacker=None, embed_fn=None, lam: float = 0.0, seed_prompt: Optional[str] = None,
+    enforce_goal: bool = False, goal_judge_fn=None,
 ) -> SearchResult:
     """Opt-in escalation: run the search on a (typically refused) primitive against a LIVE config to
     find a breaking mutation. The alternative to the current escalation — a caller enables it behind a
     flag; it is not the default until the A/B validates MCTS. ``refine_attacker`` adds the PAIR
-    LLM-refine action; ``embed_fn``+``lam`` add the coverage/novelty reward."""
+    LLM-refine action; ``embed_fn``+``lam`` add the coverage/novelty reward. ``enforce_goal`` (AdvCodeGen-
+    inspired) gates mutations through the goal-preservation validator so a neutered variant never
+    reaches the target (its refusal would be a false negative); ``goal_judge_fn`` supplies the
+    authoritative LLM check, else it falls back to structural + embedding/lexical signals."""
     searcher = searcher or MCTSSearcher()
     budget = budget or Budget(max_rollouts=30)
     rollout = make_rollout(panel, judge, config, primitive)
@@ -32,7 +37,12 @@ async def search_escalate(
     if refine_attacker is not None:
         actions.append(make_refine_action(refine_attacker, goal=primitive.short_description))
     reward_fn = NoveltyReward(embed_fn, lam) if (embed_fn is not None and lam > 0) else None
-    return await searcher.search(seed_prompt or primitive.payload_template, rollout, actions, budget, reward_fn)
+    goal_check = make_goal_check(
+        primitive.payload_template, primitive.short_description, embed_fn=embed_fn, judge_fn=goal_judge_fn,
+    ) if enforce_goal else None
+    return await searcher.search(
+        seed_prompt or primitive.payload_template, rollout, actions, budget, reward_fn, goal_check,
+    )
 
 
 async def harden_from_remediation(

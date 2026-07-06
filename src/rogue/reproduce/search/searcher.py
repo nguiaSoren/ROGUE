@@ -102,7 +102,7 @@ class Searcher(Protocol):
 
     async def search(
         self, seed_prompt: str, rollout: RolloutFn, actions: list[Action], budget: Budget,
-        reward_fn: Optional[RewardFn] = None,
+        reward_fn: Optional[RewardFn] = None, goal_check: Optional[Callable[[str], bool]] = None,
     ) -> SearchResult: ...
 
 

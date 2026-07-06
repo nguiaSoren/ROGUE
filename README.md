@@ -254,7 +254,7 @@ The mechanics behind the pipeline, each on its own page:
 - Daily threat brief (markdown + JSON) + Slack webhook.
 - ROGUE-as-MCP-server: query the attack DB from Claude Desktop / Cursor / Windsurf.
 - True multimodal red-team and a self-growing technique repertoire (see [Deep dives](#deep-dives)).
-- Deterministic obfuscation augmentation: 10 labelled, zero-LLM-cost transforms (leetspeak, homoglyph, zero-width, fullwidth, zalgo + base64 / ROT13 / hex / Unicode-escape / HTML-entity decode-wraps) skin a defended attack to measure a **flip-rate-per-transform**, separating "the target pattern-matches the surface string" from "the target understands the technique."
+- Deterministic obfuscation augmentation: 10 labelled, zero-LLM-cost transforms (leetspeak, homoglyph, zero-width, fullwidth, zalgo + base64 / ROT13 / hex / Unicode-escape / HTML-entity decode-wraps) skin a defended attack to measure a **flip-rate-per-transform**, separating "the target pattern-matches the surface string" from "the target understands the technique." A **goal-preservation validator** (inspired by AdvCodeGen, ICISC'25) checks each mutated variant still expresses the attack's goal *before* it's fired — decoding obfuscation, comparing to the original — so an over-obfuscated, self-neutered payload isn't miscounted as the model *defending*, a false negative the naive skin-and-fire loop silently produces.
 - External benchmark layer against frozen AdvBench / JailbreakBench goal sets.
 
 ## Roadmap

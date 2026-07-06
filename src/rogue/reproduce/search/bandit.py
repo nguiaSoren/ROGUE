@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 
-from typing import Optional
+from typing import Callable, Optional
 
 from .searcher import Action, Budget, RewardFn, RolloutFn, SearchResult, default_reward
 
@@ -23,7 +23,7 @@ class BanditSearcher:
 
     async def search(
         self, seed_prompt: str, rollout: RolloutFn, actions: list[Action], budget: Budget,
-        reward_fn: Optional[RewardFn] = None,
+        reward_fn: Optional[RewardFn] = None, goal_check: Optional[Callable[[str], bool]] = None,
     ) -> SearchResult:
         reward = reward_fn or default_reward  # hill-climb on reward (Feature 3 adds novelty)
         # Beta(α,β) per action; an action is rewarded if it improved the reward or produced a breach.
@@ -38,10 +38,20 @@ class BanditSearcher:
         n_breaches = 1 if out.breached else 0
         action_use: dict[str, int] = {}
         trace: list = [{"action": "seed", "verdict": out.verdict.value, "compliance": out.compliance}]
+        attempts, max_attempts = 0, budget.max_rollouts * 3  # cap so goal-rejects can't loop forever
 
-        while not budget.exhausted(n_rollouts, cost):
+        while not budget.exhausted(n_rollouts, cost) and attempts < max_attempts:
+            attempts += 1
             action = max(actions, key=lambda a: self._rng.betavariate(alpha[a.name], beta[a.name]))
             child_prompt, act_cost = await action.apply(best_reward_prompt, best_reward_out)
+            # Goal-preservation gate (opt-in, AdvCodeGen-inspired): a mutation that neutered the
+            # attack's goal never reaches the target — skip the rollout (its refusal would be a false
+            # negative), charge only the mutation cost, and penalize the action's bandit arm.
+            if goal_check is not None and not goal_check(child_prompt):
+                cost += act_cost
+                beta[action.name] += 1.0
+                trace.append({"action": action.name, "kind": action.kind, "skipped": "goal_violation"})
+                continue
             out = await rollout(child_prompt)
             n_rollouts += 1
             cost += out.cost_usd + act_cost

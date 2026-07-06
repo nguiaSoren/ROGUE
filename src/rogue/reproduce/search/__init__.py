@@ -10,6 +10,7 @@ from .actions import cheap_mutation_actions, default_actions, framing_mutation_a
 from .bandit import BanditSearcher
 from .compliance import COMPLIANCE_ANCHORS, compliance_score
 from .coverage import NoveltyReward
+from .goal_preservation import GoalPreservationResult, check_goal_preserved, make_goal_check
 from .harden import HardenCheckResult, harden_check
 from .mcts import MCTSSearcher
 from .live import make_embed_fn, make_refine_action, make_rollout, make_seed_primitive
@@ -24,6 +25,7 @@ __all__ = [
     "NoveltyReward",
     "ab_compare", "ABReport",
     "harden_check", "HardenCheckResult",
+    "check_goal_preserved", "make_goal_check", "GoalPreservationResult",
     "make_rollout", "make_refine_action", "make_embed_fn", "make_seed_primitive",
     "search_escalate", "harden_from_remediation",
 ]

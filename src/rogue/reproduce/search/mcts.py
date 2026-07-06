@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 from .searcher import Action, Budget, RewardFn, RolloutFn, RolloutOutcome, SearchResult, default_reward
 
@@ -56,7 +56,7 @@ class MCTSSearcher:
 
     async def search(
         self, seed_prompt: str, rollout: RolloutFn, actions: list[Action], budget: Budget,
-        reward_fn: Optional[RewardFn] = None,
+        reward_fn: Optional[RewardFn] = None, goal_check: Optional[Callable[[str], bool]] = None,
     ) -> SearchResult:
         reward = reward_fn or default_reward  # value the tree climbs (Feature 3 adds novelty)
         root = _Node(prompt=seed_prompt, untried=list(actions))
@@ -69,13 +69,22 @@ class MCTSSearcher:
         n_breaches = 1 if out.breached else 0
         action_use: dict[str, int] = {}
         trace: list = [{"depth": 0, "action": "seed", "verdict": out.verdict.value, "compliance": out.compliance}]
+        attempts, max_attempts = 0, budget.max_rollouts * 3  # cap so goal-rejects can't loop forever
 
-        while not budget.exhausted(n_rollouts, cost):
+        while not budget.exhausted(n_rollouts, cost) and attempts < max_attempts:
+            attempts += 1
             node = self._select(root)
             if not node.untried:
                 break  # tree fully expanded within budget (safety net; rare)
             action = node.untried.pop(self._rng.randrange(len(node.untried)))
             child_prompt, act_cost = await action.apply(node.prompt, node.outcome)
+            # Goal-preservation gate (opt-in): a mutation that neutered the goal never reaches the
+            # target — skip the rollout (its refusal would be a false negative), charge only the
+            # mutation cost, and don't graft the dead child into the tree.
+            if goal_check is not None and not goal_check(child_prompt):
+                cost += act_cost
+                trace.append({"action": action.name, "kind": action.kind, "skipped": "goal_violation"})
+                continue
             out = await rollout(child_prompt)
             n_rollouts += 1
             cost += out.cost_usd + act_cost
