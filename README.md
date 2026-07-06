@@ -8,7 +8,7 @@
 
 **ROGUE red-teams your AI agent against live open-web jailbreaks, grades each with a human-calibrated judge, and hands you signed, reproducible evidence — before you deploy.** Backed by **11,973 calibrated-judge trials across 8 production models**, with a counterintuitive measured finding: most *claimed* jailbreaks don't survive a real deployment — reproduction collapses **40% → 4%**.
 
-ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the **model** can be broken by a live jailbreak or prompt-injection, whether the **human oversight** around it is meaningful, and whether the **memory it accumulates** stays contained. Each is scored against an independent, continuously-refreshed standard and emitted as a reproducible **signed** record — and it closes the loop, **generating and verifying the fix** before you deploy (you own the runtime, so ROGUE never sits in your request path).
+ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the **model** can be broken by a live jailbreak or prompt-injection, whether the **tools it can invoke** can be turned against it (tool-use hijack, indirect injection via tool outputs), whether the **human oversight** around it is meaningful, and whether the **memory it accumulates** stays contained. Each is scored against an independent, continuously-refreshed standard and emitted as a reproducible **signed** record — and it closes the loop, **generating and verifying the fix** before you deploy (you own the runtime, so ROGUE never sits in your request path).
 
 > ### ▶ See a real breach in 20 seconds — no key, no signup
 > ```bash
@@ -44,7 +44,7 @@ https://github.com/user-attachments/assets/355df07c-71a1-44e1-8146-e59d93187d24
 Other LLM red-teams run a *fixed* attack set you have to keep updating. ROGUE is the only one that does all of this together:
 
 - **Harvests on a schedule.** New jailbreaks and prompt-injections pulled from 15 open-web sources on a recurring cron — **scraping is free and keyless** (scraper-agnostic, no scraper is a dependency; extraction runs on any LLM you choose, incl. a local one), so the threat DB keeps refreshing without manual runs. (The breach-rate measurements are periodic measured snapshots, re-run deliberately, not a continuously-updating number.)
-- **Reproduces against *your* exact config.** Your model **and its system-prompt**, not a generic safety benchmark (tool-call scoping is on the roadmap).
+- **Reproduces against *your* exact config.** Your model, its system-prompt, **and its tools** — not a generic safety benchmark. ROGUE gives the model a real function-calling surface and runs a multi-turn agent loop, so it catches tool-use hijack and indirect injection, not just text jailbreaks: safe simulated tools by default, or point it at **your own MCP tool server** for real execution (dangerous tools stay recorded-not-executed).
 - **Is queryable over MCP, both ways.** It *harvests* through MCP and *serves* results through its own MCP server, so you can ask "what breaches a model like mine?" from inside Cursor or Claude. No other red-team closes that loop.
 - **Measures three surfaces, signed.** The **model** surface is deep and paper-backed; the **human approval gate** and the **shared skill-pool** are two further instruments at proof-of-concept scale. Each is scored against an independent answer key and emitted as a tamper-evident attestation.
 - **Runs on the LLM you choose.** The judge and extraction models are configurable (`JUDGE_MODEL`): any provider or a local model (Ollama via `OPENAI_BASE_URL`), not locked to one vendor.
@@ -71,6 +71,10 @@ rogue setup      # install the best free scraper (crawl4ai) — prep for harvest
 `rogue try` runs a live **ATTACKER → MODEL → JUDGE** red-team in your terminal, fully offline and zero keys, then overlays ROGUE's **real measured breach rates across 6 production text models + 2 audio targets** (11,973 calibrated-judge trials; the two audio targets are sampled lighter, ~185 trials each) and drops a shareable breach card:
 
 <p align="center"><img src="assets/card/marketing/breach-card.png" alt="ROGUE breach card: mistral-small-2603, 668/2189 breached, calibrated judge" width="620"></p>
+
+For attacks that *scale* (many-shot / long-context), a single pass isn't enough — ROGUE sweeps the dimension and reports a **robustness threshold**: *safe up to N, breaks at M*.
+
+<p align="center"><img src="assets/card/marketing/sweep-card.png" alt="ROGUE sweep card: many-shot context-length threshold — held to 8K, breaks at 32K" width="620"></p>
 
 **Then scan _your_ model.** The target is *your own* deployment: any OpenAI-compatible **`--endpoint`** plus your real **`--system-prompt`** (that's what makes it a deployment red-team, not a bare-model test). Pass `--provider`/`--model` instead to hit a hosted model by name:
 
@@ -252,7 +256,6 @@ The mechanics behind the pipeline, each on its own page:
 ## Roadmap
 
 - **Expand source coverage.** More source plugins bring the next ~100 open-web sources online.
-- **Tool-aware scans.** Supply your agent's tool schemas so a reproduction exercises the full model × system-prompt × **tools** surface (today's scan covers model × system-prompt).
 - **Break bandit.** A second, contextual Thompson-sampling bandit that learns *how to break* (which escalation strategy to try first per attack-family × target); the control surface and reward log are already built and instrumented in prod.
 
 ---
