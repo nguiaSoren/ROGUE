@@ -120,10 +120,14 @@ def log_ladder_attempts(
     # Unambiguous target only when the ladder ran against exactly one config.
     target_vendor: Optional[str] = None
     target_family: Optional[str] = None
+    target_size_class: Optional[str] = None
     if configs is not None and len(configs) == 1:
         _model = configs[0].target_model
         target_vendor = extract_vendor(_model)
         target_family = extract_model_family(_model)
+        from .config_features import derive_config_features  # noqa: PLC0415
+
+        target_size_class = derive_config_features(_model, base_url=getattr(configs[0], "base_url", None)).sibling_key
 
     rows = []
     for idx, (label, outcome) in enumerate(attempts):
@@ -147,6 +151,7 @@ def log_ladder_attempts(
                 stopped_run=bool(quota == 0 and is_winner),
                 target_vendor=target_vendor,
                 target_family=target_family,
+                target_size_class=target_size_class,
                 is_winner=is_winner,
                 created_at=now,
             )

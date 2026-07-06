@@ -74,6 +74,7 @@ __all__ = [
     "BLEND_W_GLOBAL",
     "BLEND_W_VENDOR",
     "BLEND_W_FAMILY",
+    "BLEND_W_SIZE",
 ]
 
 # Add-1 (Laplace) smoothing on a Beta(ALPHA, BETA) prior. ALPHA=BETA=1 ⇒ an unseen
@@ -126,10 +127,14 @@ STARVATION_WEIGHT = float(os.environ.get("ROGUE_LADDER_STARVATION_WEIGHT", "1.0"
 # what works against *this* target. The weights are a convex combination — they MUST
 # sum to 1.0 (asserted below) so blend_score stays a probability-scale rate before the
 # additive exploration term, and so re-tuning one weight visibly trades off the others.
-BLEND_W_GLOBAL = float(os.environ.get("ROGUE_LADDER_BLEND_W_GLOBAL", "0.5"))
-BLEND_W_VENDOR = float(os.environ.get("ROGUE_LADDER_BLEND_W_VENDOR", "0.3"))
-BLEND_W_FAMILY = float(os.environ.get("ROGUE_LADDER_BLEND_W_FAMILY", "0.2"))
-assert abs(BLEND_W_GLOBAL + BLEND_W_VENDOR + BLEND_W_FAMILY - 1.0) < 1e-9, (
+BLEND_W_GLOBAL = float(os.environ.get("ROGUE_LADDER_BLEND_W_GLOBAL", "0.45"))
+BLEND_W_VENDOR = float(os.environ.get("ROGUE_LADDER_BLEND_W_VENDOR", "0.25"))
+BLEND_W_FAMILY = float(os.environ.get("ROGUE_LADDER_BLEND_W_FAMILY", "0.15"))
+# SIZE scope (§size-prior): breach rate against targets of the same size_class × context reach —
+# the axes the many-shot / long-context papers tie to ASR. A new large, long-context config borrows
+# the strategy order that beat other large, long-context configs (correlational prior; measurement validates).
+BLEND_W_SIZE = float(os.environ.get("ROGUE_LADDER_BLEND_W_SIZE", "0.15"))
+assert abs(BLEND_W_GLOBAL + BLEND_W_VENDOR + BLEND_W_FAMILY + BLEND_W_SIZE - 1.0) < 1e-9, (
     "contextual blend weights must sum to 1.0"
 )
 
@@ -605,6 +610,8 @@ class VendorFamilyStat:
     vendor_trials: int
     family_breaches: int
     family_trials: int
+    size_breaches: int = 0
+    size_trials: int = 0
 
     @property
     def global_rate(self) -> float:
@@ -620,6 +627,11 @@ class VendorFamilyStat:
     def family_rate(self) -> float:
         """Laplace-smoothed breach rate against ``target_family`` (unseen → 0.5)."""
         return (self.family_breaches + ALPHA) / (self.family_trials + ALPHA + BETA)
+
+    @property
+    def size_rate(self) -> float:
+        """Laplace-smoothed breach rate against same size_class × context reach (unseen → 0.5)."""
+        return (self.size_breaches + ALPHA) / (self.size_trials + ALPHA + BETA)
 
     @property
     def exploration_bonus(self) -> float:
@@ -643,12 +655,13 @@ class VendorFamilyStat:
             BLEND_W_GLOBAL * self.global_rate
             + BLEND_W_VENDOR * self.vendor_rate
             + BLEND_W_FAMILY * self.family_rate
+            + BLEND_W_SIZE * self.size_rate
             + self.exploration_bonus
         )
 
 
 def vendor_family_strategy_rates(
-    session: "Session", *, target_vendor: str, target_family: str,
+    session: "Session", *, target_vendor: str, target_family: str, target_size_class: str | None = None,
 ) -> dict[str, "VendorFamilyStat"]:
     """§10.10 — per-strategy breach priors at GLOBAL / VENDOR / FAMILY scope, the
     substrate for ``order_by_blend`` (contextual mode).
@@ -676,6 +689,9 @@ def vendor_family_strategy_rates(
     valid_trial = case((valid, 1), else_=0)
     is_vendor = LadderAttempt.target_vendor == target_vendor
     is_family = LadderAttempt.target_family == target_family
+    # size scope only counts when a size_class is requested AND the row is tagged (NULL rows contribute
+    # to GLOBAL only, like the vendor/family cold case).
+    is_size = (LadderAttempt.target_size_class == target_size_class) if target_size_class else None
     q = (
         session.query(
             LadderAttempt.entity_id.label("label"),
@@ -685,6 +701,10 @@ def vendor_family_strategy_rates(
             func.sum(case((is_vendor, valid_trial), else_=0)).label("v_trials"),
             func.sum(case((is_family, valid_breach), else_=0)).label("f_breaches"),
             func.sum(case((is_family, valid_trial), else_=0)).label("f_trials"),
+            func.sum(case((is_size, valid_breach), else_=0)).label("s_breaches") if is_size is not None
+            else func.sum(case((valid, 0), else_=0)).label("s_breaches"),
+            func.sum(case((is_size, valid_trial), else_=0)).label("s_trials") if is_size is not None
+            else func.sum(case((valid, 0), else_=0)).label("s_trials"),
         )
         .group_by(LadderAttempt.entity_id)
     )
@@ -700,6 +720,8 @@ def vendor_family_strategy_rates(
             vendor_trials=int(row.v_trials or 0),
             family_breaches=int(row.f_breaches or 0),
             family_trials=int(row.f_trials or 0),
+            size_breaches=int(row.s_breaches or 0),
+            size_trials=int(row.s_trials or 0),
         )
     return out
 

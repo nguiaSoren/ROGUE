@@ -66,6 +66,7 @@ from .grammar_node import (
     GRAMMAR_NODE_META,
     GrammarLabel,
 )
+from .generator import PayloadGenerator
 from .agent_tool import (
     AgentToolSpec,
     InjectionGoal,
@@ -135,6 +136,7 @@ __all__ = [
     "GRAMMAR_NODE_META",
     "GrammarLabel",
     # agent execution harness — tool surface + replayable trace (docs/v2/agent_harness)
+    "PayloadGenerator",
     "AgentToolSpec",
     "LiveToolTarget",
     "ToolCategory",

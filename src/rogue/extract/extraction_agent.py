@@ -1051,4 +1051,17 @@ class ExtractionAgent:
                 primitive.taxonomy_fit_note or "(no note)",
             )
 
+        # Guard: a generator spec is only useful if its kind is a REGISTERED builder. An LLM may
+        # propose an unbuildable kind — null it out (keeping the taxonomy flag) rather than persist a
+        # generator that will raise at reproduce time.
+        if primitive.generator is not None:
+            from rogue.reproduce import generators  # noqa: PLC0415
+
+            if primitive.generator.kind not in generators.available():
+                logger.warning(
+                    "dropping unbuildable generator kind %r for %r (known: %s)",
+                    primitive.generator.kind, primitive.title, generators.available(),
+                )
+                primitive = primitive.model_copy(update={"generator": None})
+
         return primitive

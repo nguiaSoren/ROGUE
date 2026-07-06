@@ -19,6 +19,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .generator import PayloadGenerator
 from .source_provenance import SourceProvenance
 
 
@@ -247,6 +248,15 @@ class AttackPrimitive(BaseModel):
         max_length=400,
         description="one-line justification when taxonomy_fit is 'weak'/'novel' (what doesn't fit and why)",
     )
+    generator: "PayloadGenerator | None" = Field(
+        default=None,
+        description=(
+            "Opt-in: when set, the payload is BUILT procedurally at reproduce time (many-shot, "
+            "shot-repetition, token-budget scaling) instead of using payload_template — which then "
+            "holds the target query the generator wraps. Enables generator/sweep attacks the static "
+            "template can't represent. See rogue.reproduce.generators + generator_sweep."
+        ),
+    )
     emergent_label: str | None = Field(
         default=None,
         max_length=60,
@@ -257,6 +267,24 @@ class AttackPrimitive(BaseModel):
             "Recurring labels are auto-clustered (rogue.extract.emergent_taxonomy) into promotion "
             "candidates; the actual enum extension stays human-approved. Null when taxonomy_fit='clear'."
         ),
+    )
+
+    # ----- Harvest-authorship provenance (XDAC-inspired; a review PRIOR, not a gate) -----
+    authorship_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "LLM-authored likelihood in [0,1] (higher = more likely machine-generated) for a HARVESTED "
+            "attack's payload, from dedupe.llm_authored (XDAC-inspired stylometric heuristic). Set at "
+            "harvest-persist time; NULL for ROGUE-synthesized/generator primitives (known-synthetic by "
+            "construction). A flag-for-review PRIOR (HC3-calibrated: AUC ~0.84 forum, precision ~0.74), "
+            "NOT an auto-drop gate — see docs/research/llm_authored_calibration.md."
+        ),
+    )
+    authorship_label: Literal["human_authored", "llm_generated", "ambiguous"] | None = Field(
+        default=None,
+        description="Discretized authorship_score at the calibrated threshold; NULL when unscored.",
     )
 
     # ----- Provenance -----

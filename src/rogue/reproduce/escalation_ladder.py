@@ -661,10 +661,14 @@ def build_escalation_context(
         if len(configs) == 1:
             tv = extract_vendor(configs[0].target_model)
             tf = extract_model_family(configs[0].target_model)
+            from .config_features import derive_config_features  # noqa: PLC0415
+
+            tsc = derive_config_features(configs[0].target_model, base_url=getattr(configs[0], "base_url", None)).sibling_key
         else:
             tv = tf = "unknown"
+            tsc = None  # ambiguous panel → size scope Laplace-falls-back to 0.5
         stats = vendor_family_strategy_rates(
-            session, target_vendor=tv, target_family=tf,
+            session, target_vendor=tv, target_family=tf, target_size_class=tsc,
         )
         # The full cross-tier label set, in the (already prior-reordered) per-tier order
         # — this seeds the stable tiebreak so a cold all-unseen blend reproduces the
@@ -1262,7 +1266,11 @@ async def run_escalation_ladder(
                 session.execute(
                     text(
                         "SELECT DISTINCT derived_from_primitive_id FROM attack_primitives "
-                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL"
+                        "WHERE synthesized = true AND derived_from_primitive_id IS NOT NULL "
+                        # Exclude obfuscation-augmentation children (a separate,
+                        # deterministic augmentation) so they don't alter this
+                        # ladder's pre-existing idempotency behaviour.
+                        "AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')"
                     ),
                 ).scalars(),
             )
@@ -1392,6 +1400,10 @@ async def run_synthesis(
                         FROM attack_primitives
                         WHERE synthesized = true
                           AND derived_from_primitive_id IS NOT NULL
+                          -- Exclude obfuscation-augmentation children (a separate
+                          -- deterministic augmentation) so they don't alter this
+                          -- ladder's pre-existing idempotency behaviour.
+                          AND (notes IS NULL OR notes NOT LIKE 'OBFUSCATION_AUGMENTATION%')
                         """
                     ),
                 ).scalars(),

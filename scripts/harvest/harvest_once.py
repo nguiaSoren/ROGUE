@@ -95,6 +95,7 @@ from rogue.db.models import (  # noqa: E402
     BrightDataCostLog,
     SourceProvenance as SourceProvenanceORM,
 )
+from rogue.dedupe import llm_authored_score  # noqa: E402
 from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
 from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # noqa: E402
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
@@ -160,10 +161,19 @@ def _to_orm_primitive(p: AttackPrimitive) -> AttackPrimitiveORM:
     cascades via the parent's relationship config; ``payload_embedding``
     is populated separately by the dedup pass before commit.
     """
+    # Harvest-authorship prior (XDAC-inspired): score the payload's human-vs-LLM authorship at
+    # persist time so likely-synthetic open-web filler can be surfaced for review. Respect a
+    # pre-set score; else compute. A review PRIOR, not a gate — it never blocks persistence.
+    a_score, a_label = p.authorship_score, p.authorship_label
+    if a_score is None:
+        _a = llm_authored_score(p.payload_template)
+        a_score, a_label = _a.score, _a.label
     return AttackPrimitiveORM(
         primitive_id=p.primitive_id,
         cluster_id=p.cluster_id,
         canonical=p.canonical,
+        authorship_score=a_score,
+        authorship_label=a_label,
         family=p.family.value,
         secondary_families=[f.value for f in p.secondary_families],
         vector=p.vector.value,
@@ -183,6 +193,7 @@ def _to_orm_primitive(p: AttackPrimitive) -> AttackPrimitiveORM:
         taxonomy_fit=p.taxonomy_fit,
         taxonomy_fit_note=p.taxonomy_fit_note,
         emergent_label=p.emergent_label,
+        generator=p.generator.model_dump() if p.generator else None,
         discovered_at=p.discovered_at,
         base_severity=p.base_severity.value,
         severity_rationale=p.severity_rationale,

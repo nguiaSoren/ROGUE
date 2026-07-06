@@ -509,7 +509,7 @@ def test_build_escalation_context_contextual_promotes_high_prior_planner(monkeyp
 
     captured = {}
 
-    def _fake_rates(session, *, target_vendor, target_family):
+    def _fake_rates(session, *, target_vendor, target_family, target_size_class=None):
         captured["vendor"] = target_vendor
         captured["family"] = target_family
         # crescendo: strong global prior; image renderers: proven weak (0 of many).

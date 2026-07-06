@@ -198,6 +198,32 @@ def _build_report(
     )
 
 
+def _dump_items(
+    path: Path | None,
+    cases: list[LabeledCase],
+    judge_labels: dict[str, str],
+) -> None:
+    """Freeze per-item (reference label, judge verdict) rows to JSONL.
+
+    These are what an external-corpus wedge analysis (e.g. the InjecAgent /
+    AgentDojo anchors) joins to find gate-breach-vs-benchmark-clean divergences,
+    and what the data-availability section releases for case-by-case audit. No-op
+    when ``path`` is None.
+    """
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        for c in cases:
+            f.write(json.dumps({
+                "case_id": c.case_id,
+                "reference_label": c.human_label,
+                "judge_label": judge_labels.get(c.case_id, "error"),
+                "fp_mode_trap": c.fp_mode_trap,
+            }) + "\n")
+    logger.info("dumped %d per-item verdicts -> %s", len(cases), path)
+
+
 # --------------------------------------------------------------------------- #
 # Gate (§4.3) — decided on CI bounds, not point estimates
 # --------------------------------------------------------------------------- #
@@ -284,6 +310,14 @@ def main(argv: list[str] | None = None) -> int:
         "<breach_type>_agentdojo_report.json — keeps an external-corpus run from "
         "clobbering the operator-labeled <breach_type>_report.json",
     )
+    parser.add_argument(
+        "--dump-items",
+        type=Path,
+        default=None,
+        help="also freeze per-item (reference_label, judge_label) rows to this "
+        "JSONL — the input an external-corpus wedge analysis joins, and the "
+        "case-by-case artifact released for audit",
+    )
     args = parser.parse_args(argv)
 
     # Validate the breach type loudly before anything else.
@@ -331,9 +365,8 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     logger.info("smoke tier: scoring %d cases …", len(smoke_cases))
-    smoke_report = _build_report(
-        smoke_cases, score(smoke_cases), args.breach_type
-    )
+    smoke_labels = score(smoke_cases)
+    smoke_report = _build_report(smoke_cases, smoke_labels, args.breach_type)
     smoke_point = smoke_report.agreement_ci[0]
     logger.info("smoke agreement point estimate = %.2f%%", 100 * smoke_point)
 
@@ -346,14 +379,18 @@ def main(argv: list[str] | None = None) -> int:
         )
         report = smoke_report
         tier_run = "smoke"
+        _dump_items(args.dump_items, smoke_cases, smoke_labels)
     elif args.tier == "smoke":
         logger.info("smoke tier passed the floor; --tier smoke → stopping here.")
         report = smoke_report
         tier_run = "smoke"
+        _dump_items(args.dump_items, smoke_cases, smoke_labels)
     else:
         logger.info("smoke passed; running full sweep over %d cases …", len(all_cases))
-        report = _build_report(all_cases, score(all_cases), args.breach_type)
+        full_labels = score(all_cases)
+        report = _build_report(all_cases, full_labels, args.breach_type)
         tier_run = "full"
+        _dump_items(args.dump_items, all_cases, full_labels)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / f"{args.breach_type}{args.out_suffix}_report.json"

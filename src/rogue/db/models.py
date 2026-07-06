@@ -191,6 +191,16 @@ class AttackPrimitive(Base):
     # Emergent-taxonomy layer: free-text proposed label for a novel technique (no enum, no migration to
     # accept new values); auto-clustered into promotion candidates. Indexed for the cluster query.
     emergent_label: Mapped[Optional[str]] = mapped_column(String(60), nullable=True, default=None, index=True)
+    # Procedural-attack spec (PayloadGenerator dict) or NULL — payload is built at reproduce time.
+    generator: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=None)
+    # Harvest-authorship provenance (XDAC-inspired, dedupe.llm_authored): LLM-authored likelihood [0,1]
+    # + discretized label for a HARVESTED payload. NULL = unscored (ROGUE-synthesized, or pre-filter
+    # rows). A flag-for-review PRIOR (precision ~0.74), never an auto-drop gate. Label indexed for the
+    # "show me likely-synthetic harvest" review query.
+    authorship_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+    authorship_label: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default=None, index=True
+    )
 
     # ----- Timestamps + severity -----
     discovered_at: Mapped[datetime] = mapped_column(
@@ -715,6 +725,9 @@ class LadderAttempt(Base):
     # Derived via adapters.model_specs.extract_vendor / extract_model_family.
     target_vendor: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     target_family: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    # Size × context-reach class (small|medium|large : short|…|xlong) of the target, for the size-scope
+    # prior — a config borrows strategy order from configs of its size. Derived via config_features.
+    target_size_class: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     # The causal winner of this ladder (the attempt whose strategy actually broke
     # the target), distinct from ``breached`` which is true on any attempt that
     # breached — see §10.9 attribution (ranking, NOT graduation). NULL on legacy rows.

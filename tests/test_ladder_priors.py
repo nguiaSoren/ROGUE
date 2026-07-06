@@ -26,6 +26,7 @@ from rogue.reproduce.ladder_priors import (
     BETA,
     BLEND_W_FAMILY,
     BLEND_W_GLOBAL,
+    BLEND_W_SIZE,
     BLEND_W_VENDOR,
     EXPLORE_WEIGHT,
     FRESHNESS_TAU_DAYS,
@@ -255,22 +256,24 @@ def test_contextual_is_a_valid_mode(monkeypatch):
 
 def test_blend_weights_are_a_convex_combination():
     # The rate part stays on the probability scale only if the weights sum to 1.
-    assert BLEND_W_GLOBAL + BLEND_W_VENDOR + BLEND_W_FAMILY == pytest.approx(1.0)
+    assert BLEND_W_GLOBAL + BLEND_W_VENDOR + BLEND_W_FAMILY + BLEND_W_SIZE == pytest.approx(1.0)
 
 
 def test_blend_score_matches_explicit_arithmetic():
-    # Hand-worked: global 8/10, vendor 1/2, family 0/0 (cold) + additive exploration.
-    s = VendorFamilyStat("x", 8, 10, 1, 2, 0, 0)
+    # Hand-worked: global 8/10, vendor 1/2, family 0/0 (cold), size 3/4 + additive exploration.
+    s = VendorFamilyStat("x", 8, 10, 1, 2, 0, 0, size_breaches=3, size_trials=4)
     g = (8 + ALPHA) / (10 + ALPHA + BETA)          # 0.75
     v = (1 + ALPHA) / (2 + ALPHA + BETA)           # 0.5
     f = (0 + ALPHA) / (0 + ALPHA + BETA)           # 0.5 (cold)
+    sz = (3 + ALPHA) / (4 + ALPHA + BETA)
     bonus = EXPLORE_WEIGHT / math.sqrt(10 + 1)     # additive, decays w/ GLOBAL trials
     assert s.global_rate == pytest.approx(g)
     assert s.vendor_rate == pytest.approx(v)
     assert s.family_rate == pytest.approx(f)
+    assert s.size_rate == pytest.approx(sz)
     assert s.exploration_bonus == pytest.approx(bonus)
     assert s.blend_score() == pytest.approx(
-        BLEND_W_GLOBAL * g + BLEND_W_VENDOR * v + BLEND_W_FAMILY * f + bonus
+        BLEND_W_GLOBAL * g + BLEND_W_VENDOR * v + BLEND_W_FAMILY * f + BLEND_W_SIZE * sz + bonus
     )
 
 
@@ -280,8 +283,9 @@ def test_blend_cold_vendor_family_falls_back_to_half():
     cold = VendorFamilyStat("x", 6, 12, 0, 0, 0, 0)
     assert cold.vendor_rate == 0.5
     assert cold.family_rate == 0.5
+    assert cold.size_rate == 0.5  # size scope is cold too on the first run
     rate_part = (
-        BLEND_W_GLOBAL * cold.global_rate + (BLEND_W_VENDOR + BLEND_W_FAMILY) * 0.5
+        BLEND_W_GLOBAL * cold.global_rate + (BLEND_W_VENDOR + BLEND_W_FAMILY + BLEND_W_SIZE) * 0.5
     )
     assert cold.blend_score() == pytest.approx(rate_part + cold.exploration_bonus)
 

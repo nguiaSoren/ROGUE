@@ -899,7 +899,17 @@ class JudgeAgent:
             or (getattr(completion, "model_extra", None) or {}).get("provider")
         )
 
-        text = completion.choices[0].message.content or ""
+        # OpenRouter can return a completion with ``choices=None`` (an upstream
+        # provider error / moderation drop / empty routing). That's a TRANSIENT
+        # miss, not a hard refusal, so raise JudgeOutputError to let tenacity
+        # re-ask (it's in _TRANSIENT_ERRORS) instead of crashing on a None index.
+        choices = getattr(completion, "choices", None)
+        if not choices:
+            raise JudgeOutputError(
+                "openrouter judge returned no choices "
+                f"(model={model_id}, error={getattr(completion, 'error', None)!r})"
+            )
+        text = choices[0].message.content or ""
         data = _parse_verdict_text(text)
         if data is None:
             raise JudgeOutputError(
