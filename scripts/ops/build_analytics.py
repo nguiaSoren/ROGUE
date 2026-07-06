@@ -269,6 +269,30 @@ def atp(c) -> dict:
     }
 
 
+def corpus_health(c) -> dict:
+    """Harvest-authorship provenance (dedupe.llm_authored, XDAC-inspired): human-vs-LLM authorship of
+    the OPEN-WEB-HARVESTED corpus. Synthesized/generator rows are excluded (machine-made by
+    construction). A flag-for-review PRIOR (~0.74 precision, HC3-calibrated AUC 0.84), not an
+    auto-drop gate. Auto-refreshes here on every harvest via regenerate()."""
+    total = c.execute(text("SELECT count(*) FROM attack_primitives")).scalar()
+    synthesized = c.execute(text("SELECT count(*) FROM attack_primitives WHERE synthesized = true")).scalar()
+    dist = dict(c.execute(text(
+        "SELECT authorship_label, count(*) FROM attack_primitives "
+        "WHERE synthesized = false AND authorship_label IS NOT NULL GROUP BY authorship_label")).all())
+    scored = sum(int(v) for v in dist.values())
+    llm = int(dist.get("llm_generated", 0))
+    return {
+        "corpus_total": int(total or 0),
+        "synthesized_excluded": int(synthesized or 0),
+        "harvested_scored": scored,
+        "human_authored": int(dist.get("human_authored", 0)),
+        "ambiguous": int(dist.get("ambiguous", 0)),
+        "llm_generated": llm,
+        "pct_likely_ai_generated": round(llm / scored, 3) if scored else None,
+        "note": "flag-for-review prior (~0.74 precision, HC3-calibrated); not an auto-drop gate",
+    }
+
+
 def regenerate(database_url: str | None = None, ts: str | None = None) -> dict:
     """Query live Neon → write data/analytics.json. Returns the report dict. No
     printing — safe to call from a harvest/reproduce end-hook. ``ts`` (the caller's
@@ -286,6 +310,7 @@ def regenerate(database_url: str | None = None, ts: str | None = None) -> dict:
             "research": research_metrics(c),
             "cost": cost(c, cap["graduated"]),
             "atp": atp(c),
+            "corpus_health": corpus_health(c),
         }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(rep, indent=2, default=str))

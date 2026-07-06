@@ -33,6 +33,11 @@ type Analytics = {
     early_stop_bias?: number; exploration_efficiency?: number; scheduler_allocation_quality?: number;
   };
   cost: { total_breach_spend_usd: number; cost_per_breach_usd: number | null; cost_per_graduation_usd: number | null };
+  corpus_health?: {
+    corpus_total: number; synthesized_excluded: number; harvested_scored: number;
+    human_authored: number; ambiguous: number; llm_generated: number;
+    pct_likely_ai_generated: number | null;
+  };
   atp?: {
     default_mode: string;
     by_order_mode: Record<string, { goals: number; asr: number | null; median_winner_rank: number | null; cost_per_success_usd: number | null }>;
@@ -123,6 +128,18 @@ export default function AnalyticsPage() {
           ))}
         </div>
       </Section>
+
+      {a.corpus_health && a.corpus_health.harvested_scored > 0 && (
+        <Section title="Corpus health · harvest provenance" tag="is a scraped attack human- or LLM-authored? a review prior (~0.74 precision, XDAC-inspired), not an auto-drop">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Stat label="Likely AI-generated" value={pct(a.corpus_health.pct_likely_ai_generated)} sub={`${a.corpus_health.llm_generated} of ${a.corpus_health.harvested_scored} harvested`} tone="orange" />
+            <Stat label="Confidently human" value={pct(a.corpus_health.human_authored / a.corpus_health.harvested_scored)} sub={`${a.corpus_health.human_authored} attacks`} tone="green" />
+            <Stat label="Ambiguous" value={pct(a.corpus_health.ambiguous / a.corpus_health.harvested_scored)} sub="short/templated payloads" tone="blue" />
+            <Stat label="Harvested corpus" value={String(a.corpus_health.harvested_scored)} sub={`${a.corpus_health.synthesized_excluded} synthesized excluded`} tone="blue" />
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-3">The open-web jailbreak corpus is measurably AI-polluted: ~1 in 4 scraped attacks flags as likely machine-written (SEO listicles, karma-farm boilerplate). Flagged for review, never auto-dropped. Auto-refreshes on each harvest.</p>
+        </Section>
+      )}
 
       <Section title="Discovery · source yield" tag="bar = volume · color = graduation rate · hover for detail">
         <ResponsiveContainer width="100%" height={Math.max(160, srcData.length * 34)}>
