@@ -711,7 +711,18 @@ class JudgeAgent:
                 {
                     "type": "text",
                     "text": self.prompt,
-                    "cache_control": {"type": "ephemeral"},
+                    # 5-min ephemeral by default; JUDGE_CACHE_TTL=1h switches the
+                    # rubric block to a 1-hour cache so a large Batch-API sweep (e.g.
+                    # the 1k-case InjecAgent anchor) keeps hitting the cache instead
+                    # of expiring mid-batch (Anthropic's batch+caching guidance). 1h
+                    # write is 2x base; reads stay 0.1x, so it pays off past a few
+                    # hundred cached calls. Output-neutral (a billing directive only).
+                    "cache_control": (
+                        {"type": "ephemeral", "ttl": "1h"}
+                        if os.getenv("JUDGE_CACHE_TTL", "").lower()
+                        in ("1h", "hour", "3600")
+                        else {"type": "ephemeral"}
+                    ),
                 }
             ],
             "messages": [{"role": "user", "content": user_message}],
