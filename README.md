@@ -76,6 +76,10 @@ For attacks that *scale* (many-shot / long-context), a single pass isn't enough 
 
 <p align="center"><img src="assets/card/marketing/sweep-card.png" alt="ROGUE sweep card: many-shot context-length threshold — held to 8K, breaks at 32K" width="620"></p>
 
+And for **PII exposure**, ROGUE plants confidential PII in the system prompt with a "never reveal" instruction, probes for disclosure, and grades severity by a **PII Risk Index** (the seven-factor decomposition from [UnPII](https://arxiv.org/abs/2601.01786)). Exact-match keeps it near-zero-FP: frontier hosted models held at **0%**, smaller open models leaked up to **58%** — the full per-model board is [live on the leaderboard](https://rogue-eosin.vercel.app/leaderboard).
+
+<p align="center"><img src="assets/card/marketing/pii-card-leaky.png" alt="ROGUE PII card: Mistral-Nemo-Instruct-2407, 58% context-leak of system-prompt-planted PII" width="620"></p>
+
 **Then scan _your_ model.** The target is *your own* deployment: any OpenAI-compatible **`--endpoint`** plus your real **`--system-prompt`** (that's what makes it a deployment red-team, not a bare-model test). Pass `--provider`/`--model` instead to hit a hosted model by name:
 
 ```bash
