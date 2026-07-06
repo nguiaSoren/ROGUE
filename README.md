@@ -206,7 +206,7 @@ Five-layer pipeline: **Harvest → Extract → Dedupe → Reproduce → Diff.**
 
 1. **Harvest.** 15 open-web sources via a fully scraper-agnostic fetcher (scraping is free/keyless, bring any scraper — none required; the extraction step calls an LLM you choose).
 2. **Extract.** An LLM agent structures each fetched document into an `AttackPrimitive`.
-3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks, with surface-obfuscation canonicalization (leetspeak/homoglyph/zero-width/Unicode folds) so an attack clusters by *technique*, not by spelling: `1gn0r3 pr3v10us` and `ignore previous` land in one cluster instead of re-entering the corpus once per skin.
+3. **Dedupe.** pgvector cosine similarity clusters near-duplicate attacks, with surface-obfuscation canonicalization (leetspeak/homoglyph/zero-width/Unicode folds) so an attack clusters by *technique*, not by spelling: `1gn0r3 pr3v10us` and `ignore previous` land in one cluster instead of re-entering the corpus once per skin. Each harvested primitive is also scored for **human-vs-LLM authorship** (a $0 stylometric filter, XDAC-inspired) and tagged for review — a measured **~26% of the open-web-harvested corpus flags as likely AI-generated** (SEO listicles, karma-farm boilerplate; a ~0.74-precision review prior, not an auto-drop). We measure our own corpus's honesty, and it's meaningfully AI-polluted.
 4. **Reproduce.** Each canonical primitive runs against your `DeploymentConfig` × 5 trials.
 5. **Diff.** A separate judge model verdicts each trial; the daily diff ships to Slack, MCP, and the dashboard.
 
