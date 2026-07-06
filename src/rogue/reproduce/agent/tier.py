@@ -62,6 +62,8 @@ class AgentExecConfig:
     n_trials: int = 1  # forced to 1 — multi-turn × multi-model is already the cost driver
     default_forbid_critical: bool = True
     emulator_model: Optional[str] = None  # None ⇒ honeytoken-only; custom-tool configs are skipped
+    detect_pii_emission: bool = False  # Axis B (opt-in): scan model text for un-planted PII emission
+    pii_semantic_model: Optional[str] = None  # detector model for the fuzzy step; None ⇒ regex-only
 
     def __post_init__(self) -> None:
         # keep the two caps coherent (M4): a full run of max_runs must fit the scan cap
@@ -252,6 +254,15 @@ async def run_agent_exec_one(
     findings = judge.judge(
         transcript, forbidden_tools=forbidden, declared_tools=config.declared_tools
     )
+    # Axis B (opt-in, uncalibrated): also scan the model's TEXT for un-planted PII emission. These
+    # findings are non-headline, so verdict / headline / exfil are unaffected; they persist as
+    # TraceFinding rows (signal='pii_emitted') for telemetry. The semantic step runs only when a
+    # detector model is configured; otherwise regex-only (deterministic, no extra spend).
+    if cfg.detect_pii_emission:
+        from .pii_semantic import make_semantic_fn  # noqa: PLC0415
+
+        pii_sem = make_semantic_fn(model=cfg.pii_semantic_model) if cfg.pii_semantic_model else None
+        findings = findings + judge.judge_pii_emission(transcript, semantic_fn=pii_sem)
     verdict, headline, _exfil = _verdict_and_exfil(findings)
     transcript.fired_signals = fired_signals(findings)
 

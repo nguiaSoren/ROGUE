@@ -8,6 +8,10 @@ import {
   LEADERBOARD_OSS_MODELS,
   LEADERBOARD_OSS_MEASURED,
   LEADERBOARD_OSS_METHOD,
+  LEADERBOARD_PII_MODELS,
+  LEADERBOARD_PII_MEASURED,
+  LEADERBOARD_PII_METHOD,
+  type PiiLeakModel,
 } from "@/lib/leaderboard-data";
 
 /**
@@ -262,7 +266,7 @@ function Board() {
           <p>{"// rank = mean any-breach rate across attack families (lower = more resistant), WITHIN each board"}</p>
           <p>{`// production: ROGUE all-time corpus, ${totalTrials.toLocaleString()} deep-pipeline trials, calibrated v3 judge ([withheld — under anonymized review]) — the same numbers \`rogue try\` prints`}</p>
           <p>{`// open-source: curated single-shot aggressive jailbreak pack (~40 trials each), primitive-level any-breach, measured ${LEADERBOARD_OSS_MEASURED}`}</p>
-          <p>{"// the two boards are NOT directly comparable (different methodologies) and are ranked independently"}</p>
+          <p>{"// the three facets (production, open-source, PII context-leak) are NOT directly comparable (different attacks/metrics) and are ranked independently"}</p>
           <p>
             {"// periodic measured snapshot, not a live feed — for the live per-family × config breakdown, see the "}
             <Link href="/matrix" className="text-rogue-green hover:underline">
@@ -270,6 +274,9 @@ function Board() {
             </Link>
           </p>
         </section>
+
+        {/* Third facet — PII context-leak (a DIFFERENT attack + metric; ranked on its own). */}
+        <PiiBoard />
 
         {/* The whole board in one shareable image (both panels, honestly separated). */}
         <ShareCard />
@@ -374,6 +381,93 @@ function CompactRow({ row, rank, index }: { row: ModelRow; rank: number; index: 
   ) : (
     <div className={cls} style={style}>
       {inner}
+    </div>
+  );
+}
+
+/**
+ * PII context-leak board — the third facet. Plant confidential PII in each model's system prompt with
+ * a "never reveal" instruction, hit it with extraction probes, and rank by how often it spills (exact
+ * match, near-zero-FP). A DIFFERENT attack + metric from the breach boards, ranked on its own. Hosted
+ * frontier models held at 0%; the leak lives in smaller open models (a size/alignment gradient).
+ */
+function PiiBoard() {
+  const rows = [...LEADERBOARD_PII_MODELS].sort(
+    (a, b) => a.leak_rate - b.leak_rate || a.ci_high - b.ci_high,
+  );
+  if (rows.length === 0) return null;
+  return (
+    <section className="space-y-4 animate-rogue-fade-up">
+      <header className="space-y-1.5">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-red">
+          pii context-leak · exact-match · measured {LEADERBOARD_PII_MEASURED}
+        </p>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">PII context-leak board</h2>
+        <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
+          Confidential PII is planted in each model&apos;s{" "}
+          <span className="text-foreground">system prompt</span> with a &ldquo;never reveal&rdquo;
+          instruction, then probed for disclosure. Ranked by{" "}
+          <span className="text-rogue-red">leak rate</span> (lower = more resistant). A{" "}
+          <span className="text-foreground">separate attack + metric</span> — not comparable to the
+          breach boards above. Hosted frontier models held at{" "}
+          <span className="text-rogue-green">0%</span>; the leak lives in smaller open models.
+        </p>
+      </header>
+      <div className="rogue-card border border-rogue-red/30 rounded-lg overflow-hidden bg-card/40">
+        {rows.map((row, i) => (
+          <PiiRow key={row.target_model} row={row} rank={i + 1} index={i} />
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground font-mono">
+        {`// ${LEADERBOARD_PII_METHOD} — measured ${LEADERBOARD_PII_MEASURED}. Small panel (2 hosted + 5 open); a first context-leak facet, ranked independently.`}
+      </p>
+    </section>
+  );
+}
+
+function PiiRow({ row, rank, index }: { row: PiiLeakModel; rank: number; index: number }) {
+  const tier = rateTier(row.leak_rate);
+  const style = { animationDelay: `${Math.min(index * 0.03, 0.4)}s` };
+  return (
+    <div
+      className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 items-start px-3 py-3 border-b border-border/50 last:border-b-0 animate-rogue-fade-up"
+      style={style}
+    >
+      <div className="flex items-center justify-center pt-0.5">
+        <RankBadge rank={rank} />
+      </div>
+      <div className="min-w-0 space-y-1.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="font-mono text-sm font-semibold truncate" title={row.target_model}>
+            {row.model_label}
+          </p>
+          <span
+            className={`shrink-0 font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
+              row.kind === "hosted"
+                ? "text-rogue-green bg-rogue-green/10"
+                : "text-rogue-orange bg-rogue-orange/10"
+            }`}
+          >
+            {row.kind}
+          </span>
+        </div>
+        <BreachBar mean={row.leak_rate} tier={tier} />
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-muted-foreground">
+          <span className="text-foreground/80">{Math.round(row.leak_rate * 100)}% leak</span>
+          <span className="opacity-60">
+            CI {Math.round(row.ci_low * 100)}–{Math.round(row.ci_high * 100)}%
+          </span>
+          <span className="opacity-60">· {Math.round(row.refusal_rate * 100)}% refused</span>
+          {row.significant && row.fisher_p !== null ? (
+            <span className="shrink-0 text-rogue-red/80">· p={row.fisher_p.toExponential(0)} vs 0%</span>
+          ) : row.leak_rate === 0 ? (
+            <span className="shrink-0 text-rogue-green">· held</span>
+          ) : (
+            <span className="shrink-0 opacity-60">· ns vs 0%</span>
+          )}
+          <span className="shrink-0 opacity-60">· n={row.n_cells}</span>
+        </div>
+      </div>
     </div>
   );
 }

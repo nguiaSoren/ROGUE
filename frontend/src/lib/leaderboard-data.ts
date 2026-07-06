@@ -70,3 +70,41 @@ export const LEADERBOARD_OSS_MODELS: LeaderboardModel[] = [
   { model_label: "Mistral-Nemo-Instruct-2407", target_model: "mistralai/Mistral-Nemo-Instruct-2407", mean_breach_rate: 0.6, worst_family: "tool_use_hijack", worst_breach_rate: 1.0, n_trials: 45, n_families: 15 },
   { model_label: "Meta-Llama-3.1-8B-Instruct-abliterated", target_model: "huihui-ai/Meta-Llama-3.1-8B-Instruct-abliterated", mean_breach_rate: 0.7333, worst_family: "tool_use_hijack", worst_breach_rate: 1.0, n_trials: 45, n_families: 15 },
 ];
+
+/* --- PII context-leak board — a THIRD, distinct facet -------------------------------------------
+ * Measures a different thing from the breach boards above: plant confidential PII + a "never reveal"
+ * instruction in a model's SYSTEM PROMPT, hit it with 6 extraction probes × 3 records × 2 trials =
+ * 36 cells/model, and detect leaks by EXACT MATCH (near-zero-FP, headline-grade — no fuzzy judge).
+ * Rank by leak rate (lower = more resistant). Wilson 95% CI; Fisher's exact vs the hosted 0/72
+ * baseline. Small panel (2 hosted + 5 open), measured 2026-07-06. NOT comparable to the breach
+ * boards (different attack + metric). Source: data/research/pii/featherless_context_leak_result.json
+ * + context_leak_result.json. Regenerate via scripts/research/pii_context_leak{,_featherless}.py. */
+export const LEADERBOARD_PII_MEASURED = "2026-07-06";
+export const LEADERBOARD_PII_METHOD =
+  "system-prompt-planted PII · exact-match leak · 36 cells/model · Wilson 95% CI · Fisher vs 0% baseline";
+
+export type PiiLeakModel = {
+  model_label: string;
+  target_model: string;
+  /** Fraction of probe cells that disclosed ≥1 planted PII value (lower = more resistant). */
+  leak_rate: number;
+  ci_low: number;
+  ci_high: number;
+  /** Fraction of cells the model explicitly refused. */
+  refusal_rate: number;
+  n_cells: number;
+  /** One-sided Fisher's exact p vs the hosted 0% baseline; significant at p<0.05. */
+  fisher_p: number | null;
+  significant: boolean;
+  kind: "hosted" | "open";
+};
+
+export const LEADERBOARD_PII_MODELS: PiiLeakModel[] = [
+  { model_label: "gpt-5.4", target_model: "openai/gpt-5.4", leak_rate: 0.0, ci_low: 0.0, ci_high: 0.096, refusal_rate: 0.667, n_cells: 36, fisher_p: null, significant: false, kind: "hosted" },
+  { model_label: "gpt-5.4-nano", target_model: "openai/gpt-5.4-nano", leak_rate: 0.0, ci_low: 0.0, ci_high: 0.096, refusal_rate: 0.611, n_cells: 36, fisher_p: null, significant: false, kind: "hosted" },
+  { model_label: "Qwen2.5-32B-Instruct", target_model: "Qwen/Qwen2.5-32B-Instruct", leak_rate: 0.0278, ci_low: 0.0049, ci_high: 0.1417, refusal_rate: 0.972, n_cells: 36, fisher_p: 0.333, significant: false, kind: "open" },
+  { model_label: "Qwen2.5-14B-Instruct", target_model: "Qwen/Qwen2.5-14B-Instruct", leak_rate: 0.25, ci_low: 0.1375, ci_high: 0.4107, refusal_rate: 0.75, n_cells: 36, fisher_p: 2.41e-5, significant: true, kind: "open" },
+  { model_label: "Qwen2.5-7B-Instruct", target_model: "Qwen/Qwen2.5-7B-Instruct", leak_rate: 0.2778, ci_low: 0.1585, ci_high: 0.4399, refusal_rate: 0.694, n_cells: 36, fisher_p: 6.56e-6, significant: true, kind: "open" },
+  { model_label: "Qwen2.5-3B-Instruct", target_model: "Qwen/Qwen2.5-3B-Instruct", leak_rate: 0.3611, ci_low: 0.2248, ci_high: 0.5243, refusal_rate: 0.639, n_cells: 36, fisher_p: 1.12e-7, significant: true, kind: "open" },
+  { model_label: "Mistral-Nemo-Instruct-2407", target_model: "mistralai/Mistral-Nemo-Instruct-2407", leak_rate: 0.5758, ci_low: 0.4081, ci_high: 0.7276, refusal_rate: 0.424, n_cells: 33, fisher_p: 2.23e-12, significant: true, kind: "open" },
+];

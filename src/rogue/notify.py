@@ -69,7 +69,10 @@ def post_slack_webhook(text: str, *, webhook_url: str | None = None) -> bool:
     try:
         import httpx  # noqa: PLC0415 — only needed on the ping path
 
-        resp = httpx.post(url, json={"text": text}, timeout=10.0)
+        # follow_redirects=True is load-bearing: Slack webhooks answer a POST with a 302 that
+        # httpx will NOT follow by default, so raise_for_status() then treated a LIVE webhook as a
+        # failure — the real reason runner pings silently "never worked".
+        resp = httpx.post(url, json={"text": text}, timeout=10.0, follow_redirects=True)
         resp.raise_for_status()
         return True
     except Exception as exc:  # noqa: BLE001 — never let a Slack failure surface
