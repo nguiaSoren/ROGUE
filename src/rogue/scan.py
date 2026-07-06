@@ -233,6 +233,8 @@ async def run_scan(
     agent_exec_runner: Any = None,
     agent_exec_adapter: Any = None,
     agent_exec_database_url: str | None = None,
+    instruction_hierarchy: bool = False,
+    remediate: bool = False,
 ) -> ScanReport:
     """Run ``primitives`` against the target described by ``config`` and grade the responses.
 
@@ -450,6 +452,31 @@ async def run_scan(
                 from .reproduce.persistence import persist_agent_exec_rows  # noqa: PLC0415
                 persist_agent_exec_rows(agent_exec_database_url, stage.persist_rows)
 
+    # INSTRUCTION-HIERARCHY stage (blue-team gauge, GC-DPO axis): fire the benign system↔user-conflict
+    # probes at the target → the deployment's system-prompt-priority score ∈[0,1]. ~4 target calls,
+    # gated ON by default; a defensive gauge must never fail the scan, so it's fully fail-soft.
+    sys_priority: float | None = None
+    if instruction_hierarchy and (budget is None or total_cost < budget):  # respect the sweep budget
+        from .remediation.instruction_hierarchy import run_instruction_hierarchy_stage  # noqa: PLC0415
+        try:
+            ihr = await run_instruction_hierarchy_stage(config, panel)
+            sys_priority = ihr.score
+            total_cost += ihr.cost_usd  # honest: its 4 probe calls count toward reported cost
+        except Exception:  # noqa: BLE001 — a defensive gauge must never fail the scan
+            sys_priority = None
+
+    # REMEDIATION-GENERATE stage (blue-team, find→FIX): for each breached family, generate a
+    # breach-specific fix candidate (dispatch generators + the deterministic GC-DPO preference data)
+    # from the evidence the scan captured. Generate-only — the expensive re-test/prove stays in the
+    # deliberate RemediationLoop. Gated OFF here (SDK/programmatic unchanged); the CLI turns it ON.
+    scan_mitigations = None
+    if remediate and n_breaches:
+        from .remediation.scan_stage import run_remediation_generate_stage  # noqa: PLC0415
+        try:
+            scan_mitigations = run_remediation_generate_stage(config, findings) or None
+        except Exception:  # noqa: BLE001 — a fix generator must never fail the scan
+            scan_mitigations = None
+
     findings.sort(key=lambda f: f.success_rate, reverse=True)
     target = config.base_url or config.target_model
     return ScanReport(
@@ -458,6 +485,8 @@ async def run_scan(
         n_breaches=n_breaches,
         cost_usd=round(total_cost, 6),
         findings=findings,
+        system_prompt_priority=sys_priority,
+        mitigations=scan_mitigations,
     )
 
 

@@ -286,7 +286,8 @@ async def test_run_scan_routes_multi_turn_to_conversation_driver():
 
     panel = _CountingPanel()
     await run_scan(
-        _config(), [_multi_turn_primitive()], n_trials=1, panel=panel, judge=_NeverBreachJudge()
+        _config(), [_multi_turn_primitive()], n_trials=1, panel=panel,
+        judge=_NeverBreachJudge(), instruction_hierarchy=False,  # this test isolates attack routing
     )
     assert panel.run_conversation_calls == 1
     assert panel.run_attack_calls == 0  # multi-turn never used the stacked single-invoke path
@@ -298,7 +299,8 @@ async def test_run_scan_keeps_single_turn_on_run_attack():
 
     panel = _CountingPanel()
     await run_scan(
-        _config(), [_single_turn_primitive()], n_trials=1, panel=panel, judge=_NeverBreachJudge()
+        _config(), [_single_turn_primitive()], n_trials=1, panel=panel,
+        judge=_NeverBreachJudge(), instruction_hierarchy=False,  # this test isolates attack routing
     )
     assert panel.run_attack_calls == 1
     assert panel.run_conversation_calls == 0

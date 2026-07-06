@@ -443,6 +443,15 @@ class ScanReport:
     # None for every non-Slack scan; `to_dict()` emits the `surface1_context` key ONLY when set, so a
     # report without it stays byte-identical to before (load-bearing for the attestation entry hash).
     surface1_context: dict | None = None
+    # Defensive gauge (blue-team): the deployment's instruction-hierarchy / system-prompt-priority
+    # score ∈[0,1] — how reliably the model holds its system prompt when a user prompt tries to
+    # override it (the GC-DPO axis). None when the stage didn't run; `to_dict()` emits the key only
+    # when set, so a report without it stays byte-identical.
+    system_prompt_priority: float | None = None
+    # Blue-team: breach-specific generated mitigations {family_slug -> RemediationResult}, attached by
+    # the scan's remediation-generate stage (CLI scan only). None when the stage didn't run; `to_dict`
+    # routes each finding's `remediation` through these when present (else the generic per-family text).
+    mitigations: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -539,7 +548,7 @@ class ScanReport:
         through a PROVEN :class:`~rogue.schemas.remediation.RemediationResult`; with the default
         ``None`` the output is byte-identical to today (the generic per-family fallback).
         """
-        muts = mitigations or {}
+        muts = mitigations or self.mitigations or {}  # explicit arg wins; else the scan-attached ones
         findings = []
         for f in self.findings:
             d = asdict(f)
@@ -583,6 +592,8 @@ class ScanReport:
         # cycle set it, so every other report's dict is byte-identical to before.
         if self.surface1_context is not None:
             out["surface1_context"] = self.surface1_context
+        if self.system_prompt_priority is not None:
+            out["system_prompt_priority"] = self.system_prompt_priority
         return out
 
     def to_json(

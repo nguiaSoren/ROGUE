@@ -157,7 +157,7 @@ async def test_error_responses_not_counted_or_judged():
     # All responses carry an error → judge is never called, nothing breaches, cost still accrues.
     panel = FakePanel(lambda n: [FakeResponse(None, cost_usd=0.002, error="rate limit") for _ in range(n)])
     judge = FakeJudge(JudgeVerdict.FULL_BREACH)
-    report = await run_scan(_config(), _prims(3), n_trials=2, panel=panel, judge=judge)
+    report = await run_scan(_config(), _prims(3), n_trials=2, panel=panel, instruction_hierarchy=False, judge=judge)
     assert report.n_breaches == 0
     assert judge.calls == 0
     assert all(f.success_rate == 0.0 for f in report.findings)
@@ -188,6 +188,6 @@ async def test_findings_sorted_by_success_rate_desc():
 async def test_cost_is_summed():
     panel = FakePanel(lambda n: [FakeResponse("sure", cost_usd=0.01) for _ in range(n)])
     judge = FakeJudge(JudgeVerdict.REFUSED)
-    report = await run_scan(_config(), _prims(4), n_trials=2, panel=panel, judge=judge)
+    report = await run_scan(_config(), _prims(4), n_trials=2, panel=panel, instruction_hierarchy=False, judge=judge)
     # 4 attacks * 2 trials * 0.01
     assert report.cost_usd == pytest.approx(0.08)

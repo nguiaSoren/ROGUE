@@ -25,7 +25,7 @@ from dataclasses import dataclass
 
 from rogue.governance import instantiate_rule_judge
 from rogue.schemas import AttackPrimitive, DeploymentConfig
-from rogue.schemas.governance import PolicyRule
+from rogue.schemas.governance import BreachType, PolicyRule
 from rogue.schemas.remediation import (
     CONFIG_APPLICABLE,
     MitigationCandidate,
@@ -34,6 +34,7 @@ from rogue.schemas.remediation import (
 )
 
 from .generate import propose_candidates
+from .goal_conditioned_dpo import generate_goal_conditioned_dpo
 from .legit_corpus import load_legit_set
 from .retest import apply_offline_mitigation, retest_vs_family, retest_vs_legitimate
 
@@ -100,6 +101,17 @@ class RemediationLoop:
             legit_set = []
         candidates = propose_candidates(
             task.rule, task.transcripts, complete=self._complete)[: self.max_candidates]
+        # GC-DPO upgrade (NAACL 2025): for the harmful-content / system-override case, ALSO offer the
+        # real goal-conditioned preference JSONL built from the FULL breach trace — the config's system
+        # prompt (g_good), the attack (u), and the target's own breaching response (y_bad). This needs
+        # the config + primitives the (rule, transcripts) dispatch can't see, so it is assembled here.
+        if task.rule.breach_type == BreachType.CAPABILITY_TRANSFER and task.transcripts and task.primitives:
+            candidates.append(generate_goal_conditioned_dpo(
+                task.rule,
+                good_system=task.config.system_prompt,
+                attack=task.primitives[0].payload_template,
+                harmful_response=task.transcripts[0],
+            ))
         rejected: list[MitigationCandidate] = []
 
         for i, cand in enumerate(candidates):

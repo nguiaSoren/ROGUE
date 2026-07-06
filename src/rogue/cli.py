@@ -389,6 +389,8 @@ def _cmd_scan(args: argparse.Namespace, out: Any) -> int:
                 judge=client._judge,
                 judge_model=client._judge_model,
                 deep=True,
+                instruction_hierarchy=True,  # customer scan: report the system-prompt-priority gauge
+                remediate=not getattr(args, "no_remediate", False),  # fixes on by default; --no-remediate opts out
                 **_agent_exec_kwargs(args),
             )
         )
@@ -813,6 +815,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Agent-exec (tool-use / indirect-injection) stage — auto-on when --tools declares tools.
     p_scan.add_argument("--tools", default=None, help="comma-separated tool names the target agent exposes (enables the agentic stage)")
     p_scan.add_argument("--no-agent-exec", dest="no_agent_exec", action="store_true", help="skip the agentic tool-execution stage")
+    p_scan.add_argument("--no-remediate", dest="no_remediate", action="store_true", help="skip generating suggested fixes (system-prompt patch + GC-DPO) for breaches")
     p_scan.add_argument("--agent-exec-seeds", dest="agent_exec_seeds", type=int, default=None, help="trials per agentic attack (default 3)")
     p_scan.add_argument("--agent-exec-stress", dest="agent_exec_stress", action="store_true", help="amplified injection framing (upper-bound ASR), else raw harvested attack")
     p_scan.add_argument("--out-dir", dest="out_dir", default=None, metavar="DIR", help="where to write the breach card (default: ./rogue-scan)")

@@ -87,16 +87,29 @@ data/research/*
 !data/research/reextracted_claims.json
 !data/research/reproducibility_gap_pairs.csv
 !data/research/coverage_validity_results.json
-# Deliberately-public P3 evidence backing the /research page (re-included past data/research/*)
-!data/research/p3_v3_rejudge_trials.jsonl
-!data/research/p3_v3_rejudge_pairs.csv
-!data/research/p3_v3_rejudge_stats.json
-# Blind-submission material — NEVER public during review (paper sources, overleaf zips,
-# supplements, build/publication plans). Removed from public 2026-06-21; keep local-only.
-docs/research/publishing/
 !data/research/scheduler_results.json
 !data/research/skill_leak_curve_2026-06-13_REDO.log
 !data/research/skill_leak_curve_2026-06-13_DIAGNOSIS.md
+# P3 v3-calibrated re-judge (verdict labels only — no payloads/harmful content; paper cites these)
+!data/research/p3_v3_rejudge_trials.jsonl
+!data/research/p3_v3_rejudge_pairs.csv
+!data/research/p3_v3_rejudge_stats.json
+# P3 objective decomposition: aggregates (safe) + REDACTED per-primitive classification
+# (stratum+id+structural only; the .full.jsonl with harmful-subject free-text stays local).
+!data/research/p3_objective_decomposition.json
+!data/research/p3_objective_classification.jsonl
+# P3 unfilled-template-slot exclusion sensitivity — primitive ids only (no payloads/harmful content)
+!data/research/p3_unfilled_primitives.json
+# P3 judge model-independence — per-judge verdict tables (verdict-only; rationale redacted) + summaries.
+# The *_trials.full.jsonl (with free-text rationale that names harmful subjects) stay LOCAL.
+!data/research/p3_consummation_qwen-qwen-2-5-72b-instruct.json
+!data/research/p3_consummation_deepseek-deepseek-chat-v3-1.json
+!data/research/p3_consummation_qwen-qwen-2-5-72b-instruct_trials.jsonl
+!data/research/p3_consummation_deepseek-deepseek-chat-v3-1_trials.jsonl
+# P3 excluded StrongREJECT willingness-judge (numeric verdict scores only; shows the non-monotone exclusion) + 2nd objective classifier labels
+!data/research/p3_strongreject_trials.jsonl
+!data/research/p3_strongreject_swap.json
+!data/research/p3_objective_classification2_qwen-qwen-2-5-72b-instruct.jsonl
 
 # LeakHub session capture — Playwright storage_state JSON. Effectively your
 # signed-in session; never commit. See scripts/_capture_leakhub_storage.py.
@@ -156,6 +169,10 @@ scripts/research/p3_teaser.py
 # Internal marketing/positioning notes — not part of the public repo
 /marketing_claims.md
 /monetization_venues.md
+# Master GTM/creative pipeline — self-declared PRIVATE / never-pushed (was an un-ignored gap)
+/PIPELINE_MASTER_PRODUCT_TO_LAUNCH.txt
+# Stray root Slack screenshot (likely private channel content) — local only
+/SLACK.png
 # Internal go-to-market + demo-production playbook (trailer/filming notes,
 # creative briefs, sitemap, positioning) — production process, not product.
 docs/marketing/
@@ -191,7 +208,6 @@ assets/trailer/
 docs/research/adaptive_orchestration_systems.md
 docs/research/scheduler_allocation_study.md
 docs/research/adaptive_orchestration_paper.md
-docs/research/judge_calibration_paper.md
 docs/research/paper_figures.md
 docs/research/figs/
 scripts/paper_figs.py
@@ -232,10 +248,30 @@ tests/fixtures/memory/_raw/*
 tests/fixtures/memory/_raw_tasks/*
 !tests/fixtures/memory/_raw_tasks/_index.json
 
-# §08 judge-calibration labelable case fixtures (P4 skill-leak/agent-memory) — PULLED from public
-# 2026-06-21 during P4's blind review (de-anonymizing submission-adjacent material). Kept local-only;
-# re-allowlist + restore post-decision. ROGUE's own synthetic fixtures — no licensing constraint.
-# !data/calibration/leakage_label_cases.json
-# !data/calibration/net_effect_label_cases.json
-# !data/calibration/net_effect_synthetic_cases.json
-# !data/calibration/net_effect_report.json
+# §08 judge-calibration labelable case fixtures — committed so a labeler's labels tie to a fixed set
+# (the harvester's Groq capture is non-deterministic and can't be regenerated identically).
+!data/calibration/leakage_label_cases.json
+!data/calibration/net_effect_label_cases.json
+!data/calibration/net_effect_synthetic_cases.json
+!data/calibration/net_effect_report.json
+
+# PromptTrend re-judge WIP (P3, not part of the skill-leak/A-Dead-Call paper artifact) — un-ignore to release
+scripts/research/promptrend_*
+scripts/research/extract_promptrend_*
+README.no-hackathon.md
+# P3 human-validation labels (id->label only; no harmful text) — make kappa / FN / fidelity recomputable
+!data/research/p3_labels.json
+!data/research/p3_fidelity.json
+# P3 corpus claim distribution (claimed_rate per primitive; backs the 71/23 + bucket counts)
+!data/research/p3_claim_distribution.csv
+
+# Local-only endorsement outreach (contains the arXiv endorsement code + draft emails)
+endorsement_outreach/
+docs/research/publishing/arxiv_bundles/
+
+# career-ops job-search tool (separate nested git repo; holds CV + application data — never ship to public ROGUE)
+/career-ops/
+
+# Internal LinkedIn post drafts (marketing working file)
+LINKEDIN.md
+docs/research/pii_leakage_axis.md
