@@ -2,9 +2,10 @@
 
 **The question.** *Can a red-team skip expensive evaluations before firing them — while explicitly
 quantifying the recall cost of doing so?* Skipping trials is easy; skipping them **safely**, with a
-number that says how many real breaches the skip costs, is the part nobody reports. Unlike prior work,
-which evaluates *predictor quality*, we evaluate **decision quality**: the operating point a practitioner
-would actually deploy under an explicit recall constraint.
+number that says how many real breaches the skip costs, is the part nobody reports. Existing work
+evaluates **prediction quality** (AUC, ranking accuracy, F1); we instead evaluate **decision quality**:
+how many evaluations can safely be skipped while maintaining an explicit breach-recall guarantee — the
+operating point a practitioner would actually deploy.
 
 **One line.** A **calibrated pre-fire skip policy**: for each (harvested attack × specific target
 config) pair, decide *before firing* whether to spend the target + judge calls on it — defer the pairs
@@ -147,11 +148,12 @@ of the three closest papers sits one axis away:
 **The estimator is intentionally conventional.** The research question is not whether another classifier
 can achieve 0.3% more ROC-AUC, but how a red-team benchmark can safely make pre-fire evaluation decisions
 while explicitly accounting for the recall cost of those decisions. The novelty lies in **composing these
-components into a deployment policy that provides measurable recall guarantees and continuous validation
-inside a production benchmark**: a calibrated, recall-bounded skip threshold with the recall cost
-*measured*; a drift-guard that refuses to skip out-of-distribution families (grounded in Kirch's OOD
-collapse); a deterministic canary that keeps validating the policy for free; visible skip accounting so a
-deferred breach can never hide; and byte-identical-when-off deployment across all three scan surfaces.
+established ingredients into a deployment policy that provides explicit recall guarantees, continuous
+validation, and production-safe integration inside a live benchmark** — concretely: a calibrated,
+recall-bounded skip threshold with the recall cost *measured*; a drift-guard that refuses to skip
+out-of-distribution families (grounded in Kirch's OOD collapse); a deterministic canary that keeps
+validating the policy for free; visible skip accounting so a deferred breach can never hide; and
+byte-identical-when-off deployment across all three scan surfaces.
 Composes with, and is orthogonal to, Q11 (attack ordering), Q6 (per-cell trial budget), and Q18 (the
 acquisition score).
 
