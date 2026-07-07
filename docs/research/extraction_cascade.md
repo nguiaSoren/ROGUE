@@ -81,6 +81,15 @@ a **fine-tune** (or schema-constrained decoding, which local runtimes can't
 compile for a schema this large), and why the adoption mechanism is a cascade,
 not a swap — a swap at *any* of these sizes would silently drop attacks.
 
+The verbatim per-model outputs are saved as receipts in
+[`extraction_cascade_results.md`](extraction_cascade_results.md). One honest
+caveat they surface: the *multilingual* abstention is partly a preprocessing
+artifact — both larger models describe that input as a "footer section," i.e. the
+head+tail truncation fed them the arXiv HTML boilerplate rather than the method
+section. So the clean signal is **copirate** (recognized-but-unstructured); the
+multilingual recognition failure is confounded by truncation and shouldn't be
+over-read.
+
 (The field-agreement scorer itself is proven correct on the golden-as-perfect-
 extractor: structural macro **1.0**, per-field enum/set/dict all 1.0, with
 `payload_template` grounding varying by attack type — 0.26 for the reconstructed
