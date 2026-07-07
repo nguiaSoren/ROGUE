@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from typing import Any
 
 from rogue.reproduce.judge import JudgeResult
 from rogue.schemas.breach_result import JudgeVerdict
@@ -465,14 +466,43 @@ def _maybe_local_model_verdict(
         return None
 
 
+def _rendered_attack_text(rendered: Any) -> str:
+    """Flatten a ``RenderedAttack``'s user turns into the single prompt string the heuristic wants.
+
+    Accepts a ``RenderedAttack`` (``.messages``) or a bare string. Kept local so ``heuristic_judge``
+    stays a leaf of ``reproduce`` (``scan`` / ``cascade_judge`` import *from* here, not the reverse)."""
+    msgs = getattr(rendered, "messages", None)
+    if not msgs:
+        return rendered if isinstance(rendered, str) else str(rendered)
+    parts = [m.get("content", "") for m in msgs if m.get("role") == "user"]
+    return "\n\n".join(p for p in parts if isinstance(p, str) and p)
+
+
 class HeuristicJudge:
     """Keyless, deterministic safety judge — the free-tier default grader.
 
-    Drop-in compatible with :class:`rogue.reproduce.judge.JudgeAgent`: returns a
-    real :class:`~rogue.reproduce.judge.JudgeResult` exposing ``.verdict``
-    (:class:`~rogue.schemas.breach_result.JudgeVerdict`), ``.rationale`` and
-    ``.confidence``.
+    Drop-in compatible with :class:`rogue.reproduce.judge.JudgeAgent`: exposes both the async
+    :meth:`judge` ``(rendered, response, primitive)`` interface the trial loops call *and* the
+    text-based :meth:`judge_sync` ``(attack_prompt, response, goal)`` the demo path uses, and returns a
+    real :class:`~rogue.reproduce.judge.JudgeResult` (``.verdict`` / ``.rationale`` / ``.confidence``)
+    from both.
     """
+
+    async def judge(
+        self,
+        rendered: Any,
+        model_response: str,
+        primitive: Any = None,
+        context: Any = None,
+    ) -> JudgeResult:
+        """Grade a ``(RenderedAttack, response, primitive)`` triple — the signature
+        :meth:`rogue.reproduce.judge.JudgeAgent.judge` uses, so a bare ``HeuristicJudge`` is a true
+        drop-in for the async trial loops (``run_scan`` / ``scan_endpoint``). Adapts the rendered attack
+        + primitive into the ``(attack_prompt, goal)`` the heuristics need, then delegates to
+        :meth:`judge_sync`. Deterministic and network-free (no ``await`` work — async only to match the
+        interface)."""
+        goal = getattr(primitive, "short_description", None) or None
+        return self.judge_sync(_rendered_attack_text(rendered), model_response, goal)
 
     def judge_sync(
         self,
