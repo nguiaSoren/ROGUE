@@ -52,6 +52,16 @@ from rogue.reproduce.calibration.bootstrap import (
     DEFAULT_SEED,
     bootstrap_ci,
 )
+from rogue.reproduce.calibration.noise_corrected import (
+    DEFAULT_ALPHA as NC_DEFAULT_ALPHA,
+)
+from rogue.reproduce.calibration.noise_corrected import (
+    DEFAULT_ZETA as NC_DEFAULT_ZETA,
+)
+from rogue.reproduce.calibration.noise_corrected import (
+    NoiseCorrectedRate,
+    noise_corrected_from_agreement,
+)
 from rogue.reproduce.wildguard_eval import AxisAgreement, score_axis
 
 __all__ = ["BinaryCalibrationReport", "BREACH", "CLEAN", "ERROR"]
@@ -212,6 +222,39 @@ class BinaryCalibrationReport:
             fp_mode_rate=fp_mode_rate,
             fp_mode_ci=fp_mode_ci,
             fp_mode_n=fp_mode_denominator,
+        )
+
+    def noise_corrected(
+        self,
+        *,
+        judge_positive: int | None = None,
+        n_judge: int | None = None,
+        alpha: float = NC_DEFAULT_ALPHA,
+        zeta: float = NC_DEFAULT_ZETA,
+    ) -> NoiseCorrectedRate:
+        """De-bias a judge-labelled breach rate against THIS report's 2x2.
+
+        The report's ``agreement`` 2x2 (from the small human-labelled set) is the
+        calibration set that pins the judge's ``TPR̂``/``FPR̂``; the *large*
+        judge-labelled run (``judge_positive`` / ``n_judge``) is de-biased
+        against it via Feng/Lee (see :mod:`.noise_corrected`).
+
+        When ``judge_positive`` / ``n_judge`` are omitted the report **self-
+        applies** on its own calibration set — ``n_judge = agreement.n`` and
+        ``judge_positive = tp + fp`` (all judge-``breach`` calls). This is a
+        wired *demonstration* (the CI is wide because ``n_judge`` is small); a
+        real headline needs a genuine large judge-only run. Callers tag the
+        source accordingly.
+        """
+        if judge_positive is None or n_judge is None:
+            judge_positive = self.agreement.tp + self.agreement.fp
+            n_judge = self.agreement.n
+        return noise_corrected_from_agreement(
+            self.agreement,
+            judge_positive=judge_positive,
+            n_judge=n_judge,
+            alpha=alpha,
+            zeta=zeta,
         )
 
     def summary_line(self) -> str:

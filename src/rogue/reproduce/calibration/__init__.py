@@ -32,6 +32,13 @@ from rogue.reproduce.judge_calibration import (
 # New v2 binary-axis calibration surface.
 from rogue.reproduce.calibration.binary_report import BinaryCalibrationReport
 from rogue.reproduce.calibration.bootstrap import bootstrap_ci
+from rogue.reproduce.calibration.noise_corrected import (
+    NoiseCorrectedRate,
+    NoiseCorrectionConfig,
+    noise_corrected_from_agreement,
+    noise_corrected_rate,
+    resolve_noise_config,
+)
 
 __all__ = [
     # back-compat re-exports from judge_calibration
@@ -45,4 +52,10 @@ __all__ = [
     # new v2 surface
     "BinaryCalibrationReport",
     "bootstrap_ci",
+    # noise-corrected calibration (Feng/Lee)
+    "NoiseCorrectedRate",
+    "NoiseCorrectionConfig",
+    "noise_corrected_rate",
+    "noise_corrected_from_agreement",
+    "resolve_noise_config",
 ]

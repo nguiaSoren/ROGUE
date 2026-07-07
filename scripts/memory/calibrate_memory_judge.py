@@ -78,6 +78,10 @@ from rogue.memory.judges import (  # noqa: E402
 from rogue.reproduce.calibration.binary_report import (  # noqa: E402
     BinaryCalibrationReport,
 )
+from rogue.reproduce.calibration.noise_corrected import (  # noqa: E402
+    build_report_block,
+    resolve_noise_config,
+)
 from rogue.reproduce.judge_calibration import (  # noqa: E402
     AGREEMENT_REFINE_THRESHOLD,
     AGREEMENT_SHIP_THRESHOLD,
@@ -321,9 +325,15 @@ def _gate(report: BinaryCalibrationReport) -> str:
     return "borderline"
 
 
-def _serialize(cfg: _JudgeConfig, report: BinaryCalibrationReport, *, dry_run: bool) -> dict:
+def _serialize(
+    cfg: _JudgeConfig,
+    report: BinaryCalibrationReport,
+    *,
+    dry_run: bool,
+    noise_corrected: dict | None = None,
+) -> dict:
     a = report.agreement
-    return {
+    payload = {
         "breach_type": report.breach_type,
         "consummation_event": cfg.consummation_event,
         "fp_mode": cfg.fp_mode_label,
@@ -340,6 +350,10 @@ def _serialize(cfg: _JudgeConfig, report: BinaryCalibrationReport, *, dry_run: b
         "gate": _gate(report),
         "summary_line": report.summary_line(),
     }
+    # Off by default: key added ONLY when the overlay is enabled (byte-identical off).
+    if noise_corrected is not None:
+        payload["noise_corrected"] = noise_corrected
+    return payload
 
 
 # --------------------------------------------------------------------------- #
@@ -441,6 +455,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="confirm the PAID live-judge sweep (operator only)",
     )
+    parser.add_argument(
+        "--noise-judge-positive",
+        type=int,
+        default=None,
+        help="judge-`breach` count on the LARGE judge-labelled run (D_J) for the "
+        "noise-corrected overlay; only used when ROGUE_NOISE_CORRECTED_CALIBRATION "
+        "is on. Omit → self-apply on the calibration set (a demonstration).",
+    )
+    parser.add_argument(
+        "--noise-n-judge",
+        type=int,
+        default=None,
+        help="total substantive judge calls on the large judge run (D_J).",
+    )
     args = parser.parse_args(argv)
 
     cfg = _CONFIGS[args.judge]
@@ -482,9 +510,28 @@ def main(argv: list[str] | None = None) -> int:
 
     report = _build_report(cfg, labeled, judge_labels)
 
+    # Noise-corrected overlay (Feng/Lee) — OFF by default; byte-identical when off.
+    noise_block = None
+    ncfg = resolve_noise_config()
+    if ncfg.enabled:
+        nc = report.noise_corrected(
+            judge_positive=args.noise_judge_positive,
+            n_judge=args.noise_n_judge,
+            alpha=ncfg.alpha,
+            zeta=ncfg.zeta,
+        )
+        source = (
+            "large_judge_run"
+            if (args.noise_judge_positive is not None and args.noise_n_judge is not None)
+            else "self_calibration_set"
+        )
+        noise_block = build_report_block(nc, source=source)
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / cfg.report_filename
-    payload = _serialize(cfg, report, dry_run=args.dry_run)
+    payload = _serialize(
+        cfg, report, dry_run=args.dry_run, noise_corrected=noise_block
+    )
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     print("\n" + "=" * 72)
@@ -500,6 +547,8 @@ def main(argv: list[str] | None = None) -> int:
             else "n/a (no trap rows scored)"
         )
     )
+    if noise_block is not None:
+        print(f"noise-corrected [{noise_block['source']}]: {noise_block['summary_line']}")
     if args.dry_run:
         print("** STUB JUDGE (dry-run): wiring fixture, NOT a calibration result. **")
     print("=" * 72)

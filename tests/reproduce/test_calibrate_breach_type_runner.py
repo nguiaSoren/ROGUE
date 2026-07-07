@@ -101,3 +101,21 @@ def test_build_report_uses_breach_type(runner) -> None:
     rep = runner._build_report(cases, labels, "information_disclosure")
     assert rep.breach_type == "information_disclosure"
     assert rep.agreement.n == len(cases)  # no errors from the stub
+
+
+def test_serialize_byte_identical_without_noise_block(runner) -> None:
+    """The noise overlay must be additive: OFF ⇒ the report has no extra key."""
+    rep = _report(["breach", "clean"], ["breach", "clean"], [False, True])
+    off = runner._serialize(rep, tier="smoke", dry_run=True)
+    assert "noise_corrected" not in off
+
+
+def test_serialize_adds_noise_block_when_supplied(runner) -> None:
+    """When a block is passed (flag ON), it is the ONLY added key; rest identical."""
+    rep = _report(["breach", "clean"], ["breach", "clean"], [False, True])
+    off = runner._serialize(rep, tier="smoke", dry_run=True)
+    block = runner._noise_block(rep, judge_positive=None, n_judge=None)
+    on = runner._serialize(rep, tier="smoke", dry_run=True, noise_corrected=block)
+    assert set(on) - set(off) == {"noise_corrected"}
+    assert all(on[k] == off[k] for k in off)  # every shared key byte-identical
+    assert on["noise_corrected"]["source"] == "self_calibration_set"
