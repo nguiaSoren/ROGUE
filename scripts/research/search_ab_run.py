@@ -6,7 +6,7 @@ Usage:
   uv run python scripts/research/search_ab_run.py --model openai/gpt-5.4-nano \
       [--budget 30] [--lam 0.3] [--with-refine] [--seeds-file seeds.json] [--system-prompt "..."]
 Cost: ~= 2 searchers × N seeds × budget rollouts × (target + judge) calls (+ embeds if --lam>0,
-      + PAIR-refine calls if --with-refine). See the price scope in RESEARCH_TODO before running.
+      + PAIR-refine calls if --with-refine). Estimate the price from the formula above before running.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ async def main() -> None:
                     help="win criterion: breach_per_dollar (throughput) or coverage (any_breach_rate — run at a tight --budget so it discriminates)")
     ap.add_argument("--prune", action="store_true",
                     help="Feature 5: pre-fire near-dup pruning (sets ROGUE_SEARCH_PRUNE=on for this run) — "
-                         "compares bandit/MCTS +prune vs the reward-only path (Arm 18)")
+                         "compares bandit/MCTS +prune vs the reward-only path")
     args = ap.parse_args()
     if args.prune:  # sugar: the pruner is env-gated, so --prune sets the flag the resolver reads
         os.environ["ROGUE_SEARCH_PRUNE"] = "on"
@@ -156,7 +156,7 @@ async def main() -> None:
     json.dump(out, open(path, "w"), indent=2)
     print("saved ->", path)
     if obj_winner == "mcts":
-        print(f"→ MCTS won on {metric_label}: candidate to promote (see RESEARCH_TODO).")
+        print(f"→ MCTS won on {metric_label}: candidate to promote (measure-first before switching the default).")
     else:
         print(f"→ MCTS did NOT win on {metric_label}: keep the bandit (measure-first).")
 
