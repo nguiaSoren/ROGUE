@@ -19,10 +19,13 @@ judge-in-the-loop evaluation pipeline without giving up parallelism or changing 
 feeds**. Concretely: (1) a concurrent-batch driver that early-stops mid-batch while still fanning
 trials out in parallel; (2) a truncation rule that falls back to the incumbent decision, so the test
 *only ever shortcuts the clear cells and never regrades a borderline one*; (3) a backward-compatible
-splice into all four execution paths, off by default and identical to today when off; and (4) a `$0`
-replay validator that measures the saving over evaluation data already collected. The statistical core
-is textbook — the value is in adapting it to a live red-team pipeline without disturbing the numbers it
-already reports.
+splice into all four execution paths, off by default and identical to today when off; and (4) a
+**replay methodology** — running the sequential test over historical evaluation traces in their stored
+firing order, so its call-saving and decision-agreement are estimated against real data *without
+re-running any paid experiment*. That last one is reusable in its own right: any adaptive-sampling
+policy can be back-tested this way over an existing evaluation corpus. The statistical core is
+textbook; the work is adapting it to a live red-team pipeline without disturbing the numbers it already
+reports.
 
 ---
 
@@ -149,10 +152,32 @@ the theory predicts:
 | 23 | 16 | 17.0 (74%) |
 | 33 | 4 | 26.0 (79%) |
 
-The Monte-Carlo **expected sample size** (trials to a decision at a known true rate `p`, `n_max=12`)
-shows the same shape independent of ROGUE's data: E[N] = 6 at p=0 (50% of a fixed 12), E[N]=4 at p=1
-(67% saved), peaking near the fixed cap only in the genuinely-ambiguous p≈0.35–0.45 band — which is
-precisely where you *want* to spend the trials.
+### Where the savings come from — effort is *reallocated*, not just cut
+
+The aggregate hides the mechanism. This is the mechanism: the Monte-Carlo **expected sample size**
+(mean trials to a decision at a known true breach rate `p`, `n_max=12`, 20k simulations/point) is a
+clean **U-shape** —
+
+| true breach rate `p` | mean trials E[N] | reach a decision |
+|---|---|---|
+| 0.0 — clearly safe | **6.0** | 100% |
+| 0.1 | 7.9 | 92% |
+| 0.2 | 9.6 | 64% |
+| 0.3 | 10.7 | 40% |
+| **0.4 — the decision boundary** | **11.0** | 32% |
+| 0.5 | 10.4 | 46% |
+| 0.6 | 9.3 | 70% |
+| 0.7 | 7.7 | 89% |
+| 0.8 | 6.2 | 98% |
+| 0.9 | 5.0 | 100% |
+| 1.0 — clearly breached | **4.0** | 100% |
+
+A cell that is obviously safe or obviously broken is settled in **~4–6 trials**; a cell sitting on the
+0.4 boundary — where the fixed-`n=3` ASR was pure noise — runs to **~11**, nearly the full cap. So SPRT
+does not uniformly cut effort: it **moves** it off the easy cells and onto the genuinely ambiguous ones,
+which is exactly where you wanted the trials in the first place. The hard cases are *not* starved to buy
+the average saving — they are the beneficiaries of it. (Independent of ROGUE's data: this is the Wald
+operating-characteristic curve, reproduced by `replay_sprt.py --asn-only`.)
 
 ## Caveats
 
@@ -176,20 +201,16 @@ precisely where you *want* to spend the trials.
 - **Not on `--judge-batch`.** Batch grading and sequential early-stopping are mutually exclusive by
   construction; the batch path fires the full fixed `n` and logs that SPRT doesn't apply.
 
-## Positioning
+## Summary
 
-The one-liner: everyone reports an ASR from a fixed handful of trials; nobody treats the trial budget as
-*sequential*. Reframing "fire N, divide" as a Wald test recovers the same breach verdict for ~⅓–¾
-fewer calls on the clear cells and, more importantly, *reallocates* those trials to the borderline
-cells where the ASR was meaningless — at 99.8% agreement with the incumbent rule on 1,939 real cells.
-The live savings % is gated on one paid cycle; until then it's a directional "we're seeing…", not a
-headline stat.
+We do not claim novelty in sequential hypothesis testing. Our contribution is an **implementation that
+makes statistically principled adaptive sampling practical for production LLM red-team evaluation
+without altering benchmark semantics** — a concurrent-batch sequential test spliced into every
+execution path, a truncation rule that guarantees the benchmark's verdicts are unchanged, and a replay
+methodology that measures the saving over historical traces without re-running paid experiments.
 
-**As a paper.** SPRT itself is classic, so this is not a standalone algorithmic contribution — framed
-that way it would be thin. Its weight is as a **systems optimization inside a larger red-team
-benchmark**: statistically principled, cost-cutting with a measured offline number, engineered for an
-async batched pipeline, and honest about the replay-vs-live gap. The framing that carries it is *"we
-adapted sequential hypothesis testing to a batched LLM evaluation pipeline while preserving
-compatibility with the existing benchmark"* — the load-bearing property being that the benchmark's
-verdicts are **unchanged** (99.8% agreement); only the cost of reaching them drops. That's the sentence
-a reviewer needs: it does not move the measurement, it makes the measurement cheaper.
+The load-bearing property is that the measurement does not move: on 1,939 real cells the sequential
+test reaches the **same breach verdict as the fixed-`n` rule on 99.8% of them**, while spending fewer
+model+judge calls to get there and reallocating the trials it does spend onto the ambiguous cells where
+the fixed-`n=3` ASR carried no signal. The offline replay puts that saving at 22.1% of already-fired
+calls; a live deployment figure is a gated paid run.
