@@ -38,6 +38,7 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
 from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # noqa: E402
+from rogue.extract.cascade import maybe_build_cascade_extractor  # noqa: E402
 from rogue.harvest.bandit_serp_phase import _infer_source_type  # noqa: E402
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.media_extract import media_urls_for_document  # noqa: E402
@@ -108,7 +109,8 @@ async def harvest_url(url: str, database_url: str, source_type: str | None) -> i
             for i in ingested
         ] or None
 
-        extractor = ExtractionAgent()
+        # Q17 — local-first cascade (off by default; unset => plain Haiku agent).
+        extractor = maybe_build_cascade_extractor() or ExtractionAgent()
         primitive = await extractor.extract_from_raw_document(doc, images=images)
     finally:
         await bd.aclose()

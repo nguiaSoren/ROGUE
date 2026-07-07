@@ -98,6 +98,10 @@ from rogue.db.models import (  # noqa: E402
 from rogue.dedupe import llm_authored_score  # noqa: E402
 from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
 from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # noqa: E402
+from rogue.extract.cascade import (  # noqa: E402
+    CascadeExtractionAgent,
+    maybe_build_cascade_extractor,
+)
 from rogue.harvest.bright_data_client import BrightDataClient  # noqa: E402
 from rogue.harvest.discovery_agent import DiscoveryAgent  # noqa: E402
 from rogue.harvest.fetch_cache import (  # noqa: E402
@@ -457,7 +461,14 @@ async def run_harvest(
         # (The ExtractionAgent default stays v3 so ad-hoc/test callers and the
         # live extraction fixtures keep byte-for-byte legacy behaviour; only the
         # production harvest pipeline opts into v4.)
-        extractor = ExtractionAgent(model=extraction_model, prompt_version="v4")
+        #
+        # Q17 — local-first extraction cascade (off by default). When
+        # ROGUE_EXTRACT_CASCADE is truthy, a cheap local tier runs first and only
+        # grounded, schema-valid primitives are accepted; everything else escalates
+        # to this exact Haiku v4 extractor. Unset => None => byte-identical below.
+        extractor = maybe_build_cascade_extractor(
+            fallback_model=extraction_model
+        ) or ExtractionAgent(model=extraction_model, prompt_version="v4")
     # Multimodal ingestion (Feature A) — construct unless explicitly disabled.
     # Reuses the same BD client (Web Unlocker) for image downloads.
     if media_ingestor is None and os.environ.get("HARVEST_INGEST_IMAGES", "1") != "0":
@@ -964,6 +975,10 @@ async def run_harvest(
         except Exception as exc:  # noqa: BLE001 - bandit failure must not block harvest
             logger.warning("bandit: persist failed (%s) — state may be stale", exc)
     finally:
+        # Q17 — surface extraction-cascade telemetry (no silent behaviour): how
+        # many docs the local tier saved a Haiku call on vs escalated, and why.
+        if isinstance(extractor, CascadeExtractionAgent):
+            logger.info("extraction cascade stats: %s", extractor.stats.to_dict())
         # Close every registered backend's HTTP pool (the BD client wrapping bd_client,
         # plus any free backends' httpx clients). Best-effort: one failing close never
         # blocks the others or the engine dispose.

@@ -568,6 +568,7 @@ class ExtractionAgent:
         # tests / static checks).
         self._anthropic_client: Any | None = None
         self._openai_client: Any | None = None
+        self._local_client: Any | None = None
 
     # ----- Public API -----
 
@@ -671,6 +672,8 @@ class ExtractionAgent:
             data = await self._call_anthropic(user_message, images)
         elif self.model.startswith("openai/"):
             data = await self._call_openai(user_message, images)
+        elif self.model.startswith("local/"):
+            data = await self._call_local_json(user_message, images)
         else:
             raise NotImplementedError(
                 f"provider for {self.model} not wired — Day 1"
@@ -1006,6 +1009,102 @@ class ExtractionAgent:
                 "reason": "openai .parsed was None (refusal or schema mismatch)",
             }
         return parsed.model_dump(mode="json")
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(_TRANSIENT_ERRORS),
+        reraise=True,
+    )
+    async def _call_local_json(
+        self,
+        user_message: str,
+        images: "list[ExtractionImage] | None" = None,
+    ) -> dict[str, Any]:
+        """Local / self-hosted OpenAI-compatible call in plain JSON mode (`local/` prefix).
+
+        Why a separate branch from :meth:`_call_openai`: the OpenAI branch pins the
+        output with ``beta.chat.completions.parse(response_format=AttackPrimitive)``,
+        which makes the SDK generate a grammar for the *full* AttackPrimitive schema.
+        Local runtimes (Ollama / llama.cpp) reject that grammar ("failed to parse
+        grammar") — the AttackPrimitive schema is too large for their GBNF sampler.
+        So a local model is driven with the endpoint-portable
+        ``response_format={"type": "json_object"}`` (json mode), and the raw JSON is
+        run through the **same** ``_normalize_extraction_payload`` (R1–R8) + Pydantic
+        validation the Haiku path uses — the normalizer already exists precisely to
+        absorb small-model schema drift, so it earns its keep double here.
+
+        The endpoint is read from ``OPENAI_BASE_URL`` (the SDK's own env var, the one
+        ``.env.example`` documents for ``openai/`` local routing). It is REQUIRED for
+        the ``local/`` prefix — we never silently fall back to api.openai.com and bill
+        a "local" extraction to the hosted OpenAI account. Images are ignored (local
+        SLMs are text-only here); a warning is logged if any are attached.
+
+        This branch is dormant unless ``EXTRACTION_MODEL`` (or the cascade's local
+        tier) is set to ``local/<model>`` — so it is byte-for-byte inert on the
+        default ``anthropic/claude-haiku-4-5`` pipeline.
+        """
+        import json  # noqa: PLC0415
+
+        from openai import AsyncOpenAI
+
+        base_url = os.environ.get("OPENAI_BASE_URL") or os.environ.get(
+            "LOCAL_OPENAI_BASE_URL"
+        )
+        if not base_url:
+            raise RuntimeError(
+                "EXTRACTION_MODEL uses the local/ prefix but OPENAI_BASE_URL is "
+                "unset — point it at your local OpenAI-compatible endpoint "
+                "(e.g. http://localhost:11434/v1 for Ollama). Refusing to route a "
+                "'local' extraction to api.openai.com."
+            )
+        if self._local_client is None:
+            self._local_client = AsyncOpenAI(
+                base_url=base_url,
+                api_key=os.environ.get("OPENAI_API_KEY", "local"),
+            )
+        if images:
+            logger.warning(
+                "local/ extraction is text-only; ignoring %d attached image(s) "
+                "(use anthropic/ or openai/ for multimodal extraction)",
+                len(images),
+            )
+
+        bare_model = self.model.split("/", 1)[1]
+        # json-mode nudge: the endpoint enforces "valid JSON object", but not the
+        # shape — so we spell out the contract in the system turn (the tool-schema
+        # the Anthropic/OpenAI branches lean on is unavailable in plain json mode).
+        system = (
+            self.prompt
+            + "\n\nOUTPUT CONTRACT: respond with EXACTLY ONE JSON object and "
+            "nothing else. If the document is an attack disclosure, emit ALL "
+            "AttackPrimitive fields (family, vector, payload_template, "
+            "payload_slots, reproducibility_score, ...). If it is NOT an attack, "
+            'emit {"is_attack": false, "reason": "..."}.'
+        )
+        response = await self._local_client.chat.completions.create(
+            model=bare_model,
+            max_tokens=4096,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_message},
+            ],
+        )
+        content = response.choices[0].message.content or ""
+        try:
+            data = json.loads(content)
+        except (ValueError, TypeError):
+            logger.warning(
+                "local model %s emitted non-JSON output (%d chars); treating as skip",
+                self.model,
+                len(content),
+            )
+            return {"is_attack": False, "reason": "local model emitted non-JSON"}
+        if not isinstance(data, dict):
+            return {"is_attack": False, "reason": "local model JSON was not an object"}
+        return data
 
     def _validate_or_none(self, data: dict[str, Any]) -> AttackPrimitive | None:
         """Common post-LLM validation. Returns `None` on the explicit skip flag.
