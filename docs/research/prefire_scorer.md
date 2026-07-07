@@ -15,11 +15,18 @@ together with its **empirically characterized recall–budget frontier**.
 
 ## The main finding: held to a fixed recall, pre-fire skipping has sharply diminishing returns
 
+**Decision quality (definition).** We define *decision quality* as the achievable evaluation-budget
+reduction — the fraction of trials skipped — while satisfying a fixed empirical breach-recall constraint.
+Unlike predictor metrics (ROC-AUC, F1, Precision@k), it is measured over the resulting **deployment
+policy**, not the score; the recall–budget frontier below is its measurement.
+
 The central empirical result — and the number the prior work leaves unmeasured — is that once you hold a
 real breach-recall target, **pre-fire skipping has sharply diminishing returns**: aggressive thresholds
 skip ~42% of evaluations, but holding a stringent 95% breach recall permits only ~7% skipping.
 Sort held-out trials by the calibrated skip score, skip the lowest, and read off how much you can skip at
 each recall target (16.5% pair-level breach base rate; `test=552`, group-split by attack):
+
+**Main result — the recall–budget frontier:**
 
 | Breach recall you insist on | Fraction of evaluations you can skip | Calibrated skip threshold |
 |---|---|---|
@@ -95,6 +102,8 @@ family/vector, `requires_*` flags, provenance scores, target size/context/tools/
 an optional semantic-affinity term (secondary). We evaluated whether semantic affinity adds value beyond
 structural metadata; it does, but only modestly (**ΔAUC = 0.009**), confirming that **deployment metadata
 carries most of the predictive signal on this corpus**.
+
+*Predictor performance (ablation) — a supporting metric, not the result:*
 
 | Head | ROC-AUC | Precision@10% | Budget-saved @80% recall |
 |---|---|---|---|
