@@ -610,6 +610,15 @@ async def run_reproduction(
         panel = TargetPanel()
     if judge is None:
         judge = JudgeAgent()
+        # Confidence-gated cascade (off by default; ROGUE_CASCADE_JUDGE=on). The free heuristic grades
+        # confident non-breach trials so the paid LLM judge only sees the ambiguous ones — pure savings
+        # on the inline per-trial grade. INERT on --judge-batch: that path grades the full fixed n in a
+        # single API batch (JudgeBatch, which also reaches into JudgeAgent internals), so there is no
+        # per-trial cheap-first decision to make — it keeps the raw JudgeAgent.
+        if not judge_batch:
+            from rogue.reproduce.cascade_judge import resolve_cascade  # noqa: PLC0415
+
+            judge = resolve_cascade(judge)
     if persona_technique is not None and persona_wrapper is None:
         persona_wrapper = PersonaWrapper.from_env()
     if pair_max_iters > 0 and pair_attacker is None:

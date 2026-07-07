@@ -289,7 +289,14 @@ async def run_scan(
     if panel is None:
         panel = TargetPanel(adapter_extra=adapter_extra or {})
     if judge is None:
-        judge = JudgeAgent(model=judge_model) if judge_model else JudgeAgent()
+        from .reproduce.cascade_judge import resolve_cascade
+
+        base_judge = JudgeAgent(model=judge_model) if judge_model else JudgeAgent()
+        # Off by default (ROGUE_CASCADE_JUDGE unset) → returns base_judge untouched, so this path is
+        # byte-identical to today. On → wraps it so the free heuristic short-circuits confident
+        # non-breach trials before the paid LLM judge is ever called. An injected judge (tests, the
+        # keyless HeuristicJudge, a visitor key) is left as-is — the cascade only wraps the default.
+        judge = resolve_cascade(base_judge)
 
     # Deep pipeline, stage 1 of 4 — PERSONA. Wrap each primitive's last user turn in a PAP
     # persuasion frame before dispatch. Stages 2–4 (multi-turn → PAIR → escalation) follow.
@@ -674,6 +681,10 @@ async def run_scan(
         }
 
     findings.sort(key=lambda f: f.success_rate, reverse=True)
+    # Surface the cascade-judge savings when it was active (no silent short-circuiting).
+    _stats = getattr(judge, "stats", None)
+    if _stats is not None and getattr(_stats, "n_total", 0):
+        _log.info("%s", _stats.summary())
     target = config.base_url or config.target_model
     return ScanReport(
         target=target,

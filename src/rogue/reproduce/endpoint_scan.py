@@ -242,7 +242,13 @@ async def scan_endpoint(
     if panel is None:
         panel = TargetPanel(adapter_extra={"api_key": api_key} if api_key else {})
     if judge is None:
-        judge = JudgeAgent()
+        from rogue.reproduce.cascade_judge import resolve_cascade  # noqa: PLC0415
+
+        # Off by default → returns JudgeAgent() untouched (byte-identical). On → the free heuristic
+        # grades confident non-breach trials, escalating only the ambiguous ones to the paid LLM judge.
+        # An injected judge (the public_scan visitor-key judge, --persist --judge heuristic, tests) is
+        # left untouched — the cascade only ever wraps the default-constructed judge.
+        judge = resolve_cascade(JudgeAgent())
 
     # Deep pipeline, stage 1 of 4 — PERSONA. Build a PAP wrapper when deep is on and none injected.
     owns_persona = False
@@ -475,6 +481,9 @@ async def scan_endpoint(
 
     findings.sort(key=lambda f: f.any_breach_rate, reverse=True)
     n_breached = sum(1 for f in findings if f.breached)
+    _stats = getattr(judge, "stats", None)
+    if _stats is not None and getattr(_stats, "n_total", 0):
+        _log.info("%s", _stats.summary())  # surface cascade-judge savings (no silent short-circuiting)
     return EndpointScanReport(
         base_url=base_url,
         model=model,
