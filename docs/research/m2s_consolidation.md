@@ -106,14 +106,22 @@ on the multi-turn slice), not an efficacy claim.
 ## Verification (wired ≠ run)
 
 Beyond 22 unit tests (formatter goldens, escaping, order preservation, schema-valid derivation, the
-20k overflow guard, the env resolver, byte-identical-off), both live surfaces were driven **end-to-end
-through the real env resolver** (`ROGUE_M2S=on`, not an injected config) with a counting panel that
-distinguishes the paths: a multi-turn primitive fired via **`run_attack` exactly once** (single-turn,
-1× trial) with the flag on, and via **`run_conversation`** with it off — the exact behavioural flip M2S
-exists to produce, `ScanReport.m2s` / `EndpointScanReport.n_m2s_consolidated` surfaced. `reproduce_once`
-is verified by parts — the `apply_m2s_pairs` helper is unit-tested and the `--m2s-consolidate` flag →
-param → splice is threaded and mirrors the adjacent, proven `--prefire-skip` block; a full
-`run_reproduction` end-to-end needs Neon primitives and is folded into the gated paid arm.
+20k overflow guard, the env resolver, byte-identical-off), **all three fire surfaces were driven
+end-to-end** (not wired-and-read):
+
+- **`run_scan` / `scan_endpoint`** — driven through the real env resolver (`ROGUE_M2S=on`, not an
+  injected config) with a counting panel: a multi-turn primitive fired via **`run_attack` exactly
+  once** (single-turn, 1× trial) with the flag on, and via **`run_conversation`** with it off — the
+  behavioural flip M2S exists to produce; `ScanReport.m2s` / `EndpointScanReport.n_m2s_consolidated`
+  surfaced.
+- **`reproduce_once::run_reproduction`** — a **real $0 end-to-end run against a local Postgres**
+  (`rogue_test`, mock panel/judge, `escalate=False`): a 3-turn crescendo primitive seeded into the DB,
+  `run_reproduction(m2s_consolidate=True)` under `ROGUE_M2S=on`, and the panel received the primitive
+  **folded to exactly one user turn** with a `BreachResult` row **persisted** — proving the ORM→Pydantic
+  conversion, the `if m2s_consolidate:` splice, `apply_m2s_pairs`, and the fire→judge→persist loop all
+  ran on the consolidated primitive; the off control received all 3 turns (byte-identical). (This is
+  the local test DB, not Neon; the *paid* cross-model efficacy A/B is still the gated arm — but the
+  splice itself is run, not assumed.)
 
 ## Status
 
