@@ -203,11 +203,18 @@ operating-characteristic curve, reproduced by `replay_sprt.py --asn-only`.)
 
 ## Summary
 
-We do not claim novelty in sequential hypothesis testing. Our contribution is an **implementation that
-makes statistically principled adaptive sampling practical for production LLM red-team evaluation
-without altering benchmark semantics** — a concurrent-batch sequential test spliced into every
-execution path, a truncation rule that guarantees the benchmark's verdicts are unchanged, and a replay
-methodology that measures the saving over historical traces without re-running paid experiments.
+We do not introduce a new statistical test; we introduce a **production evaluation architecture that
+makes sequential testing compatible with asynchronous LLM red-team pipelines** — a concurrent-batch
+sequential test spliced into every execution path, a truncation rule that guarantees the benchmark's
+verdicts are unchanged, and a replay methodology that measures the saving over historical traces
+without re-running paid experiments.
+
+**Why not just raise `n_trials` from 3 to 12?** Because a larger fixed `n` improves confidence
+*uniformly* — it spends the same extra calls on the many cells whose verdict is already obvious as on
+the few that are genuinely uncertain. SPRT buys the reliability only where it's needed: it delivers
+near-fixed-12 confidence on the ambiguous cells (which run to ~11 trials) while spending closer to
+fixed-3 cost on the easy ones (~4–6). Same statistical guarantee at the boundary, a fraction of the
+calls away from it.
 
 The load-bearing property is that the measurement does not move: on 1,939 real cells the sequential
 test reaches the **same breach verdict as the fixed-`n` rule on 99.8% of them**, while spending fewer
