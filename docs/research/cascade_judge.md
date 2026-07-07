@@ -2,8 +2,9 @@
 
 **One line.** Grade every trial with ROGUE's free regex `HeuristicJudge` first and escalate to the paid
 calibrated LLM `JudgeAgent` only when the cheap tier isn't a confident *non-breach* — so a paid scan
-stops paying a frontier model to read the flat refusals that make up the safe majority of trials, **and
-the benchmark's breach metric is provably unchanged.**
+stops paying a frontier model to read the flat refusals that make up the safe majority of trials, **while
+preserving the benchmark's breach metric under the cascade policy: every predicted breach is still
+confirmed by the calibrated judge.**
 
 **Status.** Built + wired into the three default judge-construction surfaces (`run_scan`,
 `scan_endpoint`, `reproduce_once`), off by default in code. **Live in production** since 2026-07-08
@@ -18,19 +19,24 @@ tests: `tests/test_cascade_judge.py` · env flag: `ROGUE_CASCADE_JUDGE`.
 
 ## Contribution
 
-Existing LLM-judge cascades optimize **inference cost**: grade with a cheap model, escalate to an
-expensive one when the cheap one is unsure (Ramírez 2405.02134; Jung 2407.18370). A *security benchmark*
-carries an additional constraint those methods never face: **the benchmark's headline metric — the breach
-rate — must remain invariant.** A cascade that occasionally lets the cheap tier assert a breach would
-silently rewrite the number the whole system exists to report.
+**Existing LLM-judge cascades optimize prediction cost. Ours optimizes *benchmark-evaluation* cost while
+preserving benchmark semantics** — and that distinction *is* the contribution. Generic cascades grade
+with a cheap model and escalate when it's unsure (Ramírez 2405.02134; Jung 2407.18370), free to let the
+cheap tier settle a case *in either direction* because their goal is a cheaper prediction. A security
+benchmark can't: its headline number is the breach rate, so a cascade that ever lets the cheap tier
+*assert a breach* would silently rewrite the number the whole system exists to report.
 
-Q2 is the adaptation that satisfies that constraint, in three moves:
+Q2 is the adaptation that keeps evaluation cost down **without moving the benchmark's semantics**, in
+three moves:
 
 1. **Asymmetric escalation (the security-specific core).** A generic cascade short-circuits whenever the
    cheap tier is *confident, in either direction*. Ours short-circuits **only on a confident non-breach**;
    any breach signal from the free tier is *always* escalated to the calibrated judge before it can count.
-   So the free tier can never *add* a breach — the reported breach rate is, by construction, exactly what
-   running the calibrated judge on every trial would produce. The cascade moves cost, not verdicts.
+   So the free tier can never *add* a breach — every predicted breach is still confirmed by the calibrated
+   judge. The cascade is therefore designed to **preserve the benchmark metric under this policy**: it
+   cannot inflate the breach rate, and the only residual risk is a rare *missed* breach if the regex
+   confidently mislabels a real breach as safe — bounded empirically by the 99.8% agreement measured below.
+   The cascade moves cost, not (measurably) verdicts.
 
    ```text
    generic cascade                 ROGUE cascade (asymmetric)
@@ -41,9 +47,9 @@ Q2 is the adaptation that satisfies that constraint, in three moves:
                                       unsure?          → escalate
    ```
 
-2. **A $0 cheap tier.** ROGUE's cheap tier is a network-free regex, not a smaller *paid* model — so the
-   structural floor on cascade savings (Bouchard: you always pay the cheap model before deciding) is
-   literally zero here. Every short-circuit removes a full judge call for nothing.
+2. **A $0 cheap tier.** Unlike prior cascades, which always pay a first-model cost before deciding whether
+   to escalate, ROGUE's first stage is a deterministic regex — so every short-circuit removes a full judge
+   call for nothing (no cheap-tier cost to net out against the saving).
 
 3. **A transparent adapter across benchmark stages.** Existing cascades assume interchangeable
    evaluators; ROGUE's heuristic and calibrated judges expose different interfaces and execution
@@ -63,25 +69,23 @@ loop, each governing a different budget:
 
 Q11/Q6/Q2 are efficiency controls sharing the reproduce panel; Q4 is a validity control on the judge
 output. Q2 completes the cost story: without it the system chooses which attacks and how many trials but
-still pays the frontier judge on every trial.
+still pays the frontier judge on every trial. In one line: **prior cascades cut prediction cost; Q2 cuts
+benchmark-evaluation cost while preserving benchmark semantics** — the same distinction, applied to the
+last uncovered budget.
 
-## Why a regex cheap tier is enough
+## Why regex?
 
-The asymmetry isn't just a safety rail — it's matched to what the cheap tier is actually good at. A safe
-generation is overwhelmingly a *refusal*, and refusals are **semantically narrow**: "I can't help with
-that.", "I'm not able to assist with that request.", a short deflection. A regex is excellent at these —
-high precision, near-zero miss. A *breach*, by contrast, is **semantically diverse** — synthesis steps,
-exploit code, operational detail, in any domain — exactly where a regex is weak. So the heuristic has
-**high precision on refusals and poor precision on breaches**, which is precisely the profile the
-asymmetric cascade exploits: let the regex settle the thing it's reliable at (confident refusals),
-escalate everything else. The measured 99.8% agreement on the short-circuited set is that profile showing
-up in the data.
+A regex costs **$0**, needs **no network**, is **deterministic**, and has **zero latency**. A safe
+generation is overwhelmingly a *refusal*, and refusals are stereotyped templates ("I can't help with
+that.", "I'm not able to assist with that request.") that regexes naturally capture; breaches, by
+contrast, are semantically diverse. Because the cascade only ever *trusts* a confident refusal and
+escalates everything else, this limited capability is sufficient — the regex is asked only to do the one
+thing its form is suited to. The 99.8% agreement on the short-circuited set is that sufficiency measured.
 
 **"Why not a small LLM instead of a regex?"** A small LLM still costs money, still adds latency, still
-needs an API call, and still introduces another model dependency to version and calibrate. The regex is
-deterministic, zero-latency, zero-network, and $0 — and for the one job it's assigned (recognising a
-confident refusal) it is strong. Ramírez's own finding is that the cheap tier's *own* signal beats a
-trained router; here the cheap tier is cheaper still, with no signal to train.
+needs an API call, and still introduces another model dependency to version and calibrate — defeating the
+premise of a *free* cheap tier. Ramírez's finding is that the cheap tier's *own* signal beats a trained
+router; here the cheap tier is cheaper still, with nothing to train.
 
 ## The gate and its calibration
 
@@ -131,24 +135,25 @@ drop for ~2.5× the savings.
 
 Agreement here is measured against the calibrated judge's *own* stored verdict, so the obvious reviewer
 question is: **what if the calibrated judge is itself wrong?** Q2 does not try to answer that — and
-shouldn't. It has one job: don't move the benchmark relative to running the calibrated judge everywhere.
-It provably meets that (asymmetry) and near-perfectly matches it on the trials it grades free (99.8%).
-The judge's *own* residual error is a separate axis, handled independently by the **Q4 noise-corrected
-certification layer**, which de-biases the calibrated breach rate against the judge's measured TPR̂/FPR̂
-and emits a finite-sample certified claim. So the division of labour is clean: **Q2 preserves the
-calibrated judge's verdicts cheaply; Q4 bounds that judge's error.** Neither is asked to do the other's
-job.
+shouldn't. Its one job is to **cut evaluation cost while preserving benchmark semantics**: don't move the
+benchmark relative to running the calibrated judge everywhere. By the asymmetry it cannot *inflate* the
+rate, and it near-perfectly matches the full-judge run on the trials it grades free (99.8%). The judge's
+*own* residual error is a separate axis, handled independently by the **Q4 noise-corrected certification
+layer**, which de-biases the calibrated breach rate against the judge's measured TPR̂/FPR̂ and emits a
+finite-sample certified claim. So the division of labour is clean: **Q2 preserves the calibrated judge's
+verdicts cheaply; Q4 bounds that judge's error.** Neither is asked to do the other's job.
 
 ## The live experiment (folds into the paid session, $0 extra)
 
 Unlike SPRT (which can barely early-stop over ROGUE's shallow historical cells) and survival (whose
-offline back-test is on only 8 configs), **Q2's offline replay is already close to decisive** — 12,452
-real rows, a directly-measured agreement, and a savings that is a deterministic function of the fixed
-heuristic. The live A/B therefore mostly *confirms* rather than *proves*: it measures the realised
-**dollar** savings, the **latency** reduction, and that there are **no unexpected interactions** with
-the SPRT/survival controls when all three run together. It rides the same gated paid session as those
-efficiency arms at ~$0 extra — toggle `ROGUE_CASCADE_JUDGE` on the relevant cells of the shared
-factorial. Until it lands, the headline stays "offline replay," not a live dollar figure.
+offline back-test is on only 8 configs), **Q2's replay already measures exactly the quantity the
+deployment seeks to optimize — skipped judge calls** — over 12,452 real rows, with a savings that is a
+deterministic function of the fixed heuristic. The live A/B therefore mostly *confirms* rather than
+*proves*: it measures the realised **dollar** savings, the **latency** reduction, and that there are **no
+unexpected interactions** with the SPRT/survival controls when all three run together. It rides the same
+gated paid session as those efficiency arms at ~$0 extra — toggle `ROGUE_CASCADE_JUDGE` on the relevant
+cells of the shared factorial. Until it lands, the headline stays "offline replay," not a live dollar
+figure.
 
 ## Caveats
 
@@ -162,14 +167,6 @@ factorial. Until it lands, the headline stays "offline replay," not a live dolla
 - **Heuristic quality caps savings.** Only confidently-graded trials short-circuit; a softer refusal the
   LLM still calls "refused" won't reach the gate. Improving the heuristic's refusal recall raises the
   savings directly — a cheap future lever.
-
-## Venue fit
-
-A systems/measurement optimization for security benchmarks, not an ML paper — strongest at **USENIX
-Security** (excellent fit) and **NDSS** (very good); **CCS** good. **IEEE S&P** would want a broader
-measurement story than Q2 alone provides. Q2 lands most naturally as the **judge-allocation** component
-of the combined efficiency paper (**Q11 + Q6 + Q2** — *"Adaptive Budget-Aware Red-Team Evaluation"*: which
-attacks, how many trials, which judges), with Q4 as a sibling **measurement-validity** paper.
 
 ## Grounding (read in full via crawl4ai)
 

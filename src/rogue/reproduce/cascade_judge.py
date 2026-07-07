@@ -254,7 +254,8 @@ def calibrate_tau(
     candidate_taus: list[float] | None = None,
     escalate_on_breach: bool = True,
 ) -> TauChoice:
-    """Pick the largest-coverage tau that provably holds ``target_agreement`` on the short-circuited set.
+    """Pick the largest-coverage tau whose short-circuit agreement is *certified* (Wilson lower bound)
+    to clear ``target_agreement``.
 
     ``items`` are ``(heuristic_confidence, heuristic_is_breach, reference_is_breach)`` triples — the
     heuristic's own confidence + breach bit, and the ground-truth (human- or calibrated-LLM-labelled)
