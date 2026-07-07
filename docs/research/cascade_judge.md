@@ -146,14 +146,14 @@ offline back-test is on only 8 configs), **Q2's offline replay is already close 
 real rows, a directly-measured agreement, and a savings that is a deterministic function of the fixed
 heuristic. The live A/B therefore mostly *confirms* rather than *proves*: it measures the realised
 **dollar** savings, the **latency** reduction, and that there are **no unexpected interactions** with
-SPRT/survival when all three run together. It is **Arm 16** and rides the same corpus pass as Arms
-1/13/14 at $0 extra — toggle `ROGUE_CASCADE_JUDGE` on the relevant cells of the shared factorial. Until
-it lands, the headline stays "offline replay," not a live dollar figure.
+the SPRT/survival controls when all three run together. It rides the same gated paid session as those
+efficiency arms at ~$0 extra — toggle `ROGUE_CASCADE_JUDGE` on the relevant cells of the shared
+factorial. Until it lands, the headline stays "offline replay," not a live dollar figure.
 
 ## Caveats
 
 - **Offline, not yet live-measured.** The replay is a backtest; "agreement" is consistency with the
-  calibrated judge's stored verdict, not ground truth. Live dollar/latency confirmation is Arm 16.
+  calibrated judge's stored verdict, not ground truth. Live dollar/latency confirmation is a gated paid A/B.
 - **Redacted local DB.** The docker snapshot is `model_response='[redacted]'`, so the replay reads Neon
   (reads are $0 — no LLM calls).
 - **Prod-only flag.** Live-on in prod (Render); local `reproduce_once` runs cascade only if
