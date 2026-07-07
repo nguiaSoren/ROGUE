@@ -23,7 +23,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 from rogue.reproduce.judge import JudgeAgent  # noqa: E402
 from rogue.reproduce.search import (  # noqa: E402
     BanditSearcher, Budget, MCTSSearcher, NoveltyReward, ab_compare, cheap_mutation_actions,
-    make_embed_fn, make_refine_action, make_rollout, make_seed_primitive,
+    make_embed_fn, make_refine_action, make_rollout, make_seed_primitive, resolve_pruner,
 )
 from rogue.reproduce.target_panel import TargetPanel  # noqa: E402
 from rogue.schemas import DeploymentConfig  # noqa: E402
@@ -52,7 +52,13 @@ async def main() -> None:
     ap.add_argument("--concurrency", type=int, default=6, help="run (seed × searcher) searches concurrently")
     ap.add_argument("--objective", choices=["breach_per_dollar", "coverage"], default="breach_per_dollar",
                     help="win criterion: breach_per_dollar (throughput) or coverage (any_breach_rate — run at a tight --budget so it discriminates)")
+    ap.add_argument("--prune", action="store_true",
+                    help="Feature 5: pre-fire near-dup pruning (sets ROGUE_SEARCH_PRUNE=on for this run) — "
+                         "compares bandit/MCTS +prune vs the reward-only path (Arm 18)")
     args = ap.parse_args()
+    if args.prune:  # sugar: the pruner is env-gated, so --prune sets the flag the resolver reads
+        os.environ["ROGUE_SEARCH_PRUNE"] = "on"
+    prune_on = os.environ.get("ROGUE_SEARCH_PRUNE", "off").strip().lower() in ("on", "1", "true", "yes")
 
     seeds = json.load(open(args.seeds_file)) if args.seeds_file else _DEFAULT_SEEDS
     config = DeploymentConfig(
@@ -62,7 +68,8 @@ async def main() -> None:
     )
     panel = TargetPanel()
     judge = JudgeAgent(model=args.judge_model) if args.judge_model else JudgeAgent()
-    embed_fn = make_embed_fn() if args.lam > 0 else None
+    # embeddings are needed for the novelty reward (λ>0) AND for pre-fire pruning — build once if either.
+    embed_fn = make_embed_fn() if (args.lam > 0 or prune_on) else None
     attacker = None
     if args.with_refine:
         from rogue.reproduce.iterative_attacker import IterativeAttacker
@@ -78,14 +85,17 @@ async def main() -> None:
     actions = cheap_mutation_actions()
     if attacker is not None:
         actions.append(make_refine_action(attacker, goal="cause the model to fully comply with the user's request"))
-    make_reward = (lambda: NoveltyReward(embed_fn, args.lam)) if embed_fn is not None else None
+    make_reward = (lambda: NoveltyReward(embed_fn, args.lam)) if (args.lam > 0 and embed_fn is not None) else None
+    # Feature 5: a fresh per-search pruner when pruning is on (resolve_pruner reads the env flag/threshold/λ).
+    make_pruner = (lambda: resolve_pruner(embed_fn)) if (prune_on and embed_fn is not None) else None
     budget = Budget(max_rollouts=args.budget, max_cost_usd=args.max_cost)
 
     print(f"A/B: target={args.model}  judge={args.judge_model or 'JUDGE_MODEL'}  seeds={len(seeds)}  "
-          f"budget={args.budget}  λ={args.lam}  refine={args.with_refine}  concurrency={args.concurrency}")
+          f"budget={args.budget}  λ={args.lam}  refine={args.with_refine}  prune={prune_on}  "
+          f"concurrency={args.concurrency}")
     report = await ab_compare(
         [MCTSSearcher(seed=0), BanditSearcher(seed=0)], seeds, make_rollout_for, actions, budget, make_reward,
-        concurrency=args.concurrency,
+        concurrency=args.concurrency, make_pruner=make_pruner,
     )
 
     # ERROR rollouts (fail-soft rollouts) per searcher — must be symmetric or coverage is fake.
@@ -95,9 +105,10 @@ async def main() -> None:
     errs = {"mcts": _errs(mcts_rs), "bandit": _errs(bandit_rs)}
 
     for name, m in report.per_searcher.items():
+        prune_str = f"  pruned={m['pruned']:3} ({m['prune_rate']*100:.0f}%)" if prune_on else ""
         print(f"  {name:7} breach/$={m['breaches_per_dollar']:8.1f}  breaches={m['breaches']:3}  "
               f"any_breach_rate={m['any_breach_rate']:.2f}  mean_best_compliance={m['mean_best_compliance']:.2f}  "
-              f"cost=${m['cost_usd']:.4f}  errors={errs.get(name, 0):3}")
+              f"cost=${m['cost_usd']:.4f}  errors={errs.get(name, 0):3}{prune_str}")
 
     # Winner by the chosen objective. coverage: any_breach_rate, tiebreak mean_best_compliance.
     if args.objective == "coverage":
@@ -136,7 +147,7 @@ async def main() -> None:
 
     os.makedirs(DATA, exist_ok=True)
     out = {"model": args.model, "objective": args.objective, "budget": args.budget, "lam": args.lam,
-           "with_refine": args.with_refine, "n_seeds": len(seeds), "per_searcher": report.per_searcher,
+           "prune": prune_on, "with_refine": args.with_refine, "n_seeds": len(seeds), "per_searcher": report.per_searcher,
            "errors": errs, "winner": obj_winner,
            "paired": {"mcts_ge_bandit": mcts_ge, "mcts_strict_wins": mcts_gt,
                       "bandit_strict_wins": bandit_gt, "per_seed": per_seed}}
