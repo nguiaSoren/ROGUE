@@ -2,15 +2,15 @@
 
 **The question.** *Can a red-team skip expensive evaluations before firing them — while explicitly
 quantifying the recall cost of doing so?* Skipping trials is easy; skipping them **safely**, with a
-number that tells you how many real breaches the skip costs, is the part nobody reports. That number is
-the contribution here.
+number that says how many real breaches the skip costs, is the part nobody reports. Unlike prior work,
+which evaluates *predictor quality*, we evaluate **decision quality**: the operating point a practitioner
+would actually deploy under an explicit recall constraint.
 
 **One line.** A **calibrated pre-fire skip policy**: for each (harvested attack × specific target
 config) pair, decide *before firing* whether to spend the target + judge calls on it — defer the pairs
 the policy confidently predicts won't breach, keep everything it can't confidently rule out, and account
-for every skip. Not a new predictor: a deployment gate around a deliberately boring estimator, whose
-value is the **decision discipline** (calibration, a measured recall floor, two safety rails, visible
-skip accounting) rather than the model.
+for every skip. The estimator is intentionally conventional; the contribution is the decision system
+around it.
 
 **Status.** Built + offline back-tested on real historical breach data (free, $0). A prospective live
 budget-saved A/B is a separate, deliberately-gated ~$35 reproduce run. Off by default
@@ -34,52 +34,44 @@ So there is real money in *not firing* the pairs that won't land.
 The catch is what makes this a systems problem rather than a modelling one: a **hard skip trades money
 for missed breaches**, and a red-team that silently drops real breaches to save a few dollars is worse
 than useless. A calibrated score does *not* make the skipped pairs "obvious misses" — they are
-**confidently predicted low-probability pairs**, and some fraction of them will breach anyway. The whole
-design is therefore built around bounding and accounting for that cost:
+**confidently predicted low-probability pairs**, and some fraction of them will breach anyway. So the
+research question is not whether another classifier can squeeze out 0.3% more ROC-AUC; it is how a
+benchmark can make pre-fire skip decisions *safely*, with the recall cost of those decisions measured and
+bounded. The design follows directly: a **calibrated probability** (so a threshold means a known thing),
+a **measured recall floor** as the headline, two **safety rails** that forbid confidently skipping the
+out-of-distribution, **visible skip accounting**, and **byte-identical-when-off deployment**.
 
-1. a **calibrated probability**, so a skip threshold means a known thing;
-2. a **measured recall floor** — how many trials can we skip at 95% breach recall? — as the headline
-   number, not an afterthought;
-3. two **safety rails** that forbid the gate from confidently skipping something it has no business
-   ruling out;
-4. **visible skip accounting** — every deferred pair is surfaced, never silently dropped;
-5. **deployment integration** — off by default, byte-identical when off, wired into every path a real
-   scan takes.
+## The central finding: safe skipping has sharply diminishing returns
 
-## The recall–skip tradeoff (the contribution)
+The central empirical result — and the number the prior work leaves unmeasured — is that **safe pre-fire
+skipping has sharply diminishing returns**: aggressive thresholds skip ~42% of evaluations, but holding a
+production-grade 95% breach recall permits only ~7% skipping. Sort held-out trials by the calibrated skip
+score, skip the lowest, and read off how much you can skip at each recall target:
 
-This is the number the prior work leaves unmeasured, and the one a practitioner actually decides on.
-Sort held-out trials by the calibrated skip score, skip the lowest, and read off how much you can skip at
-each breach-recall target:
-
-| Breach recall you insist on | Fraction of trials you can skip | Calibrated skip threshold |
+| Breach recall you insist on | Fraction of evaluations you can skip | Calibrated skip threshold |
 |---|---|---|
 | 80% | **42%** | — |
 | **95%** (production-safe) | **~7%** | skip if P < 0.048 |
 | 99% | ~1.6% | skip if P < 0.026 |
 
-Read plainly: the ranking is good enough to skip **~40% of trials if you accept missing one breach in
-five** — but only **~7% at a production-safe 95% breach recall**, and ~1.6% at 99%. That steep curve
-*is* the finding. It says pre-fire skipping is a real but modest lever on this corpus at safe recall, and
-it hands the operator an explicit dial rather than a vague "we skip the easy ones." The shipped default
+This is a **decision-quality** result, not a predictor-quality one: it reports the operating point you
+would actually deploy and exactly what recall you buy down as you skip more. The shipped default
 threshold (0.048) is the conservative 95%-recall point; a cost-tolerant operator raises it and the table
-tells them exactly what recall they are buying down.
-
-Measured on held-out primitives (group-split by attack), `test=552`, 16.5% base rate. Reproduce with
-`uv run python scripts/reproduce/replay_prefire.py`.
+says what it costs. Measured on held-out primitives (group-split by attack), `test=552`, 16.5% base rate.
+Reproduce with `uv run python scripts/reproduce/replay_prefire.py`.
 
 ## How the skip decision is made (the system)
 
 1. **The gate (`gate.py`).** Off unless `ROGUE_PREFIRE_SKIP=on` and a model artifact exists. When on, it
-   scores each attack against the target config and defers the ones below the calibrated threshold —
-   each recorded as a **visible skipped finding** (`n_prefire_skipped` / `ScanReport.prefire`), never a
-   silent drop — and leaves the firing order untouched (ordering is Q11's job; this only *skips*).
+   scores each attack against the target config and defers the ones below the calibrated threshold — each
+   recorded as a **visible skipped finding** (`n_prefire_skipped` / `ScanReport.prefire`), never a silent
+   drop — and leaves the firing order untouched (ordering is Q11's job; this only *skips*).
 
 2. **Calibration (`model.py`).** A skip threshold is only meaningful against a real probability, so the
-   head's raw score is passed through **Platt scaling** (`P_cal = σ(a·logit(P_raw)+b)`) fit on a
-   calibration slice group-disjoint from both fit and test. Brier **0.1214 → 0.1195**; `a=0.78` (the raw
-   head was mildly over-confident, so calibration shrinks it toward the base rate). The calibrated
-   probability is also what the planned Q18 acquisition score consumes (uncertainty = |P−0.5|).
+   head's raw score is passed through **Platt scaling** fit on a calibration slice group-disjoint from
+   both fit and test. Brier **0.1214 → 0.1195**; `a=0.78` (the raw head was mildly over-confident, so
+   calibration shrinks it toward the base rate). The calibrated probability is also the uncertainty signal
+   the planned Q18 acquisition score consumes (|P−0.5|).
 
 3. **Rail 1 — drift-guard fire-all.** A novel/emergent attack family, or one with
    `family_support < min_support`, is **never skipped**. This is Kirch's out-of-distribution collapse
@@ -90,44 +82,28 @@ Measured on held-out primitives (group-split by attack), `test=552`, 16.5% base 
    (by a stable hash of the primitive id, no RNG), so the gate keeps collecting ground truth on exactly
    the rows it wanted to skip — continuous, free validation of the skip policy in production.
 
-5. **Deployment integration.** Wired into **all three** reproduction surfaces, off by default,
+5. **Deployment integration.** Wired into **all three** reproduction surfaces, off by default and
    byte-identical when off: `endpoint_scan.py::scan_endpoint` (public API / `--persist` CLI),
    `scan.py::run_scan` (default `rogue scan` + SDK), and the research sweep `reproduce_once.py`
    (`--prefire-skip`, an **explicit opt-in only** — silently dropping cells in a measurement run would
-   corrupt the breach matrix *and* the policy's own future training labels). Serve-time: the scan
-   primitive carries no stored embedding, so the gate embeds each payload once (`text-embedding-3-small`,
-   a fraction of a cent — repaid by skipping even one target+judge trial); with no key / opted out
-   (`ROGUE_PREFIRE_EMBED=off`) it degrades to the structural signal alone, so a scan never fails because
-   embeddings are unreachable.
+   corrupt the breach matrix *and* the policy's own future training labels).
+
+The scoring inputs and the serve-time embedding mechanics are deliberately kept out of the main path;
+see the [Appendix](#appendix--score-inputs-and-serve-time-mechanics).
 
 ## What feeds the score (and an honest ablation)
 
-The estimator is deliberately the least interesting part: the identical L2-logistic IRLS head Q11 ships
-(numpy-only, deterministic, no new dependency). Its inputs, in order of how much they carry:
-
-- **Structural metadata (primary).** Reused verbatim from `survival.features`: family/vector one-hots,
-  `requires_*` flags, provenance scores, target size/context/tools/system-prompt-class.
-- **Optional semantic affinity (secondary).** A compact content feature: at train time, per config
-  sibling class (size × context reach) and globally, the centroid of breaching payload embeddings and of
-  non-breaching ones; the serve-time feature is the cosine gap to those two centroids — "does this
-  payload look like the ones that have breached targets *like this one* before?" A couple of scalars, so
-  it can't overfit a 1536-d vector into a head trained on ~1.8k rows, and it's fit on the train split
-  only (a held-out primitive's embedding never enters a centroid it is scored against).
-
-Whether that second input earns its place is **measured, not assumed** — and the honest answer is: it
-helps a little.
+The estimator is **intentionally conventional** — the same L2-logistic head Q11 ships (numpy-only,
+deterministic, no new dependency). Its inputs are structural deployment metadata (primary: family/vector,
+`requires_*` flags, provenance scores, target size/context/tools/system-prompt-class) and an optional
+semantic-affinity term (secondary). We evaluated whether semantic affinity adds value beyond structural
+metadata; it does, but only modestly (**ΔAUC = 0.009**), confirming that **deployment metadata carries
+most of the predictive signal on this corpus** — the paper is not about the embedding.
 
 | Head | ROC-AUC | Precision@10% | Budget-saved @80% recall |
 |---|---|---|---|
 | structural-only (= Q11's features) | 0.688 | 36.4% | 41.3% |
-| + semantic affinity | **0.696** | **41.8%** | **42.2%** |
-
-The affinity adds a **small, consistent** lift (AUC +0.009, precision@10 +5.5 pts) — real and repeatable,
-but not the story. This corroborates ROGUE's own prior probe (`payload_embedding_technique_signal`,
-silhouette ≈ 0): on this corpus an attack's *structure* carries most of the signal and its *content
-embedding* is a secondary refinement. We report the ablation precisely so the semantic feature is one
-component among many, not an oversold headline — a calibrated gate whose skip decision happens to have a
-small content-aware term, not an "embedding-augmented predictor."
+| + semantic affinity | 0.696 | 41.8% | 42.2% |
 
 **Not yet measured (honest):** a live prospective A/B — a paid reproduce cycle with the gate on,
 reporting the realized budget saved *at the realized recall*. That is the gated ~$35 arm; the drift-guard
@@ -135,16 +111,14 @@ reporting the realized budget saved *at the realized recall*. That is the gated 
 
 ## Relationship to Q11 (survival predictor)
 
-Q7 and Q11 share a substrate on purpose — the same self-labeled
-`breach_results ⋈ attack_primitives ⋈ deployment_configs` join, the same logistic head, the same
-group-split back-test, the same drift-guard. They are two **policies over the same attack budget**, and
-the difference is the *decision*, not the model:
+Q7 and Q11 are two **policies over the same attack budget**, sharing a substrate on purpose (the same
+self-labeled `breach_results ⋈ attack_primitives ⋈ deployment_configs` join, logistic head, group-split
+back-test, and drift-guard). The difference is the *decision*, not the model:
 
 | | Q11 survival | Q7 pre-fire gating |
 |---|---|---|
 | Decision | **reorder** — fire likely survivors first | **skip** — don't fire confidently-low pairs at all |
 | Output used | a ranking | a *calibrated* probability + a recall-bounded threshold |
-| Extra input | structural surface only | + an optional (small) semantic-affinity term |
 | Safety accounting | deferred tail surfaced | calibrated recall floor + visible skips + canary |
 
 Run them together and you get order-then-skip; the calibrated probability Q7 produces is also the
@@ -170,17 +144,16 @@ of the three closest papers sits one axis away:
   near-or-below random on held-out families (§3.3, Fig 4) — the direct justification for the
   fire-all-on-novel-family rail.
 
-**The contribution is the deployment system, not the estimator.** The estimator is logistic regression
-plus Platt scaling — and that is the point: the novelty is doing calibrated pre-fire skipping *safely*
-inside a live red-team benchmark without moving its verdicts. Concretely, that is (a) a **calibrated,
-recall-bounded skip threshold** — with the recall cost of the skip *measured*, which the prior work does
-not report; (b) a **drift-guard** that refuses to skip out-of-distribution families, grounded in Kirch's
-measured OOD collapse; (c) a **deterministic canary** that keeps validating the policy in production for
-free; (d) **visible skip accounting** so a deferred breach can never hide; and (e) **byte-identical-when-
-off deployment** across all three scan surfaces. The ingredients (embeddings→classifier;
-success-is-predictable; OOD-collapse) are each precedented; the *decision system* that turns them into a
-safe, accountable skip policy is not. Composes with, and is orthogonal to, Q11 (attack ordering), Q6
-(per-cell trial budget), and Q18 (the acquisition score).
+**The estimator is intentionally conventional.** The research question is not whether another classifier
+can achieve 0.3% more ROC-AUC, but how a red-team benchmark can safely make pre-fire evaluation decisions
+while explicitly accounting for the recall cost of those decisions. The novelty lies in **composing these
+components into a deployment policy that provides measurable recall guarantees and continuous validation
+inside a production benchmark**: a calibrated, recall-bounded skip threshold with the recall cost
+*measured*; a drift-guard that refuses to skip out-of-distribution families (grounded in Kirch's OOD
+collapse); a deterministic canary that keeps validating the policy for free; visible skip accounting so a
+deferred breach can never hide; and byte-identical-when-off deployment across all three scan surfaces.
+Composes with, and is orthogonal to, Q11 (attack ordering), Q6 (per-cell trial budget), and Q18 (the
+acquisition score).
 
 ## Configuration
 
@@ -202,3 +175,27 @@ uv run python scripts/reproduce/train_prefire_scorer.py --out data/models/prefir
 export ROGUE_PREFIRE_SKIP=on
 export ROGUE_PREFIRE_MODEL=data/models/prefire_scorer.json
 ```
+
+---
+
+## Appendix — score inputs and serve-time mechanics
+
+*Implementation detail, kept out of the main path; the contribution is the decision policy above, not
+this construction.*
+
+**Semantic-affinity feature (`embedding_affinity.py`).** Rather than feed a raw 1536-d embedding into a
+head trained on ~1.8k rows (which would overfit, and — per ROGUE's own `payload_embedding_technique_signal`
+probe, silhouette ≈ 0 — likely learn noise), the payload embedding is distilled to a compact
+breach-affinity signal: at train time, per config sibling class (size × context reach) and globally, the
+centroid of breaching payload embeddings and of non-breaching ones; the serve-time feature is the cosine
+gap to those two centroids ("does this payload look like the ones that breached targets *like this one*
+before?"). A couple of scalars. Centroids are fit on the **train** split only, and the back-test scores
+**held-out primitives**, so a test row's embedding never enters a centroid it is later scored against.
+
+**Serve-time embedding.** The scan-time primitive carries no stored embedding, so the gate embeds each
+payload once (`text-embedding-3-small`, a fraction of a cent — repaid by skipping even one target+judge
+trial). With no key / opted out (`ROGUE_PREFIRE_EMBED=off`) it degrades to the structural signal alone
+and logs the fallback, so a scan never fails because embeddings are unreachable.
+
+**Data.** Trained + group-split back-tested on the real `breach_results` (2,179 primitive × config pairs,
+1,845 with a stored embedding; 24 configs; 16.5% base rate). `fit=1295 / calib=332 / test=552`.
