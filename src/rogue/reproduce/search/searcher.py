@@ -88,6 +88,7 @@ class SearchResult:
     breached: bool
     action_use: dict = field(default_factory=dict)  # action.name -> times applied
     trace: list = field(default_factory=list)
+    n_pruned: int = 0  # candidates skipped pre-fire as near-duplicates (Feature 5; 0 when pruning off)
 
     @property
     def breaches_per_dollar(self) -> float:
@@ -103,6 +104,7 @@ class Searcher(Protocol):
     async def search(
         self, seed_prompt: str, rollout: RolloutFn, actions: list[Action], budget: Budget,
         reward_fn: Optional[RewardFn] = None, goal_check: Optional[Callable[[str], bool]] = None,
+        pruner: "Optional[object]" = None,
     ) -> SearchResult: ...
 
 

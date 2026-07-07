@@ -14,6 +14,7 @@ from .goal_preservation import make_goal_check
 from .harden import HardenCheckResult, harden_check
 from .live import make_refine_action, make_rollout
 from .mcts import MCTSSearcher
+from .pruning import PromptPruner, resolve_pruner
 from .searcher import Budget, Searcher, SearchResult
 
 
@@ -21,7 +22,7 @@ async def search_escalate(
     primitive, config, panel, judge, *,
     searcher: Optional[Searcher] = None, budget: Optional[Budget] = None,
     refine_attacker=None, embed_fn=None, lam: float = 0.0, seed_prompt: Optional[str] = None,
-    enforce_goal: bool = False, goal_judge_fn=None,
+    enforce_goal: bool = False, goal_judge_fn=None, pruner: Optional[PromptPruner] = None,
 ) -> SearchResult:
     """Opt-in escalation: run the search on a (typically refused) primitive against a LIVE config to
     find a breaking mutation. The alternative to the current escalation — a caller enables it behind a
@@ -29,7 +30,11 @@ async def search_escalate(
     LLM-refine action; ``embed_fn``+``lam`` add the coverage/novelty reward. ``enforce_goal`` (AdvCodeGen-
     inspired) gates mutations through the goal-preservation validator so a neutered variant never
     reaches the target (its refusal would be a false negative); ``goal_judge_fn`` supplies the
-    authoritative LLM check, else it falls back to structural + embedding/lexical signals."""
+    authoritative LLM check, else it falls back to structural + embedding/lexical signals.
+
+    Pre-fire pruning (Feature 5, env ``ROGUE_SEARCH_PRUNE``, off by default): when ``pruner`` is not
+    supplied it is resolved from the env — enabled + an ``embed_fn`` present ⇒ a fresh per-search
+    ``PromptPruner`` that skips near-duplicate rollouts; disabled ⇒ ``None`` ⇒ byte-identical."""
     searcher = searcher or MCTSSearcher()
     budget = budget or Budget(max_rollouts=30)
     rollout = make_rollout(panel, judge, config, primitive)
@@ -40,22 +45,30 @@ async def search_escalate(
     goal_check = make_goal_check(
         primitive.payload_template, primitive.short_description, embed_fn=embed_fn, judge_fn=goal_judge_fn,
     ) if enforce_goal else None
+    pruner = resolve_pruner(embed_fn, override=pruner)
     return await searcher.search(
         seed_prompt or primitive.payload_template, rollout, actions, budget, reward_fn, goal_check,
+        pruner=pruner,
     )
 
 
 async def harden_from_remediation(
     breaching_payload: str, patched_config, panel, judge, primitive, *,
     searcher: Optional[Searcher] = None, budget: Optional[Budget] = None,
+    embed_fn=None, pruner: Optional[PromptPruner] = None,
 ) -> HardenCheckResult:
     """Feature 4 (opt-in, report-only): pressure-test a fix by searching the PATCHED config for a
     bypass, seeded with the attack that breached. A caller in the remediation path invokes it after a
-    fix mutates the config; a ``fragile`` result flags a fix that blocks the pattern, not the technique."""
+    fix mutates the config; a ``fragile`` result flags a fix that blocks the pattern, not the technique.
+    Pre-fire pruning (Feature 5) is resolved from the env when an ``embed_fn`` is available (off by
+    default); ``pruner`` overrides for tests."""
     searcher = searcher or MCTSSearcher()
     budget = budget or Budget(max_rollouts=20)
     patched_rollout = make_rollout(panel, judge, patched_config, primitive)
-    return await harden_check(breaching_payload, patched_rollout, searcher, cheap_mutation_actions(), budget)
+    pruner = resolve_pruner(embed_fn, override=pruner)
+    return await harden_check(
+        breaching_payload, patched_rollout, searcher, cheap_mutation_actions(), budget, pruner=pruner,
+    )
 
 
 __all__ = ["search_escalate", "harden_from_remediation"]

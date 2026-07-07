@@ -14,6 +14,7 @@ from .goal_preservation import GoalPreservationResult, check_goal_preserved, mak
 from .harden import HardenCheckResult, harden_check
 from .mcts import MCTSSearcher
 from .live import make_embed_fn, make_refine_action, make_rollout, make_seed_primitive
+from .pruning import PromptPruner, resolve_pruner
 from .run import harden_from_remediation, search_escalate
 from .searcher import Action, Budget, RolloutOutcome, SearchResult, default_reward
 
@@ -23,6 +24,7 @@ __all__ = [
     "MCTSSearcher", "BanditSearcher",
     "cheap_mutation_actions", "framing_mutation_actions", "refine_action", "default_actions",
     "NoveltyReward",
+    "PromptPruner", "resolve_pruner",
     "ab_compare", "ABReport",
     "harden_check", "HardenCheckResult",
     "check_goal_preserved", "make_goal_check", "GoalPreservationResult",

@@ -42,12 +42,13 @@ class HardenCheckResult:
 
 async def harden_check(
     seed_attack: str, patched_rollout: RolloutFn, searcher: Searcher,
-    actions: list[Action], budget: Budget, reward_fn: Optional[RewardFn] = None,
+    actions: list[Action], budget: Budget, reward_fn: Optional[RewardFn] = None, pruner=None,
 ) -> HardenCheckResult:
     """Run ``searcher`` against the patched config (``patched_rollout``), seeded with the attack that
     breached. ``fragile`` iff a mutation breaches the patch within budget. Pure measurement — no fix
-    regeneration, no side effects (report-only, per ADR-0010)."""
-    res = await searcher.search(seed_attack, patched_rollout, actions, budget, reward_fn)
+    regeneration, no side effects (report-only, per ADR-0010). ``pruner`` (Feature 5, opt-in) skips
+    near-duplicate rollouts; ``None`` ⇒ byte-identical."""
+    res = await searcher.search(seed_attack, patched_rollout, actions, budget, reward_fn, pruner=pruner)
     return HardenCheckResult(
         fragile=res.breached,
         best_compliance_vs_patch=res.best_compliance,

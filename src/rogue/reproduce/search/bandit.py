@@ -24,12 +24,15 @@ class BanditSearcher:
     async def search(
         self, seed_prompt: str, rollout: RolloutFn, actions: list[Action], budget: Budget,
         reward_fn: Optional[RewardFn] = None, goal_check: Optional[Callable[[str], bool]] = None,
+        pruner=None,
     ) -> SearchResult:
         reward = reward_fn or default_reward  # hill-climb on reward (Feature 3 adds novelty)
         # Beta(α,β) per action; an action is rewarded if it improved the reward or produced a breach.
         alpha = {a.name: 1.0 for a in actions}
         beta = {a.name: 1.0 for a in actions}
 
+        if pruner is not None:
+            pruner.admit(seed_prompt)  # the seed always fires; record it so children dedup against it
         out = await rollout(seed_prompt)
         n_rollouts, cost = 1, out.cost_usd
         best_reward_prompt, best_reward = seed_prompt, reward(out)  # hill-climb anchor
@@ -52,12 +55,24 @@ class BanditSearcher:
                 beta[action.name] += 1.0
                 trace.append({"action": action.name, "kind": action.kind, "skipped": "goal_violation"})
                 continue
+            # Pre-fire prune (Feature 5, opt-in): a near-duplicate of a prompt already fired this
+            # search never reaches the target — skip the paid rollout, charge only the mutation cost,
+            # and penalise the action's arm (it produced a redundant child), mirroring the goal gate.
+            if pruner is not None and not pruner.admit(child_prompt):
+                cost += act_cost
+                beta[action.name] += 1.0
+                trace.append({"action": action.name, "kind": action.kind, "skipped": "prefire_prune"})
+                continue
             out = await rollout(child_prompt)
             n_rollouts += 1
             cost += out.cost_usd + act_cost
             action_use[action.name] = action_use.get(action.name, 0) + 1
 
-            r, comp = reward(out), out.compliance or 0.0
+            # EvoJail soft reward F(p)=S(p)+λ·D(p|P): λ·prompt-novelty added to the hill-climb value
+            # (last_novelty is child_prompt's D(p|P)). λ=0 (default) leaves the hill-climb untouched.
+            base_r = reward(out)
+            r = base_r + pruner.lam * pruner.last_novelty if (pruner is not None and pruner.lam > 0.0) else base_r
+            comp = out.compliance or 0.0
             improved = r > best_reward
             if improved or out.breached:
                 alpha[action.name] += 1.0
@@ -76,6 +91,7 @@ class BanditSearcher:
             searcher=self.name, best_prompt=best_prompt, best_compliance=best_comp,
             n_rollouts=n_rollouts, total_cost_usd=cost, n_breaches=n_breaches,
             breached=n_breaches > 0, action_use=action_use, trace=trace,
+            n_pruned=pruner.n_pruned if pruner is not None else 0,
         )
 
 

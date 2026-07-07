@@ -57,9 +57,12 @@ class MCTSSearcher:
     async def search(
         self, seed_prompt: str, rollout: RolloutFn, actions: list[Action], budget: Budget,
         reward_fn: Optional[RewardFn] = None, goal_check: Optional[Callable[[str], bool]] = None,
+        pruner=None,
     ) -> SearchResult:
         reward = reward_fn or default_reward  # value the tree climbs (Feature 3 adds novelty)
         root = _Node(prompt=seed_prompt, untried=list(actions))
+        if pruner is not None:
+            pruner.admit(seed_prompt)  # the seed always fires; record it so children dedup against it
         out = await rollout(seed_prompt)
         root.outcome = out
         self._backprop(root, reward(out))
@@ -85,6 +88,13 @@ class MCTSSearcher:
                 cost += act_cost
                 trace.append({"action": action.name, "kind": action.kind, "skipped": "goal_violation"})
                 continue
+            # Pre-fire prune (Feature 5, opt-in): a near-duplicate of a prompt already fired this
+            # search never reaches the target — skip the paid rollout, charge only the mutation cost,
+            # and don't graft the dead child into the tree (mirrors the goal gate above).
+            if pruner is not None and not pruner.admit(child_prompt):
+                cost += act_cost
+                trace.append({"action": action.name, "kind": action.kind, "skipped": "prefire_prune"})
+                continue
             out = await rollout(child_prompt)
             n_rollouts += 1
             cost += out.cost_usd + act_cost
@@ -92,7 +102,12 @@ class MCTSSearcher:
 
             child = _Node(prompt=child_prompt, parent=node, outcome=out, untried=list(actions))
             node.children.append(child)
-            self._backprop(child, reward(out))  # dynamics use reward; best_compliance stays pure
+            # EvoJail soft reward F(p)=S(p)+λ·D(p|P): add λ·prompt-novelty to the value the tree
+            # climbs (last_novelty is child_prompt's D(p|P)). λ=0 (default) leaves dynamics untouched.
+            rv = reward(out)
+            if pruner is not None and pruner.lam > 0.0:
+                rv += pruner.lam * pruner.last_novelty
+            self._backprop(child, rv)  # dynamics use reward; best_compliance stays pure
 
             if out.breached:
                 n_breaches += 1
@@ -106,6 +121,7 @@ class MCTSSearcher:
             searcher=self.name, best_prompt=best_prompt, best_compliance=best_comp,
             n_rollouts=n_rollouts, total_cost_usd=cost, n_breaches=n_breaches,
             breached=n_breaches > 0, action_use=action_use, trace=trace,
+            n_pruned=pruner.n_pruned if pruner is not None else 0,
         )
 
 
