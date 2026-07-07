@@ -589,6 +589,7 @@ async def run_reproduction(
     domain_jargon: bool = False,
     domain_jargon_max_pairs: int = 8,
     survival_skip: bool = False,
+    prefire_skip: bool = False,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -873,6 +874,24 @@ async def run_reproduction(
                     "(--survival-skip); %d will be fired",
                     len(_deferred_pairs), len(_pairs), len(_ordered_pairs),
                 )
+
+            # Q7 PRE-FIRE SKIP (opt-in, env-gated) — additionally drop the (primitive × config) pairs
+            # whose calibrated P(breach) is below the threshold, before spending target+judge calls.
+            # EXPLICIT opt-in only (--prefire-skip): dropping cells in the research sweep would corrupt
+            # the breach matrix AND the predictor's own future training labels, so it is never the
+            # default. Off (or ROGUE_PREFIRE_SKIP unset / no model) → the pair set is byte-identical.
+            # The gate's drift-guard force-fires novel/low-support families + a deterministic canary.
+            if prefire_skip:
+                from rogue.reproduce.prefire.gate import apply_prefire_skip_pairs  # noqa: PLC0415
+
+                _pf_fired, _pf_skipped, _pf_on = apply_prefire_skip_pairs(_ordered_pairs)
+                if _pf_on and _pf_skipped:
+                    logger.info(
+                        "pre-fire: skipped %d/%d (primitive × config) pairs (predicted non-breach, "
+                        "--prefire-skip); %d will be fired",
+                        len(_pf_skipped), len(_ordered_pairs), len(_pf_fired),
+                    )
+                    _ordered_pairs = _pf_fired
             coros = [_bounded(p, c) for p, c in _ordered_pairs]
 
             primitive_by_id = {p.primitive_id: p for p in primitives}
@@ -1558,6 +1577,16 @@ def main(argv: list[str] | None = None) -> int:
             "complete. Use only for a deliberate Arm-13 budget-saved A/B, not a normal measurement run."
         ),
     )
+    parser.add_argument(
+        "--prefire-skip",
+        action="store_true",
+        help=(
+            "Q7: with ROGUE_PREFIRE_SKIP=on, DROP the (primitive × config) pairs whose calibrated "
+            "P(breach) is below the threshold before spending target+judge calls. Off by default — "
+            "dropping cells corrupts the matrix + the predictor's own training labels. Use only for a "
+            "deliberate budget-saved A/B, not a normal measurement run."
+        ),
+    )
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
     if args.no_iterative:
@@ -1626,6 +1655,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             domain_jargon=getattr(args, "domain_jargon", False),
             survival_skip=getattr(args, "survival_skip", False),
+            prefire_skip=getattr(args, "prefire_skip", False),
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

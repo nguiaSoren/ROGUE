@@ -70,6 +70,9 @@ class EndpointScanReport:
     # budget cap, and how it ranked. 0 when the gate is off or no cap was set — today's default.
     n_deferred: int = 0
     survival_note: str | None = None
+    # Q7 pre-fire gate: how many attacks were skipped (predicted non-breach) before firing. 0 when the
+    # gate is off — today's default. The skipped attacks are still present as skipped findings.
+    n_prefire_skipped: int = 0
 
     @property
     def breach_rate(self) -> float:
@@ -87,6 +90,8 @@ class EndpointScanReport:
         )
         if self.n_deferred:
             tail += f" {self.n_deferred} deferred by survival gate (predicted non-transfer)."
+        if self.n_prefire_skipped:
+            tail += f" {self.n_prefire_skipped} skipped pre-fire (predicted non-breach)."
         return (
             f"Scanned {self.base_url} (model {self.model!r}): "
             f"{self.n_breached}/{self.n_primitives} attack primitives breached "
@@ -186,6 +191,8 @@ async def scan_endpoint(
     # --- opt-in Q11 survival ordering (purely additive; default off preserves today's fire order) ---
     survival_gate: object | None = None,
     survival_max_primitives: int | None = None,
+    # --- opt-in Q7 pre-fire skip (purely additive; default off → every primitive is fired) ---
+    prefire_gate: object | None = None,
     # --- opt-in agent-exec (tool-use / indirect-injection) — auto-on when declared_tools≠[] ---
     declared_tools: list[str] | None = None,
     forbidden_tools: list[str] | None = None,
@@ -296,6 +303,35 @@ async def scan_endpoint(
         survival_note = survival_plan.summary()
         _log.info("%s", survival_note)
 
+    # Q7 PRE-FIRE SKIP GATE (opt-in, env-gated) — score each surviving attack against THIS config and
+    # skip the ones whose calibrated P(breach) is below the threshold, before any target/judge call is
+    # spent. Off unless ROGUE_PREFIRE_SKIP=on and a model artifact exists → every primitive is fired,
+    # byte-identical. The gate's drift-guard fires-all novel/low-support families and a deterministic
+    # canary force-fires a fixed fraction of skips (continuous validation). Skips are recorded as
+    # visible skipped findings below — never a silent drop. Runs after survival so it only ever skips
+    # from the survivors survival already ordered.
+    from rogue.reproduce.prefire.gate import apply_prefire_skip  # noqa: PLC0415
+
+    prefire_plan = apply_prefire_skip(primitives, config, gate=prefire_gate)
+    prefire_skipped_findings: list[EndpointFinding] = []
+    n_prefire_skipped = 0
+    if prefire_plan.enabled:
+        primitives = prefire_plan.fired
+        n_prefire_skipped = len(prefire_plan.skipped)
+        for d in prefire_plan.skipped:
+            prefire_skipped_findings.append(
+                EndpointFinding(
+                    primitive_id=d.primitive.primitive_id,
+                    title=d.primitive.title,
+                    family=d.primitive.family.value,
+                    vector=d.primitive.vector.value,
+                    base_severity=d.primitive.base_severity.value,
+                    n_trials=0, n_breach=0, any_breach_rate=0.0, breached=False,
+                    skipped=f"pre-fire: predicted P(breach)={d.score:.2f} below threshold",
+                )
+            )
+        _log.info("%s", prefire_plan.summary())
+
     # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
     # byte-identical. When on, each primitive's trial loop runs Wald's sequential test bracketing the
     # breach threshold and stops as soon as the outcome is statistically clear (~4–6 trials for the
@@ -309,7 +345,7 @@ async def scan_endpoint(
             _sprt.p0, _sprt.p1, _sprt.alpha, _sprt.beta, _sprt.n_max, _sprt.batch,
         )
 
-    findings: list[EndpointFinding] = []
+    findings: list[EndpointFinding] = list(prefire_skipped_findings)  # pre-fire skips recorded, not dropped
     orm_rows: list = []  # BreachResultORM rows collected when persist=True
     try:
         for primitive in primitives:
@@ -492,6 +528,7 @@ async def scan_endpoint(
         findings=findings,
         n_deferred=n_deferred,
         survival_note=survival_note,
+        n_prefire_skipped=n_prefire_skipped,
     )
 
 

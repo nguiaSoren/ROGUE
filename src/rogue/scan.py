@@ -240,6 +240,7 @@ async def run_scan(
     remediate: bool = False,
     survival_gate: Any = None,
     survival_max_primitives: int | None = None,
+    prefire_gate: Any = None,
     domain_jargon: bool = False,
     domain_jargon_domains: tuple[str, ...] = ("medical", "finance", "legal"),
     domain_jargon_max: int = 4,
@@ -360,6 +361,31 @@ async def run_scan(
         primitives = _survival_plan.selected  # apply_survival_order already logs the plan summary
         n_deferred = len(_survival_plan.deferred)
 
+    # Q7 PRE-FIRE SKIP GATE (opt-in, env-gated) — score each surviving attack against THIS config and
+    # skip the ones whose calibrated P(breach) is below the threshold, before any target/judge call is
+    # spent. Off unless ROGUE_PREFIRE_SKIP=on + a model artifact exists → every primitive fired,
+    # byte-identical. Drift-guard fires-all novel/low-support families; a deterministic canary force-fires
+    # a fixed fraction of skips. Skips become visible skipped Findings below — never a silent drop.
+    from .reproduce.prefire.gate import apply_prefire_skip  # noqa: PLC0415
+
+    _prefire_plan = apply_prefire_skip(primitives, config, gate=prefire_gate)
+    _prefire_skipped_findings: list[Finding] = []
+    n_prefire_skipped = 0
+    if _prefire_plan.enabled:
+        primitives = _prefire_plan.fired
+        n_prefire_skipped = len(_prefire_plan.skipped)
+        for _d in _prefire_plan.skipped:
+            _prefire_skipped_findings.append(
+                Finding(
+                    family=_d.primitive.family.value,
+                    technique=technique_label(_d.primitive.family.value),
+                    vector=_d.primitive.vector.value,
+                    severity=_d.primitive.base_severity.value,
+                    title=f"{_d.primitive.title} — skipped: pre-fire predicted P(breach)={_d.score:.2f}",
+                    success_rate=0.0, n_trials=0, n_breach=0,
+                )
+            )
+
     # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
     # byte-identical. When on, each primitive's trial loop is Wald's sequential test bracketing the
     # breach threshold, stopping once the outcome is statistically clear. This matters most on the
@@ -373,7 +399,7 @@ async def run_scan(
             _sprt.p0, _sprt.p1, _sprt.alpha, _sprt.beta, _sprt.n_max, _sprt.batch,
         )
 
-    findings: list[Finding] = []
+    findings: list[Finding] = list(_prefire_skipped_findings)  # pre-fire skips recorded, not dropped
     total_cost = 0.0
     n_breaches = 0
     n_completed = 0
@@ -701,6 +727,10 @@ async def run_scan(
         survival=(
             {"n_deferred": n_deferred, "note": _survival_plan.summary()}
             if _survival_plan.enabled else None
+        ),
+        prefire=(
+            {"n_skipped": n_prefire_skipped, "note": _prefire_plan.summary()}
+            if _prefire_plan.enabled else None
         ),
     )
 

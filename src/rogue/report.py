@@ -467,6 +467,9 @@ class ScanReport:
     # Q11 survival gate: {n_deferred, note} when the survival ordering ran (ROGUE_SURVIVAL_ORDER=on).
     # None when the gate was off → today's dict is byte-identical. Surfaces the deferred tail (no silent cut).
     survival: dict | None = None
+    # Q7 pre-fire gate: {n_skipped, note} when the pre-fire skip ran (ROGUE_PREFIRE_SKIP=on). None when
+    # off → today's dict is byte-identical. Surfaces the skipped (predicted-non-breach) set (no silent cut).
+    prefire: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -619,6 +622,8 @@ class ScanReport:
             out["reasoning_leak"] = self.reasoning_leak
         if self.survival is not None:
             out["survival"] = self.survival
+        if self.prefire is not None:
+            out["prefire"] = self.prefire
         return out
 
     def to_json(
