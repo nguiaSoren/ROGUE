@@ -158,20 +158,65 @@ dedup there would be wrong. It is out of scope and noted so no one "completes" i
 - **$0 replay over real Neon data** — the two findings above.
 - Full search suite green; `ruff check src/` clean.
 
-## Why it's novel (systems framing)
+## Where it lands: the *search-budget* stage of the adaptive-evaluation framework
 
-The mechanisms are precedented — TAP prunes before firing, EvoJail rewards diversity, ROGUE's own
-`dedupe` clusters near-duplicates at harvest. The contribution is the **integration and the
-measurement**: a *per-search, black-box, near-duplicate* pre-fire gate inside a live continuous
-red-team's escalation loop, with (a) the redundancy it removes **measured on the real searchers**
-(the bandit's ~88% exact-regeneration rate when stuck is a concrete, unreported systems result), (b)
-its breach-coverage risk measured and its confound named, and (c) byte-identical-when-off deployment
-across every search surface. It composes with the sibling budget levers: Q6 (per-cell trial budget),
-Q7/Q11 (which pairs to fire), Q2 (judge economics) — this one cuts the *search-expansion* budget, a
-distinct axis. Folds into the systems paper as a search-budget section.
+This is **not a standalone paper, and the cosine gate is not the contribution.** As an algorithm it is
+deliberately unremarkable — cosine dedup is standard, TAP already prunes before firing, EvoJail already
+rewards prompt diversity — and submitted as "we skip duplicate prompts with cosine ≥ 0.92" it would
+read as incremental. It earns its place as **one control surface of a single budget-aware evaluation
+framework** (the systems paper), where it fills the stage the other controls leave open — the one
+*before* evaluation even begins:
+
+```
+Harvest → Search → Attack-selection → Sampling → Judge         (Q4: measurement validity, sits across all)
+             │           │               │          │
+            Q12         Q11             Q6         Q2
+        redundant    low-value       over-run    expensive
+         prompts      attacks         trials      judging
+```
+
+The other controls form a coherent *execution* pipeline — Q11 "which attacks deserve budget?", Q6 "how
+many trials are enough?", Q2 "which trials need the expensive judge?". Q12/Q10 operates **one layer
+earlier**: "before we spend a target query on a generated candidate at all, are we re-testing the same
+prompt region?" Adding it turns the framework's story from *"we allocate evaluation budget"* into *"we
+allocate budget across the whole red-team lifecycle, from generation to final verdict"* — a cleaner and
+more complete systems claim. It is a **supporting/completing section, not a co-headline**: **Q11 is the
+novelty anchor** (benchmark-level attack selection), and this should never be advertised as "the
+fourth/fifth optimization" — that reads as a bag of tricks. It is the *search-budget* control surface,
+full stop.
+
+## Why it's a contribution — the measurement, not the mechanism
+
+The paper-worthy result here is an **empirical discovery about search dynamics**, which the pruner is
+merely the instrument for: *automated jailbreak search has a previously-unmeasured search-budget failure
+mode — in the hardened-target (stuck) regime, a production searcher spends most of its paid rollouts
+repeatedly rediscovering the same candidate.* The number that makes it a finding, and the fact that it
+is **searcher-dependent**, is the whole story:
+
+| Searcher | Exact-regeneration when stuck | |
+|---|---|---|
+| MCTS | **7%** | tree expansion pops each action once per node |
+| Bandit (prod-default) | **87.9%** | flat hill-climb re-sampling the same arm on the same stuck prompt |
+
+The lesson is not "prompts are redundant" — it is **"the redundancy is in the search *dynamics*, not the
+prompt space,"** which is why the two searchers diverge by an order of magnitude on the *same* action
+set. That is the interesting, unreported observation; the gate is what removes the waste while
+**measuring** the coverage loss it costs (and naming the config-confound that inflates the corpus-level
+lossy figure). A reviewer's first reflex — *"isn't this just deduplication?"* — is answered by what it
+is **not**: it is **per-search state** (the fired set is this search's own history, not a static corpus
+clean), it is **target/config-conditioned** (a near-duplicate of a *different* attack against a
+*different* config genuinely differs — hence per-search, never global), it operates **before a paid
+black-box query** (it changes search *economics*, not a dataset), and it **quantifies the
+breach-recall it trades away** rather than silently filtering. Composes with — and is orthogonal to —
+Q11 (which pairs), Q6 (how many trials), Q2 (judge cost).
 
 ## Status & configuration
 
-Built + offline-validated ($0). Off by default (`ROGUE_SEARCH_PRUNE`), byte-identical when off. The
-live breach-per-dollar lift needs the gated ~$35 A/B (bandit vs bandit+prune via `ab.py`); the flag
-stays off until then. ⚑ possibly publishable as a systems result.
+Built + offline-validated ($0). Off by default (`ROGUE_SEARCH_PRUNE`), byte-identical when off. **The
+$0 replay above is the deliverable** — a real, citable measurement. The prospective live
+breach-per-dollar lift needs a paid A/B (bandit vs bandit+prune via `ab.py`), but that is **contingent,
+not scheduled**: the escalation search subsystem this lives in is itself opt-in and measure-first (the
+bandit stays prod-default until an A/B promotes the tree searcher into the scan path), so a paid prune
+run is only worth it if that promotion A/B ever runs, with pruning folded in at ~$0. Until then the flag
+stays off (flipping it is inert — the guarded path isn't in a customer scan). ⚑ publishable **only as
+the search-budget section of the systems paper** (Paper A), not standalone.
