@@ -11,20 +11,20 @@ breach-recall target — the operating point a practitioner would actually deplo
 config) pair, decide *before firing* whether to spend the target + judge calls on it — defer the pairs
 the policy confidently predicts won't breach, keep everything it can't confidently rule out, and account
 for every skip. The contribution is a **deployment policy for calibrated pre-fire evaluation gating**,
-together with an empirical characterization of the **recall–budget operating frontier**.
+together with its **empirically characterized recall–budget frontier**.
 
 ## The main finding: held to a fixed recall, pre-fire skipping has sharply diminishing returns
 
 The central empirical result — and the number the prior work leaves unmeasured — is that once you hold a
 real breach-recall target, **pre-fire skipping has sharply diminishing returns**: aggressive thresholds
-skip ~42% of evaluations, but holding a production-grade 95% breach recall permits only ~7% skipping.
+skip ~42% of evaluations, but holding a stringent 95% breach recall permits only ~7% skipping.
 Sort held-out trials by the calibrated skip score, skip the lowest, and read off how much you can skip at
 each recall target (16.5% pair-level breach base rate; `test=552`, group-split by attack):
 
 | Breach recall you insist on | Fraction of evaluations you can skip | Calibrated skip threshold |
 |---|---|---|
 | 80% | **42%** | — |
-| **95%** (production-safe) | **~7%** | skip if P < 0.048 |
+| **95%** (conservative operating point) | **~7%** | skip if P < 0.048 |
 | 99% | ~1.6% | skip if P < 0.026 |
 
 This is a **decision-quality** result, not a predictor-quality one: it reports the operating point you
@@ -142,13 +142,14 @@ random on held-out families (§3.3, Fig 4) — the direct justification for the 
 rail.
 
 The research question is not whether another classifier can achieve 0.3% more ROC-AUC, but how a red-team
-benchmark can make pre-fire evaluation decisions under an empirically measured recall target. The novelty
-lies in **composing these established ingredients into a deployment policy that provides an empirically
-characterized recall–budget frontier, continuous validation, and production-safe integration inside a
-live benchmark** — concretely: a calibrated, recall-bounded skip threshold with the recall cost
-*measured*; a drift-guard that refuses to skip out-of-distribution families (grounded in Kirch's OOD
-collapse); a deterministic canary that keeps validating the policy for free; visible skip accounting so a
-deferred breach can never hide; and byte-identical-when-off deployment across all three scan surfaces.
+benchmark can make pre-fire evaluation decisions under an empirically measured recall target. **The
+novelty is not the underlying estimator but the deployment policy: a calibrated, recall-bounded pre-fire
+evaluation gate with explicit recall accounting, continuous online validation, and production-oriented
+integration into a live benchmark.** Concretely: a calibrated, recall-bounded skip threshold with the
+recall cost *measured*; a drift-guard that refuses to skip out-of-distribution families (grounded in
+Kirch's OOD collapse); a deterministic canary that keeps validating the policy for free; visible skip
+accounting so a deferred breach can never hide; and byte-identical-when-off deployment across all three
+scan surfaces.
 Composes with, and is orthogonal to, Q11 (attack ordering), Q6 (per-cell trial budget), and Q18 (the
 acquisition score).
 
