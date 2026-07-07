@@ -2,11 +2,20 @@
 
 **One line.** Every breach rate ROGUE reports off an LLM judge is the judge's *raw* positive
 fraction; when the judge has a non-zero false-positive rate that number is biased *upward* exactly in
-the low-true-rate safety regime. This overlay estimates the judge's TPR̂/FPR̂ from the existing
-human-labelled calibration set and (a) **de-biases** the reported rate with a confidence interval that
-folds in both the test-run and the calibration-set uncertainty, and (b) emits a finite-sample
-**certification** verdict ("true breach rate < α, Type-I ≤ ζ") — so a headline number can finally ship
-off the previously-uncalibrated judges.
+the low-true-rate safety regime. This is a **certification layer** for the benchmark: it estimates the
+judge's TPR̂/FPR̂ from the existing human-labelled calibration set and turns a raw judge count into
+(a) a **de-biased rate** with a confidence interval that folds in both the test-run and the
+calibration-set uncertainty, and (b) a finite-sample **certified security claim** ("true breach rate
+< α, Type-I error ≤ ζ") — so a headline number can finally ship off the previously-uncalibrated judges.
+
+It sits at the end of the evaluation pipeline, converting observations into trustworthy claims:
+
+```
+human calibration set  ─┐
+                        ├─► estimate judge noise (TPR̂/FPR̂)  ─┐
+large judge-labelled ───┘                                    ├─► corrected rate + CI ─► CERTIFIED
+evaluation corpus (D_J) ─────────────────────────────────────┘                          security claim
+```
 
 **Status.** Built + wired into both binary-breach-axis calibration report surfaces, **off by default**
 (`ROGUE_NOISE_CORRECTED_CALIBRATION`). Offline-validated $0 by replaying it over data already paid for
@@ -20,27 +29,40 @@ Code: `src/rogue/reproduce/calibration/noise_corrected.py` · replay validator:
 `scripts/calibration/replay_noise_corrected.py` · tests: `tests/reproduce/test_noise_corrected.py` ·
 env flag: `ROGUE_NOISE_CORRECTED_CALIBRATION` (+ `ROGUE_NOISE_CORRECT_ALPHA`, `ROGUE_NOISE_CORRECT_ZETA`).
 
-**Contribution.** The statistics are Feng's and Lee's (both 2025–26). What's new here is the *systems*
-adaptation: making finite-sample noisy-judge certification run **inside a live red-team benchmark's
-reporting layer, over judge runs already logged, without moving a single stored verdict**. Concretely:
-(1) the correction reads the *same* 2×2 the calibration harness already computes
-(`AxisAgreement` → TPR̂/FPR̂) — no new labelling pipeline; (2) it treats the existing `breach_results`
-table as the large judge-labelled set `D_J`, so the de-bias is estimable **$0 over historical traces**;
-(3) it splices into both report runners as a **purely additive** block — a report written with the flag
-off is byte-identical to today, so every historical calibration artifact stays comparable; and (4) it
-**refuses rather than fabricates** when the judge is not usefully better than random on an axis
-(TPR̂ ≤ FPR̂) or a calibration cell is empty. The recipe is off-the-shelf; the work is wiring a
-validity guarantee into an operating benchmark without disturbing the numbers it already reports.
+**Contribution — a certification layer, not a calibration correction.** The correction *formula* is
+not ours and we do not claim a new statistical method: the point-estimate de-bias is the classical
+Rogan–Gladen inversion (Lee et al., 2025); the finite-sample validity guarantee is Feng et al. (2026).
+Pitched as "we apply Rogan–Gladen to LLM judges," this would be a non-contribution — that already
+exists. The contribution is the **system** that makes a *certified* security claim fall out of a live
+red-team benchmark's existing outputs. Four things, none of which is the closed form:
+
+1. **A statistical validity guarantee wired into a deployed benchmark.** The correction reads the *same*
+   2×2 the calibration harness already computes (`AxisAgreement` → TPR̂/FPR̂) and emits a certification
+   with finite-sample Type-I control — no new labelling pipeline, no bolt-on statistics stack.
+2. **Estimable $0 over historical traces.** It treats the existing `breach_results` table as the large
+   judge-labelled set `D_J`, so the de-bias and its CI are computed over evaluation runs already paid
+   for — the guarantee is retrofittable to every number the benchmark has already produced.
+3. **A heterogeneous-judge pipeline.** One overlay attaches to *all* the narrow judges (redaction / RTBF
+   / user-safety / PII / agent-memory) through one binary-axis report — the certification is a property
+   of the reporting layer, not a per-judge reimplementation.
+4. **Production reporting that doesn't rewrite history.** It splices in as a **purely additive** block —
+   a report written with the flag off is byte-identical to today. The stored verdict ("judge flagged
+   13.5%") and the statistical interpretation ("estimated true rate ≈ 1%") coexist; we correct the
+   *claim*, never the observation.
+
+And it **refuses rather than fabricates** when the judge is not identifiable — `TPR̂ ≤ FPR̂` or an empty
+calibration cell returns "not identifiable," not a confident number from nonsense parameters. That
+distinction — observation vs. certified claim, with an explicit *un*-certifiable case — is exactly what a
+security reviewer wants and what most LLM-judge evaluations omit.
 
 **Why this isn't "just apply the formula."** The reporting layer violates the clean textbook setup in
-load-bearing ways: the calibration set and the judge run are **different populations** (the human labels
-were collected on a curated set; the judge run is the live reproduction corpus), so TPR̂/FPR̂ transfer is
-an explicit, stated assumption the tooling surfaces (`source: large_judge_run` vs `self_calibration_set`)
-rather than hides; the judge's error profile is estimated from **small cells** (here n_M0 = 190
-human-clean items), so the calibration-set variance *dominates* the CI and must be carried, not dropped;
-and the same overlay must attach to **heterogeneous judges** (redaction / RTBF / user-safety / PII /
-agent-memory) that all flow through one binary-axis report. The value is the plumbing that makes the
-guarantee real on live data, not the closed form.
+load-bearing ways, and the honest handling of each *is* the contribution: the calibration set and the
+judge run are **different populations** (see [the headline reviewer risk](#the-headline-reviewer-risk-cross-population-transfer)),
+which the tooling surfaces (`source: large_judge_run` vs `self_calibration_set`) rather than hides; the
+judge's error profile is estimated from **small cells** (here n_M0 = 190 human-clean items), so the
+calibration-set variance *dominates* the CI and must be carried, not dropped; and the same overlay must
+attach to **heterogeneous judges** that all flow through one binary-axis report. The value is the
+plumbing — and the honesty — that makes the guarantee real on live data, not the closed form.
 
 ---
 
@@ -157,20 +179,42 @@ Replaying the overlay over data already paid for, on the harm breach axis:
 | **noise-corrected rate** | **1.0%  [95% CI 0.0%, 6.6%]** |
 | certification (α=0.20, ζ=0.05) | **CERTIFIES** rate < 20% (R̂_J 0.135 < c′_J 0.263) |
 
-The headline: **roughly twelve of every thirteen "breaches" the judge flags across ROGUE's reproduction
-population fall within the judge's own false-positive floor** (FPR̂ = 12.6%). The de-biased true breach
+The headline, stated carefully (the strong phrasing depends on the transfer assumption below):
+**under the estimated judge error profile, the large majority of observed positives are attributable to
+the judge's false-positive floor** (FPR̂ = 12.6%) rather than to real breaches. The de-biased true breach
 rate is ~1%, and the CI's width is set almost entirely by the calibration-set uncertainty (n_M0 = 190) —
 a live demonstration of Feng's "Oracle Gap" (scarcer calibration ⇒ wider interval). This is exactly the
-low-true-rate upward bias Feng/Lee warn about, measured on real data.
+low-true-rate upward bias Feng/Lee warn about, measured on real data — and it is not a minor correction:
+a judge with a 10% FPR reporting an 11% raw rate can make a system with a **1% true breach rate look 10×
+worse**.
 
-## Caveats
+## The headline reviewer risk: cross-population transfer
 
-- **Cross-population transfer is an assumption, not a result.** In the $0 replay, `D_M` is the JBB
-  adversarial-harmful calibration set while `D_J` is ROGUE's own reproduction population. TPR̂/FPR̂
-  estimated on the former are applied to the latter. The replay validates the *pipeline* and the
-  *magnitude* of the correction; a shipped per-judge certification needs a calibration set drawn from
-  the same population as the judge run. The tooling tags `source` so a reader never mistakes the demo
-  for a headline.
+This is the assumption the whole certification rests on, and the first thing a careful reviewer will
+attack: **the correction assumes the judge's error profile (TPR̂/FPR̂) is stable between the calibration
+population and the deployment population.** In the $0 replay it is *not* the same population — `D_M` is
+the JBB adversarial-harmful set, `D_J` is ROGUE's own reproduction corpus — so the estimated FPR̂ = 12.6%
+is transferred across a distribution shift. The replay therefore validates the *pipeline* and the
+*order of magnitude* of the correction, **not** a certified per-judge number. The tooling tags `source`
+(`self_calibration_set` vs `large_judge_run`) precisely so this is never mistaken for a shipped headline.
+
+**The experiment that removes the attack — population-matched calibration.** Draw the calibration set
+from the *same* population as the judge run: take ~100 ROGUE-generated reproduction examples, human-label
+them, and estimate `FPR̂_ROGUE` on that distribution. Two outcomes, both valuable:
+
+- **If `FPR̂_ROGUE ≈ FPR̂_JBB` (≈12.6%)** → the transfer assumption holds empirically, and the per-judge
+  certification ships with its central objection answered.
+- **If they differ materially** → that is *itself a finding*: **LLM-judge reliability is
+  distribution-dependent** — the same judge has a different false-positive floor on adversarial-harmful
+  prompts vs. reproduction traffic — which is a publishable result about judge robustness in its own
+  right (and a caution for every LLM-judge evaluation that calibrates on one distribution and deploys on
+  another).
+
+Either way the population-matched pass converts the headline risk into either a hardened claim or a new
+finding. This is the live experiment below.
+
+## Other caveats
+
 - **This does not touch the harm judge model.** We deliberately do not shrink or replace the main breach
   grader; we de-bias a *reported rate*. The stored verdicts, trials, and costs are unchanged.
 - **α and ζ are policy choices.** `α` is the tolerance you certify against ("we claim rate < α"); `ζ` is
@@ -184,15 +228,49 @@ low-true-rate upward bias Feng/Lee warn about, measured on real data.
 ## The live experiment (the gated arm)
 
 The shipped per-judge headline for each headline-blocked narrow judge needs, per judge: **~100 human
-labels** on a set drawn from the judge's own population (reuse `sample_calibration_set.py`) → TPR̂/FPR̂,
-plus **one judge-only paid pass** over a large unlabelled set from the same population → `R̂_J`, `n_J`.
-Then the overlay emits "corrected leak X% [CI], certifies < α at ζ=0.05" per judge. Cost is dominated by
-the human labelling (free but real effort); the judge pass is one modest paid run per judge, foldable
-into the queued paid session, and tracked as a gated paid arm (one judge-only pass per judge).
+labels drawn from the judge's own population** (the population-matched calibration above; reuse
+`sample_calibration_set.py`) → TPR̂/FPR̂ *on the deployment distribution*, plus **one judge-only paid
+pass** over a large unlabelled set from the same population → `R̂_J`, `n_J`. Then the overlay emits
+"corrected leak X% [CI], certifies < α at ζ=0.05" per judge. Cost is dominated by the human labelling
+(free but real effort); the judge pass is one modest paid run per judge, foldable into the queued paid
+session, and tracked as a gated paid arm. This single arm both **ships the per-judge certification** and
+**settles the cross-population question** — the same ~100 labels that certify also reveal whether the
+judge's error profile is distribution-stable.
+
+## Where this sits — the measurement-validity layer of the evaluation loop
+
+Q4 is not a standalone feature; it is the third of three orthogonal budget/validity controls, and the one
+that makes the other two *trustworthy* rather than merely *efficient*:
+
+| control | question it answers | failure mode it fixes |
+|---|---|---|
+| **survival ranking** (Q11) | *which* attacks to test first | wasting budget on attacks that won't transfer |
+| **SPRT early-stopping** (Q6) | *how many* trials each attack gets | over-sampling obvious outcomes |
+| **noise-corrected certification** (Q4) | *how accurate is the judge* | trusting a raw rate the judge's own noise inflated |
+
+Q11 and Q6 make the evaluation cheaper; **Q4 makes the number it produces defensible.** As one system —
+`harvest → survival-rank → SPRT-stop → judge → noise-corrected certification → trustworthy security
+claim` — the three compose into a complete, budget-aware, statistically-valid evaluation lifecycle. Q4 is
+the piece that turns "efficient red-team benchmark" into "*certifiable* red-team benchmark."
+
+## Venue fit
+
+As a security-measurement contribution (standalone or as the certification module of the combined
+system): **USENIX Security** is the strongest fit — false alarms, certification, and measurement validity
+are core concerns there — with **ACM CCS** and **NDSS** also strong ("reliable automated security
+evaluation of LLM systems"). **IEEE S&P** is possible but would want broader validation (more judges,
+more domains). **NeurIPS/ICML are a weak fit**: the statistics are not the ML novelty, and an ML reviewer
+fixates on "the formula already exists" — exactly the framing this document avoids. Novelty is the
+*integration* (validity guarantee + live benchmark + heterogeneous judges + production reporting), not
+the estimator.
 
 ## Summary
 
-A validity guarantee for LLM-judge rates, wired into ROGUE's reporting layer over judge runs it already
-paid for, off by default and additive so no historical number moves. The $0 replay shows the correction
-is not cosmetic: a raw 13.5% breach rate de-biases to ~1% once the judge's own 12.6% false-positive
-floor is subtracted — the difference between an alarming headline and a true one.
+A **certification layer** for LLM-judge rates — not a new estimator, but the plumbing and the honesty
+that make a *certified* security claim fall out of a live red-team benchmark's existing outputs, over
+judge runs already paid for, off by default and additive so no historical number moves. The $0 replay
+shows the correction is not cosmetic: a raw 13.5% breach rate de-biases to ~1% once the judge's own 12.6%
+false-positive floor is accounted for — the difference between an alarming number and a defensible one.
+The one thing standing between the demonstration and a shipped per-judge certification is a single
+population-matched calibration pass, which doubles as the experiment answering the method's central
+objection.
