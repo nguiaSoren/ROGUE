@@ -241,6 +241,7 @@ async def run_scan(
     survival_gate: Any = None,
     survival_max_primitives: int | None = None,
     prefire_gate: Any = None,
+    m2s_config: Any = None,
     domain_jargon: bool = False,
     domain_jargon_domains: tuple[str, ...] = ("medical", "finance", "legal"),
     domain_jargon_max: int = 4,
@@ -385,6 +386,19 @@ async def run_scan(
                     success_rate=0.0, n_trials=0, n_breach=0,
                 )
             )
+
+    # Q14 M2S CONSOLIDATION (opt-in, env-gated) — fold each multi-turn primitive's turns into ONE
+    # single-turn M2S prompt (Hyphenize/Numberize/Pythonize) so it fires via the single-invoke path at
+    # 1× trial instead of the K sequential victim calls run_conversation spends. Off unless ROGUE_M2S=on →
+    # every render below is byte-identical. Single-turn primitives pass through untouched. Runs after
+    # survival/prefire so it only rewrites the primitives that will actually fire.
+    from .reproduce.m2s.gate import apply_m2s  # noqa: PLC0415
+
+    _m2s_plan = apply_m2s(primitives, config=m2s_config)
+    n_m2s_consolidated = 0
+    if _m2s_plan.enabled:
+        primitives = _m2s_plan.primitives
+        n_m2s_consolidated = _m2s_plan.n_consolidated
 
     # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
     # byte-identical. When on, each primitive's trial loop is Wald's sequential test bracketing the
@@ -731,6 +745,11 @@ async def run_scan(
         prefire=(
             {"n_skipped": n_prefire_skipped, "note": _prefire_plan.summary()}
             if _prefire_plan.enabled else None
+        ),
+        m2s=(
+            {"n_consolidated": n_m2s_consolidated, "method": _m2s_plan.method,
+             "note": _m2s_plan.summary()}
+            if _m2s_plan.enabled else None
         ),
     )
 

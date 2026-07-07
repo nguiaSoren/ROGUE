@@ -470,6 +470,9 @@ class ScanReport:
     # Q7 pre-fire gate: {n_skipped, note} when the pre-fire skip ran (ROGUE_PREFIRE_SKIP=on). None when
     # off → today's dict is byte-identical. Surfaces the skipped (predicted-non-breach) set (no silent cut).
     prefire: dict | None = None
+    # Q14 M2S consolidation: {n_consolidated, method, note} when multi-turn primitives were folded to
+    # single-turn (ROGUE_M2S=on). None when off → today's dict is byte-identical.
+    m2s: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -624,6 +627,8 @@ class ScanReport:
             out["survival"] = self.survival
         if self.prefire is not None:
             out["prefire"] = self.prefire
+        if self.m2s is not None:
+            out["m2s"] = self.m2s
         return out
 
     def to_json(

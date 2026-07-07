@@ -73,6 +73,9 @@ class EndpointScanReport:
     # Q7 pre-fire gate: how many attacks were skipped (predicted non-breach) before firing. 0 when the
     # gate is off — today's default. The skipped attacks are still present as skipped findings.
     n_prefire_skipped: int = 0
+    # Q14 M2S: how many multi-turn primitives were folded to single-turn before firing. 0 when off.
+    n_m2s_consolidated: int = 0
+    m2s_note: str | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -92,6 +95,8 @@ class EndpointScanReport:
             tail += f" {self.n_deferred} deferred by survival gate (predicted non-transfer)."
         if self.n_prefire_skipped:
             tail += f" {self.n_prefire_skipped} skipped pre-fire (predicted non-breach)."
+        if self.n_m2s_consolidated:
+            tail += f" {self.n_m2s_consolidated} multi-turn folded to single-turn (M2S)."
         return (
             f"Scanned {self.base_url} (model {self.model!r}): "
             f"{self.n_breached}/{self.n_primitives} attack primitives breached "
@@ -193,6 +198,8 @@ async def scan_endpoint(
     survival_max_primitives: int | None = None,
     # --- opt-in Q7 pre-fire skip (purely additive; default off → every primitive is fired) ---
     prefire_gate: object | None = None,
+    # --- opt-in Q14 M2S consolidation (purely additive; default off → multi-turn fires as-is) ---
+    m2s_config: object | None = None,
     # --- opt-in agent-exec (tool-use / indirect-injection) — auto-on when declared_tools≠[] ---
     declared_tools: list[str] | None = None,
     forbidden_tools: list[str] | None = None,
@@ -331,6 +338,18 @@ async def scan_endpoint(
                 )
             )
         _log.info("%s", prefire_plan.summary())
+
+    # Q14 M2S CONSOLIDATION (opt-in, env-gated) — fold each multi-turn primitive's turns into ONE
+    # single-turn M2S prompt so it fires via the single-invoke path at 1× trial instead of the K
+    # sequential victim calls run_conversation spends. Off unless ROGUE_M2S=on → every render below is
+    # byte-identical. Runs after survival/prefire so only the primitives that will actually fire are folded.
+    from rogue.reproduce.m2s.gate import apply_m2s  # noqa: PLC0415
+
+    m2s_plan = apply_m2s(primitives, config=m2s_config)
+    n_m2s_consolidated = 0
+    if m2s_plan.enabled:
+        primitives = m2s_plan.primitives
+        n_m2s_consolidated = m2s_plan.n_consolidated
 
     # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
     # byte-identical. When on, each primitive's trial loop runs Wald's sequential test bracketing the
@@ -529,6 +548,8 @@ async def scan_endpoint(
         n_deferred=n_deferred,
         survival_note=survival_note,
         n_prefire_skipped=n_prefire_skipped,
+        n_m2s_consolidated=n_m2s_consolidated,
+        m2s_note=(m2s_plan.summary() if m2s_plan.enabled else None),
     )
 
 

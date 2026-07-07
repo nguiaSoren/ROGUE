@@ -590,6 +590,7 @@ async def run_reproduction(
     domain_jargon_max_pairs: int = 8,
     survival_skip: bool = False,
     prefire_skip: bool = False,
+    m2s_consolidate: bool = False,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -892,6 +893,23 @@ async def run_reproduction(
                         len(_pf_skipped), len(_ordered_pairs), len(_pf_fired),
                     )
                     _ordered_pairs = _pf_fired
+
+            # Q14 M2S CONSOLIDATION (explicit opt-in only: --m2s-consolidate) — fold each multi-turn
+            # pair's turns into ONE single-turn M2S prompt so it fires at 1× trial instead of the K
+            # sequential victim calls run_conversation spends. EXPLICIT opt-in because consolidating
+            # REPLACES the scripted multi-turn fire with its single-turn form; the paid A/B compares a
+            # consolidated run against a scripted (M2S-off) run keyed by primitive_id. Off → byte-identical.
+            if m2s_consolidate:
+                from rogue.reproduce.m2s.gate import apply_m2s_pairs  # noqa: PLC0415
+
+                _m2s_pairs, _m2s_n, _m2s_on = apply_m2s_pairs(_ordered_pairs)
+                if _m2s_on and _m2s_n:
+                    logger.info(
+                        "M2S: consolidated %d distinct multi-turn primitive(s) to single-turn "
+                        "(--m2s-consolidate); firing %d pair(s) at 1× trial",
+                        _m2s_n, len(_m2s_pairs),
+                    )
+                    _ordered_pairs = _m2s_pairs
             coros = [_bounded(p, c) for p, c in _ordered_pairs]
 
             primitive_by_id = {p.primitive_id: p for p in primitives}
@@ -1587,6 +1605,16 @@ def main(argv: list[str] | None = None) -> int:
             "deliberate budget-saved A/B, not a normal measurement run."
         ),
     )
+    parser.add_argument(
+        "--m2s-consolidate",
+        action="store_true",
+        help=(
+            "Q14: with ROGUE_M2S=on, fold each multi-turn pair's turns into ONE single-turn M2S prompt "
+            "(ROGUE_M2S_METHOD, default pythonize) so it fires at 1× trial instead of K sequential victim "
+            "calls. Off by default — this REPLACES the scripted multi-turn fire; the A/B compares a "
+            "consolidated run vs a scripted (M2S-off) run keyed by primitive_id."
+        ),
+    )
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
     if args.no_iterative:
@@ -1656,6 +1684,7 @@ def main(argv: list[str] | None = None) -> int:
             domain_jargon=getattr(args, "domain_jargon", False),
             survival_skip=getattr(args, "survival_skip", False),
             prefire_skip=getattr(args, "prefire_skip", False),
+            m2s_consolidate=getattr(args, "m2s_consolidate", False),
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())
