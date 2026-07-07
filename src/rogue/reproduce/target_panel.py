@@ -118,6 +118,10 @@ class ModelResponse(BaseModel):
     error: str | None
     trial_index: int
     temperature: float
+    # The reasoning trace (thinking tokens) when the target exposes one; "" otherwise. Carried
+    # separately from `content` (the answer) so ROGUE can scan the hidden scratchpad for leakage
+    # (Leaky Thoughts, 2506.15674) without changing how the answer is judged.
+    reasoning: str = ""
 
     model_config = {"frozen": True}
 
@@ -351,6 +355,7 @@ class TargetPanel:
 
         return ModelResponse(
             content=result.text,
+            reasoning=getattr(result, "reasoning", "") or "",
             latency_ms=result.latency_ms,
             tokens_in=result.usage.input_tokens,
             tokens_out=result.usage.output_tokens,

@@ -88,6 +88,11 @@ class InvocationResult:
     stop_reason: StopReason = StopReason.COMPLETE
     latency_ms: int = 0
     raw_response: dict = field(default_factory=dict)
+    # The model's REASONING TRACE (thinking tokens) when a reasoning model exposes it — DeepSeek/
+    # OpenAI-compat ``reasoning_content``, Anthropic ``thinking`` blocks. "" when absent. Kept OUT of
+    # ``content``/``text`` (it's a hidden scratchpad, not the answer) so existing judging is unchanged;
+    # ROGUE scans it separately for leakage (Leaky Thoughts, 2506.15674).
+    reasoning: str = ""
 
     @property
     def text(self) -> str:

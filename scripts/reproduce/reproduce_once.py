@@ -548,6 +548,8 @@ async def run_reproduction(
     only_unreproduced: bool = False,
     primitive_ids: list[str] | None = None,
     config_ids: list[str] | None = None,
+    domain_jargon: bool = False,
+    domain_jargon_max_pairs: int = 8,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -1173,6 +1175,28 @@ async def run_reproduction(
 
             stats.primitives_processed = len(primitives)
 
+            # DOMAIN-JARGON reproduce post-pass (ExpGuard axis, opt-in --domain-jargon): over refused
+            # (primitive × config) pairs, re-express in a finance/medical/legal register and re-fire —
+            # the cross-model flip the domain-robustness board is built from. Capped + fully fail-soft.
+            if domain_jargon:
+                try:
+                    from rogue.reproduce.agent.domain_jargon_stage import (  # noqa: PLC0415
+                        make_goal_judge, make_llm_invoke, run_domain_jargon_reproduce_pass,
+                    )
+                    from rogue.schemas.breach_result import BREACH_VERDICTS  # noqa: PLC0415
+
+                    _atk = make_llm_invoke()
+                    dj = await run_domain_jargon_reproduce_pass(
+                        primitives, configs, panel=panel, judge=judge,
+                        breach_verdicts=BREACH_VERDICTS, attacker_invoke=_atk,
+                        goal_judge=make_goal_judge(_atk), max_pairs=domain_jargon_max_pairs)
+                    stats.estimated_cost_usd += dj.cost_usd
+                    logger.info(
+                        "DOMAIN-JARGON pass: %s per_domain=%s cost=$%.4f",
+                        dj.summary, dj.per_domain, dj.cost_usd)
+                except Exception as e:  # noqa: BLE001 — a gauge must never fail the sweep
+                    logger.warning("domain-jargon pass skipped: %s", e)
+
     finally:
         await panel.aclose()
         if persona_wrapper is not None:
@@ -1269,6 +1293,17 @@ def main(argv: list[str] | None = None) -> int:
             "OFF by default so re-grade / re-test / new-day workflows (which "
             "deliberately re-fire the whole corpus) keep working. Combine with "
             "--judge-batch for a cheap, latency-tolerant catch-up pass."
+        ),
+    )
+    parser.add_argument(
+        "--domain-jargon",
+        dest="domain_jargon",
+        action="store_true",
+        help=(
+            "ExpGuard axis (2603.02588): after the sweep, re-express REFUSED attacks in a "
+            "finance/medical/legal register and re-fire across the panel — the cross-model "
+            "domain-jargon flip-rate the domain-robustness board is built from. LLM-costed, "
+            "capped, fail-soft; OFF by default. Needs an attacker API key."
         ),
     )
     parser.add_argument(
@@ -1500,6 +1535,7 @@ def main(argv: list[str] | None = None) -> int:
                 if args.config_ids
                 else None
             ),
+            domain_jargon=getattr(args, "domain_jargon", False),
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

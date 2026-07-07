@@ -452,6 +452,18 @@ class ScanReport:
     # the scan's remediation-generate stage (CLI scan only). None when the stage didn't run; `to_dict`
     # routes each finding's `remediation` through these when present (else the generic per-family text).
     mitigations: dict | None = None
+    # ExpGuard axis: domain-jargon evasion flip summary {summary, per_domain}, attached by the scan's
+    # domain-jargon stage (opt-in). None when the stage didn't run; `to_dict` emits the key only when set.
+    domain_jargon: dict | None = None
+    # Opt-Out axis: RTBF entity-unlearning verification {forget_leak_rate, retain_rate, recovered, …},
+    # attached by the scan's RTBF stage (opt-in, when an entity's attributes are supplied). None = didn't run.
+    rtbf: dict | None = None
+    # U-SafeBench axis: user-specific safety {safety_rate, helpfulness_rate, unsafe_fulfilled, …}, attached
+    # by the scan's user-safety stage (opt-in, when profile probes are supplied). None = didn't run.
+    user_safety: dict | None = None
+    # Leaky-Thoughts axis: reasoning-trace leakage {n_reasoning_only, reasoning_only, …} — secrets the
+    # target spelled out in its thinking but withheld from the answer. Opt-in (reasoning_leak_secrets).
+    reasoning_leak: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -594,6 +606,14 @@ class ScanReport:
             out["surface1_context"] = self.surface1_context
         if self.system_prompt_priority is not None:
             out["system_prompt_priority"] = self.system_prompt_priority
+        if self.domain_jargon is not None:
+            out["domain_jargon"] = self.domain_jargon
+        if self.rtbf is not None:
+            out["rtbf"] = self.rtbf
+        if self.user_safety is not None:
+            out["user_safety"] = self.user_safety
+        if self.reasoning_leak is not None:
+            out["reasoning_leak"] = self.reasoning_leak
         return out
 
     def to_json(

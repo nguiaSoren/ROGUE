@@ -45,5 +45,6 @@ def build(kind: str, params: dict[str, Any], target_query: str, seed: int = 0) -
 # Register built-in generators on import.
 from . import many_shot as _many_shot  # noqa: E402,F401
 from . import shot_repetition as _shot_repetition  # noqa: E402,F401
+from . import domain_terminology as _domain_terminology  # noqa: E402,F401
 
 __all__ = ["GeneratorFn", "register", "available", "build"]

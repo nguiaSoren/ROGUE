@@ -253,10 +253,13 @@ class AnthropicAdapter(TargetAdapter):
         # Preserve provider block order: each Anthropic ``text`` block → a TextBlock, each
         # ``tool_use`` block → a ToolCallBlock, interleaved exactly as returned (contract §3).
         content_blocks: list[ContentBlock] = []
+        reasoning_parts: list[str] = []  # Anthropic extended-thinking blocks — the reasoning trace
         for block in getattr(response, "content", None) or []:
             btype = getattr(block, "type", None)
             if btype == "text":
                 content_blocks.append(TextBlock(text=getattr(block, "text", "") or ""))
+            elif btype in ("thinking", "redacted_thinking"):
+                reasoning_parts.append(getattr(block, "thinking", "") or "")
             elif btype == "tool_use":
                 content_blocks.append(
                     ToolCallBlock(
@@ -272,6 +275,7 @@ class AnthropicAdapter(TargetAdapter):
 
         return InvocationResult(
             content=content_blocks,
+            reasoning="\n".join(p for p in reasoning_parts if p),
             usage=UsageMetrics.from_io(
                 tokens_in,
                 tokens_out,

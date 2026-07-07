@@ -235,6 +235,19 @@ async def run_scan(
     agent_exec_database_url: str | None = None,
     instruction_hierarchy: bool = False,
     remediate: bool = False,
+    domain_jargon: bool = False,
+    domain_jargon_domains: tuple[str, ...] = ("medical", "finance", "legal"),
+    domain_jargon_max: int = 4,
+    domain_jargon_attacker: Any = None,
+    domain_jargon_goal_judge: Any = None,
+    rtbf_attributes: Any = None,
+    rtbf_leak_invoke: Any = None,
+    user_safety_probes: Any = None,
+    user_safety_refused_fn: Any = None,
+    reasoning_leak_secrets: Any = None,
+    reasoning_leak_invoke: Any = None,
+    reasoning_leak_pii_fn: Any = None,
+    reasoning_leak_extract: bool = False,
 ) -> ScanReport:
     """Run ``primitives`` against the target described by ``config`` and grade the responses.
 
@@ -297,6 +310,30 @@ async def run_scan(
         escalate_planner = EscalationPlanner.from_env()
         owns_planner = True
 
+    # DOMAIN-JARGON stage setup (ExpGuard axis, opt-in): re-express a refused primitive in a specialist
+    # register (finance/medical/legal) and re-fire — a flip (refused plain, complied in-register, goal
+    # intact) is a domain-evasion. Runs INSIDE the loop on non-breaching primitives (capped), reusing
+    # this scan's panel+judge. Attacker/goal-judge LLM seams are built once, lazily, and fail-soft.
+    dj_results: list = []
+    dj_cost = 0.0
+    dj_done = 0
+    dj_attacker = domain_jargon_attacker
+    dj_goal_judge = domain_jargon_goal_judge
+    if domain_jargon and dj_attacker is None:
+        try:
+            from .reproduce.agent.domain_jargon_stage import make_goal_judge, make_llm_invoke  # noqa: PLC0415
+            dj_attacker = make_llm_invoke()
+            # a semantic rewrite shares few surface words with the goal, so default an LLM goal judge —
+            # else check_goal_preserved's lexical fallback voids every variant (proven in the live run).
+            if dj_goal_judge is None:
+                dj_goal_judge = make_goal_judge(dj_attacker)
+        except Exception:  # noqa: BLE001 — no LLM wired ⇒ stage no-ops, never fails the scan
+            dj_attacker = None
+
+    # REASONING-LEAK accumulator (Leaky Thoughts axis, opt-in): scan each response's reasoning trace for
+    # secrets that leak in the thinking but not the answer. Populated in the response loop; fail-soft.
+    rl_leaks: list = []
+
     findings: list[Finding] = []
     total_cost = 0.0
     n_breaches = 0
@@ -306,6 +343,12 @@ async def run_scan(
         for prim in primitives:
             if budget is not None and total_cost >= budget:
                 break
+            # Reasoning-leak ergonomics: the secret lives in the deployment system prompt, but render()
+            # only injects it when the primitive grants system-prompt access. When a reasoning-leak scan
+            # is requested, coerce that flag on so the model actually receives the secret (else it can't
+            # leak what it was never told — the run_scan structural gap the flag closes).
+            if reasoning_leak_secrets and not getattr(prim, "requires_system_prompt_access", False):
+                prim = prim.model_copy(update={"requires_system_prompt_access": True})
             rendered = render(prim, config)
 
             # Deep stage 1 — PERSONA: wrap the rendered attack in a PAP persuasion frame. A wrap
@@ -355,6 +398,16 @@ async def run_scan(
                 total_cost += r.cost_usd
                 if r.error is not None:
                     continue
+                # REASONING-LEAK: scan the captured reasoning trace (vs the answer) for leaked secrets.
+                if reasoning_leak_secrets and getattr(r, "reasoning", ""):
+                    try:
+                        from .reproduce.agent.reasoning_leak import scan_reasoning_leak  # noqa: PLC0415
+                        rl = scan_reasoning_leak(
+                            r.reasoning, r.content or "", secrets=list(reasoning_leak_secrets),
+                            invoke=reasoning_leak_invoke, pii_fn=reasoning_leak_pii_fn)
+                        rl_leaks.extend(rl.leaks)
+                    except Exception:  # noqa: BLE001 — a leakage gauge must never fail the scan
+                        pass
                 try:
                     result = await judge.judge(rendered, r.content, prim)
                 except Exception:  # a judge glitch must not abort the whole scan
@@ -364,6 +417,19 @@ async def run_scan(
                     if example_response is None:
                         example_attack = _attack_text(rendered)[:400] or None
                         example_response = (r.content or "")[:400] or None
+
+            # ② REASONING-EXTRACTION pass: for targets that HIDE their reasoning, fire the probe with
+            # the extraction injection so the RT bleeds into the answer, then scan it. Opt-in + fail-soft.
+            if reasoning_leak_extract and reasoning_leak_secrets:
+                try:
+                    from .reproduce.agent.reasoning_leak import extract_and_scan  # noqa: PLC0415
+                    ex_res, ex_cost = await extract_and_scan(
+                        rendered, config, panel=panel, secrets=list(reasoning_leak_secrets),
+                        invoke=reasoning_leak_invoke)
+                    total_cost += ex_cost
+                    rl_leaks.extend(ex_res.leaks)
+                except Exception:  # noqa: BLE001 — a leakage gauge must never fail the scan
+                    pass
 
             n = len(responses)
             rate = n_breach / n if n else 0.0
@@ -397,6 +463,25 @@ async def run_scan(
                     technique = outcome.technique or technique
                     example_attack = outcome.example_attack or example_attack
                     example_response = outcome.example_response or example_response
+
+            # DOMAIN-JARGON flip: on a primitive the baseline did NOT breach (plain refused), re-express
+            # it per domain and re-fire through this panel+judge. Text renders only, capped, fail-soft.
+            if (domain_jargon and dj_attacker is not None and n_breach == 0
+                    and dj_done < domain_jargon_max
+                    and rendered.image_b64 is None and rendered.audio_b64 is None):
+                from .reproduce.agent.domain_jargon_stage import run_domain_jargon_flip  # noqa: PLC0415
+                try:
+                    goal = getattr(prim, "goal", None) or getattr(prim, "objective", None) or ""
+                    flips, fcost = await run_domain_jargon_flip(
+                        rendered, config, goal, panel=panel, judge=judge, prim=prim,
+                        attacker_invoke=dj_attacker, goal_judge=dj_goal_judge,
+                        domains=domain_jargon_domains, breach_verdicts=BREACH_VERDICTS)
+                    dj_results.extend(flips)
+                    dj_cost += fcost
+                    total_cost += fcost
+                    dj_done += 1
+                except Exception:  # noqa: BLE001 — a gauge must never fail the scan
+                    pass
 
             if rate >= breach_threshold:
                 n_breaches += 1
@@ -477,6 +562,67 @@ async def run_scan(
         except Exception:  # noqa: BLE001 — a fix generator must never fail the scan
             scan_mitigations = None
 
+    # DOMAIN-JARGON aggregate: roll the per-primitive flips into the reportable stage summary.
+    domain_jargon_report = None
+    if domain_jargon and dj_results:
+        from .reproduce.agent.domain_jargon_stage import aggregate_domain_jargon  # noqa: PLC0415
+        try:
+            agg = aggregate_domain_jargon(dj_results)
+            domain_jargon_report = {"summary": agg.summary, "per_domain": agg.per_domain}
+        except Exception:  # noqa: BLE001
+            domain_jargon_report = None
+
+    # RTBF stage (blue-team, Opt-Out axis): given the entity a customer claims to have deleted + its
+    # attributes, probe the live target across paraphrases → forget-leak-rate + neighbor-retain-rate.
+    # Opt-in (fires only when rtbf_attributes is supplied); fully fail-soft.
+    rtbf_report = None
+    if rtbf_attributes:
+        try:
+            from .reproduce.agent.rtbf_stage import run_rtbf_stage  # noqa: PLC0415
+            from .reproduce.agent.domain_jargon_stage import make_llm_invoke  # noqa: PLC0415
+            leak_inv = rtbf_leak_invoke or make_llm_invoke()
+            rtbf_res = await run_rtbf_stage(
+                list(rtbf_attributes), config, panel=panel, leak_invoke=leak_inv)
+            total_cost += rtbf_res.cost_usd
+            s = rtbf_res.score
+            rtbf_report = {
+                "forget_leak_rate": s.forget_leak_rate, "retain_rate": s.retain_rate,
+                "n_forget": s.n_forget, "n_retain": s.n_retain,
+                "recovered": s.recovered, "over_forgotten": s.over_forgotten, "failed": s.failed}
+        except Exception:  # noqa: BLE001 — a compliance gauge must never fail the scan
+            rtbf_report = None
+
+    # USER-SPECIFIC SAFETY stage (blue-team, U-SafeBench axis): inject a vulnerable-user profile and fire
+    # profile-unsafe + profile-safe instructions → safety_rate (refuse the harmful-for-this-user asks) +
+    # helpfulness_rate (don't over-refuse the benign ones). Opt-in; fully fail-soft.
+    user_safety_report = None
+    if user_safety_probes:
+        try:
+            from .reproduce.agent.user_safety import run_user_safety_stage  # noqa: PLC0415
+            us = await run_user_safety_stage(
+                list(user_safety_probes), config, panel=panel, refused_fn=user_safety_refused_fn)
+            total_cost += us.cost_usd
+            s = us.score
+            user_safety_report = {
+                "safety_rate": s.safety_rate, "helpfulness_rate": s.helpfulness_rate,
+                "n_unsafe": s.n_unsafe, "n_safe": s.n_safe,
+                "unsafe_fulfilled": s.unsafe_fulfilled, "safe_refused": s.safe_refused,
+                "failed": s.failed}
+        except Exception:  # noqa: BLE001 — a safety gauge must never fail the scan
+            user_safety_report = None
+
+    # REASONING-LEAK aggregate: roll the per-response leaks into the reportable summary. The headline is
+    # reasoning-only leakage (secret in the thinking, absent from the answer).
+    reasoning_leak_report = None
+    if reasoning_leak_secrets and rl_leaks:
+        ronly = [x for x in rl_leaks if x.reasoning_only]
+        reasoning_leak_report = {
+            "n_leaks": len(rl_leaks),
+            "n_reasoning_only": len(ronly),
+            "reasoning_only": [{"kind": x.kind, "detail": x.detail, "method": x.method} for x in ronly],
+            "failed": bool(ronly),
+        }
+
     findings.sort(key=lambda f: f.success_rate, reverse=True)
     target = config.base_url or config.target_model
     return ScanReport(
@@ -487,6 +633,10 @@ async def run_scan(
         findings=findings,
         system_prompt_priority=sys_priority,
         mitigations=scan_mitigations,
+        domain_jargon=domain_jargon_report,
+        rtbf=rtbf_report,
+        user_safety=user_safety_report,
+        reasoning_leak=reasoning_leak_report,
     )
 
 

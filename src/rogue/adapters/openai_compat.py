@@ -303,12 +303,19 @@ class OpenAICompatAdapter(TargetAdapter):
         content_text = ""
         finish_reason: str | None = None
         tool_call_blocks: list[ToolCallBlock] = []
+        reasoning_text: str = ""
         choices = getattr(response, "choices", None)
         if choices:
             message = choices[0].message
             content_text = getattr(message, "content", None) or ""
             finish_reason = getattr(choices[0], "finish_reason", None)
             tool_call_blocks = self._parse_tool_calls(message)
+            # Reasoning trace, when the provider exposes one: DeepSeek/OpenRouter use
+            # ``reasoning_content`` (or ``reasoning``). Captured out-of-band from the answer.
+            reasoning_text = (
+                getattr(message, "reasoning_content", None)
+                or getattr(message, "reasoning", None) or ""
+            )
 
         # Text first, then tool calls, in order. Preserve the legacy no-tools shape exactly: a
         # response with no tool calls always yields a single (possibly empty) TextBlock; a response
@@ -325,6 +332,7 @@ class OpenAICompatAdapter(TargetAdapter):
 
         return InvocationResult(
             content=blocks,
+            reasoning=reasoning_text if isinstance(reasoning_text, str) else "",
             usage=UsageMetrics.from_io(
                 tokens_in,
                 tokens_out,

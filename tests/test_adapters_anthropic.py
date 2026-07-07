@@ -114,6 +114,30 @@ async def test_happy_path_text_usage_stop():
 
 
 @pytest.mark.asyncio
+async def test_extended_thinking_block_captured_as_reasoning():
+    # Reasoning trace capture (Leaky Thoughts): a `thinking` block → InvocationResult.reasoning, and it
+    # stays OUT of content/text (the answer is judged unchanged). Exercises the real parse code, which
+    # can't be run against live Anthropic here (no credits) — this is the $0 coverage for that surface.
+    resp = SimpleNamespace(
+        content=[
+            SimpleNamespace(type="thinking", thinking="the user's SSN is 481-22-9930; I must withhold it"),
+            SimpleNamespace(type="redacted_thinking", thinking="[redacted chain]"),
+            SimpleNamespace(type="text", text="I can't share that."),
+        ],
+        usage=SimpleNamespace(input_tokens=5, output_tokens=9),
+        stop_reason="end_turn",
+        model_dump=lambda: {},
+    )
+    result = await _adapter(FakeClient(resp)).invoke([CanonicalMessage.user("what's my SSN?")])
+    assert "481-22-9930" in result.reasoning  # captured from the thinking block
+    assert "[redacted chain]" in result.reasoning
+    assert result.text == "I can't share that."  # answer only — reasoning stays out of content
+    assert "481-22-9930" not in result.text
+    assert result.usage.output_tokens == 9  # this response's own usage
+    assert result.stop_reason == StopReason.COMPLETE
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider_stop,expected",
     [

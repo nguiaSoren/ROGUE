@@ -64,6 +64,10 @@ class AgentExecConfig:
     emulator_model: Optional[str] = None  # None ⇒ honeytoken-only; custom-tool configs are skipped
     detect_pii_emission: bool = False  # Axis B (opt-in): scan model text for un-planted PII emission
     pii_semantic_model: Optional[str] = None  # detector model for the fuzzy step; None ⇒ regex-only
+    detect_safeguard: bool = False  # signal (d), opt-in: did the agent refuse the harmful task or proceed
+    safeguard_task_tools: tuple[str, ...] = ()  # recon/sink tools that count as pursuing the objective
+    derived_exfil_decode: bool = True  # signal (f) DECODE tier: $0, near-zero-FP → ON by default
+    derived_exfil_semantic_model: Optional[str] = None  # opt-in SEMANTIC tier LLM (costs $ + uncalibrated)
 
     def __post_init__(self) -> None:
         # keep the two caps coherent (M4): a full run of max_runs must fit the scan cap
@@ -263,6 +267,30 @@ async def run_agent_exec_one(
 
         pii_sem = make_semantic_fn(model=cfg.pii_semantic_model) if cfg.pii_semantic_model else None
         findings = findings + judge.judge_pii_emission(transcript, semantic_fn=pii_sem)
+    # Signal (d) (opt-in, uncalibrated): did the agent refuse the harmful task or PROCEED. Emitted only
+    # on 'proceeded', as a NON-headline finding (v1 heuristic) — verdict/headline/exfil are unaffected;
+    # it persists as a TraceFinding row for telemetry + the tools-on/off delta (the two-arm board metric).
+    if cfg.detect_safeguard:
+        from .safeguard_judge import safeguard_finding, safeguard_verdict  # noqa: PLC0415
+
+        sv = safeguard_verdict(
+            transcript, task_tools=cfg.safeguard_task_tools or tuple(config.declared_tools or ()))
+        if sv.proceeded:
+            findings = findings + [safeguard_finding(sv)]
+    # Signal (f), non-headline: evidence-bank-hardened exfil — a returned canary reappearing in later
+    # args NON-verbatim. TWO tiers with different gating: the DECODE tier ($0, near-zero-FP) runs by
+    # DEFAULT (no reason to hide a free, reliable hardening); the SEMANTIC tier (LLM $ + uncalibrated)
+    # is opt-in, firing only when derived_exfil_semantic_model is set. Both closes the (b)/(c) M8 blind
+    # spot; neither is headline-eligible.
+    if cfg.derived_exfil_decode or cfg.derived_exfil_semantic_model:
+        _exfil_invoke = None
+        if cfg.derived_exfil_semantic_model:
+            from .domain_jargon_stage import make_llm_invoke  # noqa: PLC0415 — reuse the env LLM seam
+            try:
+                _exfil_invoke = make_llm_invoke(cfg.derived_exfil_semantic_model)
+            except Exception:  # noqa: BLE001 — no key ⇒ decode tier only
+                _exfil_invoke = None
+        findings = findings + judge.judge_derived_exfil(transcript, invoke=_exfil_invoke)
     verdict, headline, _exfil = _verdict_and_exfil(findings)
     transcript.fired_signals = fired_signals(findings)
 
