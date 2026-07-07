@@ -11,6 +11,19 @@ publishable (see [Why it's novel](#why-its-novel)).
 Code: `src/rogue/reproduce/survival/` · trainer CLI: `scripts/reproduce/train_survival_model.py` ·
 live wiring: `reproduce/endpoint_scan.py` (the survival gate) · tests: `tests/test_survival_predictor.py`.
 
+**Contribution (paper framing).** The contribution is *not* "we trained a model that predicts jailbreak
+success" — that is crowded and weak. It is that **jailbreak evaluation implicitly assumes exhaustive
+reproduction, and we show cross-deployment transfer is sparse (~14%) and predictable enough to make
+evaluation budget-aware.** Four ingredients, in order of what a reviewer should care about: (1) a **new
+prediction axis** — does an attack *survive a deployment change*, from its own surface features — which
+the cited work leaves open; (2) a **leakage-safe evaluation protocol** (group-split by attack); (3) an
+**operational drift-guard** that makes deferral safe under distribution shift; and (4) a **budget-saved
+metric** measured on a real reproduction corpus, integrated into the live scan path. The estimator
+itself is deliberately the least interesting part. External working title: *"Survival Ranking: Adaptive
+Jailbreak Evaluation Under Deployment Shift"* (or *"Predicting Jailbreak Transferability Across LLM
+Deployment Configurations for Budget-Efficient Security Evaluation"*) — "survival" is our internal term
+and needs the deployment-shift gloss for an outside reader.
+
 ---
 
 ## The problem
@@ -70,18 +83,26 @@ corroborated by ROGUE's own prior negative result
     survival hinges on.
 - **Label**: for each (primitive × config) pair in `breach_results`, did it breach (any-breach rate ≥
   the same 0.4 threshold the threat brief uses)?
-- **Model** (`survival/model.py`): an **L2-regularized logistic head, numpy-only**, fit by
-  Newton/IRLS. Deterministic (no random init, no SGD shuffle → byte-identical weights across runs).
-  Chosen over a boosted forest deliberately: the training set is thousands of rows (not millions),
-  where strong-L2 logistic out-generalizes a forest and won't memorize a few prolific primitives; it
-  adds **no new dependency** (ROGUE ships numpy; sklearn/torch are out by stack discipline); and its
-  coefficients are inspectable, so "why did this rank high" is a dot product — which matters for a
-  security product whose users must trust the order.
+- **Survival estimator** (`survival/model.py`) — *deliberately the least interesting part; the
+  contribution is above the model, not in it.* A strong-L2-regularized linear head fit deterministically
+  (numpy-only, Newton/IRLS, no random init → identical weights across runs). The estimator is chosen to
+  be *boring on purpose*: on thousands of rows (not millions) a heavily-regularized linear model
+  out-generalizes a boosted forest and won't memorize a few prolific primitives; it adds **no new
+  dependency**; and its coefficients are inspectable, so "why did this rank high" is a dot product —
+  which matters for a security tool whose users must trust the order. Swapping in a gradient-boosted or
+  neural head is a free future ablation; it would not change the paper, because the paper is the axis
+  and the protocol, not the function class.
 - **Training + back-test** (`survival/train.py`): the join `breach_results ⋈ attack_primitives ⋈
-  deployment_configs`. The split is **group-aware by primitive** (an attack is entirely in train or
-  entirely in test), so the numbers measure "will a *new* attack survive," not "can we memorize."
-  Headline metric is **budget-saved** = 1 − (trials fired, in survival-rank order, to recover 80% of
-  true survivors) / (fire-all).
+  deployment_configs`. Headline metric is **budget-saved** = 1 − (trials fired, in survival-rank order,
+  to recover 80% of true survivors) / (fire-all).
+
+**The one methodological choice reviewers check first: the split is group-aware by primitive.** Every
+trial of a given attack is *entirely* in train or *entirely* in test — never the leakage pattern
+"attack A × config 1 → train, attack A × config 2 → test," which would let the model memorize attack A
+and report an inflated number. That split is the difference between measuring *"will a **new** attack
+survive a deployment change"* and accidentally measuring *"can we recognize an attack we've already
+seen."* The reported AUC is the former; it is the number that has to hold for the feature to be worth
+shipping.
 
 ## The drift-guard (why this is honest)
 
@@ -187,15 +208,85 @@ model is surface-features-only; adding the DB payload embedding is a plausible a
 (the training path can already featurize it) but was kept out of the serving hot path to guarantee
 zero-cost, no-API-call ranking.
 
-## Why it's publishable
+### Strengthening experiments (measured, `$0`)
 
-A **black-box, attack-feature predictor of cross-system-prompt survival** is the gap Kirch (white-box,
-same-model), Ball (white-box, mechanism), and Helm (black-box but per-*config*, not per-*attack*) all
-leave open. ROGUE is uniquely positioned to fill it because it already owns the one asset the papers
+Three offline experiments a security reviewer asks for, all on the already-paid corpus — reproduce with
+`scripts/reproduce/survival_experiments.py` (read-only, no spend):
+
+**1. Leave-one-family-out (LOFO) — generalization to an unseen family.** Retraining with an *entire
+attack family* held out and testing on it, mean held-out **AUC = 0.62** (median 0.60, 13 evaluable
+families) — down from the in-distribution 0.77, the honest degradation expected when the test family
+was never seen. The tail is the point: `tool_use_hijack` lands at **AUC 0.49 — below random.** That is
+Kirch's OOD-collapse reproduced on ROGUE's own data, and the direct empirical justification for the
+**drift-guard**: generalization across *primitives* of a known family is strong (0.77), but across an
+*unseen family* it is partial and can collapse — so the gate defers only within-distribution and fires
+every novel / low-support family unconditionally.
+
+| held-out family (n / survivors) | AUC |
+|---|---|
+| policy_roleplay (30 / 2) | 0.79 |
+| training_data_extraction (89 / 57) | 0.68 |
+| refusal_suppression (188 / 22) | 0.62 |
+| indirect_prompt_injection (570 / 77) | 0.60 |
+| direct_instruction_override (267 / 33) | 0.54 |
+| tool_use_hijack (60 / 6) | **0.49 (below random)** |
+| **13 families (mean)** | **0.62** |
+
+**2. Calibration — the scores are trustworthy, not just monotone.** On the held-out set predicted
+survival tracks observed across the range (0.10→0.09, 0.26→0.36, 0.50→0.56, 0.86→0.92), giving
+**ECE = 0.026**. The budget policy only needs the *ranking*, but a low ECE means a score can be read as
+a probability — useful if the gate ever surfaces "P(survive)" to an operator.
+
+**3. Baselines — the lift is the learned axis, not any ordering.** Budget-saved @80% recall: survival
+**0.391**, random **0.199** (≈ 2× survival), and the reproducibility-score heuristic **0.056 — *worse*
+than random.** A single hand-picked feature *hurts*: an attack's in-the-wild `reproducibility_score`
+does not predict *cross-config* survival (if anything it anti-correlates), which is exactly why the
+learned survival axis is needed. Survivors recovered vs budget fired makes the separation visible:
+
+| budget fired | survival | reproducibility | random |
+|---|---|---|---|
+| 10% | 43% | 1% | 10% |
+| 20% | 53% | 13% | 20% |
+| 40% | 76% | 29% | 40% |
+| 50% | 79% | 38% | 50% |
+
+Of the four experiments a main-conference bar wants, three are done here; only the **live A/B**
+(predictor-ranked top-k vs random on a fresh paid cycle) remains the one gated number.
+
+## Publishability
+
+The paper is *not* publishable because "the classifier works." It is publishable because it names a
+**missing axis in jailbreak evaluation — transfer survival under deployment shift — and builds a
+budget-aware evaluation system around it.** A black-box, per-*attack* predictor of cross-system-prompt
+survival is the gap Kirch (white-box, same-model), Ball (white-box, mechanism) and Helm (black-box but
+per-*config*, the transpose of our question) all leave open, and ROGUE uniquely owns the asset they
 lack: a large table of *the same attacks reproduced across many deployment configs*. The measured
-budget-saved curve on a jailbreak *reproduction* corpus (not a static benchmark) would be a
-first-of-its-kind artifact, and it composes with the P1 allocation-scheduler paper (survival rank is a
-new acquisition signal for the allocator).
+budget-saved curve on a real reproduction corpus (not a static benchmark) is a first-of-its-kind
+artifact, and it composes with the P1 allocation-scheduler paper (survival rank is a new acquisition
+signal for the allocator).
+
+**Venue fit.** This is a *security-systems* contribution, not an ML-algorithm one — so a security venue
+(USENIX Security / NDSS / CCS) is the right home, where "a real system + an expensive evaluation problem
++ operational deployment + an honest threat model" reads as strength. An ML-conference reviewer
+(NeurIPS/ICML) would fixate on "logistic regression on handcrafted features / small dataset" and miss
+the point; TMLR is a plausible fit once the experiments below are added.
+
+**Current state → strengthening path.** As written this is a strong workshop / applied-security paper —
+the framing, the leakage-safe protocol, and the honest caveats are here. Of the four experiments a
+main-conference security bar wants, **three are now measured** (see [Strengthening experiments
+above](#strengthening-experiments-measured-0), all `$0` on already-paid data):
+
+1. ✅ **Leave-one-family-out** — mean held-out **AUC 0.62**, with one family (`tool_use_hijack`) **below
+   random**: Kirch's OOD-collapse on our own data, and the empirical case for the drift-guard.
+2. ✅ **Calibration** — **ECE 0.026**; the scores are trustworthy, not just monotone.
+3. ✅ **Baselines** — survival budget-saved **0.391 vs random 0.199 (≈2×)**; the `reproducibility_score`
+   heuristic is **worse than random**, so the lift is the *learned* survival axis, not any ordering.
+4. ⏳ **Live budget-saved A/B (the headline)** — predictor-ranked top-k vs. random on a fresh paid cycle,
+   prospective confirmation of the offline 0.39. This is the one gated number (a dedicated paid A/B);
+   until it lands, "39% budget saved" is an offline back-test result, not a deployment claim.
+
+The sentence that carries it: *this is not "the classifier works," it is "cross-deployment jailbreak
+transfer is a predictable axis, and evaluation can be made budget-aware around it."*
 
 ## Grounding
 
