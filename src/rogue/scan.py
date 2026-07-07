@@ -27,6 +27,7 @@ persuasion frame around each primitive) and then, for any primitive the baseline
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -34,6 +35,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .report import ScanReport
     from .schemas import AttackPrimitive, DeploymentConfig
+
+_log = logging.getLogger(__name__)
 
 # (n_completed, n_total, current_label) — fired after each primitive completes. Optional; default
 # None means no behaviour change for existing callers. The platform worker wires this through to
@@ -235,6 +238,8 @@ async def run_scan(
     agent_exec_database_url: str | None = None,
     instruction_hierarchy: bool = False,
     remediate: bool = False,
+    survival_gate: Any = None,
+    survival_max_primitives: int | None = None,
     domain_jargon: bool = False,
     domain_jargon_domains: tuple[str, ...] = ("medical", "finance", "legal"),
     domain_jargon_max: int = 4,
@@ -334,6 +339,33 @@ async def run_scan(
     # secrets that leak in the thinking but not the answer. Populated in the response loop; fail-soft.
     rl_leaks: list = []
 
+    # Q11 SURVIVAL GATE (opt-in, env-gated) — reorder so predicted survivors fire first, and (under a
+    # cap or the ROGUE_SURVIVAL_SKIP_THRESHOLD floor) defer the predicted-dead tail. Off unless
+    # ROGUE_SURVIVAL_ORDER=on and a model artifact exists → today's order is byte-identical. The
+    # drift-guard inside the gate guarantees newly-harvested/low-support families are never skipped.
+    from .reproduce.survival.gate import apply_survival_order  # noqa: PLC0415
+
+    _survival_plan = apply_survival_order(
+        primitives, config, gate=survival_gate, max_primitives=survival_max_primitives,
+    )
+    n_deferred = 0
+    if _survival_plan.enabled:
+        primitives = _survival_plan.selected  # apply_survival_order already logs the plan summary
+        n_deferred = len(_survival_plan.deferred)
+
+    # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
+    # byte-identical. When on, each primitive's trial loop is Wald's sequential test bracketing the
+    # breach threshold, stopping once the outcome is statistically clear. This matters most on the
+    # default path, whose n_trials=1 makes the point ASR a bare {0,1} — SPRT gives it a meaningful n.
+    from .reproduce.sprt import resolve_config as _resolve_sprt, run_sprt  # noqa: PLC0415
+
+    _sprt = _resolve_sprt()
+    if _sprt is not None:
+        _log.info(
+            "SPRT early-stopping ON (p0=%.2f p1=%.2f α=%.2f β=%.2f n_max=%d batch=%d)",
+            _sprt.p0, _sprt.p1, _sprt.alpha, _sprt.beta, _sprt.n_max, _sprt.batch,
+        )
+
     findings: list[Finding] = []
     total_cost = 0.0
     n_breaches = 0
@@ -386,18 +418,17 @@ async def run_scan(
             # stays on the single-invoke path. (Stacking turns into one invoke was the bug we fix.)
             # ``user_turn_count`` is a static helper; ``run_conversation`` is guarded by hasattr so a
             # duck-typed test panel without it cleanly degrades to ``run_attack``.
-            if TargetPanel.user_turn_count(rendered) >= 2 and hasattr(panel, "run_conversation"):
-                responses = await panel.run_conversation(rendered, config, n_trials=n_trials)
-            else:
-                responses = await panel.run_attack(rendered, config, n_trials=n_trials)
-
-            n_breach = 0
             example_attack: str | None = None
             example_response: str | None = None
-            for r in responses:
+
+            # One trial: cost-account → reasoning-leak scan → judge → example capture. Returns True
+            # (breach) / False (no breach) / None (errored). Shared by the fixed-n loop and the SPRT
+            # driver so both accumulate cost/leaks/examples identically; only the trial *count* differs.
+            async def _judge_trial(r, _prim=prim, _rendered=rendered) -> bool | None:
+                nonlocal total_cost, example_attack, example_response
                 total_cost += r.cost_usd
                 if r.error is not None:
-                    continue
+                    return None
                 # REASONING-LEAK: scan the captured reasoning trace (vs the answer) for leaked secrets.
                 if reasoning_leak_secrets and getattr(r, "reasoning", ""):
                     try:
@@ -409,14 +440,33 @@ async def run_scan(
                     except Exception:  # noqa: BLE001 — a leakage gauge must never fail the scan
                         pass
                 try:
-                    result = await judge.judge(rendered, r.content, prim)
-                except Exception:  # a judge glitch must not abort the whole scan
-                    continue
-                if result.verdict in BREACH_VERDICTS:
-                    n_breach += 1
-                    if example_response is None:
-                        example_attack = _attack_text(rendered)[:400] or None
-                        example_response = (r.content or "")[:400] or None
+                    result = await judge.judge(_rendered, r.content, _prim)
+                except Exception:  # noqa: BLE001 — a judge glitch must not abort the whole scan
+                    return None
+                breach = result.verdict in BREACH_VERDICTS
+                if breach and example_response is None:
+                    example_attack = _attack_text(_rendered)[:400] or None
+                    example_response = (r.content or "")[:400] or None
+                return breach
+
+            async def _fire(want: int, _rendered=rendered) -> list[bool | None]:
+                if TargetPanel.user_turn_count(_rendered) >= 2 and hasattr(panel, "run_conversation"):
+                    resp = await panel.run_conversation(_rendered, config, n_trials=want)
+                else:
+                    resp = await panel.run_attack(_rendered, config, n_trials=want)
+                return [await _judge_trial(r) for r in resp]
+
+            if _sprt is not None:
+                _out = await run_sprt(_fire, _sprt, breach_threshold=breach_threshold)
+                _log.debug("%s %s", prim.primitive_id, _out.summary())
+                n_breach, _n_sprt, rate = _out.n_breach, _out.n_trials, _out.rate
+                breached = _out.breached
+            else:
+                results = await _fire(n_trials)
+                _n_sprt = len(results)
+                n_breach = sum(1 for b in results if b is True)
+                rate = n_breach / _n_sprt if _n_sprt else 0.0
+                breached = rate >= breach_threshold
 
             # ② REASONING-EXTRACTION pass: for targets that HIDE their reasoning, fire the probe with
             # the extraction injection so the RT bleeds into the answer, then scan it. Opt-in + fail-soft.
@@ -431,8 +481,7 @@ async def run_scan(
                 except Exception:  # noqa: BLE001 — a leakage gauge must never fail the scan
                     pass
 
-            n = len(responses)
-            rate = n_breach / n if n else 0.0
+            n = _n_sprt  # trials fired (SPRT: judged, non-errored; fixed-n: all responses) — rate set above
             technique = technique_label(prim.family.value)
 
             # Deep stages 3 + 4 — only on a primitive the baseline did NOT breach. PAIR first (the
@@ -460,6 +509,7 @@ async def run_scan(
                         outcome = esc
                 if outcome is not None and outcome.breached:
                     n, n_breach, rate = 1, 1, 1.0
+                    breached = True
                     technique = outcome.technique or technique
                     example_attack = outcome.example_attack or example_attack
                     example_response = outcome.example_response or example_response
@@ -483,7 +533,7 @@ async def run_scan(
                 except Exception:  # noqa: BLE001 — a gauge must never fail the scan
                     pass
 
-            if rate >= breach_threshold:
+            if breached:  # SPRT decision when on; rate>=breach_threshold when off (set above)
                 n_breaches += 1
             findings.append(
                 Finding(
@@ -637,6 +687,10 @@ async def run_scan(
         rtbf=rtbf_report,
         user_safety=user_safety_report,
         reasoning_leak=reasoning_leak_report,
+        survival=(
+            {"n_deferred": n_deferred, "note": _survival_plan.summary()}
+            if _survival_plan.enabled else None
+        ),
     )
 
 

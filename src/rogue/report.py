@@ -464,6 +464,9 @@ class ScanReport:
     # Leaky-Thoughts axis: reasoning-trace leakage {n_reasoning_only, reasoning_only, …} — secrets the
     # target spelled out in its thinking but withheld from the answer. Opt-in (reasoning_leak_secrets).
     reasoning_leak: dict | None = None
+    # Q11 survival gate: {n_deferred, note} when the survival ordering ran (ROGUE_SURVIVAL_ORDER=on).
+    # None when the gate was off → today's dict is byte-identical. Surfaces the deferred tail (no silent cut).
+    survival: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -614,6 +617,8 @@ class ScanReport:
             out["user_safety"] = self.user_safety
         if self.reasoning_leak is not None:
             out["reasoning_leak"] = self.reasoning_leak
+        if self.survival is not None:
+            out["survival"] = self.survival
         return out
 
     def to_json(

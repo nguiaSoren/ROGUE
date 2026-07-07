@@ -66,6 +66,10 @@ class EndpointScanReport:
     n_primitives: int
     n_breached: int
     findings: list[EndpointFinding] = field(default_factory=list)
+    # Q11 survival gate: how many attacks the predictor deferred (predicted non-transfer) under a
+    # budget cap, and how it ranked. 0 when the gate is off or no cap was set — today's default.
+    n_deferred: int = 0
+    survival_note: str | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -81,6 +85,8 @@ class EndpointScanReport:
         tail = (
             f" {skipped} skipped (target not multimodal)." if skipped else ""
         )
+        if self.n_deferred:
+            tail += f" {self.n_deferred} deferred by survival gate (predicted non-transfer)."
         return (
             f"Scanned {self.base_url} (model {self.model!r}): "
             f"{self.n_breached}/{self.n_primitives} attack primitives breached "
@@ -177,6 +183,9 @@ async def scan_endpoint(
     database_url: str | None = None,
     config_id: str = "adhoc-endpoint-scan",
     config_name: str | None = None,
+    # --- opt-in Q11 survival ordering (purely additive; default off preserves today's fire order) ---
+    survival_gate: object | None = None,
+    survival_max_primitives: int | None = None,
     # --- opt-in agent-exec (tool-use / indirect-injection) — auto-on when declared_tools≠[] ---
     declared_tools: list[str] | None = None,
     forbidden_tools: list[str] | None = None,
@@ -263,6 +272,37 @@ async def scan_endpoint(
         escalate_planner = EscalationPlanner.from_env()
         owns_planner = True
 
+    # Q11 SURVIVAL GATE (opt-in, env-gated) — reorder the corpus so predicted survivors fire first,
+    # and (when survival_max_primitives is set) defer the predicted-dead tail. Off unless
+    # ROGUE_SURVIVAL_ORDER=on and a model artifact exists → today's order is byte-identical. The
+    # drift-guard (novel/low-support families) inside the gate guarantees newly-harvested families are
+    # never skipped — they are always fired regardless of score.
+    from rogue.reproduce.survival.gate import apply_survival_order  # noqa: PLC0415
+
+    survival_plan = apply_survival_order(
+        primitives, config, gate=survival_gate, max_primitives=survival_max_primitives,
+    )
+    n_deferred = 0
+    survival_note = None
+    if survival_plan.enabled:
+        primitives = survival_plan.selected
+        n_deferred = len(survival_plan.deferred)
+        survival_note = survival_plan.summary()
+        _log.info("%s", survival_note)
+
+    # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
+    # byte-identical. When on, each primitive's trial loop runs Wald's sequential test bracketing the
+    # breach threshold and stops as soon as the outcome is statistically clear (~4–6 trials for the
+    # obvious cells) — cutting target+judge calls while giving borderline cells a meaningful n.
+    from rogue.reproduce.sprt import resolve_config as _resolve_sprt, run_sprt  # noqa: PLC0415
+
+    _sprt = _resolve_sprt()
+    if _sprt is not None:
+        _log.info(
+            "SPRT early-stopping ON (p0=%.2f p1=%.2f α=%.2f β=%.2f n_max=%d batch=%d)",
+            _sprt.p0, _sprt.p1, _sprt.alpha, _sprt.beta, _sprt.n_max, _sprt.batch,
+        )
+
     findings: list[EndpointFinding] = []
     orm_rows: list = []  # BreachResultORM rows collected when persist=True
     try:
@@ -299,49 +339,55 @@ async def scan_endpoint(
                 )
                 continue
 
-            # True multi-turn: ≥2 user turns → real back-and-forth; single-turn → single invoke.
-            # ``run_conversation`` is guarded by hasattr so a duck-typed test panel without it cleanly
-            # degrades to ``run_attack``.
-            if TargetPanel.user_turn_count(rendered) >= 2 and hasattr(panel, "run_conversation"):
-                responses = await panel.run_conversation(
-                    rendered, config, temperature=temperature, n_trials=n_trials
-                )
-            else:
-                responses = await panel.run_attack(
-                    rendered, config, temperature=temperature, n_trials=n_trials
-                )
-            n_breach = 0
-            n_error = 0
-            for r in responses:
+            # One trial: dispatch → judge → optional persist. Returns True (breach) / False (no breach)
+            # / None (errored — endpoint or judge). Shared by the fixed-n loop and the SPRT driver so
+            # both persist and grade identically; only the *number* of trials fired differs.
+            async def _judge_trial(r, _prim=primitive, _rendered=rendered) -> bool | None:
                 if r.error is not None:
-                    # errored trial — no judgment, no row (error skipped intentionally)
-                    n_error += 1
-                    continue
+                    return None  # errored trial — no judgment, no row
                 try:
-                    result = await judge.judge(rendered, r.content, primitive)
+                    result = await judge.judge(_rendered, r.content, _prim)
                 except Exception as e:  # a judge glitch must not abort the whole scan
-                    _log.warning("judge failed on %s: %s", primitive.primitive_id, e)
-                    n_error += 1
-                    # judge failure counts as errored — no row persisted for this trial
-                    continue
-                if result.verdict in BREACH_VERDICTS:
-                    n_breach += 1
+                    _log.warning("judge failed on %s: %s", _prim.primitive_id, e)
+                    return None
                 if persist:
-                    from rogue.reproduce.persistence import build_breach_result_orm
+                    from rogue.reproduce.persistence import build_breach_result_orm  # noqa: PLC0415
 
                     orm_rows.append(
                         build_breach_result_orm(
-                            primitive_id=primitive.primitive_id,
-                            config_id=config.config_id,
-                            rendered=rendered,
-                            response=r,
-                            judge_result=result,
+                            primitive_id=_prim.primitive_id, config_id=config.config_id,
+                            rendered=_rendered, response=r, judge_result=result,
                         )
                     )
-            n = len(responses)
-            rate = n_breach / n if n else 0.0
+                return result.verdict in BREACH_VERDICTS
+
+            # Fire ``want`` trials. True multi-turn (≥2 user turns) drives a real back-and-forth;
+            # ``run_conversation`` is guarded by hasattr so a duck-typed test panel degrades cleanly.
+            async def _fire(want: int, _rendered=rendered) -> list[bool | None]:
+                if TargetPanel.user_turn_count(_rendered) >= 2 and hasattr(panel, "run_conversation"):
+                    resp = await panel.run_conversation(
+                        _rendered, config, temperature=temperature, n_trials=want)
+                else:
+                    resp = await panel.run_attack(
+                        _rendered, config, temperature=temperature, n_trials=want)
+                return [await _judge_trial(r) for r in resp]
+
             title = primitive.title
-            error = "all_trials_errored" if n and n_error == n else None
+            if _sprt is not None:
+                _out = await run_sprt(_fire, _sprt, breach_threshold=breach_threshold)
+                _log.debug("%s %s", primitive.primitive_id, _out.summary())
+                n, n_breach, rate = _out.n_trials, _out.n_breach, _out.rate
+                breached = _out.breached
+                error = "all_trials_errored" if _out.all_errored else None
+            else:
+                # Today's fixed-n scan: fire all n_trials at once, grade each (byte-identical path).
+                results = await _fire(n_trials)
+                n = len(results)
+                n_breach = sum(1 for b in results if b is True)
+                n_error = sum(1 for b in results if b is None)
+                rate = n_breach / n if n else 0.0
+                breached = rate >= breach_threshold
+                error = "all_trials_errored" if n and n_error == n else None
 
             # Deep stages 3 + 4 — only on a primitive the baseline did NOT breach. PAIR first, then
             # escalation if PAIR also failed. A win folds back into THIS finding (n_trials=1,
@@ -360,6 +406,7 @@ async def scan_endpoint(
                         outcome = esc
                 if outcome is not None and outcome.breached:
                     n, n_breach, rate = 1, 1, 1.0
+                    breached = True
                     error = None
                     if outcome.technique:
                         title = f"{primitive.title} — broke via {outcome.technique}"
@@ -374,7 +421,7 @@ async def scan_endpoint(
                     n_trials=n,
                     n_breach=n_breach,
                     any_breach_rate=round(rate, 3),
-                    breached=rate >= breach_threshold,
+                    breached=breached,
                     error=error,
                 )
             )
@@ -434,6 +481,8 @@ async def scan_endpoint(
         n_primitives=len(findings),
         n_breached=n_breached,
         findings=findings,
+        n_deferred=n_deferred,
+        survival_note=survival_note,
     )
 
 

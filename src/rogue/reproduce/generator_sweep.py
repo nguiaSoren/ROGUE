@@ -10,7 +10,7 @@ real panel+judge in prod (``live_trial_fn``) and a stub in tests.
 
 from __future__ import annotations
 
-import math
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
@@ -18,18 +18,12 @@ from rogue.schemas import AttackPrimitive, DeploymentConfig, PayloadGenerator
 
 from . import generators
 from .generators._util import count_tokens
+from .sprt import resolve_config as _resolve_sprt, run_sprt, wilson_interval as _wilson
 
-TrialFn = Callable[[str, DeploymentConfig, int], Awaitable[tuple[int, float]]]
-
-
-def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = p + z * z / (2 * n)
-    m = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
-    return (max(0.0, (c - m) / d), min(1.0, (c + m) / d))
+# A trial_fn fires ``n_trials`` of ``payload`` against ``config`` and returns ``(n_breach, cost)`` — or,
+# when it early-stops (SPRT), the 3-tuple ``(n_breach, cost, n_fired)`` so the sweep can report the ASR
+# over the trials it actually spent. ``_probe`` accepts either shape.
+TrialFn = Callable[[str, DeploymentConfig, int], Awaitable[tuple]]
 
 
 @dataclass
@@ -95,11 +89,17 @@ async def run_generator_sweep(
             return None
         params: dict[str, Any] = {**generator.params, generator.sweep_param: value}
         payload = generators.build(generator.kind, params, target_query, seed)
-        n_breach, cost = await trial_fn(payload, config, n_trials)
+        outcome = await trial_fn(payload, config, n_trials)
+        # trial_fn returns (n_breach, cost) — or (n_breach, cost, n_fired) when it early-stopped (SPRT).
+        if len(outcome) == 3:
+            n_breach, cost, n_fired = outcome
+        else:
+            n_breach, cost = outcome
+            n_fired = n_trials
         res.cost_usd += cost
-        asr = n_breach / n_trials if n_trials else 0.0
-        lo, hi = _wilson(n_breach, n_trials)
-        pt = SweepPoint(value, count_tokens(payload), n_trials, n_breach, asr, lo, hi)
+        asr = n_breach / n_fired if n_fired else 0.0
+        lo, hi = _wilson(n_breach, n_fired)
+        pt = SweepPoint(value, count_tokens(payload), n_fired, n_breach, asr, lo, hi)
         cache[value] = pt
         return pt
 
@@ -130,30 +130,67 @@ async def run_generator_sweep(
     return res
 
 
-def live_trial_fn(adapter: Any, judge_fn: Callable[[str, str], bool]) -> TrialFn:
+def live_trial_fn(
+    adapter: Any,
+    judge_fn: Callable[[str, str], bool],
+    *,
+    sprt: Any = None,
+    breach_threshold: float = 0.5,
+) -> TrialFn:
     """A trial_fn that dispatches ``payload`` to a real model via ``adapter`` and grades with ``judge_fn``.
 
-    ``judge_fn(target_query_or_payload, response_text) -> breached``. Errors count as non-breach trials
-    (a failed/refused call is not a breach) so a flaky provider can't inflate ASR.
+    ``judge_fn(target_query_or_payload, response_text) -> breached``. A failed/refused call is an errored
+    trial (never a breach), so a flaky provider can't inflate ASR.
+
+    SPRT (opt-in, ``ROGUE_SPRT=on`` or an injected ``sprt`` config): instead of a fixed ``n_trials`` per
+    swept value, each value's trials run Wald's sequential test and stop as soon as the breach signal is
+    clear — returning ``(n_breach, cost, n_fired)`` so the sweep reports the ASR over the trials actually
+    spent. Off → today's fixed loop returning ``(n_breach, cost)``. (SPRT's own decision is discarded
+    here; the sweep independently compares the reported ASR against its ``breach_threshold``.)
     """
     from rogue.core.content_blocks import TextBlock
     from rogue.core.message import CanonicalMessage, MessageRole
 
-    async def _trial(payload: str, config: DeploymentConfig, n_trials: int) -> tuple[int, float]:
+    _sprt = sprt if sprt is not None else _resolve_sprt()
+
+    def _messages(payload: str, config: DeploymentConfig):
+        msgs = []
+        if config.system_prompt:
+            msgs.append(CanonicalMessage(role=MessageRole.SYSTEM, content=[TextBlock(text=config.system_prompt)]))
+        msgs.append(CanonicalMessage(role=MessageRole.USER, content=[TextBlock(text=payload)]))
+        return msgs
+
+    async def _fire_one(payload: str, config: DeploymentConfig) -> tuple[bool | None, float]:
+        try:
+            result = await adapter.invoke(_messages(payload, config), temperature=0.7)
+            cost = getattr(result.usage, "estimated_cost_usd", None) or 0.0
+            return bool(judge_fn(payload, result.text)), cost
+        except Exception:  # noqa: BLE001 — provider error → errored trial (None)
+            return None, 0.0
+
+    async def _trial(payload: str, config: DeploymentConfig, n_trials: int) -> tuple:
+        if _sprt is not None:
+            cost_acc = 0.0
+
+            async def fire_batch(want: int) -> list[bool | None]:
+                nonlocal cost_acc
+                pairs = await asyncio.gather(*(_fire_one(payload, config) for _ in range(want)))
+                out: list[bool | None] = []
+                for breach, c in pairs:
+                    cost_acc += c
+                    out.append(breach)
+                return out
+
+            outcome = await run_sprt(fire_batch, _sprt, breach_threshold=breach_threshold)
+            return outcome.n_breach, cost_acc, outcome.n_trials
+
         breaches = 0
         cost = 0.0
         for _ in range(n_trials):
-            messages = []
-            if config.system_prompt:
-                messages.append(CanonicalMessage(role=MessageRole.SYSTEM, content=[TextBlock(text=config.system_prompt)]))
-            messages.append(CanonicalMessage(role=MessageRole.USER, content=[TextBlock(text=payload)]))
-            try:
-                result = await adapter.invoke(messages, temperature=0.7)
-                cost += getattr(result.usage, "estimated_cost_usd", None) or 0.0
-                if judge_fn(payload, result.text):
-                    breaches += 1
-            except Exception:  # noqa: BLE001 — provider error → non-breach trial
-                continue
+            breach, c = await _fire_one(payload, config)
+            cost += c
+            if breach is True:
+                breaches += 1
         return breaches, cost
 
     return _trial
