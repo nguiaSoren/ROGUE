@@ -106,7 +106,8 @@ shipping.
 
 ## The drift-guard (why this is honest)
 
-Kirch's out-of-distribution collapse, made operational. Two rails in `survival/gate.py`:
+The failure mode identified by Kirch et al. (probes trained on known families transferring below random
+to held-out ones), made operational. Two rails in `survival/gate.py`:
 
 1. **Fire-all for novel / low-support families.** A family with fewer than `min_support` (default 8)
    distinct training primitives, or a technique the frozen taxonomy doesn't cover
@@ -216,9 +217,10 @@ Three offline experiments a security reviewer asks for, all on the already-paid 
 **1. Leave-one-family-out (LOFO) — generalization to an unseen family.** Retraining with an *entire
 attack family* held out and testing on it, mean held-out **AUC = 0.62** (median 0.60, 13 evaluable
 families) — down from the in-distribution 0.77, the honest degradation expected when the test family
-was never seen. The tail is the point: `tool_use_hijack` lands at **AUC 0.49 — below random.** That is
-Kirch's OOD-collapse reproduced on ROGUE's own data, and the direct empirical justification for the
-**drift-guard**: generalization across *primitives* of a known family is strong (0.77), but across an
+was never seen. The tail is the point: `tool_use_hijack` lands at **AUC 0.49 — below random**, which is
+consistent with the failure mode Kirch et al. identify (probes collapsing below random on held-out
+families) and is the direct empirical justification for the **drift-guard**: generalization across
+*primitives* of a known family is strong (0.77), but across an
 *unseen family* it is partial and can collapse — so the gate defers only within-distribution and fires
 every novel / low-support family unconditionally.
 
@@ -259,8 +261,8 @@ The paper is *not* publishable because "the classifier works." It is publishable
 **missing axis in jailbreak evaluation — transfer survival under deployment shift — and builds a
 budget-aware evaluation system around it.** A black-box, per-*attack* predictor of cross-system-prompt
 survival is the gap Kirch (white-box, same-model), Ball (white-box, mechanism) and Helm (black-box but
-per-*config*, the transpose of our question) all leave open, and ROGUE uniquely owns the asset they
-lack: a large table of *the same attacks reproduced across many deployment configs*. The measured
+per-*config*, the transpose of our question) all leave open, and ROGUE provides an uncommon asset they
+lack: a table of *the same attacks reproduced across many deployment configs*. The measured
 budget-saved curve on a real reproduction corpus (not a static benchmark) is a first-of-its-kind
 artifact, and it composes with the P1 allocation-scheduler paper (survival rank is a new acquisition
 signal for the allocator).
@@ -277,7 +279,7 @@ main-conference security bar wants, **three are now measured** (see [Strengtheni
 above](#strengthening-experiments-measured-0), all `$0` on already-paid data):
 
 1. ✅ **Leave-one-family-out** — mean held-out **AUC 0.62**, with one family (`tool_use_hijack`) **below
-   random**: Kirch's OOD-collapse on our own data, and the empirical case for the drift-guard.
+   random**: consistent with the failure mode Kirch et al. identify, and the empirical case for the drift-guard.
 2. ✅ **Calibration** — **ECE 0.026**; the scores are trustworthy, not just monotone.
 3. ✅ **Baselines** — survival budget-saved **0.391 vs random 0.199 (≈2×)**; the `reproducibility_score`
    heuristic is **worse than random**, so the lift is the *learned* survival axis, not any ordering.

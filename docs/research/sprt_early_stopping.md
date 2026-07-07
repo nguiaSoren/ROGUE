@@ -27,6 +27,16 @@ policy can be back-tested this way over an existing evaluation corpus. The stati
 textbook; the work is adapting it to a live red-team pipeline without disturbing the numbers it already
 reports.
 
+**Why this isn't "just apply SPRT."** A red-team evaluation pipeline violates the textbook SPRT setup in
+specific, load-bearing ways, and each is an engineering constraint the design has to satisfy: trials are
+**asynchronous and already parallelized** (naive one-at-a-time sampling would serialize what the panel
+fires concurrently — hence the batch driver); each trial carries an **expensive judge call**, so the
+saving is per-observation, not per-token; the same test must splice into **heterogeneous execution
+paths** (default scan, endpoint scan, sweep, paid research arm) that fire and grade differently; and it
+must **preserve the existing benchmark's verdicts and metrics** exactly, or every historical number
+becomes incomparable. The contribution is the *evaluation architecture* that meets all four at once — an
+off-the-shelf SPRT satisfies none of them.
+
 ---
 
 ## The problem
@@ -179,6 +189,33 @@ which is exactly where you wanted the trials in the first place. The hard cases 
 the average saving — they are the beneficiaries of it. (Independent of ROGUE's data: this is the Wald
 operating-characteristic curve, reproduced by `replay_sprt.py --asn-only`.)
 
+### Replay validation is itself a contribution
+
+Adaptive evaluation methods are *expensive to validate*: "we think this adaptive policy saves money"
+normally costs thousands of dollars to demonstrate, because you have to actually run the policy live.
+The replay validator sidesteps that — it drives the sequential policy over **evaluation traces already
+collected**, in their real firing order, and estimates call-saving + decision-agreement for `$0`. The
+method is not SPRT-specific: *any* adaptive-sampling or early-stopping policy over a
+Bernoulli-per-trial benchmark can be pre-screened this way against real historical data before a single
+paid run. For a field where evaluation is the dominant cost, a cheap way to vet adaptive policies
+offline is useful on its own.
+
+### The live experiment (the one number still gated)
+
+The offline replay is *pessimistic by construction*: the method targets `n_max=12`, but most historical
+cells carry only 3–5 trials, so on replay SPRT rarely has room to reach a boundary (21% "decided"). A
+live experiment removes that ceiling — a single fresh reproduce pass, two arms over the same cells:
+
+| arm | policy | measured |
+|---|---|---|
+| **A — baseline** | fixed **12 trials/cell** | verdicts, cost, latency |
+| **B — SPRT** | sequential, **cap 12/cell** | decision agreement vs A · calls saved · dollars saved · mean trials/cell · latency |
+
+That converts "SPRT should save calls" into *"in production LLM security evaluation, SPRT reduced
+evaluation cost by X% while preserving Y% of verdicts"* — the deployment sentence a reviewer remembers.
+It is a short pass over a handful of configs, foldable into any paid session, and it matters *more* here
+than for a ranking method precisely because the offline replay understates the benefit.
+
 ## Caveats
 
 - **Replay ≠ live.** The 22.1% is what SPRT would have saved *over the trials ROGUE already fired*;
@@ -187,11 +224,8 @@ operating-characteristic curve, reproduced by `replay_sprt.py --asn-only`.)
   run, not a claim we can make from replay alone.
 - **Composing with survival ordering — same run, own arm.** SPRT and the survival gate are orthogonal
   (survival picks *which cells* fire; SPRT sets *how many trials* each fired cell gets), so they compose
-  as a product and share one harvest/config/budget envelope. But the *measurement* can't piggyback on a
-  scan that fires ~3 trials/cell — one short of a SAFE decision, so a replay over it inherits the same
-  weak signal as above. A strong live SPRT number needs a short dedicated pass at **higher `n_trials`
-  (≥12)** so SPRT has room to early-stop against a real fixed-n baseline — a deliberately-configured
-  arm, not a by-product of an ordering A/B.
+  as a product and share one harvest/config/budget envelope. But SPRT's *own* measurement needs the
+  higher-depth two-arm pass above, not a by-product of an ordering A/B — see [the live experiment](#the-live-experiment-the-one-number-still-gated). (The two together are the stronger paper — see [Summary](#summary).)
 - **Latency vs cost.** Batched sequential firing (`batch=2`) trades some parallelism for early
   stopping. For a paid scan, dollars dominate latency; raise `ROGUE_SPRT_BATCH` to recover throughput
   at the cost of a little over-firing.
@@ -215,6 +249,23 @@ the few that are genuinely uncertain. SPRT buys the reliability only where it's 
 near-fixed-12 confidence on the ambiguous cells (which run to ~11 trials) while spending closer to
 fixed-3 cost on the easy ones (~4–6). Same statistical guarantee at the boundary, a fraction of the
 calls away from it.
+
+**Venue.** This is operational security-evaluation tooling, so **USENIX Security** is the strongest fit
+(it rewards real systems + deployment constraints); **NDSS / CCS** are good, though CCS wants the framing
+to be *"reliability and efficiency of automated red-team evaluation,"* not "an optimization trick";
+**IEEE S&P** and the ML venues (NeurIPS/ICML) are a harder sell for the statistics alone; **TMLR** is
+possible.
+
+**Stronger together with survival ranking (Q11).** The two are complementary halves of one budget-aware
+evaluation loop — survival ranking answers *which attacks to test first*, SPRT answers *how many trials
+each tested attack gets*:
+
+    harvest → survival-rank (which to fire) → SPRT (how many trials each) → budget-efficient evaluation
+
+Framed as a single system — *Adaptive LLM Red-Team Evaluation Under Budget Constraints* — the pair is a
+markedly stronger submission than either alone: the ranking supplies the novelty, the sequential test
+supplies the statistical rigor, and both share the replay-validation methodology and the
+benchmark-compatibility guarantee (verdicts unchanged, only cheaper to reach).
 
 The load-bearing property is that the measurement does not move: on 1,939 real cells the sequential
 test reaches the **same breach verdict as the fixed-`n` rule on 99.8% of them**, while spending fewer
