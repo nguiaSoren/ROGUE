@@ -54,20 +54,32 @@ brief cited was fact-checked against the source.
 4. **Once adequately trained, the small-model failure mode is *omission*, not
    *fabrication*** — the safer mode for a downstream reproduce pipeline.
 
-## Measured, $0: off-the-shelf 3B is not adequate
+## Measured, $0: off-the-shelf local is not adequate — at *any* size tested
 
-Ran `qwen2.5:3b` (Ollama, `local/` prefix) through the real `ExtractionAgent`
-against the golden source-doc fixtures (`scripts/extract/eval_extractor_fields.py`):
+Ran **three** off-the-shelf `qwen2.5` sizes (3B / 14B / 32B, Ollama, `local/`
+prefix) through the real `ExtractionAgent` against the golden source-doc fixtures
+(`scripts/extract/eval_extractor_fields.py`) — **all three score recall 0/2**, and
+the *reason* sharpens with size rather than the result improving:
 
-| doc (source → golden) | qwen2.5:3b result |
-|---|---|
-| `multilingual_paper.html` → 01 (language-switching jailbreak) | **abstained** (`is_attack: false`) |
-| `copirate_365.html` → 02 (indirect prompt injection, CVE) | **abstained** (`is_attack: false`) |
+| model | `multilingual_paper.html` (academic jailbreak) | `copirate_365.html` (CVE injection) |
+|---|---|---|
+| **qwen2.5:3b** | abstains (`is_attack: false`) | abstains (`is_attack: false`) — no recognition |
+| **qwen2.5:14b** | abstains | **recognizes** the attack (its prose summary is *accurate*) but emits a free-form summary / no `payload_template` → R5 demote |
+| **qwen2.5:32b** | abstains | **recognizes** the attack (classification metadata) but still no `payload_template` → R5 demote |
 
-**Recall 0/2.** An off-the-shelf 3B misses *real* attack disclosures entirely — it
-would silently drop attacks if swapped in naively. This is exactly Lincoln's
-"only fine-tuned small is validated" landing on ROGUE's task, and it is *why* the
-adoption mechanism is a cascade, not a swap.
+**Recall 0/2 across the board.** Two distinct failure modes, and the important
+one is prompt-resistant: (1) **recognition** — every size abstains on the harder
+academic-paper attack; (2) **structuring** — 14B/32B *understand* the CVE attack
+but won't render it as schema-shaped fields, specifically failing to synthesise
+the free-text `payload_template` (exactly Lincoln's weak-field prediction). I gave
+the models a fair shot: the `local/` path injects the full field contract + enum
+vocabulary into the prompt (`_LOCAL_SCHEMA_HINT`, derived from the real enums), yet
+at temperature 0 the 14B **deterministically ignores it** and keeps summarising.
+So this is *not* "a 3B is too small" and *not* "under-prompted" — scaling params
+15× and handing the model the schema both leave it at 0/2. That is why the fix is
+a **fine-tune** (or schema-constrained decoding, which local runtimes can't
+compile for a schema this large), and why the adoption mechanism is a cascade,
+not a swap — a swap at *any* of these sizes would silently drop attacks.
 
 (The field-agreement scorer itself is proven correct on the golden-as-perfect-
 extractor: structural macro **1.0**, per-field enum/set/dict all 1.0, with
@@ -86,10 +98,15 @@ for cost:
   because the existing `openai/` branch pins output with
   `beta.chat.completions.parse(response_format=AttackPrimitive)`, whose grammar
   the AttackPrimitive schema is too large for local runtimes to compile (verified:
-  Ollama returns *"failed to parse grammar"*). The raw JSON flows through the
-  **same** R1–R8 normalizer + Pydantic validation the Haiku path uses — the
-  normalizer that already exists to absorb small-model schema drift earns its keep
-  twice here.
+  Ollama returns *"failed to parse grammar"*). Since json-mode enforces valid
+  JSON but not the *shape*, the branch injects the field contract into the prompt
+  instead — `_LOCAL_SCHEMA_HINT`, the exact top-level field names + the (small)
+  family/vector/severity enum vocabularies, derived from the real enums so it can
+  never drift, with clauses that target the observed mid-model failures (prose
+  summary instead of the payload; nesting under a wrapper key). The raw JSON flows
+  through the **same** R1–R8 normalizer + Pydantic validation the Haiku path uses —
+  the normalizer that already exists to absorb small-model schema drift earns its
+  keep twice here.
 - **Acceptance gate (asymmetric — mirrors Q2's "never assert from the cheap
   tier").** Accept the local extraction **iff** it is a schema-valid
   `AttackPrimitive` with a non-empty `payload_template` that clears an
@@ -126,18 +143,19 @@ cascade escalated to a $0 stub Haiku tier which returned the correct
 `n_escalated_abstain=1`, `local_save_rate=0.0` surfaced. The harvest seam was
 exercised in both flag states (off → `ExtractionAgent`, on → `CascadeExtractionAgent`).
 The **accept path** (grounded valid local primitive → no escalation) is covered by
-the stub-local unit test but was **never fired by the real 3B** — because the 3B
-never produces a grounded primitive. 60 tests pass (13 new cascade/field-eval + 47
-extraction), ruff clean.
+the stub-local unit test but was **never fired by any real off-the-shelf model** —
+none of 3B/14B/32B produces a grounded primitive. 60 tests pass (13 new
+cascade/field-eval + 47 extraction), ruff clean.
 
 ## Honest gaps / what a live headline needs
 
-- **No paid run was spent.** The 0/2 recall is a real $0 measurement; a Haiku
-  *baseline* field-F1 (the bar the local model must clear) is a cents-level paid
-  call, gated behind `--include-haiku`.
-- **n = 2 source-doc fixtures** (03 is golden-only). This is a directional signal
-  + a mechanism proof, not a powered benchmark. A wider labeled-corpus A/B
-  (>100 scraped docs) would need a small paid Haiku baseline (~$1–2).
+- **No paid run was spent.** The 0/2 recall (× 3 model sizes) is a real $0
+  measurement; a Haiku *baseline* field-F1 (the bar the local model must clear) is
+  a cents-level paid call, gated behind `--include-haiku`.
+- **n = 2 source-doc fixtures** (03 is golden-only). The model axis is now covered
+  (3B/14B/32B), but the *document* axis is thin — this is a directional signal + a
+  mechanism proof, not a powered benchmark. A wider labeled-corpus A/B (>100
+  scraped docs) would need a small paid Haiku baseline (~$1–2).
 - **The path to an actual saving** is a *fine-tuned* local extractor. ROGUE owns
   the ideal distillation set for it — its own logged Haiku extractions
   (`attack_primitives` ⋈ source docs). That is the natural follow-on and the only

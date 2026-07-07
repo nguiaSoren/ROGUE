@@ -47,9 +47,12 @@ from tenacity import (
 
 from rogue.schemas import (
     AUTO_INTEGRABLE_MODALITIES,
+    AttackFamily,
     AttackPrimitive,
+    AttackVector,
     Modality,
     RawDocument,
+    Severity,
     StrategyStatus,
     TechniqueSpec,
 )
@@ -394,6 +397,49 @@ def _build_extraction_tool_schema() -> dict[str, Any]:
 
 #: Static tool schema sent to the extraction LLM (payload + technique branches).
 _EXTRACTION_TOOL_SCHEMA: dict[str, Any] = _build_extraction_tool_schema()
+
+
+def _build_local_schema_hint() -> str:
+    """Field-contract hint appended to the local (`local/`) system prompt.
+
+    The Anthropic/OpenAI branches pin output to the AttackPrimitive schema via a
+    tool schema / strict parse. Local json-mode (`response_format=json_object`)
+    only guarantees *valid JSON*, NOT the shape — and the full-schema grammar is
+    too large for local runtimes to compile (Ollama: "failed to parse grammar").
+    So the contract is delivered in the prompt instead: the exact top-level field
+    names + the (small) enum vocabularies, derived from the real enums so it can
+    never drift. Two clauses target measured mid-size-model failure modes:
+    emitting a prose summary instead of the actual payload, and nesting the
+    fields under a wrapper key. Computed once at import.
+    """
+    families = ", ".join(e.value for e in AttackFamily)
+    vectors = ", ".join(e.value for e in AttackVector)
+    severities = ", ".join(e.value for e in Severity)
+    return (
+        "\n\nSTRUCTURED OUTPUT CONTRACT — emit ONE JSON object with these fields "
+        "at the TOP LEVEL (do NOT nest them under any wrapper key like "
+        '"attack_primitive"):\n'
+        f"- family: exactly one of [{families}]\n"
+        f"- vector: exactly one of [{vectors}]\n"
+        "- title: short string\n"
+        "- short_description: 1-3 sentence summary\n"
+        "- payload_template: the ACTUAL reusable attack prompt text itself "
+        "(the verbatim jailbreak / injection string, with {slot} placeholders "
+        "for the variable parts) — NOT a description or summary of the attack\n"
+        "- payload_slots: object mapping each {slot} in payload_template to an "
+        "example value\n"
+        "- reproducibility_score: integer 1-10\n"
+        f"- base_severity: exactly one of [{severities}]\n"
+        "- severity_rationale: one sentence\n"
+        "- secondary_families: optional list drawn from the family vocab above\n"
+        "- requires_multi_turn: boolean\n"
+        'If the document is NOT an attack disclosure, emit {"is_attack": false, '
+        '"reason": "..."} instead. No markdown fences, no wrapper key, one object.'
+    )
+
+
+#: Cached field-contract hint for the local json-mode branch.
+_LOCAL_SCHEMA_HINT: str = _build_local_schema_hint()
 
 
 def _build_technique_or_none(data: Any, *, source_url: str) -> TechniqueSpec | None:
@@ -1071,17 +1117,13 @@ class ExtractionAgent:
             )
 
         bare_model = self.model.split("/", 1)[1]
-        # json-mode nudge: the endpoint enforces "valid JSON object", but not the
-        # shape — so we spell out the contract in the system turn (the tool-schema
-        # the Anthropic/OpenAI branches lean on is unavailable in plain json mode).
-        system = (
-            self.prompt
-            + "\n\nOUTPUT CONTRACT: respond with EXACTLY ONE JSON object and "
-            "nothing else. If the document is an attack disclosure, emit ALL "
-            "AttackPrimitive fields (family, vector, payload_template, "
-            "payload_slots, reproducibility_score, ...). If it is NOT an attack, "
-            'emit {"is_attack": false, "reason": "..."}.'
-        )
+        # json-mode delivers the field contract in the prompt: json mode enforces
+        # "valid JSON object" but not the *shape*, and the tool-schema the
+        # Anthropic/OpenAI branches lean on is unavailable here (and the
+        # full-schema grammar won't compile on local runtimes). `_LOCAL_SCHEMA_HINT`
+        # spells out the exact top-level fields + enum vocab so the model can emit
+        # a valid primitive instead of a free-form summary.
+        system = self.prompt + _LOCAL_SCHEMA_HINT
         response = await self._local_client.chat.completions.create(
             model=bare_model,
             max_tokens=4096,
