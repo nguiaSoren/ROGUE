@@ -136,11 +136,57 @@ class AxisAgreement:
     def agreement_rate(self) -> float | None:
         return self.n_agreed / self.n if self.n else None
 
+    @property
+    def cohen_kappa(self) -> float | None:
+        """Chance-corrected agreement (Cohen's κ) from the 2×2 cells.
+
+        ``κ = (p_o − p_e) / (1 − p_e)`` where ``p_o`` is observed agreement and
+        ``p_e`` is the agreement expected by chance from the two marginals
+        (judge-positive rate × human-positive rate + the negative product).
+
+        This is the metric BOTH grounding papers (Krumdick 2503.05061, Thakur
+        2406.12624) report, and the honest one for a judge-shrink A/B: raw
+        ``agreement_rate`` inflates under class imbalance — a judge that merely
+        tracks the base rate scores high agreement but low κ. Returns ``None``
+        when undefined (``n==0`` or a degenerate ``p_e==1`` where one class is
+        empty and κ carries no information). Mirrors the canonical formula in
+        ``scripts/research/repro_kappa_check.py`` — kept here so every axis
+        (JBB / WildGuard / binary-breach) exposes κ without duplicating it.
+        """
+        n = self.n
+        if n == 0:
+            return None
+        p_o = self.n_agreed / n
+        p_pred_pos = (self.tp + self.fp) / n  # judge said positive
+        p_true_pos = (self.tp + self.fn) / n  # human said positive
+        p_e = p_pred_pos * p_true_pos + (1 - p_pred_pos) * (1 - p_true_pos)
+        if p_e >= 1.0:
+            return None  # one class empty on a marginal — κ undefined
+        return (p_o - p_e) / (1 - p_e)
+
+    @property
+    def false_positive_rate(self) -> float | None:
+        """Judge over-call rate on the positive class: ``fp / (fp + tn)``.
+
+        On the breach axis the positive class is *breach*, so this is the rate
+        at which the judge asserts a breach on a response a human called clean —
+        the leniency / precision-deficit that Thakur (2406.12624) shows grows as
+        judges shrink, and the exact contamination ROGUE_PLAN §10.2 warns about
+        (a chunk of the headline breach matrix being judge over-eagerness). The
+        judge-shrink gate refuses a candidate whose FPR is materially above the
+        Sonnet baseline's even when overall κ looks close. ``None`` when there is
+        no human-negative support (rate undefined — never a fabricated 0.0)."""
+        denom = self.fp + self.tn
+        return self.fp / denom if denom else None
+
     def summary_line(self) -> str:
         rate = self.agreement_rate
         rate_str = f"{rate:.2%}" if rate is not None else "n/a"
+        kappa = self.cohen_kappa
+        kappa_str = f"{kappa:.3f}" if kappa is not None else "n/a"
         return (
-            f"{self.axis}: agreement={rate_str} ({self.n_agreed}/{self.n}) "
+            f"{self.axis}: agreement={rate_str} κ={kappa_str} "
+            f"({self.n_agreed}/{self.n}) "
             f"[tp={self.tp} fp={self.fp} fn={self.fn} tn={self.tn}]"
         )
 
