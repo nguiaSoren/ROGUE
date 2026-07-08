@@ -7,6 +7,7 @@ from .community_archive import CommunityArchivePlugin
 from .github_search import GithubSearchPlugin
 from .huggingface_discussion import HuggingFaceDiscussionPlugin
 from .leakhub_scrape import LeakHubScrapePlugin
+from .multilingual_forum import MultilingualForumPlugin
 from .obliteratus_hf import ObliteratusHfPlugin
 from .pliny_github import PlinyGithubPlugin
 from .reddit_subreddit import RedditSubredditPlugin
@@ -21,6 +22,7 @@ __all__ = [
     "GithubSearchPlugin",
     "HuggingFaceDiscussionPlugin",
     "LeakHubScrapePlugin",
+    "MultilingualForumPlugin",
     "ObliteratusHfPlugin",
     "PlinyGithubPlugin",
     "RedditSubredditPlugin",

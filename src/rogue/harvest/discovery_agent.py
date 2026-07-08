@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -58,6 +59,7 @@ from rogue.harvest.sources import (
     GithubSearchPlugin,
     HuggingFaceDiscussionPlugin,
     # LeakHubScrapePlugin,  # disabled 2026-05-26 — see default_plugins() docstring
+    MultilingualForumPlugin,
     ObliteratusHfPlugin,
     PlinyGithubPlugin,
     RedditSubredditPlugin,
@@ -359,6 +361,15 @@ def default_plugins() -> list[SourcePlugin]:
         # --- Scraping Browser plugins (most expensive — run last) ---
         # LeakHubScrapePlugin(),  # disabled 2026-05-26 — see docstring
         CommunityArchivePlugin(),
+        # Q20 multilingual harvest (non-English Reddit keyword discovery). Registered ONLY when
+        # ROGUE_MULTILINGUAL_HARVEST is on so the daily harvest is byte-identical to today by default.
+        # It runs last (like the scraping-browser plugins) since per-language yield is uneven.
+        *(
+            [MultilingualForumPlugin()]
+            if os.environ.get("ROGUE_MULTILINGUAL_HARVEST", "off").strip().lower()
+            in ("on", "1", "true", "yes")
+            else []
+        ),
     ]
 
 

@@ -29,6 +29,7 @@ def build_breach_result_orm(
     rendered: RenderedAttack,
     response: ModelResponse,
     judge_result: JudgeResult,
+    language: str | None = None,
 ) -> BreachResultORM:
     """Compose one BreachResult ORM row from (rendered, response, verdict).
 
@@ -63,6 +64,7 @@ def build_breach_result_orm(
         cost_usd=response.cost_usd,
         ran_at=datetime.now(timezone.utc),
         persona_used=rendered.persona_used,
+        language=language,
     )
 
 

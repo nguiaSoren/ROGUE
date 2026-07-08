@@ -151,5 +151,14 @@ class BreachResult(BaseModel):
     )
 
     ran_at: datetime
+    language: Optional[str] = Field(
+        default=None,
+        max_length=8,
+        description=(
+            "Q20 translate-then-reproduce: ISO code of the language this attack was fired in when a "
+            "primitive was expanded into a language panel; NULL for the untranslated English baseline "
+            "and every non-multilingual run."
+        ),
+    )
 
     model_config = {"frozen": True}  # results are append-only and immutable

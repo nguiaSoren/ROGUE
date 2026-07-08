@@ -242,6 +242,7 @@ async def run_scan(
     survival_max_primitives: int | None = None,
     prefire_gate: Any = None,
     m2s_config: Any = None,
+    multilingual_config: Any = None,
     domain_jargon: bool = False,
     domain_jargon_domains: tuple[str, ...] = ("medical", "finance", "legal"),
     domain_jargon_max: int = 4,
@@ -399,6 +400,25 @@ async def run_scan(
     if _m2s_plan.enabled:
         primitives = _m2s_plan.primitives
         n_m2s_consolidated = _m2s_plan.n_consolidated
+
+    # Q20 MULTILINGUAL EXPANSION (opt-in, env-gated) — expand each text primitive into itself (the
+    # untouched English baseline) PLUS one translated, round-trip-gated variant per target language, so the
+    # scan measures the per-deployment English-vs-non-English breach delta WITHOUT moving the English
+    # verdict. Off unless ROGUE_MULTILINGUAL=on → the list is byte-identical. Runs last so only the
+    # primitives that will actually fire are translated (a paid step). Variants have distinct ids, so they
+    # never collide with the base in the findings aggregation below.
+    from .reproduce.multilingual.gate import apply_multilingual  # noqa: PLC0415
+
+    _ml_plan = await apply_multilingual(primitives, config=multilingual_config)
+    _multilingual_report: dict | None = None
+    if _ml_plan.enabled:
+        primitives = _ml_plan.primitives
+        _multilingual_report = {
+            "n_variants": _ml_plan.n_variants,
+            "n_invalid": _ml_plan.n_invalid,
+            "languages": _ml_plan.languages,
+            "note": _ml_plan.summary(),
+        }
 
     # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
     # byte-identical. When on, each primitive's trial loop is Wald's sequential test bracketing the
@@ -757,6 +777,7 @@ async def run_scan(
              "note": _m2s_plan.summary()}
             if _m2s_plan.enabled else None
         ),
+        multilingual=_multilingual_report,
     )
 
 

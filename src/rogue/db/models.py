@@ -201,6 +201,14 @@ class AttackPrimitive(Base):
     authorship_label: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, default=None, index=True
     )
+    # Camouflaged-intent tag (Zheng 2509.05471, extract.camouflage): benign-frame × dual-use co-occurrence
+    # likelihood [0,1] + discretized label for a HARVESTED payload. NULL = unscored (flag off / synthesized).
+    # A flag-for-review PRIOR (Zheng: keyword detection can't do this reliably), never a gate. Label indexed
+    # for the "show me camouflaged harvest" review query.
+    camouflage_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+    camouflage_label: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default=None, index=True
+    )
 
     # ----- Timestamps + severity -----
     discovered_at: Mapped[datetime] = mapped_column(
@@ -334,6 +342,12 @@ class BreachResult(Base):
     persona_used: Mapped[Optional[str]] = mapped_column(
         String(60), nullable=True, index=False
     )
+    # Q20 multilingual: ISO code of the language this attack was FIRED in when the translate-then-reproduce
+    # path expanded a primitive into a language panel (ROGUE_MULTILINGUAL / --multilingual). NULL for the
+    # untranslated English baseline and every non-multilingual run — so today's rows are byte-identical.
+    # Indexed for the English-vs-non-English breach-delta GROUP BY. String (not enum) per the exfil_method /
+    # persona_used convention.
+    language: Mapped[Optional[str]] = mapped_column(String(8), nullable=True, index=True)
 
     # §10.7 full PAIR build: iteration index at which this cell FIRST
     # breached (verdict ∈ {partial_breach, full_breach}). NULL when no PAIR

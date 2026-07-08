@@ -97,6 +97,7 @@ from rogue.db.models import (  # noqa: E402
 )
 from rogue.dedupe import llm_authored_score  # noqa: E402
 from rogue.dedupe.embeddings import Deduplicator  # noqa: E402
+from rogue.extract.camouflage import camouflage_score as _camouflage_score  # noqa: E402
 from rogue.extract.extraction_agent import ExtractionAgent, ExtractionImage  # noqa: E402
 from rogue.extract.cascade import (  # noqa: E402
     CascadeExtractionAgent,
@@ -157,6 +158,12 @@ def parse_since(value: str) -> datetime:
 # --------------------------------------------------------------------------- #
 
 
+def _camouflage_tag_enabled() -> bool:
+    """Q20 camouflaged-intent tag is opt-in: on only when ROGUE_CAMOUFLAGE_TAG ∈ {on,1,true,yes}.
+    Off (default) → camouflage_score/label stay NULL at persist, byte-identical to pre-Q20 harvest."""
+    return os.environ.get("ROGUE_CAMOUFLAGE_TAG", "off").strip().lower() in ("on", "1", "true", "yes")
+
+
 def _to_orm_primitive(p: AttackPrimitive) -> AttackPrimitiveORM:
     """Mirror ``scripts/ops/seed_demo_data.py::_to_orm_primitive``.
 
@@ -172,12 +179,21 @@ def _to_orm_primitive(p: AttackPrimitive) -> AttackPrimitiveORM:
     if a_score is None:
         _a = llm_authored_score(p.payload_template)
         a_score, a_label = _a.score, _a.label
+    # Camouflaged-intent tag (Q20, Zheng 2509.05471): a benign-frame × dual-use co-occurrence PRIOR set at
+    # persist time, ONLY when ROGUE_CAMOUFLAGE_TAG is on so the column stays NULL (byte-identical to today)
+    # when off. Respects a pre-set value (so a fixture / re-persist keeps its tag). A review flag, not a gate.
+    c_score, c_label = p.camouflage_score, p.camouflage_label
+    if c_score is None and _camouflage_tag_enabled():
+        _c = _camouflage_score(p.payload_template)
+        c_score, c_label = _c.score, _c.label
     return AttackPrimitiveORM(
         primitive_id=p.primitive_id,
         cluster_id=p.cluster_id,
         canonical=p.canonical,
         authorship_score=a_score,
         authorship_label=a_label,
+        camouflage_score=c_score,
+        camouflage_label=c_label,
         family=p.family.value,
         secondary_families=[f.value for f in p.secondary_families],
         vector=p.vector.value,

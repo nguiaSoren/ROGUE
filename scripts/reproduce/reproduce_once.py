@@ -103,6 +103,7 @@ from rogue.reproduce.pair_orchestrator import (  # noqa: E402
     build_step_orm_rows,
     new_breach_id,
 )
+from rogue.reproduce.multilingual.expand import fire_identity as _ml_fire_identity  # noqa: E402
 from rogue.reproduce.persistence import (  # noqa: E402
     build_breach_result_orm,
     persist_breach_rows,
@@ -489,10 +490,12 @@ async def _run_judge_batch_phase(
                     rationale="judge batch returned no verdict for this cell",
                     confidence=0.0,
                 )
+            _fk_pid, _lang = _ml_fire_identity(pid, rendered.resolved_slots)
             rows.append(
                 build_breach_result_orm(
-                    primitive_id=pid, config_id=cid,
+                    primitive_id=_fk_pid, config_id=cid,
                     rendered=rendered, response=resp, judge_result=vr,
+                    language=_lang,
                 )
             )
             stats.add_verdict(vr.verdict)
@@ -591,6 +594,8 @@ async def run_reproduction(
     survival_skip: bool = False,
     prefire_skip: bool = False,
     m2s_consolidate: bool = False,
+    multilingual: bool = False,
+    multilingual_translator: object | None = None,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -744,6 +749,41 @@ async def run_reproduction(
 
             primitives = [_orm_to_pydantic_primitive(o) for o in primitive_orms]
             configs = [_orm_to_pydantic_config(o) for o in config_orms]
+
+            # Q20 MULTILINGUAL EXPANSION (explicit opt-in: --multilingual) — expand the primitive set
+            # UP-FRONT (before pairs / the by-id bookkeeping dicts are built) into each base plus one
+            # translated, round-trip-gated variant per target language. Expanding here (not at the pair
+            # level) keeps cells_left / prim_breached / primitive_by_id / _pairs internally consistent.
+            # Variants carry distinct ids + a _ml_lang marker; each fired trial persists against its BASE
+            # primitive_id with the language on the breach_results row (variant_fire_identity), so the FK
+            # holds and the corpus is NOT polluted. Recommended with escalate=False for a clean
+            # English-vs-non-English delta. Off (no --multilingual) → primitives byte-identical.
+            if multilingual:
+                from rogue.reproduce.multilingual.gate import (  # noqa: PLC0415
+                    MultilingualConfig,
+                    apply_multilingual,
+                )
+                from rogue.reproduce.multilingual.languages import resolve_languages  # noqa: PLC0415
+                from rogue.reproduce.multilingual.translate import build_translator  # noqa: PLC0415
+
+                _ml_raw = os.environ.get("ROGUE_MULTILINGUAL_LANGS", "").strip()
+                _ml_codes = [c.strip() for c in _ml_raw.split(",") if c.strip()] if _ml_raw else None
+                _ml_langs = resolve_languages(_ml_codes)
+                if _ml_langs:
+                    _ml_cfg = MultilingualConfig(
+                        languages=_ml_langs,
+                        translator=multilingual_translator or build_translator(),
+                    )
+                    _ml_plan = await apply_multilingual(primitives, config=_ml_cfg)
+                    primitives = _ml_plan.primitives
+                    logger.info(
+                        "multilingual: +%d translated variant(s) across %s (%d dropped for empty/"
+                        "failed round-trip); firing %d primitive(s) total",
+                        _ml_plan.n_variants, "/".join(_ml_plan.languages), _ml_plan.n_invalid,
+                        len(primitives),
+                    )
+                else:
+                    logger.warning("--multilingual set but no valid target languages resolved — skipping")
 
             # §11.8 — AUTOMATIC media carriers. For multimodal-image primitives
             # that describe a carrier (media_query) but don't already have a
@@ -978,12 +1018,14 @@ async def run_reproduction(
                 cell_breached = False
                 for response, verdict_result in trials:
                     try:
+                        _fk_pid, _lang = _ml_fire_identity(pid, rendered.resolved_slots)
                         row = build_breach_result_orm(
-                            primitive_id=pid,
+                            primitive_id=_fk_pid,
                             config_id=cid,
                             rendered=rendered,
                             response=response,
                             judge_result=verdict_result,
+                            language=_lang,
                         )
                         session.add(row)
                         stats.breach_results_persisted += 1
@@ -1615,6 +1657,18 @@ def main(argv: list[str] | None = None) -> int:
             "consolidated run vs a scripted (M2S-off) run keyed by primitive_id."
         ),
     )
+    parser.add_argument(
+        "--multilingual",
+        action="store_true",
+        help=(
+            "Q20: expand each primitive into itself (English baseline) PLUS one translated, "
+            "round-trip-gated variant per target language (ROGUE_MULTILINGUAL_LANGS csv, default the "
+            "6-language panel) and fire them all, so the sweep measures the English-vs-non-English breach "
+            "delta. Each variant persists against its BASE primitive_id with the fired language on the "
+            "breach_results row. PAID (real translation) unless ROGUE_MULTILINGUAL_TRANSLATOR=echo. "
+            "Run with --no-escalate for a clean flat measurement."
+        ),
+    )
     args = parser.parse_args(argv)
     # --no-iterative overrides --pair-max-iters per §10.7 demo-fallback semantics.
     if args.no_iterative:
@@ -1685,6 +1739,7 @@ def main(argv: list[str] | None = None) -> int:
             survival_skip=getattr(args, "survival_skip", False),
             prefire_skip=getattr(args, "prefire_skip", False),
             m2s_consolidate=getattr(args, "m2s_consolidate", False),
+            multilingual=getattr(args, "multilingual", False),
         )
     )
     logger.info("run_id=%s done: %s", run_id, stats.summary_line())

@@ -76,6 +76,11 @@ class EndpointScanReport:
     # Q14 M2S: how many multi-turn primitives were folded to single-turn before firing. 0 when off.
     n_m2s_consolidated: int = 0
     m2s_note: str | None = None
+    # Q20 multilingual: how many translated per-language variants were added before firing (0 when off);
+    # n_multilingual_invalid = variants dropped for empty/failed round-trip. Languages fired listed too.
+    n_multilingual_variants: int = 0
+    n_multilingual_invalid: int = 0
+    multilingual_note: str | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -97,6 +102,8 @@ class EndpointScanReport:
             tail += f" {self.n_prefire_skipped} skipped pre-fire (predicted non-breach)."
         if self.n_m2s_consolidated:
             tail += f" {self.n_m2s_consolidated} multi-turn folded to single-turn (M2S)."
+        if self.n_multilingual_variants:
+            tail += f" +{self.n_multilingual_variants} multilingual variant(s) fired."
         return (
             f"Scanned {self.base_url} (model {self.model!r}): "
             f"{self.n_breached}/{self.n_primitives} attack primitives breached "
@@ -200,6 +207,8 @@ async def scan_endpoint(
     prefire_gate: object | None = None,
     # --- opt-in Q14 M2S consolidation (purely additive; default off → multi-turn fires as-is) ---
     m2s_config: object | None = None,
+    # --- opt-in Q20 multilingual expansion (purely additive; default off → English-only, byte-identical) ---
+    multilingual_config: object | None = None,
     # --- opt-in agent-exec (tool-use / indirect-injection) — auto-on when declared_tools≠[] ---
     declared_tools: list[str] | None = None,
     forbidden_tools: list[str] | None = None,
@@ -351,6 +360,22 @@ async def scan_endpoint(
         primitives = m2s_plan.primitives
         n_m2s_consolidated = m2s_plan.n_consolidated
 
+    # Q20 MULTILINGUAL EXPANSION (opt-in, env-gated) — expand each text primitive into itself (English
+    # baseline, untouched) PLUS one translated, round-trip-gated variant per target language, so the scan
+    # measures the English-vs-non-English breach delta without moving the English verdict. Off unless
+    # ROGUE_MULTILINGUAL=on → byte-identical. Runs last so only firing primitives are translated (paid).
+    from rogue.reproduce.multilingual.gate import apply_multilingual  # noqa: PLC0415
+
+    ml_plan = await apply_multilingual(primitives, config=multilingual_config)
+    n_multilingual_variants = 0
+    n_multilingual_invalid = 0
+    multilingual_note: str | None = None
+    if ml_plan.enabled:
+        primitives = ml_plan.primitives
+        n_multilingual_variants = ml_plan.n_variants
+        n_multilingual_invalid = ml_plan.n_invalid
+        multilingual_note = ml_plan.summary()
+
     # SPRT early-stopping (opt-in, env-gated). Off unless ROGUE_SPRT=on → the fixed-n loop below is
     # byte-identical. When on, each primitive's trial loop runs Wald's sequential test bracketing the
     # breach threshold and stops as soon as the outcome is statistically clear (~4–6 trials for the
@@ -413,11 +438,17 @@ async def scan_endpoint(
                     return None
                 if persist:
                     from rogue.reproduce.persistence import build_breach_result_orm  # noqa: PLC0415
+                    from rogue.reproduce.multilingual.expand import variant_fire_identity  # noqa: PLC0415
 
+                    # A multilingual variant persists against its BASE primitive_id (FK-valid) with the
+                    # fired language on the row; a normal primitive → (its own id, None). Byte-identical
+                    # when multilingual is off (no variant carries the _ml_lang marker).
+                    _fk_pid, _lang = variant_fire_identity(_prim)
                     orm_rows.append(
                         build_breach_result_orm(
-                            primitive_id=_prim.primitive_id, config_id=config.config_id,
+                            primitive_id=_fk_pid, config_id=config.config_id,
                             rendered=_rendered, response=r, judge_result=result,
+                            language=_lang,
                         )
                     )
                 return result.verdict in BREACH_VERDICTS
@@ -556,6 +587,9 @@ async def scan_endpoint(
         n_prefire_skipped=n_prefire_skipped,
         n_m2s_consolidated=n_m2s_consolidated,
         m2s_note=(m2s_plan.summary() if m2s_plan.enabled else None),
+        n_multilingual_variants=n_multilingual_variants,
+        n_multilingual_invalid=n_multilingual_invalid,
+        multilingual_note=multilingual_note,
     )
 
 

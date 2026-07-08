@@ -473,6 +473,10 @@ class ScanReport:
     # Q14 M2S consolidation: {n_consolidated, method, note} when multi-turn primitives were folded to
     # single-turn (ROGUE_M2S=on). None when off → today's dict is byte-identical.
     m2s: dict | None = None
+    # Q20 multilingual expansion: {n_variants, n_invalid, languages, note} when translate-then-reproduce
+    # ran (ROGUE_MULTILINGUAL=on). None when off → today's dict is byte-identical. Surfaces the added
+    # per-language variants + the ones dropped for a failed round-trip (no silent inflation).
+    multilingual: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -629,6 +633,8 @@ class ScanReport:
             out["prefire"] = self.prefire
         if self.m2s is not None:
             out["m2s"] = self.m2s
+        if self.multilingual is not None:
+            out["multilingual"] = self.multilingual
         return out
 
     def to_json(

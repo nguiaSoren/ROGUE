@@ -287,6 +287,26 @@ class AttackPrimitive(BaseModel):
         description="Discretized authorship_score at the calibrated threshold; NULL when unscored.",
     )
 
+    # ----- Camouflaged-intent tag (Zheng 2509.05471; a review PRIOR, not a gate) -----
+    camouflage_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Camouflaged-intent likelihood in [0,1] (higher = a benign frame co-occurring with a "
+            "dual-use capability, i.e. a harmful ask laundered as legitimate research/DIY/security work) "
+            "from extract.camouflage — a cheap lexical CO-OCCURRENCE prior grounded in Zheng 'Behind the "
+            "Mask' (2509.05471). Set at harvest-persist time under ROGUE_CAMOUFLAGE_TAG; NULL when "
+            "unscored. HONEST: a weak lexical FLAG-FOR-REVIEW (Zheng shows keyword detection can't do "
+            "this reliably — the strong signal is the LLM judge), NEVER an auto-drop gate. See "
+            "docs/research/multilingual_coverage.md."
+        ),
+    )
+    camouflage_label: Literal["camouflaged", "overt", "ambiguous"] | None = Field(
+        default=None,
+        description="Discretized camouflage_score: camouflaged (frame + dual-use co-occur) / overt / ambiguous; NULL when unscored.",
+    )
+
     # ----- Provenance -----
     sources: list[SourceProvenance] = Field(
         ..., min_length=1, description="at least one source — extraction without source rejected"
