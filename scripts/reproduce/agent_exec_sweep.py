@@ -41,7 +41,6 @@ from rogue.reproduce.agent.backends.hybrid import HybridBackend
 from rogue.reproduce.agent.context import AgentRunContext
 from rogue.reproduce.agent.scenarios import build_scenario, render_primitive
 from rogue.reproduce.agent.canaries import new_run_secret
-from rogue.reproduce.agent.memory_channel import memory_exfil_overrides
 from rogue.reproduce.agent.tier import (
     AgentExecBudget,
     AgentExecConfig,
@@ -369,8 +368,10 @@ async def _run(args) -> int:
         # account_linking, calculate, ...) actually fire — those breaches land in the caveated
         # emulated column (non-headline, Q3). NOTE: emulator OpenAI cost is NOT in the budget cap.
         emulator_model=args.emulator_model or None,
-        # Cross-session memory-exfil probe (Q13): env-gated (ROGUE_MEMORY_EXFIL), off unless set.
-        **memory_exfil_overrides(),
+        # NOTE: the Q13 memory-exfil probe fires only via run_agent_exec_stage (run_scan /
+        # scan_endpoint). This sweep drives run_agent_exec_one/pass, which never calls the stage,
+        # so ROGUE_MEMORY_EXFIL is intentionally NOT plumbed here — it would be inert. Run the memory
+        # probe against a live endpoint with scan_endpoint(..., ROGUE_MEMORY_EXFIL=on) instead.
     )
 
     # DB read (both modes): report what the real corpus looks like
