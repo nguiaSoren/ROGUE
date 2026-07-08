@@ -412,15 +412,15 @@ async def run_sweep(args) -> dict:
 
 
 def _ops_by_name(kinds):
-    from rogue.obfuscation.operators import OBFUSCATION_OPERATORS
+    from rogue.obfuscation.operators import active_operators
 
-    return [(op.name, op.apply) for op in OBFUSCATION_OPERATORS if op.kind in kinds]
+    return [(op.name, op.apply) for op in active_operators() if op.kind in kinds]
 
 
 def _kind_of(name, kinds):
-    from rogue.obfuscation.operators import OBFUSCATION_OPERATORS
+    from rogue.obfuscation.operators import active_operators
 
-    for op in OBFUSCATION_OPERATORS:
+    for op in active_operators():
         if op.name == name:
             return op.kind
     return None

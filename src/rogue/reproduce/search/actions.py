@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable, Optional
 
-from rogue.obfuscation.operators import OBFUSCATION_OPERATORS, apply_operator
+from rogue.obfuscation.operators import active_operators, apply_operator
 from rogue.reproduce.structured_data import STRUCTURED_FORMATS, wrap_structured_data
 
 from .searcher import Action, RolloutOutcome
@@ -26,7 +26,10 @@ def cheap_mutation_actions() -> list[Action]:
 
         return Action(name=f"obf:{name}", apply=_apply, kind="mutation")
 
-    return [_mk(op.name) for op in OBFUSCATION_OPERATORS]
+    # active_operators() = baseline 10, plus the Q16 extended set only when
+    # ROGUE_OBF_EXTENDED is on — so the search action space is byte-identical
+    # to today unless the flag is flipped.
+    return [_mk(op.name) for op in active_operators()]
 
 
 def framing_mutation_actions() -> list[Action]:

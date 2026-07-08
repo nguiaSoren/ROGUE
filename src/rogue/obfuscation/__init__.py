@@ -13,16 +13,24 @@ from __future__ import annotations
 
 from rogue.obfuscation.canonical import canonicalize
 from rogue.obfuscation.operators import (
+    ENCODING_FAMILY_COVERAGE,
+    EXTENDED_OBFUSCATION_OPERATORS,
     OBFUSCATION_OPERATORS,
     ObfuscationOperator,
+    active_operators,
     apply_operator,
     obfuscate,
+    try_decode_nested_cipher,
 )
 
 __all__ = [
+    "ENCODING_FAMILY_COVERAGE",
+    "EXTENDED_OBFUSCATION_OPERATORS",
     "OBFUSCATION_OPERATORS",
     "ObfuscationOperator",
+    "active_operators",
     "apply_operator",
     "canonicalize",
     "obfuscate",
+    "try_decode_nested_cipher",
 ]

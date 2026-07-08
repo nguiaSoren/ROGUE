@@ -2,9 +2,11 @@
 
 The deterministic, zero-LLM-cost sibling of ``synthesize_mutations.py``. Where
 that script paraphrases an almost-defended parent with an LLM, this one skins it
-with the ten obfuscation operators (``rogue.obfuscation.operators`` — leetspeak,
-homoglyph, zero-width, fullwidth, zalgo + base64/rot13/hex/unicode-escape/
-html-entity decode-wraps) and persists each as a ``synthesized=True`` child
+with the ``active_operators()`` set (``rogue.obfuscation.operators`` — the ten
+baseline operators: leetspeak, homoglyph, zero-width, fullwidth, zalgo +
+base64/rot13/hex/unicode-escape/html-entity decode-wraps; plus the Q16 extended
+set — diacritics, variation-selector/unicode-tag smuggling, nested cipher —
+when ``ROGUE_OBF_EXTENDED`` is on) and persists each as a ``synthesized=True`` child
 primitive. ``reproduce_once.py`` then fires those children through the panel
 like any other primitive, so the breach matrix shows whether a target defends
 the *technique* or merely the *exact surface string* — the "pattern-matching,
@@ -54,7 +56,7 @@ from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from rogue.db.models import AttackPrimitive as AttackPrimitiveORM  # noqa: E402
-from rogue.obfuscation.operators import OBFUSCATION_OPERATORS  # noqa: E402
+from rogue.obfuscation.operators import active_operators  # noqa: E402
 from rogue.reproduce.instantiator import render  # noqa: E402
 from rogue.schemas import AttackPrimitive, DeploymentConfig  # noqa: E402
 
@@ -176,7 +178,7 @@ def run_obfuscation_synthesis(
     primitive_id: str | None = None,
 ) -> ObfuscationStats:
     _assert_schema_present(database_url)
-    operators = [op for op in OBFUSCATION_OPERATORS if op.kind in kinds]
+    operators = [op for op in active_operators() if op.kind in kinds]
 
     engine = create_engine(database_url)
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -268,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
     kinds = tuple(k.strip() for k in args.kinds.split(",") if k.strip())
 
     if args.dry_run:
-        n_ops = len([op for op in OBFUSCATION_OPERATORS if op.kind in kinds])
+        n_ops = len([op for op in active_operators() if op.kind in kinds])
         print(f"DRY-RUN: up to {args.limit} parents x {n_ops} operators "
               f"({','.join(kinds)}) → up to {args.limit * n_ops} synthesized children. "
               "No DB writes. Drop --dry-run to persist.")

@@ -121,3 +121,46 @@ ZALGO_MARKS: tuple[str, ...] = (
     "ͤ",
     "҉",
 )
+
+
+# ----- Diacritics / combining substitution (Q16) ----------------------------
+
+# Vowel -> a precomposed accented twin (forward, the ``diacritics`` operator;
+# Hackett et al. 2504.11168 "hèllö"). The inverse needs NO table: NFKD
+# decomposition + the combining-mark strip already in ``canonical`` folds these
+# straight back (à -> a + U+0300 -> a), so diacritics ride the existing
+# canonicalization path with zero new decode logic.
+DIACRITIC_ENCODE: dict[str, str] = {
+    "a": "à", "e": "è", "i": "ì", "o": "ò", "u": "ù",
+    "A": "À", "E": "È", "I": "Ì", "O": "Ò", "U": "Ù",
+}
+
+
+# ----- Unicode Tag smuggling (U+E0000 block, Q16) ---------------------------
+
+# ASCII printable ``c`` -> its invisible "tag" twin at ``U+E0000 + ord(c)``
+# (forward, ``unicode_tag_smuggle``; Hackett 2504.11168 — co-highest ASR, one of
+# only two families to beat a hardened Protect AI v2). Many models still read
+# tag chars as the ASCII they mirror, so the payload survives while a
+# surface-level classifier sees an empty string.
+UNICODE_TAG_BASE = 0xE0000
+# The printable-ASCII tag sub-range that carries a real payload (space .. ~).
+TAG_PRINTABLE_RANGE: tuple[int, int] = (0xE0020, 0xE007E)
+
+
+# ----- Emoji variation-selector smuggling (Q16) -----------------------------
+
+# Byte ``b`` -> a variation selector: ``b < 16`` -> VS1..VS16 (U+FE00 + b);
+# else -> VS17..VS256 (U+E0100 + b - 16). A run of selectors trailing a benign
+# carrier emoji hides an arbitrary byte string in plain sight (forward,
+# ``variation_selector_smuggle``; Hackett 2504.11168 — the single highest-ASR
+# family, 100%, and the only one to beat Protect AI v2).
+VS_LOW_BASE = 0xFE00      # VS1..VS16   -> bytes 0..15
+VS_HIGH_BASE = 0xE0100    # VS17..VS256 -> bytes 16..255
+VARIATION_SELECTOR_RANGES: tuple[tuple[int, int], ...] = (
+    (0xFE00, 0xFE0F),
+    (0xE0100, 0xE01EF),
+)
+# A variation selector must follow a base character to be well-formed, so the
+# smuggled run is anchored to this benign visible carrier (😀).
+VS_CARRIER = "\U0001F600"

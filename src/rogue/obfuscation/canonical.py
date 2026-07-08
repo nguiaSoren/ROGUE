@@ -34,12 +34,25 @@ from rogue.obfuscation.tables import (
     DIRECTION_CONTROL_CHARS,
     HOMOGLYPH_DECODE,
     LEET_DECODE,
+    TAG_PRINTABLE_RANGE,
+    UNICODE_TAG_BASE,
+    VARIATION_SELECTOR_RANGES,
     ZERO_WIDTH_CHARS,
 )
 
 __all__ = ["canonicalize"]
 
 _INVISIBLE = set(ZERO_WIDTH_CHARS) | set(DIRECTION_CONTROL_CHARS)
+
+# A run of >=1 variation selector — decoded (Q16 emoji smuggling) only under
+# ``decode_transport`` and only when the run is long enough and round-trips to
+# printable UTF-8, so legitimate single-selector emoji (❤️ = U+2764 U+FE0F) are
+# left untouched.
+_VS_RUN = re.compile(
+    "["
+    + "".join(f"{chr(lo)}-{chr(hi)}" for lo, hi in VARIATION_SELECTOR_RANGES)
+    + "]+"
+)
 
 # Sequences leet-folding must not touch — mirrors Defender's PROTECTED_SEQUENCE.
 # Corrupting a base64 blob or a \xHH / \uHHHH escape would break later
@@ -96,14 +109,56 @@ def _fold_leet(text: str) -> str:
     return "".join(out)
 
 
+def _decode_unicode_tags(text: str) -> str:
+    """Fold invisible Unicode-tag chars (U+E0020..U+E007E) back to the ASCII they
+    mirror — the inverse of the ``unicode_tag_smuggle`` operator (Q16)."""
+    lo, hi = TAG_PRINTABLE_RANGE
+    return "".join(
+        chr(ord(c) - UNICODE_TAG_BASE) if lo <= ord(c) <= hi else c for c in text
+    )
+
+
+def _vs_to_byte(ch: str) -> int:
+    cp = ord(ch)
+    if 0xFE00 <= cp <= 0xFE0F:
+        return cp - 0xFE00
+    return cp - 0xE0100 + 16  # 0xE0100..0xE01EF (guaranteed by _VS_RUN)
+
+
+def _decode_variation_selectors(text: str) -> str:
+    """Fold a variation-selector run back to its smuggled text — the inverse of
+    the ``variation_selector_smuggle`` operator (Q16). Guarded: only a run of
+    >=4 selectors that decodes to mostly-printable UTF-8 is folded, so real
+    emoji presentation selectors survive."""
+
+    def _sub(m: re.Match[str]) -> str:
+        run = m.group(0)
+        if len(run) < 4:
+            return run
+        try:
+            decoded = bytes(_vs_to_byte(c) for c in run).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return run
+        if decoded and sum(c.isprintable() or c.isspace() for c in decoded) / len(decoded) >= 0.8:
+            return decoded
+        return run
+
+    return _VS_RUN.sub(_sub, text)
+
+
 def _maybe_decode_transport(text: str) -> str:
-    """Best-effort decode of rot13 and standalone base64 blobs.
+    """Best-effort decode of invisible smuggling (Q16 tag + variation-selector)
+    and standalone base64 blobs.
 
     Only applied when ``decode_transport=True``. A base64 blob is replaced by
     its decoded text *only* when the decode round-trips to mostly-printable
     ASCII — otherwise the blob is left as-is (it was probably real data, not
-    an encode-wrapped instruction).
+    an encode-wrapped instruction). Tag/variation-selector folding recovers a
+    smuggled payload so obfuscated near-duplicates collapse in dedup and the
+    goal-preservation gate can see through them.
     """
+    text = _decode_unicode_tags(text)
+    text = _decode_variation_selectors(text)
     # rot13 is a pure letter rotation; applying it canonicalizes both a rot13
     # payload and its plaintext to the same fold point is NOT desired, so we
     # only rot13 when the text looks rot13-ish is hard to detect — skip by

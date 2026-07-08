@@ -47,6 +47,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from rogue.obfuscation.canonical import canonicalize
+from rogue.obfuscation.operators import try_decode_nested_cipher
 
 from .coverage import _cosine
 
@@ -79,10 +80,14 @@ def _lexical_overlap(text: str, ref: str) -> float:
 
 def _decoded_candidates(text: str) -> list[str]:
     """Best-effort de-obfuscations to recover the underlying payload from a wrap/obfuscation skin.
-    ``canonicalize`` folds inline obfuscation + base64; the ROGUE wrap operators also use rot13, hex,
-    unicode-escape, and html-entity, which are decoded here. Every attempt is guarded — a bogus decode
-    just yields text that won't match the original."""
+    ``canonicalize`` folds inline obfuscation + base64 + Q16 tag/variation-selector smuggling; the
+    ROGUE wrap operators also use rot13, hex, unicode-escape, html-entity, and the Q16 nested
+    ROT-13∘Vigenère cipher, which are decoded here. Every attempt is guarded — a bogus decode just
+    yields text that won't match the original."""
     cands = [canonicalize(text, decode_transport=True)]
+    nested = try_decode_nested_cipher(text)
+    if nested:
+        cands.append(nested)
     for fn in (lambda t: codecs.decode(t, "rot_13"), lambda t: html.unescape(t)):
         try:
             cands.append(fn(text))
