@@ -1,64 +1,98 @@
 # Observable leakage channels — a provenance-instrumentation framework (P5)
 
-**Status:** framework spec + 3 instantiated channels shipped (tool-args, reasoning-traces, persistent-memory); retrieval next. The cross-model *prevalence* study is the open empirical question (see §7). This doc is the framework; the per-channel docs are its instances.
+**Elevator pitch.** *ROGUE turns hidden agent-internal channels — tool-call arguments, reasoning traces, persistent memory — into observable, provenance-labeled leakage channels that can be measured with deterministic canaries.* Everything below is an instance of that one idea.
 
-## 1. The claim
+**Contribution (stated once).** We do **not** contribute a new attack. We contribute a **reusable, provenance-based instrumentation framework** that makes leakage on any internal execution channel measurable with deterministic, ground-truth canary tracking — and we demonstrate it generalizes by instantiating three channels on one substrate, cross-session persistent memory being the newest.
 
-A leak is not only what a model *says*. A tool-using, memory-bearing agent exposes a value through many **observable execution channels** — tool-call arguments, reasoning traces, persistent memory, retrieval context — and an audit that inspects only the final response is structurally blind to all of them. The framework's claim is narrow and testable: **the instrumentation needed to catch a leak on any one channel is the same across channels**, so you build it once and instantiate per channel, and the interesting object is not any single channel but the *reusable instrument* and what it reveals when pointed at many channels at once.
+**Status:** framework spec + 3 instantiated channels shipped (tool-args, reasoning-traces, persistent-memory); retrieval next. The reuse and the provenance-attribution accuracy are demonstrated at $0 (below); the cross-model *prevalence* finding is the open empirical question (§7) and needs a live run.
 
-The kernel is **provenance, not detection**. That a value appeared is one question; *where along the execution graph it originated* — retrieved, recalled from a prior session, or produced from parameters — is the harder, more useful one, and it is what turns a pile of channel logs into an attributable audit.
+## 1. Why output-only auditing is not enough
 
-## 2. Why output-only detection is not enough (the baseline)
+A leak is not only what a model *says*. A tool-using, memory-bearing agent exposes a value through many observable execution channels, and an audit of the final response is blind to all of them. This is measured, not asserted: AgentLeak (2602.11510) finds **41.7% of traces are "false-clean"** — the output passes every check while an internal channel leaked. Trace-logging tools (LangSmith, Phoenix, and agent observability generally) *see* those channels — they record tool calls and memory ops — but they log **what happened**, not **whether a secret leaked** or **where it came from**. The gap this framework fills is adversarial, ground-truth leakage *measurement* with provenance, not trace visibility (§6).
 
-The simplest alternative is to scan the final answer for the secret. It cannot, by construction, see a secret that leaves through a tool argument, a private reasoning trace, or a recalled memory — the channels never touch the answer. This is measurable, not rhetorical: AgentLeak (2602.11510) reports that **41.7% of traces are "false-clean"** — the output passes every privacy check while an internal channel leaked. Naive per-channel logging is a second baseline: it records *that* a value appeared on a channel but not *where it came from*, so it cannot separate a genuine cross-session leak from the model legitimately echoing something it was just handed. The framework's value over both is **whole-graph auditing with attributable provenance**, and that is the comparison a paper should draw (a measured provenance-accuracy vs logging-accuracy gap is the natural experiment).
+## 2. The channel abstraction (formal)
 
-## 3. The channel abstraction
+> **Definition 1 (Leakage channel).** A leakage channel is a tuple **C = ⟨S, P, J, E⟩** where
+> - **S — source:** a function that plants a ground-truth secret `κ` at a known site on the channel (an HMAC-minted, unguessable canary in a tool return / a context window / a memory record). Unguessability gives the key property: `κ` cannot appear downstream unless the model actually read it off the channel, so any match is near-zero-FP.
+> - **P — provenance:** a labeling `π(v) → {planted, retrieval, memory, parametric, ambiguous}` attributing an emitted value `v` to its origin along the execution graph (single-hop v1).
+> - **J — judge:** a deterministic predicate over the replayable trace that decides leak / no-leak per the channel's egress semantics (temporal + sink-graded), with no LLM in the headline path.
+> - **E — evidence:** a bank of what the agent *learned* on the channel, so a non-verbatim exfil (a decoded/paraphrased copy of `κ`) is still caught (non-headline hardening).
 
-A channel is a tuple **⟨source, provenance, judge, evidence⟩**:
+> **Algorithm 1 (Instrument a channel).**
+> ```
+> plant κ via S at a known site                     # ground truth
+> run the agent, record the replayable trace T      # execution graph
+> for each emitted value v in T:
+>     if v derives from κ (verbatim | E-decoded):    # J: near-zero-FP by |κ| unguessability
+>         label ← P(v)                               # provenance: where κ entered
+>         emit finding(channel=C, provenance=label, egress=sink?(v))
+> ```
 
-- **source (plant).** How a *ground-truth* secret is introduced at a known site so any later appearance is attributable — an HMAC-minted, unguessable **canary** planted in a tool return / a system-prompt context / a memory record. Unguessability is what makes a downstream match near-zero-false-positive: the model cannot emit the literal without actually reading it off the channel.
-- **provenance.** The label attributing an emitted value to its origin along the execution graph — `PLANTED / RETRIEVAL / MEMORY / PARAMETRIC / AMBIGUOUS` (single-hop v1). This is the shared kernel; adding a channel is, in essence, adding one provenance label + the site that produces it.
-- **judge.** A *deterministic* scorer over the replayable execution trace that decides leak / no-leak per the channel's egress semantics (sink-graded, temporal), with no LLM in the headline path — which is why the core rate escapes the ~31% false-positive regime of LLM-judged trace evaluation.
-- **evidence.** An evidence bank of what the agent *learned* on the channel, so a non-verbatim exfil (a base64/hex/paraphrased copy) is still caught — a hardening tier, deliberately non-headline (the semantic sub-tier is an uncalibrated LLM).
+Adding a channel means supplying **S** (a new plant site) and one new **P** label; **J** and **E** are reused unchanged. That is the framework's claim, and §3 shows it holds by construction, not by assertion.
 
-The framework's structural bet: these four are **channel-agnostic**. `canaries.py`, `pii_provenance.py`, the trace-judge substring/temporal/sink logic, and `evidence_bank.py` are written once; a channel supplies only its plant site and its provenance label.
+## 3. Proof of reuse (not an assertion)
 
-## 4. Instances
+The substrate is written once and shared **byte-identical** across all three channels:
 
-| Channel | source (plant site) | provenance | judge egress | distinguishing axis |
-|---|---|---|---|---|
-| **tool-call args** ✅ | canary in a SOURCE tool return | `RETRIEVAL` | canary in a later SINK call's args | within-session tool I/O |
-| **reasoning traces** ✅ | secret in system-prompt / context | (RT-scoped) | secret in the reasoning channel, *absent from the answer* | private scratchpad |
-| **persistent memory** ✅ | canary in a *dormant* memory record | `MEMORY` | recalled *cross-session* → SINK | **temporal persistence** |
-| **retrieval (RAG)** — next | canary in a retrieved document | `RETRIEVAL` | surfaced from retrieved context | semantic recall |
+| Component | Module | LOC | Shared across channels? |
+|---|---|---:|---|
+| source / canary (S) | `canaries.py` | 94 | ✅ all 3 |
+| provenance (P) | `pii_provenance.py` | 94 | ✅ all 3 (+1 label per channel) |
+| judge core (J) | `trace_judge.py` (minus per-channel methods) | ~460 | ✅ all 3 |
+| evidence bank (E) | `evidence_bank.py` | 91 | ✅ all 3 |
 
-Everything left of "distinguishing axis" is shared machinery; the rightmost column is the only thing each channel genuinely adds. That ratio — a lot of reused substrate, a little channel-specific novelty — is the systems contribution, and the paper must keep saying so: the value is the deployed, reusable instrument, not any one channel's plant.
+What the **persistent-memory** instance adds on top of that ~740-LOC shared substrate: a `MemoryStore` + tool pair (the new **S**), **one** `PIIProvenance.MEMORY` label (the new **P**), and a **79-LOC** `judge_memory_exfil` method (the channel's egress semantics) — reusing J's substring/temporal/sink logic and E untouched. The ratio *(≈740 reused : ≈80 channel-specific for J/P)* is the systems contribution made concrete: a new internal-leak channel costs one plant site + one label + one judge predicate, not a new pipeline.
 
-## 5. What makes each channel distinct — and why memory earns its own instance
+## 4. The memorable path (persistent memory as the cross-session instance)
 
-The temptation is to fold memory into retrieval (both "surface a stored value"). They differ on the one axis that matters here: **temporal persistence.** Tool-args, reasoning, and retrieval all plant and leak *within one session*; persistent memory is the only channel where the plant and the leak occur in **different sessions**, and where the payload re-enters a later session as **trusted** context rather than an untrusted tool output. That temporal gap is the whole attack surface — dormancy, a delayed topic-triggered activation, survival across many benign sessions — and it is not expressible as a within-session retrieval. So memory is not "retrieval again"; it is the channel that makes the audit *cross-session*, which is exactly the boundary an output-only or single-session instrument cannot cross.
+```
+        SESSION 1  (benign)                         SESSION 2  (fresh, unrelated)
+     ┌──────────────────────┐                    ┌────────────────────────────────┐
+     │ user task             │                    │ sensitive-topic trigger         │
+     │   └─ save_memory(κ) ──┼──►  MemoryStore ───┼─► recall_memory() ─► κ surfaces │
+     └──────────────────────┘   (dormant, N=100  │        │                        │
+                                  benign sessions)│        └─► send_email(… κ …)    │
+                                                  └──────────────┬─────────────────┘
+                                                                 ▼
+                                          J: MEMORY_SURFACED (recall) → MEMORY_EXFIL (sink)
+                                          P: provenance = MEMORY (cross-session)
+```
 
-## 6. Scope — what this is and is not
+The one axis that makes memory its own instance, not "retrieval again," is **temporal persistence**: it is the only channel where the plant and the leak happen in *different sessions* and the payload re-enters as *trusted* context. That is the boundary an output-only or single-session instrument cannot cross.
 
-- It **is** instrumentation: a way to *measure* leakage across channels with attributable provenance, deployed continuously, off by default and byte-identical when off.
-- It is **not** an attempt to improve any attack. The attacks are prior work (Trojan Hippo for memory, the injection literature for tool-args, Leaky Thoughts for reasoning); we operationalize and measure them, we do not raise their ASR. Reviewers should not compare a channel's leak rate against an attack paper's ASR — different objective, different threat model.
-- The offline, deterministic validation proves **implementation correctness** (plant → surface → judge fires, off is byte-identical, no double-count), not **effectiveness on real models**. Those are different claims; §7 is the second.
+## 5. What each component buys (ablation)
 
-## 7. The open empirical question (what deployment measures)
+| Remove… | Consequence | Evidence |
+|---|---|---|
+| the **canary** (use a plain secret) | matches benign text → false positives; no ground truth to attribute | design rationale; unguessable `κ` is the near-zero-FP guarantee (Def 1) |
+| the **evidence bank** | a base64/hex/reversed copy of `κ` evades the verbatim match | **measured $0** — the decode tier catches non-verbatim copies the substring scan misses (`evidence_bank` tests) |
+| the **deterministic judge** (use an LLM judge) | trace evaluation enters the ~31% false-positive regime | cited (ToolEmu); ROGUE's headline path is deterministic by design |
+| **provenance** | you get a leak *count* but not *where from* — cannot separate retrieval vs cross-session memory vs parametric | **measured $0** — 3-way provenance accuracy **1.00** on a 36-item labeled set (`pii_provenance.py`); it is what turns "83 leaks" into "tool-args / reasoning / memory" (§7) |
 
-The framework is the instrument; the science is what it reads. None of the following is answered offline — they need a live cross-model run, and they are the paper's empirical core, honestly unfinished until it lands:
+## 6. Positioning vs observability tools
 
-- **Prevalence & spread.** How often does each channel leak, per model? A memorable one-sentence result ("cross-session memory leaks in X% of agents; model Y never leaked") lives here, not in the plumbing.
-- **Architecture dependence.** Does explicit/list memory leak differently from vector/semantic memory? Does a retrieval top-k policy change the rate? (Our deterministic store cannot answer this — it is an honest gap, §honest-boundaries in the memory doc.)
-- **Trigger structure.** Which sensitive-topic trigger classes dominate cross-session activation?
-- **Provenance accuracy cross-channel.** Does the single-hop provenance kernel attribute correctly as channels multiply — and what is the detection-vs-provenance gap (caught but mis-attributed) that justifies the whole-graph audit over naive logging (§2)?
+| | traces tool calls / memory ops | plants ground-truth canaries | provenance attribution | deterministic breach verdict |
+|---|:---:|:---:|:---:|:---:|
+| observability / tracing (LangSmith, Phoenix, agent loggers) | ✓ | ✕ | ✕ | ✕ |
+| **ROGUE leakage channels** | ✓ | ✓ | ✓ | ✓ |
 
-Until these are measured the contribution is an instrument, not a finding. The instrument's value is that it makes them *measurable and comparable* under one framework — but a reviewer who wants the finding is right to, and the answer is the gated run, not more prose.
+*Honesty note:* observability platforms genuinely capture the traces (that's their job); the differentiator is not visibility but **adversarial leakage measurement** — planting ground truth, attributing provenance, and rendering a deterministic breach verdict. This row is a positioning claim on the *leakage-measurement* axis, to be re-checked against each tool's current features, not a certified feature audit.
+
+## 7. Cost, and the open empirical question
+
+**Cost (measured / bounded, $0 parts).** Off by default → **zero** overhead when disabled (byte-identical). The judge is a deterministic canary match → **no LLM judge call** (unlike a graded scan, this channel adds no per-trial judge cost). The store is `O(records)` in memory (a dict). The only real spend is the target model calls of the live probe itself — which is the paid arm, not framework overhead.
+
+**The finding (the paid run).** The framework is the instrument; the science is what it reads, and none of it is answered offline:
+- **Prevalence & spread** — how often does each channel leak, per model? The memorable sentence ("cross-session memory leaks in X of Y models") lives only in a live run.
+- **Provenance *changes what you learn*** — the demonstration is the per-channel breakdown: an output-only audit sees `N` leaks; provenance splits them into `tool-args / reasoning / memory`, which is *why* the whole-graph audit matters. The attribution machinery is measured (1.00, §5); the cross-channel breakdown numbers are the live experiment's output.
+- **Architecture dependence** — explicit/list memory vs vector/semantic memory; a retrieval top-k policy. The deterministic exact-match store **cannot** answer this (an honest gap, not a covered case), so the measured *rate* does not generalize even though the *engineering* does.
+
+Until those land the contribution is an instrument, not a finding — and a live result could be compelling (a cross-model spread) or flat (uniform ~0%); the framework is useful either way, but the empirical impact is not. That outcome is stated up front, not hedged after.
 
 ## 8. Conclusion
 
-The result of this work, independent of the live run, is that **provenance-based leakage instrumentation generalizes**: the same source-canary → provenance → deterministic-judge → evidence-bank substrate that audits tool-call arguments and reasoning traces extends, unchanged in its core, to persistent memory — a channel that is *cross-session*, which no output-only or single-session instrument can reach. Persistent memory is the third instance and the proof that the abstraction holds; retrieval is the next. The cross-model prevalence study (§7) is the natural, and deliberately scoped, next step.
+Independent of the live run, the result is that **provenance-based leakage instrumentation generalizes**: the same S → P → J → E substrate that audits tool-call arguments and reasoning traces extends — ~740 LOC reused byte-identical, ~80 channel-specific — to persistent memory, a *cross-session* channel no output-only or single-session instrument can reach. Persistent memory is the third instance and the proof the abstraction holds; retrieval is next; the cross-model prevalence study (§7) is the scoped next step.
 
 ## Instances (code)
 - `memory_exfil_channel.md` — persistent-memory provenance (this framework's cross-session instance).
-- The tool-args and reasoning-trace channels are instantiated in the agent-exec harness: `src/rogue/reproduce/agent/` (`trace_judge.py` signals, `reasoning_leak.py`, `evidence_bank.py`, `pii_provenance.py`).
+- Tool-args and reasoning-trace channels: `src/rogue/reproduce/agent/` (`trace_judge.py` signals, `reasoning_leak.py`, `evidence_bank.py`, `pii_provenance.py`).
