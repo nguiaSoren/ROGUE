@@ -228,7 +228,13 @@ def test_two_paper_routing_is_distinguishable(db_session) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _skip_unless_anthropic_key() -> None:
+def _skip_unless_live() -> None:
+    # Doubly gated (matches tests/test_extraction_fixtures.py): this test issues a
+    # real, paid Anthropic extraction call, so it must NOT fire on a routine
+    # `uv run pytest` just because a key is present in `.env` (dotenv autoloads it).
+    # Require the explicit opt-in flag AND a key.
+    if os.environ.get("ROGUE_LIVE_TESTS") != "1":
+        pytest.skip("live LLM call — set ROGUE_LIVE_TESTS=1 to run the Phase 5 smoke test")
     if not os.environ.get("ANTHROPIC_API_KEY"):
         pytest.skip("ANTHROPIC_API_KEY unset — skipping live Phase 5 smoke test")
 
@@ -238,7 +244,7 @@ async def test_live_v4_routes_both_fixtures() -> None:
     """Live sanity: the real v4 extractor labels both fixtures as techniques and
     routes them by modality (text→drivable, image→renderer-needed). Loose
     assertions to tolerate model nondeterminism; gated, not CI-required."""
-    _skip_unless_anthropic_key()
+    _skip_unless_live()
     agent = ExtractionAgent(prompt_version="v4")
 
     text_doc = (FIXTURES / "fixture_text_technique.md").read_text(encoding="utf-8")
