@@ -614,11 +614,14 @@ async def run_scan(
     if agent_exec and (config.declared_tools or config.live_tool_target is not None):
         from .adapters import model_specs  # noqa: PLC0415 — lazy
         if config.base_url or model_specs.supports_tools(config.target_model):
+            from .reproduce.agent.memory_channel import memory_exfil_overrides  # noqa: PLC0415
             from .reproduce.agent.scan_stage import run_agent_exec_stage  # noqa: PLC0415
             from .reproduce.agent.tier import AgentExecConfig, AgentExecRunner  # noqa: PLC0415
 
+            # Cross-session memory-exfil probe (Q13) is env-gated (ROGUE_MEMORY_EXFIL) and off by
+            # default → overrides is {} → this AgentExecConfig is byte-identical to today's.
             _runner = agent_exec_runner or AgentExecRunner(
-                AgentExecConfig(enabled=True), adapter_extra=adapter_extra
+                AgentExecConfig(enabled=True, **memory_exfil_overrides()), adapter_extra=adapter_extra
             )
             stage = await run_agent_exec_stage(
                 config, primitives, runner=_runner, seeds=agent_exec_seeds,

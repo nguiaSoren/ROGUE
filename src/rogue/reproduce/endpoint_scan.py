@@ -500,11 +500,15 @@ async def scan_endpoint(
         from rogue.adapters import model_specs  # noqa: PLC0415
 
         if config.base_url or model_specs.supports_tools(config.target_model):
+            from rogue.reproduce.agent.memory_channel import memory_exfil_overrides  # noqa: PLC0415
             from rogue.reproduce.agent.scan_stage import run_agent_exec_stage  # noqa: PLC0415
             from rogue.reproduce.agent.tier import AgentExecConfig, AgentExecRunner  # noqa: PLC0415
 
+            # Cross-session memory-exfil probe (Q13): env-gated (ROGUE_MEMORY_EXFIL), off by default →
+            # overrides {} → byte-identical to today's construction.
             runner = agent_exec_runner or AgentExecRunner(
-                AgentExecConfig(enabled=True), adapter_extra={"api_key": api_key} if api_key else None
+                AgentExecConfig(enabled=True, **memory_exfil_overrides()),
+                adapter_extra={"api_key": api_key} if api_key else None,
             )
             stage = await run_agent_exec_stage(
                 config, primitives, runner=runner, seeds=agent_exec_seeds,

@@ -94,9 +94,11 @@ def test_library_has_expected_signal_coverage():
     assert cats.count(ToolCategory.SINK) >= 2
     assert cats.count(ToolCategory.SOURCE) >= 2
     assert cats.count(ToolCategory.ACTION) >= 2
-    # every SOURCE tool declares a canary kind; SINK/ACTION never do
+    # every MINTING SOURCE tool declares a canary kind; SINK/ACTION never do. recall_memory (Q13) is a
+    # SOURCE that surfaces a PRE-PLANTED cross-session canary from ctx.memory rather than minting one, so
+    # it carries no secret_kind — the memory-source exception.
     for t in HONEYTOKEN_TOOLS:
-        if t.category is ToolCategory.SOURCE:
+        if t.category is ToolCategory.SOURCE and t.canonical != "recall_memory":
             assert t.secret_kind is not None
         else:
             assert t.secret_kind is None
@@ -166,7 +168,9 @@ async def test_every_source_tool_plants_neutral_regex_matching_value():
     """Review M6/F7: SOURCE canaries are minted-neutral and match their judge regex."""
     b = _backend()
     for tool in HONEYTOKEN_TOOLS:
-        if tool.category is not ToolCategory.SOURCE:
+        # only MINTING sources plant a canary in their return; recall_memory (Q13) surfaces a
+        # pre-planted cross-session canary from ctx.memory (secret_kind is None) — covered elsewhere.
+        if tool.category is not ToolCategory.SOURCE or tool.secret_kind is None:
             continue
         ctx = _ctx()
         call = ToolCallBlock(id="cx", name=tool.canonical, arguments={})

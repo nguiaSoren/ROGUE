@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from rogue.schemas import AgentToolSpec, InjectionGoal, PlantedSecret
+
+if TYPE_CHECKING:  # avoid an import cycle; only a type reference is needed at runtime
+    from .memory_channel import MemoryStore
 
 
 @dataclass
@@ -48,6 +51,10 @@ class AgentRunContext:
     planted_secrets: list[PlantedSecret] = field(default_factory=list)
     injections: list[InjectionPayload] = field(default_factory=list)
     emulator_cache: dict[str, str] = field(default_factory=dict)
+    # Cross-session agent MEMORY (Q13 / AgentLeak C5). ``None`` in an ordinary run — the ``recall_memory``
+    # / ``save_memory`` tools stay inert-benign, so a config without them is byte-identical. Attached only
+    # by the memory-exfil probe (sealed like ``emulator_cache``; survives across runs for a 2-session pair).
+    memory: Optional["MemoryStore"] = None
     turn_index: int = 0
 
     def rng(self) -> random.Random:
