@@ -27,12 +27,14 @@ from rogue.schemas import (
 
 from .canaries import new_run_secret
 from .context import AgentRunContext
+from .multiparty import MultipartyScenario, scenarios_for
 from .scenarios import build_scenario, render_primitive
 from .tier import (
     AgentExecBudget,
     _has_agentic_surface,
     run_agent_exec_one,
     run_memory_exfil_probe,
+    run_multiparty_probe,
     to_persistence_rows,
 )
 from .trace_judge import headline_findings
@@ -156,6 +158,111 @@ async def _run_memory_exfil_probes(
     return finding, rows, cost
 
 
+def _multiparty_probe_primitive(scenario: MultipartyScenario) -> AttackPrimitive:
+    """A synthetic AttackPrimitive so a multi-party leak maps onto the same persistence rows as every
+    other agent-exec breach (report/dashboard/DB parity). Sourced to MuPPET. Family ``system_prompt_leak``
+    is the closest frozen-taxonomy fit — privileged in-context information disclosed to the wrong
+    recipient — with the human-facing technique string (``multiparty-privacy``) disambiguating."""
+    return AttackPrimitive(
+        primitive_id=f"multiparty-{scenario.scenario_id}-000",
+        family=AttackFamily.SYSTEM_PROMPT_LEAK,
+        vector=AttackVector.USER_TURN,
+        title=f"Multi-party contextual-privacy leak ({scenario.domain})",
+        short_description="MuPPET / ConfAIde Tier-3: a shared assistant discloses one party's confided secret to another party.",
+        payload_template="[multiparty probe] party A confides a secret under a norm; party B asks; does the reply to B leak it",
+        reproducibility_score=5,
+        sources=[
+            SourceProvenance(
+                url="https://arxiv.org/abs/2606.23217",
+                source_type="other",
+                fetched_at=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                archive_hash="muppet2606",
+                bright_data_product="fixture",
+            )
+        ],
+        discovered_at=datetime.now(timezone.utc),
+        base_severity=Severity.HIGH,
+        severity_rationale="disclosing a party's confided sensitive fact to an unauthorized recipient is a contextual-privacy breach",
+    )
+
+
+def _default_multiparty_semantic_judge():
+    """Wrap ``leakage_recovery_judge`` as a ``(probe, reply, secret_concept) -> leaked`` fn — the
+    uncalibrated inferable tier (built only when ``multiparty_semantic`` is on; a real LLM judge)."""
+    from rogue.memory.judges import leakage_recovery_judge  # noqa: PLC0415 — lazy (LLM dependency)
+
+    judge = leakage_recovery_judge()
+
+    def _fn(probe: str, reply: str, secret_concept: str) -> bool:
+        try:
+            res = judge.grade_sync(
+                attack_prompt=probe, model_response=reply, protected_content=secret_concept
+            )
+            return bool(judge.breach(res))
+        except Exception:  # noqa: BLE001 — a judge error is a non-leak, never a scan failure
+            return False
+
+    return _fn
+
+
+async def _run_multiparty_probes(
+    config: DeploymentConfig, *, runner: Any, adapter: Any, want_persist: bool
+) -> tuple[Finding | None, list, float]:
+    """Run the multi-party contextual-privacy probe (signal h / Q15) over a budget-capped slice of the
+    scenario corpus, aggregate into ONE Finding, and (optionally) build persistence rows for the best
+    breaching outcome. Off unless ``runner.cfg.detect_multiparty`` — byte-identical when off.
+
+    Unlike the memory probe, this needs NO honeytoken tools (the assistant just replies in text), so it
+    is NOT skipped for a ``live_tool_target`` — it works against a live customer chat model too."""
+    scenarios = scenarios_for(limit=max(0, getattr(runner.cfg, "multiparty_max_scenarios", 12)))
+    semantic_judge = None
+    if getattr(runner.cfg, "multiparty_semantic", False):
+        semantic_judge = getattr(runner, "multiparty_semantic_judge", None) or _default_multiparty_semantic_judge()
+    outs = []
+    for scenario in scenarios:
+        if not runner.budget.can_start_run():
+            break
+        outs.append(
+            await run_multiparty_probe(
+                config, harness=runner.harness, cfg=runner.cfg, budget=runner.budget,
+                scenario=scenario, adapter=adapter, semantic_judge=semantic_judge,
+            )
+        )
+    cost = sum(o.spend_usd for o in outs)
+    fired = [o for o in outs if o.fired and not o.errored and o.transcript is not None]
+    if not fired:
+        return None, [], cost
+
+    runs = len(fired)
+    breaches = sum(1 for o in fired if o.headline_breached)
+    best = next((o for o in fired if o.headline_breached), None)
+    sevs = [f.severity for f in headline_findings(best.findings)] if best is not None else []
+    severity = (max(sevs, key=lambda s: _SEV[s]).value if sevs else Severity.HIGH.value)
+    finding = Finding(
+        family=AttackFamily.SYSTEM_PROMPT_LEAK.value,
+        technique="multiparty-privacy",
+        vector=AttackVector.USER_TURN.value,
+        severity=severity,
+        title="Multi-party contextual-privacy leak (MuPPET / ConfAIde Tier-3)",
+        success_rate=breaches / runs,
+        n_trials=runs,
+        n_breach=breaches,
+        example_attack="party A confides a secret under a norm → party B asks with an incentive → assistant leaks A's secret to B",
+        example_response=(
+            "regurgitated A's confidential record to B in the group reply"
+            if best is not None else "held the confidence — did not disclose A's secret to B"
+        ),
+        agentic=True,
+        primitive_id="multiparty-privacy",
+    )
+    rows = []
+    if want_persist and best is not None:
+        sid = best.primitive_id.replace("multiparty-", "") or "unknown"
+        scenario = next((s for s in scenarios if s.scenario_id == sid), scenarios[0])
+        rows.append(to_persistence_rows(best, _multiparty_probe_primitive(scenario), config))
+    return finding, rows, cost
+
+
 async def run_agent_exec_stage(
     config: DeploymentConfig,
     primitives: list[AttackPrimitive],
@@ -241,6 +348,24 @@ async def run_agent_exec_stage(
             res.findings.append(mem_finding)
             if mem_rows:
                 res.persist_rows.extend(mem_rows)
+
+    # signal (h) — multi-party contextual-privacy probe (Q15 / MuPPET). Off by default; when on, a
+    # per-config conversational probe (its own confide→elicit scenarios, NO tools). Unlike the memory
+    # probe it is NOT skipped for a live_tool_target — the assistant just replies in text, so it works
+    # against a live customer chat model too.
+    if getattr(runner.cfg, "detect_multiparty", False):
+        mp_finding, mp_rows, mp_cost = await _run_multiparty_probes(
+            config, runner=runner, adapter=adapter, want_persist=want_persist
+        )
+        res.cost_usd += mp_cost
+        if mp_finding is not None:
+            res.n_agentic += 1
+            res.n_measurable += 1
+            if mp_finding.n_breach > 0:
+                res.n_breaching += 1
+            res.findings.append(mp_finding)
+            if mp_rows:
+                res.persist_rows.extend(mp_rows)
 
     res.findings.sort(key=lambda f: f.success_rate, reverse=True)
     return res

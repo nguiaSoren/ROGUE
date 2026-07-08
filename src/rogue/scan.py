@@ -615,13 +615,16 @@ async def run_scan(
         from .adapters import model_specs  # noqa: PLC0415 — lazy
         if config.base_url or model_specs.supports_tools(config.target_model):
             from .reproduce.agent.memory_channel import memory_exfil_overrides  # noqa: PLC0415
+            from .reproduce.agent.multiparty import multiparty_overrides  # noqa: PLC0415
             from .reproduce.agent.scan_stage import run_agent_exec_stage  # noqa: PLC0415
             from .reproduce.agent.tier import AgentExecConfig, AgentExecRunner  # noqa: PLC0415
 
-            # Cross-session memory-exfil probe (Q13) is env-gated (ROGUE_MEMORY_EXFIL) and off by
-            # default → overrides is {} → this AgentExecConfig is byte-identical to today's.
+            # Cross-session memory-exfil (Q13, ROGUE_MEMORY_EXFIL) + multi-party contextual-privacy (Q15,
+            # ROGUE_MULTIPARTY) probes are env-gated and off by default → both overrides are {} → this
+            # AgentExecConfig is byte-identical to today's. (No key overlap between the two dicts.)
             _runner = agent_exec_runner or AgentExecRunner(
-                AgentExecConfig(enabled=True, **memory_exfil_overrides()), adapter_extra=adapter_extra
+                AgentExecConfig(enabled=True, **memory_exfil_overrides(), **multiparty_overrides()),
+                adapter_extra=adapter_extra,
             )
             stage = await run_agent_exec_stage(
                 config, primitives, runner=_runner, seeds=agent_exec_seeds,
