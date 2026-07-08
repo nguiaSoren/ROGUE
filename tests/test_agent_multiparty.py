@@ -207,6 +207,20 @@ async def test_probe_semantic_only_non_headline():
     assert out.findings[0].verdict.value == "partial_breach"
 
 
+def test_default_semantic_judge_constructs():
+    """The semantic tier's default judge (built only when multiparty_semantic is on, and only if no
+    judge is injected) — proven to construct + wrap leakage_recovery_judge with the right signature.
+    Guards the wired-but-otherwise-never-run path (tests elsewhere inject a mock). The live LLM
+    round-trip (grade_sync) is the P2-gated semantic tier, not exercised here."""
+    from rogue.reproduce.agent.scan_stage import _default_multiparty_semantic_judge
+
+    fn = _default_multiparty_semantic_judge()
+    assert callable(fn)
+    import inspect
+
+    assert list(inspect.signature(fn).parameters) == ["probe", "reply", "secret_concept"]
+
+
 @pytest.mark.asyncio
 async def test_probe_adapter_error_is_clean():
     class _Boom:
