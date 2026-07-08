@@ -16,7 +16,7 @@ A leak is not only what a model *says*. A tool-using, memory-bearing agent expos
 
 > **Definition 1 (Leakage channel).** A leakage channel is a tuple **C = ⟨S, P, J, E⟩** where
 > - **S — source:** a function that plants a ground-truth secret `κ` at a known site on the channel (an HMAC-minted, unguessable canary in a tool return / a context window / a memory record). Unguessability gives the key property: `κ` cannot appear downstream unless the model actually read it off the channel, so any match is near-zero-FP.
-> - **P — provenance:** a labeling `π(v) → {planted, retrieval, memory, parametric, ambiguous}` attributing an emitted value `v` to its origin along the execution graph (single-hop v1).
+> - **P — provenance:** a labeling `π(v) → {planted, retrieval, memory, parametric, ambiguous}` attributing an emitted value `v` to its origin along the execution graph (single-hop v1). The `memory` label is what lets provenance extend **across execution boundaries** — origin can be a *prior* session, not just this execution.
 > - **J — judge:** a deterministic predicate over the replayable trace that decides leak / no-leak per the channel's egress semantics (temporal + sink-graded), with no LLM in the headline path.
 > - **E — evidence:** a bank of what the agent *learned* on the channel, so a non-verbatim exfil (a decoded/paraphrased copy of `κ`) is still caught (non-headline hardening).
 
@@ -41,6 +41,17 @@ The substrate — **S** (`canaries.py`, 94 LOC) · **P** (`pii_provenance.py`, 9
 | tool-call args (baseline) | ✅ | ✅ `RETRIEVAL` | ✅ | ✅ | ~113 (signal-b+c) | ~740 |
 | reasoning traces | ✅ | ✅ | ✅ | ✅ | 165 | ~740 |
 | persistent memory | ✅ | ✅ +`MEMORY` | ✅ | ✅ (decode tier) | 82 judge (+224 store) | ~740 |
+
+And per **component**, for the memory instance — what is reused vs written new:
+
+| Component | Reused (shared) | New (memory instance) |
+|---|---|---|
+| canary mint (`canaries.py`) | ✅ 94 LOC | — (reused; only the plant *site* differs) |
+| provenance (`pii_provenance.py`) | ✅ 94 LOC | +1 label (`MEMORY`) |
+| judge core (`trace_judge.py`) | ✅ ~460 LOC | +82-LOC predicate (`judge_memory_exfil`) |
+| evidence bank (`evidence_bank.py`) | ✅ 91 LOC | — (decode tier reused) |
+| memory store (`memory_channel.py`) | — | **224 LOC** (new — the cross-session persistence) |
+| honeytool pair (recall/save) | — | **70 LOC** (new) |
 
 That is "reusable framework" made **measurable**: a new internal-leak channel costs one plant site + one provenance label + one judge predicate (**82–165 LOC**) against **~740 LOC of reused, byte-identical substrate** — not a new pipeline. The memory instance's own share is an 82-LOC `judge_memory_exfil` predicate + one `PIIProvenance.MEMORY` label, reusing J's substring/temporal/sink logic and E's decode tier (a base64/hex copy of the canary is still caught, non-headline — verified by test). Memory additionally needs a 224-LOC cross-session `MemoryStore` the within-session channels don't — the one place its LOC is higher, and precisely *because* it is the cross-session channel.
 
