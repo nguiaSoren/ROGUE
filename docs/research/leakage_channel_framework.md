@@ -10,6 +10,8 @@
 
 A leak is not only what a model *says*. A tool-using, memory-bearing agent exposes a value through many observable execution channels, and an audit of the final response is blind to all of them. This is measured, not asserted: AgentLeak (2602.11510) finds **41.7% of traces are "false-clean"** — the output passes every check while an internal channel leaked. Trace-logging tools (LangSmith, Phoenix, and agent observability generally) *see* those channels — they record tool calls and memory ops — but they log **what happened**, not **whether a secret leaked** or **where it came from**. The gap this framework fills is adversarial, ground-truth leakage *measurement* with provenance, not trace visibility (§6).
 
+**Why provenance, not just detection.** Existing audits detect that a value leaked but cannot *attribute the channel*. Provenance lets us distinguish whether a leaked value originated from a tool output, a reasoning trace, retrieval, or persistent memory — which is what enables **channel-specific defenses** (you cannot patch a channel you cannot name) and **longitudinal measurement** (each channel's leak rate tracked across models and over time). Detection says *that* you leaked; provenance says *where from* — the actionable half, and the reason the per-channel breakdown in §7 is the result worth measuring, not the aggregate count.
+
 ## 2. The channel abstraction (formal)
 
 > **Definition 1 (Leakage channel).** A leakage channel is a tuple **C = ⟨S, P, J, E⟩** where
@@ -32,15 +34,15 @@ Adding a channel means supplying **S** (a new plant site) and one new **P** labe
 
 ## 3. Proof of reuse (not an assertion)
 
-The substrate — **S** (`canaries.py`, 94 LOC) · **P** (`pii_provenance.py`, 94) · **J**-core (`trace_judge.py` minus per-channel methods, ~460) · **E** (`evidence_bank.py`, 91) ≈ **740 LOC** — is written once and shared **byte-identical**. Each channel supplies only a plant site, one provenance label, and one judge predicate:
+The substrate — **S** (`canaries.py`, 94 LOC) · **P** (`pii_provenance.py`, 94) · **J**-core (`trace_judge.py` minus per-channel methods, ~460) · **E** (`evidence_bank.py`, 91) ≈ **740 LOC** — is written once and shared **byte-identical**. Each channel supplies only a plant site, one provenance label, and one judge predicate. New vs reused, with real LOC:
 
-| Channel | S (canary) | P (provenance) | J (judge core) | E (evidence) | channel-specific new code |
-|---|:---:|:---:|:---:|:---:|---|
-| tool-call args (baseline) | ✅ | ✅ `RETRIEVAL` | ✅ | ✅ | *defines the substrate* |
-| reasoning traces | ✅ | ✅ | ✅ | ✅ | `reasoning_leak.py` — **165 LOC** |
-| persistent memory | ✅ | ✅ **+`MEMORY`** label | ✅ **+79-LOC** method | ✅ | `memory_channel.py` 224 + judge 79 + tools 70 ≈ **373 LOC** |
+| Channel | S | P | J | E | **new LOC** | **reused LOC** |
+|---|:-:|:-:|:-:|:-:|--:|--:|
+| tool-call args (baseline) | ✅ | ✅ `RETRIEVAL` | ✅ | ✅ | ~113 (signal-b+c) | ~740 |
+| reasoning traces | ✅ | ✅ | ✅ | ✅ | 165 | ~740 |
+| persistent memory | ✅ | ✅ +`MEMORY` | ✅ | ✅ (decode tier) | 82 judge (+224 store) | ~740 |
 
-That is "reusable framework" made **measurable**: a new internal-leak channel costs one plant site + one provenance label + one judge predicate (≈165–373 LOC) against **~740 LOC of reused, byte-identical substrate** — not a new evaluation pipeline. The memory instance's own share is a `MemoryStore` + tool pair (the new **S**), one `PIIProvenance.MEMORY` label (**P**), and a 79-LOC `judge_memory_exfil` (**J**'s egress predicate), reusing J's substring/temporal/sink logic and E untouched.
+That is "reusable framework" made **measurable**: a new internal-leak channel costs one plant site + one provenance label + one judge predicate (**82–165 LOC**) against **~740 LOC of reused, byte-identical substrate** — not a new pipeline. The memory instance's own share is an 82-LOC `judge_memory_exfil` predicate + one `PIIProvenance.MEMORY` label, reusing J's substring/temporal/sink logic and E's decode tier (a base64/hex copy of the canary is still caught, non-headline — verified by test). Memory additionally needs a 224-LOC cross-session `MemoryStore` the within-session channels don't — the one place its LOC is higher, and precisely *because* it is the cross-session channel.
 
 ## 4. The memorable path (persistent memory as the cross-session instance)
 

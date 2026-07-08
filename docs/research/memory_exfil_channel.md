@@ -29,8 +29,8 @@ Memory instantiates the framework's four components as:
 |---|---|
 | **S** source | `plant_dormant_secret` seeds a `MemoryStore` record with an HMAC canary `κ` (`planted_in="memory"`) — a prior session's write; `κ` is unguessable, so any later match is near-zero-FP. |
 | **P** provenance | `PIIProvenance.MEMORY` — the cross-session sibling of `RETRIEVAL` (a value recalled from a *prior* session, not this session's context). |
-| **J** judge | `judge_memory_exfil` — a 79-LOC predicate: `MEMORY_SURFACED` (recall crosses the session boundary, non-headline) → `MEMORY_EXFIL` (recalled `κ` reaches a sink, headline, sink-graded). |
-| **E** evidence | reused unchanged (the decode/semantic evidence bank hardens against a non-verbatim copy of `κ`). |
+| **J** judge | `judge_memory_exfil` — an 82-LOC predicate: `MEMORY_SURFACED` (recall crosses the session boundary, non-headline) → `MEMORY_EXFIL` (recalled `κ` reaches a sink, sink-graded). |
+| **E** evidence | reused via the `$0` **decode tier** (`decoded_reveals`): a verbatim copy of `κ` at a sink is **headline**; a base64/hex/rot13/reversed copy is still caught but **non-headline** (same discipline as signal (f)). Verified by test. The semantic (LLM-entailment) tier is available framework-wide but not enabled for memory in v1. |
 
 Everything except S's plant site and J's predicate is the shared ~740-LOC substrate (see the framework doc's reuse table). Trojan Hippo's own variant plants an *instruction* rather than a secret; ROGUE covers that facet through the framework's existing indirect-injection signal — same channel plumbing.
 
@@ -50,11 +50,18 @@ The offline $0 validation establishes **software-correctness properties** with a
 | flag off | — | (no memory finding) | byte-identical / zero overhead when disabled |
 | any | recall of a memory `κ` | core `judge()`: **no** `SECRET_IN_ARGS` | no double-count with the within-session scan |
 
-11 memory tests; full suite 3,498 green. That proves the instrument fires correctly. **It does not prove that real frontier models leak, how often, or which architectures are vulnerable** — those are the scientific questions (§6), unanswered offline by construction. Honest boundaries: exact/substring store, **not** embedding/RAG/Mem0 semantic retrieval (where Trojan Hippo's 70–85% lives); single-agent, no inter-agent C2 (AgentLeak's dominant channel); verbatim exfil only; a canned payload (a lower bound).
+12 memory tests (incl. the decode-tier case); full suite green. That proves the instrument fires correctly. **It does not prove that real frontier models leak, how often, or which architectures are vulnerable** — those are the scientific questions (§6), unanswered offline by construction. Honest boundaries: exact/substring store, **not** embedding/RAG/Mem0 semantic retrieval (where Trojan Hippo's 70–85% lives); single-agent, no inter-agent C2 (AgentLeak's dominant channel); verbatim exfil only; a canned payload (a lower bound).
 
 ## 5. Cost
 
-Off by default → **zero** overhead when disabled (byte-identical). The judge is a deterministic canary match → **no LLM judge call** (unlike a graded scan, this channel adds no per-trial judge cost). The `MemoryStore` is `O(records)` in memory (a dict). The only real spend is the live probe's target-model calls — the paid arm (§6), not framework overhead.
+Concrete per-probe overhead over a normal scan (disabled → **all zero**, byte-identical):
+
+- **+0 LLM judge calls** — the judge is a deterministic canary match, not a graded verdict.
+- **+1 dictionary lookup per recall** — the `MemoryStore` is a plain dict (`O(records)`, records are short strings).
+- **+0 external dependencies** — pure stdlib (`hmac`/`hashlib`); no new package.
+- **+~380 LOC** on top of the ~740-LOC shared substrate (an 82-LOC judge predicate + a 224-LOC cross-session store + a 70-LOC tool pair — the store is the extra the *other* channels don't need, precisely because memory is cross-session).
+
+The only real spend is the live probe's target-model calls — the paid arm (§6), not framework overhead.
 
 ## 6. The open experiment (the finding, if any)
 
