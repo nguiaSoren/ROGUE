@@ -32,16 +32,15 @@ Adding a channel means supplying **S** (a new plant site) and one new **P** labe
 
 ## 3. Proof of reuse (not an assertion)
 
-The substrate is written once and shared **byte-identical** across all three channels:
+The substrate — **S** (`canaries.py`, 94 LOC) · **P** (`pii_provenance.py`, 94) · **J**-core (`trace_judge.py` minus per-channel methods, ~460) · **E** (`evidence_bank.py`, 91) ≈ **740 LOC** — is written once and shared **byte-identical**. Each channel supplies only a plant site, one provenance label, and one judge predicate:
 
-| Component | Module | LOC | Shared across channels? |
-|---|---|---:|---|
-| source / canary (S) | `canaries.py` | 94 | ✅ all 3 |
-| provenance (P) | `pii_provenance.py` | 94 | ✅ all 3 (+1 label per channel) |
-| judge core (J) | `trace_judge.py` (minus per-channel methods) | ~460 | ✅ all 3 |
-| evidence bank (E) | `evidence_bank.py` | 91 | ✅ all 3 |
+| Channel | S (canary) | P (provenance) | J (judge core) | E (evidence) | channel-specific new code |
+|---|:---:|:---:|:---:|:---:|---|
+| tool-call args (baseline) | ✅ | ✅ `RETRIEVAL` | ✅ | ✅ | *defines the substrate* |
+| reasoning traces | ✅ | ✅ | ✅ | ✅ | `reasoning_leak.py` — **165 LOC** |
+| persistent memory | ✅ | ✅ **+`MEMORY`** label | ✅ **+79-LOC** method | ✅ | `memory_channel.py` 224 + judge 79 + tools 70 ≈ **373 LOC** |
 
-What the **persistent-memory** instance adds on top of that ~740-LOC shared substrate: a `MemoryStore` + tool pair (the new **S**), **one** `PIIProvenance.MEMORY` label (the new **P**), and a **79-LOC** `judge_memory_exfil` method (the channel's egress semantics) — reusing J's substring/temporal/sink logic and E untouched. The ratio *(≈740 reused : ≈80 channel-specific for J/P)* is the systems contribution made concrete: a new internal-leak channel costs one plant site + one label + one judge predicate, not a new pipeline.
+That is "reusable framework" made **measurable**: a new internal-leak channel costs one plant site + one provenance label + one judge predicate (≈165–373 LOC) against **~740 LOC of reused, byte-identical substrate** — not a new evaluation pipeline. The memory instance's own share is a `MemoryStore` + tool pair (the new **S**), one `PIIProvenance.MEMORY` label (**P**), and a 79-LOC `judge_memory_exfil` (**J**'s egress predicate), reusing J's substring/temporal/sink logic and E untouched.
 
 ## 4. The memorable path (persistent memory as the cross-session instance)
 
