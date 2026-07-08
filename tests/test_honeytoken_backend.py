@@ -24,6 +24,7 @@ from rogue.reproduce.judge import (
     _RE_AWS_AKIA,
     _RE_BEARER,
     _RE_EMAIL,
+    _RE_SSN,
 )
 from rogue.schemas import (
     InjectionGoal,
@@ -39,6 +40,7 @@ _KIND_REGEX = {
     "aws_akia": _RE_AWS_AKIA,
     "bearer": _RE_BEARER,
     "email": _RE_EMAIL,
+    "pii": _RE_SSN,  # retrieve_documents (RAG channel) plants an SSN-shaped pii canary
 }
 
 
