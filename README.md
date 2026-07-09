@@ -238,7 +238,7 @@ The mechanics behind the pipeline, each on its own page:
 - **Scraper-agnostic harvest.** A `Fetcher` registry picks the best backend per capability (page fetch, JS render, search, PDF), so the *scraping* runs free and keyless out of the box and any scraper or proxy slots in behind one env var — none is a dependency (extraction calls an LLM you choose). Plus a self-tuning ε-greedy bandit that allocates harvest budget by yield (novel primitives per dollar). → [docs/harvest-backends.md](docs/harvest-backends.md)
 - **Multimodal red-team.** Refused text jailbreaks become real images and audio via deterministic black-box renderers, climbing an autonomous escalation ladder that stops at the first breach. → [docs/multimodal.md](docs/multimodal.md)
 - **Self-growing attack repertoire.** ROGUE harvests reusable *techniques*, not just payloads, classifying, routing, and graduating / retiring / resurrecting them on live breach evidence, with a governed renderer registry and grammar-driven planning (the planner-willingness finding: 22% → 100% by changing only the planner). → [docs/self-growing-repertoire.md](docs/self-growing-repertoire.md)
-- **Judge calibration.** Every breach number is an LLM verdict, so the judge is validated against independent human labels four ways: in-distribution FP 2.56%, WildGuardTest harm 88.5%, StrongREJECT −26% inflation, JBB **89.3%** human agreement ([withheld], tied with the frontier LLM-as-judge baselines, reproducible from `data/calibration/`), up from a 70.3% v1 judge after a diagnosed recalibration. → [docs/judge-calibration.md](docs/judge-calibration.md)
+- **Judge calibration.** Every breach number is an LLM verdict, so the judge is validated against independent human labels four ways — in-distribution and against three published external benchmarks (WildGuardTest, StrongREJECT, JailbreakBench). The detailed results are written up in a paper under anonymized review and withheld here until decisions. → [docs/judge-calibration.md](docs/judge-calibration.md)
 - **Benchmark, coverage over time.** Frozen AdvBench / JBB goal sets run through ROGUE's own graduated ladder against a fixed target, to answer "is this month's ROGUE better than last month's?" (honest caveat: still N=1, pre-recalibration). → [docs/benchmark.md](docs/benchmark.md)
 - **Dashboard tour.** A 5-second pitch and a 5-minute deep-dive: cinematic home, `/feed` war room (attacks replayed as ATTACKER → MODEL → JUDGE), `/matrix` breach heatmap, `/brief` threat brief. → [docs/dashboard.md](docs/dashboard.md)
 
@@ -348,7 +348,7 @@ OPENAI_BASE_URL=http://localhost:11434/v1
 OPENAI_API_KEY=ollama
 ```
 
-> **Honest caveat on a local judge:** ROGUE's judge is *calibrated*, and its verdict credibility (89.3% agreement vs human labels, the κ / SHIP gate in [`docs/judge-calibration.md`](docs/judge-calibration.md)) is validated against the **default** judge. A local/open judge is **uncalibrated** and tends to *under-report* breaches until you re-run the calibration harness (`scripts/calibration/`) against it. Free judge: yes. Trusted judge: re-calibrate first.
+> **Honest caveat on a local judge:** ROGUE's judge is *calibrated* — its verdict credibility is validated against human labels via the SHIP/refine gate in [`docs/judge-calibration.md`](docs/judge-calibration.md), against the **default** judge. A local/open judge is **uncalibrated** and tends to *under-report* breaches until you re-run the calibration harness (`scripts/calibration/`) against it. Free judge: yes. Trusted judge: re-calibrate first.
 
 ## Pipeline CLI reference
 
