@@ -1,26 +1,37 @@
 # Multilingual continuous coverage + camouflaged-intent tag (Q20)
 
-ROGUE harvests from 19 open-web sources — every one English-centric — and reproduces every attack in
-English. That leaves the **one benchmark blind spot ROGUE wholly lacked**: the language axis. The field
-names it as a *known-dangerous, already-demonstrated* surface (GPT-4 fell to low-resource-language
-jailbreaks), yet the existing coverage is a single **static** multilingual benchmark. Q20 closes it the
-way ROGUE closes everything — as a *continuous, per-deployment* measurement, off by default and
-byte-identical to today when off.
+ROGUE harvests jailbreaks from 19 open-web sources — every one English-centric — and reproduces every
+attack in English. So the corpus it fires against any given deployment has a measured, striking
+property: **~99% of harvested primitives carry no language variation whatsoever** (see *Measured*
+below). That dataset observation motivates the whole build. The language axis is a *known-dangerous,
+already-demonstrated* attack surface — GPT-4 fell to low-resource-language jailbreaks (Yong et al.
+2310.02446) — yet the academic coverage of it is a handful of **static benchmark campaigns**. To our
+knowledge, prior academic work evaluates multilingual robustness with those static campaigns rather than
+as a **continuous, deployment-oriented measurement over harvested attacks**.
 
-Three independent, env-gated components, none of which moves an existing (English) verdict:
+Q20's one-sentence claim: **ROGUE continuously measures English-vs-non-English safety regression on the
+exact attack corpus deployed against a model.** *Continuous* here has a specific operational meaning: the
+multilingual reproduction re-runs automatically whenever new harvested attacks enter the corpus or the
+model panel changes — not a one-off campaign that produces a single table.
 
-1. **Translate-then-reproduce** — expand each attack into itself (the untouched English baseline) plus
+Three env-gated components, none of which moves an existing (English) verdict (off by default,
+byte-identical when off):
+
+1. **Translate-then-reproduce** (the core) — expand each attack into its untouched English baseline plus
    one translated, round-trip-gated variant per target language, fire them all, and measure the
    **per-deployment English-vs-non-English breach delta**.
-2. **Camouflaged-intent tag** — a cheap harvest-time prior flagging attacks that hide a harmful ask
-   behind a benign frame (orthogonal to language; the second gap Q20's papers name).
-3. **Multilingual harvest source** — non-English Reddit keyword discovery so in-the-wild non-English
+2. **Multilingual harvest source** — non-English Reddit keyword discovery so in-the-wild non-English
    attacks enter the pipeline natively.
+3. **Camouflaged-intent tag** — a cheap harvest-time prior for *stratifying* attacks by whether they
+   hide a harmful ask behind a benign frame. **Orthogonal to the language axis and deliberately
+   secondary** (see the note under *Measured*): it is a stratification aid, not part of the multilingual
+   story, and would be the first thing to cut if the write-up needs to be tight.
 
 Positioning (honest, per the marketing-honesty filter): the novelty is **the combination** —
-multilingual × continuous × per-deployment × real-harvested attacks — *not* "we found the multilingual
-gap." Prior work established the vulnerability; nobody measures it continuously, per deployment, on
-live-harvested attacks across a model panel.
+multilingual × continuous × per-deployment × real-harvested attacks — *not* "we invented multilingual
+red teaming." Prior work established the vulnerability and measured it statically; ROGUE differs by
+assembling existing ideas (harvest → translate → reproduce → dashboard) into a reusable measurement
+system that observes the regression *on the deployed corpus*, continuously.
 
 ## Paper grounding (read in full via crawl4ai; Elicit's numbers fact-checked against the papers)
 
@@ -110,15 +121,20 @@ on re-run. This was **verified by running it**, not just reading it (below).
 
 Over the real 635-primitive corpus:
 
-- **Camouflaged-intent tag:** 1.9% camouflaged **[95% Wilson CI 1.1%, 3.3%]**, 24.6% overt, 73.5%
-  ambiguous — a deliberately conservative prior (co-occurrence required). *Weak lexical prior, not a
-  measured detection rate.*
-- **English-centrism (the gap):** only 0.2% of primitives are `language_switching` family and 0.9%
-  carry any language slot — **~99% of the corpus is English-only text with no language axis at all.**
+- **English-centrism — the motivating result.** Only 0.2% of primitives are `language_switching` family
+  and 0.9% carry any language slot: **~99% of the harvested corpus contains no language variation
+  whatsoever.** This is the dataset observation that justifies the feature — the corpus fired at every
+  deployment is monolingual by construction, so any non-English regression is, today, entirely
+  unmeasured.
+- **Camouflaged-intent tag (secondary, orthogonal):** 1.9% camouflaged **[95% Wilson CI 1.1%, 3.3%]**,
+  24.6% overt, 73.5% ambiguous — a deliberately conservative co-occurrence prior. This is a **weak
+  lexical prior intended for stratified analysis, not attack detection** (Zheng shows keyword detection
+  can't reliably catch camouflage) — a way to slice the corpus, not a classifier, and independent of the
+  multilingual axis.
 
 **NOT measured offline (the honest gap):** the English-vs-non-English **breach delta** across the panel.
-That needs the paid `--multilingual` reproduce arm (real translation + real victims); the offline census
-reports coverage + tag distribution only.
+That needs the paid `--multilingual` cross-model reproduce (real translation + real victims); the offline
+census reports coverage + tag distribution only.
 
 ## Verification (wired ≠ run)
 
@@ -146,17 +162,37 @@ nullable). Going live = push (approval) → set `ROGUE_MULTILINGUAL=on` (+ optio
 reproduce for the breach-delta headline. Production translation is a real paid Anthropic call
 (`LLMTranslator`, no new dependency); tests/dry-runs use `ROGUE_MULTILINGUAL_TRANSLATOR=echo`.
 
-## Publishable? / LinkedIn?
+## Publishable? — a module of ROGUE, not a standalone paper
 
-**Publishable: plausibly, as a systems contribution** — "continuous, per-deployment multilingual
-red-teaming on live-harvested real-world attacks." Prior work (MM-ART/Atil/Deng) measured translation
-gaps *once, statically, on synthetic/benchmark attacks*; ROGUE measures the English-vs-non-English delta
-*continuously, per deployment, on attacks harvested from the open web*, and pairs it with Atil's
-reversal to ask "which languages break which models under **real** attacks" — a first-of-its-kind board.
-The headline needs the paid arm; until then it's a component of the systems paper, not a standalone
-claim.
+Assess the two contributions separately (the split a reviewer would make):
 
-**LinkedIn: worth a post once the paid arm runs — not before.** The honest hook today is the coverage
-gap (99% English-only) + the framework; the striking number ("English-safe, language-X-breaks") is a
-"we're seeing…" note only after the cross-model paid run. The camouflaged-intent finding is a
-measurement-integrity note (a weak lexical prior over the corpus), not a headline.
+- **Engineering / systems: strong.** The build states precisely what is new, what already exists, what is
+  measured vs unmeasured, and what is offline vs online — and proves the integration *end-to-end*
+  (migrations, persistence, the FK-remap, a real DB, all three fire surfaces run, not just wired). That
+  is the credible half today.
+- **Research / empirical: contingent on the paid run.** Without the multilingual reproduce, the honest
+  reading is "measurement infrastructure." *With* a run that shows cross-model, cross-language differences
+  — e.g. a deployment safe in English that regresses in Japanese/Bengali, with the ranking flipping by
+  model (Atil's reversal) — the reading becomes "this infrastructure exposes a deployment-relevant
+  regression that static benchmarks couldn't observe on the deployed corpus." Those are very different
+  outcomes, and the second is the one worth publishing.
+
+**How it differs from prior work:** MM-ART/Atil/Deng each measure a multilingual gap *once, statically, on
+synthetic/benchmark prompts, and produce one table*; ROGUE measures the gap *continuously, per deployment,
+on attacks harvested from the open web that are actually being fired at that model*. The contribution is
+the reusable measurement system + the deployment-corpus framing — not the multilingual attack, which is
+prior art.
+
+**Where it fits:** one module inside the larger ROGUE platform — alongside P5 (provenance
+instrumentation), the persistent-memory channel, obfuscation, harvesting, reproduction — which together
+frame ROGUE as an end-to-end adversarial *measurement* platform rather than a bag of isolated tricks. It
+is paper-worthy in that context; it is **not** a standalone paper. The paid `--multilingual` cross-model
+reproduce is the single gated experiment that upgrades it from "engineering infrastructure" to
+"engineering + empirical insight"; the offline census (~99% English-only) is the motivating dataset
+observation, not the result.
+
+**LinkedIn: worth a post once the paid run lands — not before.** The honest hook today is the coverage
+gap (99% English-only) + the framework; the striking number ("safe in English, breaks in language X, and
+the ranking flips by model") is a "we're seeing…" note only after the cross-model run. The
+camouflaged-intent finding is a measurement-integrity note (a weak lexical prior for stratifying the
+corpus), not a headline.
