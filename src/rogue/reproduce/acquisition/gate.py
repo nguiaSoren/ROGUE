@@ -221,12 +221,16 @@ class AcquisitionGate:
         return float(self.predictor.score_one(feats))
 
     def _info_gain(self, p: AttackPrimitive, config: DeploymentConfig) -> float:
-        """Expected posterior-variance reduction for this cell ≈ 1/(n_cell + 1).
+        """Inverse-support (low-support / exploration) bonus for this cell = 1/(n_cell + 1).
+
+        NOT expected information gain — it is an inverse *sampling frequency*, a cheap monotone proxy for
+        EIG (true EIG would be the Beta-posterior entropy reduction, a strictly larger computation). Method
+        name kept ``_info_gain`` for the intent; the doc/glossary call it the support/exploration term.
 
         The cell key is ``(target_model, family)`` — the exact order ``ladder_priors.contextual_breach_rates``
         (and therefore ``build_cell_evidence``) produces, so the lookup actually hits. A fresh cell (no prior
         trials) → 1.0; a cell with 9 prior trials → 0.1. When ``cell_evidence`` is empty every cell reads n=0
-        → a constant 1.0, so info-gain drops out of the ranking (neutral)."""
+        → a constant 1.0, so the term drops out of the ranking (neutral)."""
         cell = (config.target_model, p.family.value)
         _breaches, trials = self.cell_evidence.get(cell, (0, 0))
         return 1.0 / (trials + 1.0)
