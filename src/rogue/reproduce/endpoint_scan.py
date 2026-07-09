@@ -85,6 +85,10 @@ class EndpointScanReport:
     n_multilingual_variants: int = 0
     n_multilingual_invalid: int = 0
     multilingual_note: str | None = None
+    # Q5 judge-disagreement: how many breaches the strict grading bracket wouldn't confirm
+    # (low-confidence breaches, also per-cell rationale-stamped). 0 when the check is off — default.
+    n_judge_uncertain: int = 0
+    judge_disagreement_note: str | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -110,6 +114,8 @@ class EndpointScanReport:
             tail += f" {self.n_m2s_consolidated} multi-turn folded to single-turn (M2S)."
         if self.n_multilingual_variants:
             tail += f" +{self.n_multilingual_variants} multilingual variant(s) fired."
+        if self.n_judge_uncertain:
+            tail += f" {self.n_judge_uncertain} breach(es) flagged low-confidence (strict bracket disagreed)."
         return (
             f"Scanned {self.base_url} (model {self.model!r}): "
             f"{self.n_breached}/{self.n_primitives} attack primitives breached "
@@ -275,12 +281,15 @@ async def scan_endpoint(
         panel = TargetPanel(adapter_extra={"api_key": api_key} if api_key else {})
     if judge is None:
         from rogue.reproduce.cascade_judge import resolve_cascade  # noqa: PLC0415
+        from rogue.reproduce.disagreement_judge import resolve_disagreement  # noqa: PLC0415
 
         # Off by default → returns JudgeAgent() untouched (byte-identical). On → the free heuristic
         # grades confident non-breach trials, escalating only the ambiguous ones to the paid LLM judge.
         # An injected judge (the public_scan visitor-key judge, --persist --judge heuristic, tests) is
         # left untouched — the cascade only ever wraps the default-constructed judge.
-        judge = resolve_cascade(JudgeAgent())
+        # Q5: the disagreement check wraps outside the cascade — off by default (identity), on → flags
+        # each breach the strict bracket won't confirm as low-confidence (no verdict change).
+        judge = resolve_disagreement(resolve_cascade(JudgeAgent()))
 
     # Deep pipeline, stage 1 of 4 — PERSONA. Build a PAP wrapper when deep is on and none injected.
     owns_persona = False
@@ -602,6 +611,13 @@ async def scan_endpoint(
     _stats = getattr(judge, "stats", None)
     if _stats is not None and getattr(_stats, "n_total", 0):
         _log.info("%s", _stats.summary())  # surface cascade-judge savings (no silent short-circuiting)
+    # Q5 judge-disagreement: surface the low-confidence-breach count when the strict-bracket check ran.
+    from rogue.reproduce.disagreement_judge import DisagreementJudge  # noqa: PLC0415 — lazy, no cycle
+    _n_uncertain = 0
+    _disagreement_note = None
+    if isinstance(judge, DisagreementJudge) and judge.stats.n_total:
+        _n_uncertain = judge.stats.n_flagged
+        _disagreement_note = judge.stats.summary()
     return EndpointScanReport(
         base_url=base_url,
         model=model,
@@ -618,6 +634,8 @@ async def scan_endpoint(
         n_multilingual_variants=n_multilingual_variants,
         n_multilingual_invalid=n_multilingual_invalid,
         multilingual_note=multilingual_note,
+        n_judge_uncertain=_n_uncertain,
+        judge_disagreement_note=_disagreement_note,
     )
 
 

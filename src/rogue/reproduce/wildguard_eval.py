@@ -179,6 +179,23 @@ class AxisAgreement:
         denom = self.fp + self.tn
         return self.fp / denom if denom else None
 
+    @property
+    def false_negative_rate(self) -> float | None:
+        """Judge miss rate on the positive class: ``fn / (fn + tp)``.
+
+        Mirror of :attr:`false_positive_rate`. On the breach axis the positive
+        class is *breach*, so this is the rate at which the judge lets a response
+        a human called a breach through as *clean* — the failure mode Eiras
+        (2503.04474) and Chen (2503.09347) show a benign, harm-preserving
+        artifact (an apology prefix, an appended benign block, a stylistic
+        restyle) can inflate: the judge is fooled into rating unsafe content as
+        safe. The artifact-robustness probe (`calibration/artifact_robustness`)
+        reports the **ΔFNR** this induces as a black-box judge-stability number.
+        ``None`` when there is no human-positive support (rate undefined — never
+        a fabricated 0.0)."""
+        denom = self.fn + self.tp
+        return self.fn / denom if denom else None
+
     def summary_line(self) -> str:
         rate = self.agreement_rate
         rate_str = f"{rate:.2%}" if rate is not None else "n/a"

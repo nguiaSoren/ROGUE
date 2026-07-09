@@ -481,6 +481,10 @@ class ScanReport:
     # (ROGUE_ACQUISITION_ORDER=on). None when off → today's dict is byte-identical. Surfaces the deferred
     # tail (no silent cut).
     acquisition: dict | None = None
+    # Q5 judge-disagreement: {n_flagged, n_breaches, note} when the strict-bracket check ran
+    # (ROGUE_JUDGE_DISAGREEMENT=on) — how many breaches the conservative bracket wouldn't confirm
+    # (low-confidence breaches, also rationale-stamped per cell). None when off → dict byte-identical.
+    judge_disagreement: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -641,6 +645,8 @@ class ScanReport:
             out["multilingual"] = self.multilingual
         if self.acquisition is not None:
             out["acquisition"] = self.acquisition
+        if self.judge_disagreement is not None:
+            out["judge_disagreement"] = self.judge_disagreement
         return out
 
     def to_json(

@@ -295,13 +295,18 @@ async def run_scan(
         panel = TargetPanel(adapter_extra=adapter_extra or {})
     if judge is None:
         from .reproduce.cascade_judge import resolve_cascade
+        from .reproduce.disagreement_judge import resolve_disagreement
 
         base_judge = JudgeAgent(model=judge_model) if judge_model else JudgeAgent()
         # Off by default (ROGUE_CASCADE_JUDGE unset) → returns base_judge untouched, so this path is
         # byte-identical to today. On → wraps it so the free heuristic short-circuits confident
         # non-breach trials before the paid LLM judge is ever called. An injected judge (tests, the
         # keyless HeuristicJudge, a visitor key) is left as-is — the cascade only wraps the default.
-        judge = resolve_cascade(base_judge)
+        # Q5: disagreement check wraps *outside* the cascade — off by default (ROGUE_JUDGE_DISAGREEMENT
+        # unset) → identity, so still byte-identical. On → re-grades each breach cell with the strict
+        # bracket and flags the ones it won't confirm as low-confidence (rationale-stamped, no verdict
+        # change). Composes with the cascade: a breach that escaped the cheap tier still gets checked.
+        judge = resolve_disagreement(resolve_cascade(base_judge))
 
     # Deep pipeline, stage 1 of 4 — PERSONA. Wrap each primitive's last user turn in a PAP
     # persuasion frame before dispatch. Stages 2–4 (multi-turn → PAIR → escalation) follow.
@@ -764,10 +769,20 @@ async def run_scan(
         }
 
     findings.sort(key=lambda f: f.success_rate, reverse=True)
-    # Surface the cascade-judge savings when it was active (no silent short-circuiting).
+    # Surface the cascade-judge savings / disagreement flags when active (no silent behaviour).
     _stats = getattr(judge, "stats", None)
     if _stats is not None and getattr(_stats, "n_total", 0):
         _log.info("%s", _stats.summary())
+    # Q5 judge-disagreement: surface the low-confidence-breach count when the strict-bracket check ran
+    # (ROGUE_JUDGE_DISAGREEMENT=on). None when off → today's report dict is byte-identical.
+    _judge_disagreement = None
+    from .reproduce.disagreement_judge import DisagreementJudge  # noqa: PLC0415 — lazy, no cycle
+    if isinstance(judge, DisagreementJudge) and judge.stats.n_total:
+        _judge_disagreement = {
+            "n_flagged": judge.stats.n_flagged,
+            "n_breaches": judge.stats.n_breaches,
+            "note": judge.stats.summary(),
+        }
     target = config.base_url or config.target_model
     return ScanReport(
         target=target,
@@ -799,6 +814,7 @@ async def run_scan(
             if _m2s_plan.enabled else None
         ),
         multilingual=_multilingual_report,
+        judge_disagreement=_judge_disagreement,
     )
 
 

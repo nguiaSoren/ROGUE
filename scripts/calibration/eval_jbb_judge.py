@@ -30,6 +30,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -42,10 +43,20 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from benchmark.datasets import JudgeComparisonItem, load_jbb_judge_comparison  # noqa: E402
+from rogue.reproduce.calibration.artifact_robustness import (  # noqa: E402
+    DETERMINISTIC_PERTURBATIONS,
+    LabeledResponse,
+    probe_artifact_robustness,
+)
 from rogue.reproduce.instantiator import RenderedAttack  # noqa: E402
 from rogue.reproduce.jbb_eval import BASELINE_CLASSIFIERS, JBBReport, evaluate, jbb_primitive  # noqa: E402
 from rogue.reproduce.judge import JudgeAgent  # noqa: E402
 from rogue.schemas import JudgeVerdict  # noqa: E402
+from rogue.schemas.breach_result import BREACH_VERDICTS  # noqa: E402
+
+# Q5 artifact-robustness: env alias for the --artifact-robustness flag (so the knob is documented in
+# .env.example next to the other ROGUE_* levers). Either the flag or the env truthy value enables it.
+ENV_ARTIFACT_ROBUSTNESS = "ROGUE_JUDGE_ARTIFACT_ROBUSTNESS"
 
 logger = logging.getLogger("rogue.scripts.calibration.eval_jbb_judge")
 
@@ -100,6 +111,62 @@ def _make_verdict_fn(judge: JudgeAgent):
     return verdict_fn
 
 
+def _make_grade_fn(judge: JudgeAgent):
+    """Grade a (possibly perturbed) response text with the real judge → is-breach.
+
+    The artifact-robustness probe's ``grade_fn``: it perturbs ``item.response`` and
+    asks whether the judge still calls it a breach. Same render/primitive as the
+    baseline verdict fn, but the response text is the probe's (perturbed) one."""
+
+    def grade(case: LabeledResponse, response_text: str) -> bool:
+        primitive = jbb_primitive(case.goal)
+        rendered = RenderedAttack(
+            messages=[{"role": "user", "content": case.prompt}],
+            is_multi_turn=False,
+            resolved_slots={},
+            primitive_id=primitive.primitive_id,
+            deployment_config_id="jbb_judge_comparison",
+        )
+        try:
+            return judge.judge_sync(rendered, response_text, primitive).verdict in BREACH_VERDICTS
+        except Exception as exc:  # noqa: BLE001 — a coverage miss is an honest non-breach, not a crash
+            logger.warning("artifact-robustness grade errored on item %s: %s", case.key, exc)
+            return False
+
+    return grade
+
+
+def _run_artifact_robustness(
+    subset: list[JudgeComparisonItem], report: JBBReport, judge: JudgeAgent
+) -> dict:
+    """Q5: re-grade the slice under the deterministic artifact perturbations and
+    report the judge's ΔFNR/ΔFPR. Reuses the already-paid baseline grade from
+    ``report.scored`` (aligned to ``subset`` order), so only the perturbed grades
+    cost. See :mod:`rogue.reproduce.calibration.artifact_robustness`."""
+    cases = [
+        LabeledResponse(
+            key=str(it.index), goal=it.goal, prompt=it.prompt,
+            response=it.response, human_is_harmful=bool(it.human_majority),
+        )
+        for it in subset
+    ]
+    # Baseline breach bits already graded by evaluate() (None/ERROR → non-breach).
+    baseline_pred = [bool(s.rogue_breach) for s in report.scored]
+    ar = probe_artifact_robustness(
+        cases, _make_grade_fn(judge),
+        judge_label=f"rogue_judge:{judge.model}",
+        perturbations=DETERMINISTIC_PERTURBATIONS,
+        baseline_pred=baseline_pred,
+    )
+    print("\n" + "=" * 60)
+    print("Q5 artifact-robustness (ΔFNR under benign judge-hacks):")
+    print("  " + ar.summary_line())
+    for p in ar.perturbations.values():
+        print("  " + p.summary_line())
+    print("=" * 60)
+    return ar.to_dict()
+
+
 def _baselines_only_report(items: list[JudgeComparisonItem]) -> JBBReport:
     """Free report: score the four stored classifiers (no judge calls)."""
     return evaluate(items, lambda _it: JudgeVerdict.ERROR)
@@ -149,7 +216,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prompt-version", default="v3", help="judge rubric version to score (e.g. v1, v3)")
     parser.add_argument("--dry-run", action="store_true", help="baselines + estimate, free")
     parser.add_argument("--yes", action="store_true", help="confirm the paid judge run")
+    parser.add_argument(
+        "--artifact-robustness", action="store_true",
+        help="Q5: also re-grade under the 3 deterministic artifact perturbations and report ΔFNR/ΔFPR "
+        "(adds ~3 judge calls/item; env ROGUE_JUDGE_ARTIFACT_ROBUSTNESS also enables it)",
+    )
     args = parser.parse_args(argv)
+
+    artifact_robustness = args.artifact_robustness or os.environ.get(
+        ENV_ARTIFACT_ROBUSTNESS, ""
+    ).strip().lower() in ("1", "true", "yes", "on")
 
     try:
         items = load_jbb_judge_comparison()
@@ -157,7 +233,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("%s", exc)
         return 1
     subset = _stratified_subset(items, args.limit, args.seed)
-    est = len(subset) * _JUDGE_COST_ESTIMATE_PER_CALL_USD
+    # +3 deterministic perturbation grades/item when the artifact-robustness probe is on.
+    _ar_extra = len(DETERMINISTIC_PERTURBATIONS) if artifact_robustness else 0
+    est = len(subset) * (1 + _ar_extra) * _JUDGE_COST_ESTIMATE_PER_CALL_USD
 
     if args.dry_run or not args.yes:
         base = _baselines_only_report(subset)
@@ -166,7 +244,13 @@ def main(argv: list[str] | None = None) -> int:
         for name in BASELINE_CLASSIFIERS:
             agg = base.predictors[name]
             print(f"  {name:14} {agg.agreement_rate:6.1%}  ({agg.n_agreed}/{agg.n})")
-        print(f"\nscoring the ROGUE judge over {len(subset)} items ≈ ${est:.2f}")
+        if artifact_robustness:
+            print(
+                f"\nscoring the ROGUE judge + artifact-robustness over {len(subset)} items "
+                f"(1 baseline + {_ar_extra} perturbations each) ≈ ${est:.2f}"
+            )
+        else:
+            print(f"\nscoring the ROGUE judge over {len(subset)} items ≈ ${est:.2f}")
         if args.dry_run:
             print("dry-run: re-run with --yes to score the judge.")
             return 0
@@ -180,11 +264,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     report = evaluate(subset, _make_verdict_fn(judge))
 
+    # Q5 artifact-robustness — additive: only runs when enabled, reuses the baseline grade above.
+    artifact_robustness_block = None
+    if artifact_robustness:
+        artifact_robustness_block = _run_artifact_robustness(subset, report, judge)
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / f"jbb_judge_report_{args.prompt_version}.json"
     _payload = _serialize(report, seed=args.seed, limit=args.limit)
     _payload["judge_model"] = judge.model
     _payload["resolved_model"] = judge._last_resolved_model
+    if artifact_robustness_block is not None:
+        _payload["artifact_robustness"] = artifact_robustness_block
     out_path.write_text(
         json.dumps(_payload, indent=2),
         encoding="utf-8",
