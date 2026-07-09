@@ -11,10 +11,8 @@ ROGUE's findings are written up as papers and posts. This is the index: each ent
 **Preprint** · [Zenodo · 10.5281/zenodo.21016849](https://doi.org/10.5281/zenodo.21016849)
 Reproduce: `scripts/reproduce/candidate_quota_ab.py` over frozen `data/research/scheduler_results.json`.
 
-### P2 · [withheld — under anonymized review]
-*A per-type consummation gate and an independence discipline for operator-labeled ground truth.* One consummation-gate template ("engagement ≠ breach; consummation = breach") calibrates judges across four breach classes (JBB **91.0%** human agreement, top of field) — reported alongside **a null on its own headline**: an independent 6-labeler panel did not replicate the trace-modality κ lift (raw Δκ +0.011). All 45 divergences released for case-by-case adjudication.
-**CAMLIS 2026** (under review, anonymized) · [Zenodo · [withheld]](https://doi.org/[withheld])
-Reproduce: `scripts/calibration/run_calibration.py`, `eval_jbb_judge.py`, `analyze_kappa_replication.py` over `data/calibration/`. See [`docs/judge-calibration.md`](docs/judge-calibration.md).
+### P2 · *(withheld — under anonymized double-blind review)*
+Title, results, preprint DOI, and reproduction package are withheld until review decisions, to preserve submission anonymity (CAMLIS 2026, strict double-blind). Details restored after the venue notifies.
 
 ### P3 · *(withheld — under anonymized double-blind review)*
 Title, results, preprint DOI, and reproduction package are withheld until review decisions, to preserve submission anonymity. Details restored after the venue notifies.

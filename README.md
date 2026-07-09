@@ -26,7 +26,7 @@ ROGUE measures **every place a high-stakes AI agent can go wrong**: whether the 
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 
-> **📄 Research** — ROGUE's findings are written up as papers, each reproducible from this repo (frozen data + a script per result): a per-type judge gate reaching **[withheld — under anonymized review]** ([withheld] classifiers); and evaluation *allocation* as a capability lever (**8/20 vs 0/20** candidates graduate, Fisher *p* = 0.003). Two further papers are under anonymized double-blind review, withheld until decisions. → **[PAPERS.md](PAPERS.md)**
+> **📄 Research** — ROGUE's findings are written up as papers, each reproducible from this repo (frozen data + a script per result): evaluation *allocation* as a capability lever (**8/20 vs 0/20** candidates graduate, Fisher *p* = 0.003). Three further papers are under anonymized double-blind review, withheld until decisions. → **[PAPERS.md](PAPERS.md)**
 
 > **🔒 Security & Trust** — ROGUE generates and verifies fixes but **never sits in your request path** — you own the runtime. Scans run **locally** against your own endpoint; your prompts, system prompts, and keys never leave your machine. Released data is **derived-only**, never raw scraped corpora ([RESPONSIBLE_RELEASE.md](RESPONSIBLE_RELEASE.md)). Found a security issue? [SECURITY.md](SECURITY.md).
 
@@ -229,8 +229,7 @@ One engine, one independent standard, the same operation each time: fire inputs 
 ROGUE's findings are written up as papers and posts. **[PAPERS.md](PAPERS.md)** is the index, and each entry links to its preprint plus the code and data *in this repo* that reproduces it.
 
 - **Allocation Is a Capability-Growth Mechanism.** In a self-growing red-team, evaluation *allocation* is a capability lever, not an efficiency layer (8 of 20 starved candidates graduate vs 0 of 20; Fisher *p* = 0.003). · [Zenodo preprint](https://doi.org/10.5281/zenodo.21016849) · *arXiv on conference acceptance*
-- **[withheld — under anonymized review].** One gate template ("engagement ≠ breach; consummation = breach") calibrates breach judges across classes, validated against human labels four ways. · [Zenodo preprint](https://doi.org/[withheld]) · *arXiv on conference acceptance*
-- *Two further papers are under anonymized double-blind review; their titles, results, and preprints are withheld until decisions and restored afterward.*
+- *Three further papers are under anonymized double-blind review; their titles, results, and preprints are withheld until decisions and restored afterward.*
 
 ## Deep dives
 
