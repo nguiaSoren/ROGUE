@@ -916,6 +916,28 @@ async def run_reproduction(
                     len(_deferred_pairs), len(_pairs), len(_ordered_pairs),
                 )
 
+            # Q18 ACQUISITION ORDER (opt-in, env-gated: ROGUE_ACQUISITION_ORDER=on) — reorder the
+            # (primitive × config) pairs by the hybrid acquisition score (value + α·uncertainty +
+            # β·diversity + γ·info-gain) so the sweep spends its budget on the most *informative* pairs
+            # first. ORDERING-ONLY — never drops a cell (an early budget/primitive_limit cutoff has already
+            # fired the most informative pairs, so the breach matrix + the predictor's own future labels
+            # stay complete). Off unless the env flag is set → the pair order is byte-identical. Info-gain
+            # uses THIS session's breach-matrix cell counts; value/uncertainty use the Q7 model when present.
+            from rogue.reproduce.acquisition.gate import (  # noqa: PLC0415
+                apply_acquisition_order_pairs,
+                resolve_acquisition_gate,
+            )
+
+            _acq_gate = resolve_acquisition_gate(session=session)
+            _acq_ordered, _acq_on = apply_acquisition_order_pairs(_ordered_pairs, gate=_acq_gate)
+            if _acq_on:
+                logger.info(
+                    "acquisition: reordered %d (primitive × config) pairs by the hybrid acquisition score "
+                    "(ROGUE_ACQUISITION_ORDER=on)",
+                    len(_acq_ordered),
+                )
+                _ordered_pairs = _acq_ordered
+
             # Q7 PRE-FIRE SKIP (opt-in, env-gated) — additionally drop the (primitive × config) pairs
             # whose calibrated P(breach) is below the threshold, before spending target+judge calls.
             # EXPLICIT opt-in only (--prefire-skip): dropping cells in the research sweep would corrupt

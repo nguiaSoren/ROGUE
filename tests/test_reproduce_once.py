@@ -508,6 +508,75 @@ async def test_run_reproduction_m2s_consolidates_multi_turn_end_to_end(
 
 
 @pytest.mark.asyncio
+async def test_run_reproduction_acquisition_reorders_end_to_end(
+    live_db_with_seeded_data, monkeypatch,
+) -> None:
+    """REAL end-to-end run of the reproduce_once Q18 acquisition splice (the 3rd surface) — not a helper
+    unit test. The two seeded primitives have reproducibility 9 and 6, so the survival stage hands the
+    default order [prim0, prim1] to the acquisition block. With the gate ON, uncertainty-only weights and
+    the reproducibility-score value fallback (no model artifact) make P(breach)=0.6 *more* uncertain than
+    0.9, so the block reorders the pairs to [prim1, prim0] before they become `coros` and fire. A spy over
+    the module-level orderer captures the exact (input → output) the splice produced (reliable, unlike the
+    concurrent fire order); both pairs still persist. The OFF control leaves the pairs untouched."""
+    prim0 = "01TESTPRIM0" + "0" * 16  # reproducibility 9 → P=0.9 → low uncertainty
+    prim1 = "01TESTPRIM1" + "0" * 16  # reproducibility 6 → P=0.6 → high uncertainty
+
+    import rogue.reproduce.acquisition.gate as acqmod
+
+    class _StubPanel:
+        async def run_attack(self, rendered, config, temperature, n_trials):
+            return [ModelResponse(content="ok", latency_ms=5, tokens_in=1, tokens_out=1,
+                                  cost_usd=0.0, error=None, trial_index=i, temperature=temperature)
+                    for i in range(n_trials)]
+
+        async def aclose(self):
+            pass
+
+    class _BreachJudge:
+        async def judge(self, rendered, model_response, primitive):
+            return JudgeResult(verdict=JudgeVerdict.REFUSED, rationale="stub", confidence=0.9)
+
+    captured: dict = {}
+    real_orderer = acqmod.apply_acquisition_order_pairs
+
+    def _spy(pairs, *, gate=None):
+        out, on = real_orderer(pairs, gate=gate)
+        captured["enabled"] = on
+        captured["in"] = [p.primitive_id for p, _ in pairs]
+        captured["out"] = [p.primitive_id for p, _ in out]
+        return out, on
+
+    monkeypatch.setattr(acqmod, "apply_acquisition_order_pairs", _spy)
+
+    # --- ON: acquisition ordering, uncertainty-only, repro-score value fallback ⇒ pairs get reordered ---
+    monkeypatch.setenv("ROGUE_ACQUISITION_ORDER", "on")
+    monkeypatch.setenv("ROGUE_ACQUISITION_MODEL", "/nonexistent/acq-model.json")  # force repro fallback
+    monkeypatch.setenv("ROGUE_ACQ_EMBED", "off")
+    monkeypatch.setenv("ROGUE_ACQ_W_VALUE", "0")
+    monkeypatch.setenv("ROGUE_ACQ_ALPHA", "1")
+    monkeypatch.setenv("ROGUE_ACQ_BETA", "0")
+    monkeypatch.setenv("ROGUE_ACQ_GAMMA", "0")
+    stats_on = await run_reproduction(
+        database_url=live_db_with_seeded_data, primitive_limit=None, n_trials=1, temperature=0.7,
+        concurrency=1, panel=_StubPanel(), judge=_BreachJudge(), fetch_media=False, escalate=False,
+    )
+    assert captured["enabled"] is True
+    assert captured["in"] == [prim0, prim1]        # the block received the survival(default)-ordered pairs
+    assert captured["out"] == [prim1, prim0]       # …and reordered them by acquisition before firing
+    assert stats_on.breach_results_persisted == 2  # the reordered pairs actually fired + persisted
+
+    # --- OFF control: gate off ⇒ the pairs are handed through untouched (byte-identical) ---
+    captured.clear()
+    monkeypatch.delenv("ROGUE_ACQUISITION_ORDER", raising=False)
+    await run_reproduction(
+        database_url=live_db_with_seeded_data, primitive_limit=None, n_trials=1, temperature=0.7,
+        concurrency=1, panel=_StubPanel(), judge=_BreachJudge(), fetch_media=False, escalate=False,
+    )
+    assert captured["enabled"] is False
+    assert captured["out"] == captured["in"] == [prim0, prim1]   # unchanged when off
+
+
+@pytest.mark.asyncio
 async def test_run_reproduction_end_to_end_with_mocked_panel_and_judge(
     live_db_with_seeded_data,
 ) -> None:

@@ -240,6 +240,8 @@ async def run_scan(
     remediate: bool = False,
     survival_gate: Any = None,
     survival_max_primitives: int | None = None,
+    acquisition_gate: Any = None,
+    acquisition_max_primitives: int | None = None,
     prefire_gate: Any = None,
     m2s_config: Any = None,
     multilingual_config: Any = None,
@@ -362,6 +364,21 @@ async def run_scan(
     if _survival_plan.enabled:
         primitives = _survival_plan.selected  # apply_survival_order already logs the plan summary
         n_deferred = len(_survival_plan.deferred)
+
+    # Q18 ACQUISITION ORDER (opt-in, env-gated) — reorder the surviving attacks by the hybrid acquisition
+    # score (value + α·uncertainty + β·diversity + γ·info-gain) so the fixed budget is spent on the most
+    # *informative* attacks, not just the highest raw breach yield. Off unless ROGUE_ACQUISITION_ORDER=on →
+    # today's (reproducibility_score / survival) order is byte-identical. Runs after survival (it reorders
+    # survival's survivors) and before pre-fire skip. A cap defers the tail — surfaced, never a silent cut.
+    from .reproduce.acquisition.gate import apply_acquisition_order  # noqa: PLC0415
+
+    _acq_plan = apply_acquisition_order(
+        primitives, config, gate=acquisition_gate, max_primitives=acquisition_max_primitives,
+    )
+    n_acq_deferred = 0
+    if _acq_plan.enabled:
+        primitives = _acq_plan.selected  # apply_acquisition_order already logs the plan summary
+        n_acq_deferred = len(_acq_plan.deferred)
 
     # Q7 PRE-FIRE SKIP GATE (opt-in, env-gated) — score each surviving attack against THIS config and
     # skip the ones whose calibrated P(breach) is below the threshold, before any target/judge call is
@@ -767,6 +784,10 @@ async def run_scan(
         survival=(
             {"n_deferred": n_deferred, "note": _survival_plan.summary()}
             if _survival_plan.enabled else None
+        ),
+        acquisition=(
+            {"n_deferred": n_acq_deferred, "note": _acq_plan.summary()}
+            if _acq_plan.enabled else None
         ),
         prefire=(
             {"n_skipped": n_prefire_skipped, "note": _prefire_plan.summary()}

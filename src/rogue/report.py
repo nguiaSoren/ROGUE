@@ -477,6 +477,10 @@ class ScanReport:
     # ran (ROGUE_MULTILINGUAL=on). None when off → today's dict is byte-identical. Surfaces the added
     # per-language variants + the ones dropped for a failed round-trip (no silent inflation).
     multilingual: dict | None = None
+    # Q18 acquisition ordering: {n_deferred, note} when the hybrid acquisition order ran
+    # (ROGUE_ACQUISITION_ORDER=on). None when off → today's dict is byte-identical. Surfaces the deferred
+    # tail (no silent cut).
+    acquisition: dict | None = None
 
     @property
     def breach_rate(self) -> float:
@@ -635,6 +639,8 @@ class ScanReport:
             out["m2s"] = self.m2s
         if self.multilingual is not None:
             out["multilingual"] = self.multilingual
+        if self.acquisition is not None:
+            out["acquisition"] = self.acquisition
         return out
 
     def to_json(

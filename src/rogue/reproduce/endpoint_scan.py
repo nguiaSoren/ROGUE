@@ -70,6 +70,10 @@ class EndpointScanReport:
     # budget cap, and how it ranked. 0 when the gate is off or no cap was set — today's default.
     n_deferred: int = 0
     survival_note: str | None = None
+    # Q18 acquisition gate: how many attacks the hybrid-acquisition order deferred under a budget cap, and
+    # its plan summary. 0 / None when the gate is off or no cap was set — today's default.
+    n_acquisition_deferred: int = 0
+    acquisition_note: str | None = None
     # Q7 pre-fire gate: how many attacks were skipped (predicted non-breach) before firing. 0 when the
     # gate is off — today's default. The skipped attacks are still present as skipped findings.
     n_prefire_skipped: int = 0
@@ -98,6 +102,8 @@ class EndpointScanReport:
         )
         if self.n_deferred:
             tail += f" {self.n_deferred} deferred by survival gate (predicted non-transfer)."
+        if self.n_acquisition_deferred:
+            tail += f" {self.n_acquisition_deferred} deferred by acquisition gate (budget cap)."
         if self.n_prefire_skipped:
             tail += f" {self.n_prefire_skipped} skipped pre-fire (predicted non-breach)."
         if self.n_m2s_consolidated:
@@ -203,6 +209,9 @@ async def scan_endpoint(
     # --- opt-in Q11 survival ordering (purely additive; default off preserves today's fire order) ---
     survival_gate: object | None = None,
     survival_max_primitives: int | None = None,
+    # --- opt-in Q18 hybrid-acquisition ordering (purely additive; default off preserves today's order) ---
+    acquisition_gate: object | None = None,
+    acquisition_max_primitives: int | None = None,
     # --- opt-in Q7 pre-fire skip (purely additive; default off → every primitive is fired) ---
     prefire_gate: object | None = None,
     # --- opt-in Q14 M2S consolidation (purely additive; default off → multi-turn fires as-is) ---
@@ -318,6 +327,23 @@ async def scan_endpoint(
         n_deferred = len(survival_plan.deferred)
         survival_note = survival_plan.summary()
         _log.info("%s", survival_note)
+
+    # Q18 ACQUISITION ORDER (opt-in, env-gated) — reorder the survivors by the hybrid acquisition score
+    # (value + α·uncertainty + β·diversity + γ·info-gain) so the budget goes to the most informative
+    # attacks, not just the highest raw yield. Off unless ROGUE_ACQUISITION_ORDER=on → today's order is
+    # byte-identical. Runs after survival (reorders its survivors), before pre-fire skip.
+    from rogue.reproduce.acquisition.gate import apply_acquisition_order  # noqa: PLC0415
+
+    acquisition_plan = apply_acquisition_order(
+        primitives, config, gate=acquisition_gate, max_primitives=acquisition_max_primitives,
+    )
+    n_acquisition_deferred = 0
+    acquisition_note = None
+    if acquisition_plan.enabled:
+        primitives = acquisition_plan.selected
+        n_acquisition_deferred = len(acquisition_plan.deferred)
+        acquisition_note = acquisition_plan.summary()
+        _log.info("%s", acquisition_note)
 
     # Q7 PRE-FIRE SKIP GATE (opt-in, env-gated) — score each surviving attack against THIS config and
     # skip the ones whose calibrated P(breach) is below the threshold, before any target/judge call is
@@ -584,6 +610,8 @@ async def scan_endpoint(
         findings=findings,
         n_deferred=n_deferred,
         survival_note=survival_note,
+        n_acquisition_deferred=n_acquisition_deferred,
+        acquisition_note=acquisition_note,
         n_prefire_skipped=n_prefire_skipped,
         n_m2s_consolidated=n_m2s_consolidated,
         m2s_note=(m2s_plan.summary() if m2s_plan.enabled else None),
