@@ -263,6 +263,26 @@ def test_apply_multilingual_off_is_identity(monkeypatch):
     assert resolve_multilingual() is None
 
 
+class _DeadTranslator:
+    """Stands in for a credit-exhausted / auth-dead translator: every call returns '' (the LLMTranslator's
+    graceful-degradation output on an API error). Every variant → invalid → 0 variants."""
+
+    name = "dead"
+
+    async def translate(self, text, target):
+        return ""
+
+
+def test_apply_multilingual_all_invalid_is_enabled_but_empty():
+    from rogue.reproduce.multilingual.gate import MultilingualConfig
+    p = _prim()
+    cfg = MultilingualConfig(languages=resolve_languages(["es", "ja"]), translator=_DeadTranslator())
+    plan = asyncio.run(apply_multilingual([p], config=cfg))
+    # a systemic translator failure: enabled, base preserved, 0 variants, all languages counted invalid
+    assert plan.enabled and plan.n_variants == 0 and plan.n_invalid == 2
+    assert plan.primitives == [p]  # only the untouched English baseline fires
+
+
 def test_apply_multilingual_on_expands(monkeypatch):
     monkeypatch.setenv("ROGUE_MULTILINGUAL", "on")
     monkeypatch.setenv("ROGUE_MULTILINGUAL_LANGS", "es,ja")

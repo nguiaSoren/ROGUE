@@ -116,5 +116,16 @@ async def apply_multilingual(
         languages=[lang.code for lang in cfg.languages],
         enabled=True,
     )
-    _log.info("%s", plan.summary())
+    # A systemic translator failure (no credit / bad key / provider down) shows up as EVERY translation
+    # invalid → 0 variants. Distinguish that from a few legitimately-garbled prompts with a loud warning,
+    # so a paid multilingual run can't silently produce an English-only result that looks like "no gap".
+    if n_variants == 0 and n_invalid > 0:
+        _log.warning(
+            "multilingual ON but produced 0 variants (%d dropped) — likely a translator failure "
+            "(credit/auth/provider), not garbled prompts. Check the translator (%s) before trusting "
+            "an English-vs-non-English result.",
+            n_invalid, type(cfg.translator).__name__,
+        )
+    else:
+        _log.info("%s", plan.summary())
     return plan
