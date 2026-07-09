@@ -1,4 +1,4 @@
-# Observable leakage channels — a provenance-instrumentation framework (P5)
+# Observable leakage channels — a provenance-instrumentation framework
 
 **Elevator pitch.** *ROGUE turns hidden agent-internal channels — tool-call arguments, reasoning traces, persistent memory, retrieval — into observable, provenance-labeled leakage channels that can be measured with deterministic canaries.* Everything below is an instance of that one idea.
 

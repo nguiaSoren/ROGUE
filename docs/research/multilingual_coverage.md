@@ -185,8 +185,8 @@ synthetic/benchmark prompts, and produce one table* — they answer a different 
 gap *continuously, per deployment, on attacks harvested from the open web that are actually being fired at
 that model* (the contribution stated up front: the measurement *system*, not the attack).
 
-**Where it fits:** one module inside the larger ROGUE platform — alongside P5 (provenance
-instrumentation), the persistent-memory channel, obfuscation, harvesting, reproduction — which together
+**Where it fits:** one module inside the larger ROGUE platform — alongside the provenance-instrumentation
+framework, the persistent-memory channel, obfuscation, harvesting, reproduction — which together
 frame ROGUE as an end-to-end adversarial *measurement* platform rather than a bag of isolated tricks. It
 is paper-worthy in that context; it is **not** a standalone paper. The paid `--multilingual` cross-model
 reproduce is the single gated experiment that upgrades it from "engineering infrastructure" to

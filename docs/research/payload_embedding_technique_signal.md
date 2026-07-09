@@ -1,6 +1,6 @@
 # Payload embeddings carry a technique signal too weak to separate (Tier-A pilot)
 
-*Lab note · ROGUE retrieval/embedding layer · 2026-06-11. Corroborates the HF-datasets "0 new families" result (`RESEARCH_TODO.md` #HF) and extends arXiv 2506.12685 to ROGUE's production embedder.*
+*Lab note · ROGUE retrieval/embedding layer · 2026-06-11. Corroborates the HF-datasets "0 new families" result (in the research backlog) and extends arXiv 2506.12685 to ROGUE's production embedder.*
 
 ## The question
 A proposed paper imagined a **unified multimodal + multilingual embedding** over payload / technique / primitive — a shared space that indexes, dedups, and detects novelty across modalities and languages. Before any of that, one precondition has to hold: **do attack payloads even cluster by TECHNIQUE (family) in a real embedding space — or does surface form / topic dominate, with technique only faintly recoverable?** If payload text doesn't separate by technique in a strong embedder, a "technique/primitive embedding backbone" is weak before modality or language ever enters. This pilot tests exactly that, on data already on disk, for ~$0.

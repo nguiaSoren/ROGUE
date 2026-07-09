@@ -1,4 +1,4 @@
-# Persistent-memory provenance — a cross-session leakage channel (Q13, P5)
+# Persistent-memory provenance — a cross-session leakage channel (Q13)
 
 **Status:** BUILT + offline-validated ($0), 2026-07-08. One instance of the leakage-channel framework — **read the framework doc first: `docs/research/leakage_channel_framework.md`** ([link](leakage_channel_framework.md)) for the `Channel = ⟨source, provenance, judge, evidence⟩` abstraction, Definition 1, and the cross-channel reuse proof. Off by default (`ROGUE_MEMORY_EXFIL`), byte-identical when off. The cross-model leak *rate* is the open empirical question (§6).
 
@@ -79,7 +79,7 @@ A **modest multi-turn live run (≥2 sessions, smaller than a full ~$35 reproduc
 
 ## 7. Positioning
 
-Belongs **inside P5** as one instance of the leakage-channel framework, not a standalone paper — inflating it invites a direct comparison against Trojan Hippo / AgentLeak on *attack* terms, the wrong axis. Within P5 those become prior work and the contribution is the reusable instrumentation layer. See [`leakage_channel_framework.md`](leakage_channel_framework.md) §7–8.
+Belongs **inside the leakage-channel framework** as one instance, not a standalone paper — inflating it invites a direct comparison against Trojan Hippo / AgentLeak on *attack* terms, the wrong axis. Within that framework those become prior work and the contribution is the reusable instrumentation layer. See [`leakage_channel_framework.md`](leakage_channel_framework.md) §7–8.
 
 ---
 

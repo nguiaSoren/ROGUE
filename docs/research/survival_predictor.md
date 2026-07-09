@@ -264,7 +264,7 @@ survival is the gap Kirch (white-box, same-model), Ball (white-box, mechanism) a
 per-*config*, the transpose of our question) all leave open, and ROGUE provides an uncommon asset they
 lack: a table of *the same attacks reproduced across many deployment configs*. The measured
 budget-saved curve on a real reproduction corpus (not a static benchmark) is a first-of-its-kind
-artifact, and it composes with the P1 allocation-scheduler paper (survival rank is a new acquisition
+artifact, and it composes with ROGUE's allocation-scheduler work (survival rank is a new acquisition
 signal for the allocator).
 
 **Venue fit.** This is a *security-systems* contribution, not an ML-algorithm one — so a security venue
