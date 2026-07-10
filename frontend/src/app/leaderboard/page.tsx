@@ -12,11 +12,8 @@ import {
   LEADERBOARD_PII_MEASURED,
   LEADERBOARD_PII_METHOD,
   type PiiLeakModel,
-  LEADERBOARD_ROBUSTNESS_MODELS,
-  LEADERBOARD_ROBUSTNESS_MEASURED,
-  LEADERBOARD_ROBUSTNESS_METHOD,
-  type RobustnessModel,
 } from "@/lib/leaderboard-data";
+import RobustnessBoard from "./RobustnessBoardClient";
 
 /**
  * /leaderboard, the public model-resistance board (VIRAL_LAUNCH_SPEC Decision #4).
@@ -486,75 +483,6 @@ function PiiRow({ row, rank, index }: { row: PiiLeakModel; rank: number; index: 
  * downloadable. Deliberately NOT the page OG image: that's the correctly-sized 1200×630 dynamic
  * opengraph-image.tsx; this tall 1600×1500 card would crop badly as a social preview.
  */
-function fmtTokens(n: number | null): string {
-  if (n == null) return "held";
-  return n >= 1000 ? `${Math.round(n / 1000)}K` : String(n);
-}
-
-function RobustnessBoard() {
-  const rows = [...LEADERBOARD_ROBUSTNESS_MODELS].sort((a, b) => a.breach_rate - b.breach_rate);
-  if (rows.length === 0) return null;
-  return (
-    <section id="robustness-board" className="space-y-4 animate-rogue-fade-up scroll-mt-24">
-      <header className="space-y-1.5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rogue-green">
-          long-context robustness · breaks at N tokens · measured {LEADERBOARD_ROBUSTNESS_MEASURED}
-        </p>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Long-context robustness board</h2>
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
-          Many-shot / long-context attacks flood the context until a model caves. Each model is swept over a{" "}
-          <span className="text-foreground">token ladder (2K&rarr;128K)</span> to find the{" "}
-          <span className="text-rogue-green">threshold where it breaks</span> &mdash; the metric nobody else
-          publishes. Ranked by long-context breach rate (lower = more robust). A{" "}
-          <span className="text-foreground">separate attack + metric</span> &mdash; not comparable to the breach
-          boards above.
-        </p>
-      </header>
-      <div className="rogue-card border border-rogue-green/30 rounded-lg overflow-hidden bg-card/40">
-        {rows.map((row, i) => (
-          <RobustnessRow key={row.model_label} row={row} rank={i + 1} index={i} />
-        ))}
-      </div>
-      <p className="text-[10px] text-muted-foreground font-mono">
-        {`// ${LEADERBOARD_ROBUSTNESS_METHOD} — measured ${LEADERBOARD_ROBUSTNESS_MEASURED}. Directional (small per-model n); a first robustness-threshold facet, ranked independently.`}
-      </p>
-    </section>
-  );
-}
-
-function RobustnessRow({ row, rank, index }: { row: RobustnessModel; rank: number; index: number }) {
-  const tier = rateTier(row.breach_rate);
-  const style = { animationDelay: `${Math.min(index * 0.03, 0.4)}s` };
-  const robust = row.first_break_tokens != null && row.first_break_tokens >= 64000;
-  return (
-    <div
-      className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 items-start px-3 py-3 border-b border-border/50 last:border-b-0 animate-rogue-fade-up"
-      style={style}
-    >
-      <div className="flex items-center justify-center pt-0.5">
-        <RankBadge rank={rank} />
-      </div>
-      <div className="min-w-0 space-y-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <p className="font-mono text-sm font-semibold truncate">{row.model_label}</p>
-          <span
-            className={`shrink-0 font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
-              robust ? "text-rogue-green bg-rogue-green/10" : "text-rogue-red bg-rogue-red/10"
-            }`}
-          >
-            breaks {fmtTokens(row.first_break_tokens)}
-          </span>
-        </div>
-        <BreachBar mean={row.breach_rate} tier={tier} />
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-muted-foreground">
-          <span className="text-foreground/80">{(row.breach_rate * 100).toFixed(1)}% breach @long-ctx</span>
-          <span className="opacity-60">· n={row.n}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ShareCard() {
   const src = "/cards/breach-leaderboard.png";
   return (
