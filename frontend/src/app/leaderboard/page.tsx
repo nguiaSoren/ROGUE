@@ -235,8 +235,8 @@ function Board() {
               blurb={
                 <>
                   {tested} hosted models · deep escalation + PAIR pipeline · graded by the{" "}
-                  <span className="text-rogue-green">calibrated v3 judge</span> (89.3% human
-                  agreement). Snapshot as of 2026-06-07.
+                  <span className="text-rogue-green">calibrated v3 judge</span> ([withheld — under
+                  anonymized review]). Snapshot as of 2026-06-07.
                 </>
               }
               rows={rows}
