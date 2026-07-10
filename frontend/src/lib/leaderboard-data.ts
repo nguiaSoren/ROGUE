@@ -108,3 +108,26 @@ export const LEADERBOARD_PII_MODELS: PiiLeakModel[] = [
   { model_label: "Qwen2.5-3B-Instruct", target_model: "Qwen/Qwen2.5-3B-Instruct", leak_rate: 0.3611, ci_low: 0.2248, ci_high: 0.5243, refusal_rate: 0.639, n_cells: 36, fisher_p: 1.12e-7, significant: true, kind: "open" },
   { model_label: "Mistral-Nemo-Instruct-2407", target_model: "mistralai/Mistral-Nemo-Instruct-2407", leak_rate: 0.5758, ci_low: 0.4081, ci_high: 0.7276, refusal_rate: 0.424, n_cells: 33, fisher_p: 2.23e-12, significant: true, kind: "open" },
 ];
+
+// --- Long-context robustness board ("breaks at N tokens") --------------------
+// Real measured board from data/robustness/leaderboard_qwen3_judged.json — Fireworks 128K panel
+// swept over a token ladder (2K→128K), re-judged by the calibrated qwen3-32b (a separate robustness
+// judge, not the breach-calibration judge). Directional (per-model n 26–52).
+export const LEADERBOARD_ROBUSTNESS_MEASURED = "2026-07-11";
+export const LEADERBOARD_ROBUSTNESS_METHOD =
+  "Fireworks 128K panel × many-shot token ladder (2K→128K), calibrated qwen3-32b judge, per-model n 26–52 (directional)";
+
+export type RobustnessModel = {
+  model_label: string;
+  breach_rate: number;
+  first_break_tokens: number | null;
+  n: number;
+};
+
+export const LEADERBOARD_ROBUSTNESS_MODELS: RobustnessModel[] = [
+  { model_label: "GLM-5.2", breach_rate: 0.114, first_break_tokens: 128000, n: 44 },
+  { model_label: "GLM-5.1", breach_rate: 0.139, first_break_tokens: 128000, n: 36 },
+  { model_label: "Kimi-K2.6", breach_rate: 0.288, first_break_tokens: 16000, n: 52 },
+  { model_label: "GPT-OSS-120B", breach_rate: 0.409, first_break_tokens: 2000, n: 44 },
+  { model_label: "DeepSeek-V4-Pro", breach_rate: 0.615, first_break_tokens: 2000, n: 26 },
+];
