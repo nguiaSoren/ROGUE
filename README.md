@@ -72,7 +72,7 @@ rogue setup      # install the best free scraper (crawl4ai) — prep for harvest
 
 <p align="center"><img src="assets/card/marketing/breach-card.png" alt="ROGUE breach card: mistral-small-2603, 668/2189 breached, calibrated judge" width="620"></p>
 
-For attacks that *scale* (many-shot / long-context), a single pass isn't enough — ROGUE sweeps the dimension and reports a **robustness threshold**: *safe up to N, breaks at M*.
+For attacks that *scale* (many-shot / long-context), a single pass isn't enough — ROGUE sweeps the dimension and reports a **robustness threshold**: the context length at which each model caves. The cross-model board is live on the [leaderboard](https://rogue-eosin.vercel.app/leaderboard); the measured finding is counterintuitive — for an *explicit* harmful ask, length barely matters (most models break at the smallest 2K setting), and the spread is between models, not lengths: on a 128K many-shot ladder of AdvBench harmful asks, GPT-OSS-120B holds at every length while DeepSeek-V4-Pro caves 97% of the time.
 
 <p align="center"><img src="assets/card/marketing/sweep-card.png" alt="ROGUE sweep card: many-shot context-length threshold — held to 8K, breaks at 32K" width="620"></p>
 
