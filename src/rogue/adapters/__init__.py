@@ -10,6 +10,7 @@ from ..core.registry import registry
 from .anthropic import AnthropicAdapter
 from .base import AdapterConfig, TargetAdapter
 from .custom import CustomHTTPAdapter
+from .featherless import FeatherlessAdapter
 from .gemini import GeminiAdapter
 from .mock import MockAdapter
 from .openai import GroqAdapter, OpenAIAdapter
@@ -23,6 +24,7 @@ registry.register("openrouter", OpenRouterAdapter, overwrite=True)
 registry.register("anthropic", AnthropicAdapter, overwrite=True)
 registry.register("gemini", GeminiAdapter, overwrite=True)
 registry.register("custom", CustomHTTPAdapter, overwrite=True)
+registry.register("featherless", FeatherlessAdapter, overwrite=True)
 
 __all__ = [
     "TargetAdapter",
@@ -34,5 +36,6 @@ __all__ = [
     "AnthropicAdapter",
     "GeminiAdapter",
     "CustomHTTPAdapter",
+    "FeatherlessAdapter",
     "registry",
 ]

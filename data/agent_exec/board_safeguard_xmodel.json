@@ -1,0 +1,26 @@
+{
+  "mode": "safeguard",
+  "live": true,
+  "board": {
+    "GPT-5.4-Nano": {
+      "findings": 0,
+      "breached": 0
+    },
+    "GPT-5.4-Mini": {
+      "findings": 0,
+      "breached": 0
+    },
+    "Qwen3-32B": {
+      "findings": 0,
+      "breached": 0
+    },
+    "DeepSeek-V3.1": {
+      "findings": 0,
+      "breached": 0
+    },
+    "Mistral-Small-24B": {
+      "findings": 0,
+      "breached": 0
+    }
+  }
+}

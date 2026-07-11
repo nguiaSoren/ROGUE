@@ -83,6 +83,13 @@ def supports_audio(target_model: str) -> bool:
 _PROVIDER_ROUTES: tuple[tuple[str, str], ...] = (
     ("openai/", "openai"),
     ("groq/", "groq"),
+    # Featherless flat-fee OpenAI-compatible surface for open-weight vendors (FeatherlessAdapter
+    # bakes in api.featherless.ai/v1 + FEATHERLESS_API_KEY; DB configs carry no base_url).
+    ("Qwen/", "featherless"),
+    ("deepseek-ai/", "featherless"),
+    ("zai-org/", "featherless"),
+    ("huihui-ai/", "featherless"),
+    ("MiniMaxAI/", "featherless"),
     ("mistralai/", "openrouter"),
     ("google/", "openrouter"),
     ("meta-llama/", "openrouter"),

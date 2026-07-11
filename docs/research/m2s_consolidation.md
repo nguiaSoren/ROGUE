@@ -97,11 +97,28 @@ from the corpus turn counts with no target/judge call:
 - **2,219 `breach_results` rows** already sit on multi-turn primitives — the fired surface is real and
   heavily exercised, not a corner case.
 
-**What is NOT measured here (honest gap).** Whether the consolidated single-turn form *retains or
-lifts* ASR versus the scripted multi-turn original — Ha's central claim — requires firing **both** forms
-on a live panel. That is the gated paid A/B (~$5–15, EVADE-band primitives): fire scripted vs
-consolidated, compare breach rate. Until it runs, the headline is the **cost** number (71% fewer calls
-on the multi-turn slice), not an efficacy claim.
+**What is NOT measured by the offline census (the efficacy question).** Whether the consolidated
+single-turn form *retains or lifts* ASR versus the scripted multi-turn original — Ha's central claim —
+requires firing **both** forms on a live panel. A first **directional** A/B ran 2026-07-11 (below); the
+offline headline remains the **cost** number (71% fewer calls on the multi-turn slice), and the
+efficacy read is small-n, not yet a powered stat.
+
+## Measured live — first directional A/B (2026-07-11, small-n, judge = `openai/gpt-5.4-mini`)
+
+⚠️ Directional, small-n — **NOT a headline**. The judge here is `gpt-5.4-mini` (a proxy; the calibrated
+production judge was unavailable at run time), so read this as directional. Breach = `full_breach + partial_breach` (`evaded`/`refused` are non-breaches).
+
+- **OpenAI (gpt-5.4-mini + nano, 15 multi-turn primitives × 2 trials = 60 cells/pass):**
+  scripted **3/60 = 5.0%** → M2S-consolidated **5/60 = 8.3%** — consolidation **retained + slightly
+  lifted** breach (+3.3 pts; all partial; 3 cells moved off "refused"). Directionally supports Ha's
+  contextual-blindness claim on aligned targets.
+- **Featherless Qwen3-32B (scripted only — the consolidated pass was killed for slowness at
+  concurrency-1 under the Featherless 4-unit cap):** **10/15 = 66.7%** (5 full + 5 partial). No Qwen
+  A/B, but the scripted rate is a striking **cross-vendor permissiveness gap** vs OpenAI's 5.0% (the
+  "model is the variable" / safeguard-variance theme).
+
+Data: Neon `breach_results` + `data/agent_exec/session_2026-07-11_arms_3_8a_19_21.md`. This is a
+"we're seeing" directional read (n=15 primitives), not the powered A/B; `ROGUE_M2S` stays OFF in prod.
 
 ## Verification (wired ≠ run)
 
