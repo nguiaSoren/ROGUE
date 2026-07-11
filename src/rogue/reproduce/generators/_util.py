@@ -1,8 +1,25 @@
-"""Shared helpers for procedural generators: token counting + a benign shot bank."""
+"""Shared helpers for procedural generators: token counting + shot banks (benign + harmful)."""
 
 from __future__ import annotations
 
 import functools
+import json
+from pathlib import Path
+
+_ADVBENCH = Path(__file__).resolve().parents[2] / "data" / "benchmark" / "advbench_100.jsonl"
+
+
+@functools.lru_cache(maxsize=1)
+def advbench_harmful_shots() -> tuple[tuple[str, str], ...]:
+    """HARMFUL demonstration shots for a many-shot ladder — AdvBench (goal → compliance-opener target).
+
+    Used as the ``corpus`` for ``shot_source="corpus"`` so the ladder demonstrates COMPLIANCE with
+    harmful requests rather than benign filler. This is the corpus fix that makes robustness responses
+    judge-able: with harmful demos priming a concrete harmful final ask, a reply is unambiguous
+    (produces harm = breach / refuses = safe), instead of the benign-shot / template ambiguity that
+    turned the first robustness board into a judge artifact (see tasks/LESSONS.md 2026-07-11)."""
+    rows = [json.loads(x) for x in _ADVBENCH.read_text().splitlines() if x.strip()]
+    return tuple((r["goal"], r["target"]) for r in rows)
 
 # A bank of BENIGN question/answer shots. The MSJ paper found that dummy/benign shots break
 # long-context safety as well as harmful ones — so filling the context with these tests the

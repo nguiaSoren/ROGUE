@@ -87,7 +87,12 @@ def _load_from_db(database_url: str, limit: int) -> list[AttackPrimitive]:
     from rogue.db.models import AttackPrimitive as AttackPrimitiveORM
     from scripts.reproduce.reproduce_once import _orm_to_pydantic_primitive
 
-    engine = create_engine(database_url, pool_pre_ping=True)
+    # idle_in_transaction_session_timeout=0: pool_pre_ping pings on checkout only; this stops
+    # Neon killing a connection whose txn sits idle during a long scan (2026-07-10 paid-session fix).
+    engine = create_engine(
+        database_url, pool_pre_ping=True,
+        connect_args={"options": "-c idle_in_transaction_session_timeout=0"},
+    )
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
     with SessionLocal() as session:
         q = (
@@ -164,6 +169,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=False,
         help="under --deep, skip the escalation ladder (keep persona + multi-turn + PAIR only)",
     )
+    # --- opt-in robustness sweep (COSTS MORE — sweeps the token ladder; bounded by --robustness-sweep-max-spend) ---
+    p.add_argument(
+        "--robustness-sweep",
+        action="store_true",
+        default=False,
+        help=(
+            "after the scan, sweep base primitive(s) across the many-shot / long-context token "
+            "ladder to find this endpoint's breaking THRESHOLD ('breaks at N tokens'), graded by "
+            "the same judge. Adds cost (bounded by --robustness-sweep-max-spend)."
+        ),
+    )
+    p.add_argument(
+        "--robustness-sweep-limit",
+        type=int,
+        default=1,
+        help="how many base primitives to sweep for the threshold (default 1)",
+    )
+    p.add_argument(
+        "--robustness-sweep-max-spend",
+        type=float,
+        default=2.00,
+        help="hard USD cap across the whole robustness-sweep stage (default $2.00)",
+    )
     return p.parse_args(argv)
 
 
@@ -202,6 +230,9 @@ async def _run(args: argparse.Namespace) -> EndpointScanReport:
         deep=args.deep,
         pair_max_iters=args.pair_max_iters,
         escalate=not args.no_escalate,
+        robustness_sweep=args.robustness_sweep,
+        robustness_sweep_limit=args.robustness_sweep_limit,
+        robustness_sweep_max_spend=args.robustness_sweep_max_spend,
     )
 
 
