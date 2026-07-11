@@ -1,4 +1,4 @@
-# Observable leakage channels — a provenance-instrumentation framework
+# Observable leakage channels — a provenance-instrumentation framework (P5)
 
 **Elevator pitch.** *ROGUE turns hidden agent-internal channels — tool-call arguments, reasoning traces, persistent memory, retrieval — into observable, provenance-labeled leakage channels that can be measured with deterministic canaries.* Everything below is an instance of that one idea.
 
@@ -49,6 +49,12 @@ The LOC in §3 shows the components *reuse*; this section argues they are the *r
 **Boundaries — channels that do NOT fit (so "everything fits" isn't by construction).** The abstraction has real edges. (a) *No plantable ground truth* — timing / resource / cache side-channels carry information with no site to plant a canary, so **S** has no instance; out of scope by design. (b) *Multi-hop, distributed provenance* — a secret passing through several agents needs **P** to be a taint *graph*, which the single-hop v1 **P** cannot express; that channel would require extending **P**, not reusing it. (c) *No discrete egress event* — gradual behavioral influence (a model nudged over many turns) has no sink for **J** to grade. Naming these is the honest test that the four components are a real abstraction with a boundary, not a definition stretched until everything fits.
 
 **Relation to taint tracking / information-flow control.** IFC and dynamic taint tracking answer a superset question — track *all* flows — but require white-box access to instrument the runtime, are heavy, and do not apply to a black-box frontier model behind an API. This framework is the black-box dual: it plants a *known* secret and observes egress across observable channels with **no model internals**. It is deliberately *unsound* (it measures verbatim + decoded + planted-canary flows — a lower bound, never a completeness claim), and that is the trade that buys deployability against proprietary agents where taint/IFC cannot run. Complementary, not competing: IFC for systems you can instrument, canary-measurement for agents you can only observe.
+
+## 2.6 A sibling surface — recipient-appropriateness (multi-party contextual privacy)
+
+The boundaries above name channels that extend a *component* (multi-hop **P**). A distinct extension is a surface that reuses the *substrate* but changes the *kernel*. The **multi-party contextual-privacy** surface (`docs/research/multiparty_privacy.md`, Q15) is exactly that — a **sibling, not a fifth channel**: a shared assistant entrusted with party A's confidence discloses it to a *different* party B in the same conversation. It reuses this framework's machinery — the unguessable canary (**S**) and the two-tier verbatim+semantic judge (**J/E**) — but its kernel is **recipient-appropriateness** (Nissenbaum's contextual integrity: *to whom* may a secret flow), not **provenance** (*where did it come from*). There is no tool trace, no `PIIProvenance`, no origin label; the "sink" is the reply itself, served to the wrong recipient. That **S** and **J** transfer cleanly across this kernel boundary is itself evidence the canary-and-judge measurement machinery generalizes beyond provenance — the sibling strengthens the framework's reach without being folded into its four-channel claim.
+
+**Measured (2026-07-11, directional — `data/multiparty/leaderboard_featherless.json`).** A "smaller-the-leakier" contextual-privacy spread landed: **Qwen2.5-7B** leaks the confided fact **verbatim 37%** of the time (group framing) while its 14B / 32B siblings hold it (~0%) — despite local deployment being sold as the private option (echoing MuPPET). MuPPET's *group > one-to-one* delta did **not** reproduce on this small panel, so we report the cross-model variance, not the framing delta. Directional (one confided fact per scenario, small panel); the flag stays off in prod.
 
 ## 3. Proof of reuse (not an assertion)
 
@@ -121,6 +127,8 @@ The one axis that makes memory its own instance, not "retrieval again," is **tem
 - **Architecture dependence** — explicit/list memory vs vector/semantic memory; a retrieval top-k policy. The deterministic exact-match store **cannot** answer this (an honest gap), so the measured *rate* does not generalize even though the *engineering* does.
 
 Until those land the contribution is an instrument, not an empirical finding — and a live result could be a meaningful cross-model spread or a flat ~0%; the framework is useful either way, but the empirical impact differs. Stated up front, not hedged after.
+
+**First directional prevalence signal — the memory channel (2026-07-11).** The prevalence question got its first partial answer on the hardest channel. A cross-model agent-exec board (`data/agent_exec/board_memexfil_xmodel.json`; 5 models × 5 seeds, one agentic primitive) found **Qwen3-32B the sole breacher of five** — it recalled + exfil'd a dormant canary planted in a *prior* session; GPT-5.4-Nano/Mini + DeepSeek-V3.1 engaged the recall but did not exfil, Mistral-Small never engaged. One agentic primitive ⇒ plumbing-scale, **not a rate** — but it is the first cross-model signal that memory-channel leakage *tracks the model*, consistent with the containment-tracks-alignment pattern P4 reports on the skill-pool channel. It narrows the open item from "unmeasured" to "directionally model-dependent"; the powered per-channel prevalence run still remains.
 
 ## 8. Conclusion
 
