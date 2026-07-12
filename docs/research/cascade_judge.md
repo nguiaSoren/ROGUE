@@ -11,8 +11,22 @@ confirmed by the calibrated judge.**
 (`ROGUE_CASCADE_JUDGE=on` on the Render API+worker), so customer scans already cascade. Offline-validated
 by replaying the cascade over ROGUE's existing `breach_results` ($0, read-only, on Neon): at the safe
 default gate **18.4% of paid judge calls saved at 99.8% agreement** with the calibrated verdict (95% CI
-99.5–99.9%, n=12,452), rising to **46.5% saved at a certified ≥95% agreement floor**. A live dollar/latency
-headline needs one gated ~$35 A/B — but note (below) the offline number is already close to decisive here.
+99.5–99.9%, n=12,452), rising to **46.5% saved at a certified ≥95% agreement floor**.
+
+> **Live judge-call-saved % — measured 2026-07-12.** `reproduce_once` now folds the cascade's own
+> `CascadeStats` onto the run summary (`cascade_short_circuit=N/M`), so a live reproduce reports the realised
+> judge-call savings directly. A cascade-on pass over a representative baseline-order corpus (100 cells × 2
+> OpenAI configs, 90% refusal rate — the normal mix) saved **34% of LLM-judge calls** (`34/100`, run_id
+> `e16c762b8fe4`), with verdicts unchanged (the free heuristic only short-circuits confident *refusals*). That
+> lands inside the offline 18.4–46.5% band and confirms it live. **Honest caveat:** the realised % scales with
+> the corpus *refusal* rate — more flat refusals ⇒ more confident short-circuits; on an acquisition-ordered
+> pass that front-loads model-engaging attacks (only ~55% refused) the same instrument saved just 2%. So 34%
+> is the number for a representative scan mix, not a universal constant.
+
+> **Breach-rate-unchanged half — Paper-A factorial, 2026-07-10.** The factorial's cascade cell
+> (`n_trials=12`, 2 real OpenAI configs) confirmed cascading does **not** degrade the breach rate (50/720
+> with cascade vs 54/720 baseline — the same rate; the count delta is noise), exactly the asymmetric-rail
+> prediction.
 
 Code: `src/rogue/reproduce/cascade_judge.py` · replay validator: `scripts/reproduce/replay_cascade.py` ·
 tests: `tests/test_cascade_judge.py` · env flag: `ROGUE_CASCADE_JUDGE`.

@@ -180,6 +180,10 @@ class ReproductionRunStats:
     escalation_breaches: int = 0
     escalation_spend_usd: float = 0.0
     escalation_winners: dict[str, int] = field(default_factory=dict)
+    # Q2/cascade (only when ROGUE_CASCADE_JUDGE=on): how many trials the free heuristic tier graded so
+    # the paid LLM judge was never called — the run's realised judge-call savings (the live judge-economics number).
+    cascade_short_circuit: int = 0
+    cascade_total: int = 0
 
     def add_verdict(self, verdict: JudgeVerdict) -> None:
         self.verdict_counts[verdict.value] = (
@@ -210,6 +214,12 @@ class ReproductionRunStats:
                 f"escalation_breaches={self.escalation_breaches} "
                 f"escalation_spend=${self.escalation_spend_usd:.2f} "
                 f"escalation_winners=[{winners}]"
+            )
+        if self.cascade_total:
+            saved = self.cascade_short_circuit / self.cascade_total
+            base += (
+                f" | cascade_short_circuit={self.cascade_short_circuit}/{self.cascade_total} "
+                f"({saved:.0%} LLM-judge calls saved)"
             )
         return base
 
@@ -644,6 +654,7 @@ async def run_reproduction(
 
     if panel is None:
         panel = TargetPanel()
+    _cascade_judge = None  # set below when we build a cascade-wrapped judge, so its saved-% surfaces in stats
     if judge is None:
         judge = JudgeAgent()
         # Confidence-gated cascade (off by default; ROGUE_CASCADE_JUDGE=on). The free heuristic grades
@@ -658,7 +669,10 @@ async def run_reproduction(
             # Q5: disagreement check wraps outside the cascade — off by default (identity). On →
             # each breach cell is re-graded by the strict bracket and flagged low-confidence if the
             # bracket disagrees (verdict unchanged). Also INERT on --judge-batch (kept raw above).
-            judge = resolve_disagreement(resolve_cascade(judge))
+            # Keep the cascade layer in a local so its realised judge-call savings surface on the run
+            # stats (Q2 cascade judge-economics); when the flag is off resolve_cascade returns the judge unchanged.
+            _cascade_judge = resolve_cascade(judge)
+            judge = resolve_disagreement(_cascade_judge)
     if persona_technique is not None and persona_wrapper is None:
         persona_wrapper = PersonaWrapper.from_env()
     if pair_max_iters > 0 and pair_attacker is None:
@@ -1433,6 +1447,13 @@ async def run_reproduction(
                     logger.warning("domain-jargon pass skipped: %s", e)
 
     finally:
+        # Q2 cascade: fold the cascade's realised judge-call savings onto the run stats (no-op when the
+        # flag is off — resolve_cascade returned the judge unchanged, so this stays a plain JudgeAgent).
+        from rogue.reproduce.cascade_judge import CascadeJudge  # noqa: PLC0415
+
+        if isinstance(_cascade_judge, CascadeJudge) and _cascade_judge.stats.n_total:
+            stats.cascade_short_circuit = _cascade_judge.stats.n_short_circuit
+            stats.cascade_total = _cascade_judge.stats.n_total
         await panel.aclose()
         if persona_wrapper is not None:
             await persona_wrapper.aclose()
