@@ -5,10 +5,12 @@ Probability Ratio Test: fire trials one small concurrent batch at a time and sto
 breach/no-breach decision is statistically clear — so a clearly-safe or clearly-broken cell resolves
 in ~4–6 trials, and only genuinely borderline cells spend the full budget.
 
-**Status.** Built + wired into all four trial-loop surfaces, off by default. Offline-validated by
-replaying the real driver over ROGUE's existing `breach_results` ($0): **22.1% of already-fired
-target+judge calls saved at 99.8% decision agreement** with today's rule. A *live* budget-saved
-headline needs one gated ~$35 reproduce cycle (see [Caveats](#caveats)).
+**Status.** Built + wired into all four trial-loop surfaces, off by default. **Live A/B RAN 2026-07-10**
+(Paper-A factorial, `n_trials=12`, 2 real OpenAI configs, 0 errors): **SPRT cut target calls ~48%
+(720 → 376) with the breach rate preserved (7.5% → 7.4%)** — the controlled contribution at full sampling
+depth. This is consistent with the earlier `$0` offline replay (**22.1% saved at 99.8% decision agreement**
+over ROGUE's shallow historical cells): the replay was pessimistic because most historical cells carry
+only 3–5 trials, so at depth-12 SPRT reaches a boundary far more often. See [the live experiment](#the-live-experiment--ran-2026-07-10-measured-not-replay).
 
 Code: `src/rogue/reproduce/sprt.py` · replay validator: `scripts/reproduce/replay_sprt.py` ·
 tests: `tests/test_sprt.py` · env flag: `ROGUE_SPRT`.
@@ -200,28 +202,37 @@ Bernoulli-per-trial benchmark can be pre-screened this way against real historic
 paid run. For a field where evaluation is the dominant cost, a cheap way to vet adaptive policies
 offline is useful on its own.
 
-### The live experiment (the one number still gated)
+### The live experiment — RAN 2026-07-10 (measured, not replay)
 
 The offline replay is *pessimistic by construction*: the method targets `n_max=12`, but most historical
 cells carry only 3–5 trials, so on replay SPRT rarely has room to reach a boundary (21% "decided"). A
-live experiment removes that ceiling — a single fresh reproduce pass, two arms over the same cells:
+live experiment removes that ceiling — a single fresh reproduce pass at **`n_trials=12`**, two arms over
+the same cells (the Paper-A factorial's A/C cells, `openai/gpt-5.4-nano` + `openai/gpt-5.4-mini`,
+30 primitives × 2 configs, judge `gpt-4o-mini`, 0 target/judge/persist errors):
 
-| arm | policy | measured |
-|---|---|---|
-| **A — baseline** | fixed **12 trials/cell** | verdicts, cost, latency |
-| **B — SPRT** | sequential, **cap 12/cell** | decision agreement vs A · calls saved · dollars saved · mean trials/cell · latency |
+| arm | policy | target calls fired | breach rate | outcome |
+|---|---|---|---|---|
+| **A — baseline** | fixed **12 trials/cell** | **720** | 54/720 = **7.5%** | — |
+| **C — SPRT** | sequential, **cap 12/cell** | **376** | 28/376 = **7.4%** | **−47.8% calls, breach rate preserved** |
 
-That converts "SPRT should save calls" into *"in production LLM security evaluation, SPRT reduced
-evaluation cost by X% while preserving Y% of verdicts"* — the deployment sentence a reviewer remembers.
-It is a short pass over a handful of configs, foldable into any paid session, and it matters *more* here
-than for a ranking method precisely because the offline replay understates the benefit.
+**Measured: SPRT cut target calls by ~48% at `n_max=12` while the breach rate held (7.5% → 7.4%)** — it
+early-stops after enough evidence without dropping detections. This is the *controlled A/B contribution
+at full sampling depth*, exactly the number the offline replay understated: at depth-12 SPRT reaches a
+boundary far more often than on ROGUE's shallow historical cells (hence 48% here vs 22.1% on replay). The
+two are consistent — the replay is the same method throttled by the shallow trials it had to replay over.
+(⚠️ Depth-dependent: the *production-realized* savings scale with the deployed `n_trials`; 48% is the
+benefit at the paper's `n_max=12`, not a claim about every prod scan. Decision *agreement* per-cell wasn't
+separately logged this run — the replay's 99.8% agreement stands for that; here the preserved breach
+*rate* is the detection-quality evidence.) Data: `data/exports/factorial_v2_summary.json`.
 
 ## Caveats
 
-- **Replay ≠ live.** The 22.1% is what SPRT would have saved *over the trials ROGUE already fired*;
-  most cells only carry 3–5 trials, so SPRT rarely reaches a boundary on replay (21% "decided"). Live,
-  it fires up to `n_max` and decides far more often — the honest live figure is a gated paid reproduce
-  run, not a claim we can make from replay alone.
+- **Replay ≠ live — now both exist.** The 22.1% is what SPRT would have saved *over the trials ROGUE
+  already fired* (mostly 3–5/cell, so it rarely reaches a boundary on replay: 21% "decided"). The live
+  A/B at `n_trials=12` (RAN 2026-07-10) removes that ceiling and measured **~48% calls saved, breach rate
+  preserved** — confirming the replay understated the benefit. The residual honesty caveat is now only
+  *depth*: production-realized savings scale with the deployed `n_trials`, so 48% is the full-depth
+  contribution, not a per-scan guarantee.
 - **Composing with survival ordering — same run, own arm.** SPRT and the survival gate are orthogonal
   (survival picks *which cells* fire; SPRT sets *how many trials* each fired cell gets), so they compose
   as a product and share one harvest/config/budget envelope. But SPRT's *own* measurement needs the
