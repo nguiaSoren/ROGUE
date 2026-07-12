@@ -25,7 +25,7 @@ from rogue.reproduce.prefire.features import build_prefire_features
 from rogue.reproduce.prefire.model import PrefirePredictor
 from rogue.reproduce.config_features import derive_config_features
 from rogue.retrieval.embed import deterministic_embed_fn
-from rogue.schemas import AttackPrimitive, DeploymentConfig, JudgeVerdict
+from rogue.schemas import AttackPrimitive, AttackVector, DeploymentConfig, JudgeVerdict
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures"
 _GOLDENS = (
@@ -177,6 +177,87 @@ def test_p_breach_reuses_prefire_scoring_exactly():
         expected = pred.score_one(build_prefire_features(s.primitive, cfg, None, pred.affinity, config_features=cf))
         assert abs(s.p_breach - expected) < 1e-12
         assert abs(s.uncertainty - (1.0 - 2.0 * abs(expected - 0.5))) < 1e-12
+
+
+# --- modality gate (config-aware; sink incompatible below the budget) -----------------------------
+
+_TEXT_MODEL = "company-text-only-1"     # unknown to model_specs → text-only (fail-safe)
+_IMAGE_MODEL = "openai/gpt-4o-mini"     # model_specs marks it image-capable
+
+
+def _image_prim(base: AttackPrimitive, pid: str, repro: int) -> AttackPrimitive:
+    d = base.model_dump()
+    d["primitive_id"] = pid
+    d["reproducibility_score"] = repro
+    d["vector"] = AttackVector.MULTIMODAL_IMAGE
+    d["requires_multimodal"] = True
+    d["synthesized"] = False
+    d["derived_from_primitive_id"] = None
+    return AttackPrimitive.model_validate(d)
+
+
+def test_modality_incompatible_sinks_below_compatible_against_text_target():
+    # The image attack has the higher value, but a text-only target can't read it → it modality-skips at
+    # fire, so the gate must sort it LAST (else a budget cap is spent on a cell that produces zero rows).
+    g = _goldens()
+    text = _clone(g[0], "p-textprim00", 5, g[0].payload_template)
+    image = _image_prim(g[1], "p-imageprim0", 9)
+    gate = AcquisitionGate(predictor=None, embed_fn=None, cell_evidence={},
+                           w_value=1.0, alpha=0.0, beta=0.0, gamma=0.0)  # pure value
+    plan = gate.rank([image, text], _cfg(model=_TEXT_MODEL))
+    assert [p.primitive_id for p in plan.ordered] == ["p-textprim00", "p-imageprim0"]
+    sc = {s.primitive.primitive_id: s for s in plan.scores}
+    assert sc["p-imageprim0"].compatible is False and sc["p-textprim00"].compatible is True
+    assert "modality-sunk" in plan.summary()
+
+
+def test_modality_gate_is_per_config_untouched_against_vision_target():
+    # SAME image primitive, vision-capable target → not penalised; its higher value keeps the lead.
+    g = _goldens()
+    text = _clone(g[0], "p-textprim00", 5, g[0].payload_template)
+    image = _image_prim(g[1], "p-imageprim0", 9)
+    gate = AcquisitionGate(predictor=None, embed_fn=None, cell_evidence={},
+                           w_value=1.0, alpha=0.0, beta=0.0, gamma=0.0)
+    plan = gate.rank([image, text], _cfg(model=_IMAGE_MODEL))
+    assert [p.primitive_id for p in plan.ordered] == ["p-imageprim0", "p-textprim00"]
+    assert all(s.compatible for s in plan.scores)
+
+
+def test_modality_gate_off_restores_the_wasteful_value_order():
+    g = _goldens()
+    text = _clone(g[0], "p-textprim00", 5, g[0].payload_template)
+    image = _image_prim(g[1], "p-imageprim0", 9)
+    gate = AcquisitionGate(predictor=None, embed_fn=None, cell_evidence={},
+                           w_value=1.0, alpha=0.0, beta=0.0, gamma=0.0, modality_gate=False)
+    plan = gate.rank([image, text], _cfg(model=_TEXT_MODEL))
+    assert [p.primitive_id for p in plan.ordered] == ["p-imageprim0", "p-textprim00"]  # no sink
+
+
+def test_rank_pairs_sinks_incompatible_to_the_tail():
+    # The reproduce-sweep path: the highest-value pair is a text-incompatible image attack, so a downstream
+    # --acquisition-budget of 2 must fire the two text pairs, not waste a slot on the image.
+    g = _goldens()
+    text1 = _clone(g[0], "p-txt1111111", 5, g[0].payload_template)
+    text2 = _clone(g[2], "p-txt2222222", 4, g[2].payload_template)
+    image = _image_prim(g[1], "p-img0000000", 9)
+    cfg = _cfg(model=_TEXT_MODEL)
+    pairs = [(image, cfg), (text1, cfg), (text2, cfg)]
+    gate = AcquisitionGate(predictor=None, embed_fn=None, cell_evidence={},
+                           w_value=1.0, alpha=0.0, beta=0.0, gamma=0.0)
+    ordered, enabled = apply_acquisition_order_pairs(pairs, gate=gate)
+    assert enabled is True
+    assert ordered[-1][0].primitive_id == "p-img0000000"       # image is last despite the top repro score
+    assert {p.primitive_id for p, _ in ordered[:2]} == {"p-txt1111111", "p-txt2222222"}
+
+
+def test_resolve_modality_gate_env(monkeypatch):
+    monkeypatch.setenv("ROGUE_ACQUISITION_ORDER", "on")
+    monkeypatch.setenv("ROGUE_ACQ_EMBED", "off")
+    monkeypatch.setenv("ROGUE_ACQUISITION_MODEL", "/nonexistent/model.json")
+    monkeypatch.delenv("ROGUE_ACQ_MODALITY_GATE", raising=False)     # default → on
+    assert resolve_acquisition_gate().modality_gate is True
+    monkeypatch.setenv("ROGUE_ACQ_MODALITY_GATE", "off")
+    assert resolve_acquisition_gate().modality_gate is False
 
 
 # --- resolve() env contract -----------------------------------------------------------------------

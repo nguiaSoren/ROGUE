@@ -39,6 +39,14 @@ breach-rate estimate, so we deliberately do **not** apply LURE and do **not** sa
 sort deterministically (highest acquisition first) so the canonical/discovery reproducibility contract
 (§10.3) holds: the same corpus + telemetry snapshot always yields the same fire order.
 
+**Modality gate.** All four terms score *whether* an attack is worth firing; none of them notices that an
+image/audio attack against a text-only target fires **zero trials** (it modality-skips at dispatch). Under a
+budget cap that is a silent waste — the acquisition order can spend the whole budget on multimodal primitives
+a text target can't read. So the gate sinks any modality-incompatible primitive below every compatible one
+(``ROGUE_ACQ_MODALITY_GATE`` on by default). It is **per-config** — the same image primitive is untouched
+against a vision target — and **ordering-only**: nothing is dropped (the sunk primitives simply fall past the
+cap), so the "never drops a cell" contract holds and a text-only corpus is byte-for-byte unchanged.
+
 **Composition.** ``value`` is Q7's calibrated probability; ``uncertainty`` is a transform of the same
 probability (exploit vs explore — the same number, opposite goals); Q11's survival predictor is a *sibling*
 acquisition signal (near-death configs) that a caller can run first. The gate is off by default
@@ -58,7 +66,7 @@ from rogue.reproduce.prefire.model import PrefirePredictor
 from rogue.reproduce.survival.features import is_novel_family
 from rogue.reproduce.survival.train import DEFAULT_MIN_SUPPORT
 from rogue.retrieval.embed import EmbedFn
-from rogue.schemas import AttackPrimitive, DeploymentConfig
+from rogue.schemas import AttackPrimitive, AttackVector, DeploymentConfig
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -73,6 +81,7 @@ ENV_BETA = "ROGUE_ACQ_BETA"                  # diversity weight
 ENV_GAMMA = "ROGUE_ACQ_GAMMA"                # info-gain weight
 ENV_MIN_SUPPORT = "ROGUE_ACQ_MIN_SUPPORT"    # drift-guard: below this family support, force-keep
 ENV_EMBED = "ROGUE_ACQ_EMBED"               # on (default) | off — compute serve-time embeddings for diversity
+ENV_MODALITY_GATE = "ROGUE_ACQ_MODALITY_GATE"  # on (default) | off — sink modality-incompatible primitives
 
 # Default weights are on comparable [0,1] scales and sum to 1.0 — mirroring the report's worked example
 # (0.6 value / 0.25 uncertainty / 0.10 diversity / 0.05 info-gain). Not asserted convex: additive weights
@@ -84,6 +93,32 @@ DEFAULT_GAMMA = 0.05
 
 # The Q7 pre-fire model doubles as the acquisition value/uncertainty source — no separate artifact to train.
 DEFAULT_MODEL_PATH = "data/models/prefire_scorer.json"
+
+# A modality-incompatible primitive (an image/audio attack against a target that can't read that modality)
+# fires ZERO trials — it modality-skips at dispatch (``TargetPanel.modality_skip_reason``), so spending paid
+# budget on it is pure waste. When the modality gate is on the gate sinks such a primitive below every
+# compatible one. This constant dominates every [0,1]-scaled term AND the ≤β diversity add, so incompatible
+# items sort strictly last while preserving their relative order among themselves.
+_MODALITY_PENALTY = 1.0e6
+
+
+def _modality_compatible(p: AttackPrimitive, config: DeploymentConfig) -> bool:
+    """False iff ``p`` requires an input modality the target can't consume (would modality-skip at fire).
+
+    The raw-primitive (pre-render) analogue of ``TargetPanel.modality_skip_reason``: a MULTIMODAL_IMAGE /
+    MULTIMODAL_AUDIO vector — or a ``requires_multimodal`` primitive whose specific modality the vector
+    doesn't pin — against a target whose ``model_specs`` say it can't read that modality dispatches no
+    trials, so it can neither breach nor teach. Text / multi-turn primitives are always compatible."""
+    from rogue.adapters import model_specs  # noqa: PLC0415 — local import keeps gate module import cheap
+
+    tm = config.target_model
+    if p.vector == AttackVector.MULTIMODAL_IMAGE:
+        return model_specs.supports_image(tm)
+    if p.vector == AttackVector.MULTIMODAL_AUDIO:
+        return model_specs.supports_audio(tm)
+    if p.requires_multimodal:  # modality not pinned by the vector — compatible if the target reads either
+        return model_specs.supports_image(tm) or model_specs.supports_audio(tm)
+    return True
 
 
 @dataclass
@@ -100,6 +135,7 @@ class AcquisitionScore:
     forced: bool             # drift-guard force-keep (novel/low-support family) — never deferred by a cap
     forced_reason: str       # "" | "novel_family" | "low_support"
     orig_index: int
+    compatible: bool = True  # modality-compatible with the target (else sunk below the budget by the gate)
 
 
 @dataclass
@@ -114,9 +150,11 @@ class AcquisitionPlan:
 
     def summary(self) -> str:
         forced = sum(1 for s in self.scores if s.forced)
+        incompatible = sum(1 for s in self.scores if not s.compatible)
         return (
             f"acquisition gate: ranked {len(self.ordered)} attacks, firing {len(self.selected)} "
-            f"({forced} force-kept by drift-guard, {len(self.deferred)} deferred)"
+            f"({forced} force-kept by drift-guard, {incompatible} modality-sunk, "
+            f"{len(self.deferred)} deferred)"
         )
 
 
@@ -185,7 +223,9 @@ class AcquisitionGate:
     ``cell_evidence`` maps ``(target_model, family) → (breaches, trials)`` for info-gain (the key order
     ``contextual_breach_rates`` emits); an empty map makes info-gain a constant (neutral — every cell
     equally under-evidenced), which is the honest behaviour when no telemetry is passed (e.g. a stateless
-    SDK scan).
+    SDK scan). ``modality_gate`` (on by default) sinks a primitive whose required modality the target
+    can't read below every compatible one, so a budget cap isn't spent on cells that would only
+    modality-skip; it is per-config (the same image primitive vs a vision target is untouched).
     """
 
     predictor: PrefirePredictor | None = None
@@ -196,6 +236,7 @@ class AcquisitionGate:
     beta: float = DEFAULT_BETA
     gamma: float = DEFAULT_GAMMA
     min_support: int = DEFAULT_MIN_SUPPORT
+    modality_gate: bool = True
     enabled: bool = True
     _embed_warned: bool = False
 
@@ -266,9 +307,17 @@ class AcquisitionGate:
             unc = 1.0 - 2.0 * abs(pb - 0.5)
             ig = self._info_gain(p, config)
             forced, reason = self._forced(p)
+            compat = (not self.modality_gate) or _modality_compatible(p, config)
+            base = self.w_value * pb + self.alpha * unc + self.gamma * ig
             embs.append(emb)
-            static.append(self.w_value * pb + self.alpha * unc + self.gamma * ig)
-            meta.append({"p": p, "pb": pb, "unc": unc, "ig": ig, "forced": forced, "reason": reason, "i": i})
+            # A modality-incompatible primitive would only skip against this target, so sink it below every
+            # compatible one (the penalty dominates all terms + the later diversity add). Terms are still
+            # recorded raw in ``meta`` for telemetry — the sinking is a scoring choice, not a silent drop.
+            static.append(base if compat else base - _MODALITY_PENALTY)
+            meta.append({
+                "p": p, "pb": pb, "unc": unc, "ig": ig,
+                "forced": forced, "reason": reason, "compat": compat, "i": i,
+            })
         return embs, static, meta
 
     def rank(
@@ -300,6 +349,7 @@ class AcquisitionGate:
                     primitive=m["p"], p_breach=m["pb"], value=m["pb"], uncertainty=m["unc"],
                     info_gain=m["ig"], diversity=div, total=total,
                     forced=m["forced"], forced_reason=m["reason"], orig_index=m["i"],
+                    compatible=m["compat"],
                 )
             )
         ordered = [s.primitive for s in scores]
@@ -343,10 +393,12 @@ class AcquisitionGate:
             g["prims"].append(p)
 
         merged: list[tuple[float, int, int, tuple[AttackPrimitive, DeploymentConfig]]] = []
+        sunk = 0
         for g in groups.values():
             c = g["config"]
             cf = derive_config_features(c.target_model, base_url=getattr(c, "base_url", None))
-            embs, static, _meta = self._static_terms(g["prims"], c, cf)
+            embs, static, meta = self._static_terms(g["prims"], c, cf)
+            sunk += sum(1 for m in meta if not m["compat"])
             unit = _unit_matrix(embs)
             order, div_at = _greedy_order(static, unit, self.beta)
             for pos, j in enumerate(order):
@@ -355,6 +407,11 @@ class AcquisitionGate:
                 # a deterministic global order that keeps each config's own acquisition ranking intact.
                 merged.append((-total, g["order"], pos, (g["prims"][j], c)))
         merged.sort(key=lambda t: (t[0], t[1], t[2]))
+        if sunk:
+            _log.info(
+                "acquisition sweep-order: %d/%d pairs modality-sunk below the budget (target can't read "
+                "their modality)", sunk, len(pairs),
+            )
         return [pair for _, _, _, pair in merged]
 
 
@@ -423,6 +480,8 @@ def resolve_acquisition_gate(
         except ValueError:
             return default
 
+    modality_gate = os.environ.get(ENV_MODALITY_GATE, "on").strip().lower() in ("on", "1", "true", "yes")
+
     return AcquisitionGate(
         predictor=predictor,
         embed_fn=embed_fn,
@@ -432,6 +491,7 @@ def resolve_acquisition_gate(
         beta=_w(ENV_BETA, DEFAULT_BETA),
         gamma=_w(ENV_GAMMA, DEFAULT_GAMMA),
         min_support=int(os.environ.get(ENV_MIN_SUPPORT, DEFAULT_MIN_SUPPORT)),
+        modality_gate=modality_gate,
         enabled=True,
     )
 

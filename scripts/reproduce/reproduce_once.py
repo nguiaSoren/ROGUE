@@ -106,6 +106,7 @@ from rogue.reproduce.pair_orchestrator import (  # noqa: E402
 from rogue.reproduce.multilingual.expand import fire_identity as _ml_fire_identity  # noqa: E402
 from rogue.reproduce.persistence import (  # noqa: E402
     build_breach_result_orm,
+    nul_strip,
     persist_breach_rows,
 )
 from rogue.reproduce.persona_wrap import PersonaWrapper  # noqa: E402
@@ -128,14 +129,36 @@ DEFAULT_N_TRIALS = 5
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_CONCURRENCY = 5
 
-# Judge-input rough estimate per call: rubric (~3K) + rendered attack
-# (~1.5K) + response (~1.5K) ≈ 6K input tokens + ~300 tokens output. With
-# Sonnet ($3/M in + $15/M out), per-call ≈ $0.0225.
+# Flat fallback for a judge whose model has no price entry (Featherless flat-sub, unknown model).
+# NOTE: this is a Sonnet-era placeholder ($0.0225/call ≈ 6K-in Sonnet). For a PRICED judge model,
+# use `_estimate_judge_call_cost` below instead — the flat constant over-counted a gpt-4o-mini judge
+# ~150× and made reproduce_once est_cost read ~40× the real spend (2026-07-10 fix).
 _JUDGE_COST_ESTIMATE_PER_CALL_USD = 0.0225
 # Rough per-target-call estimate for the §10.9 escalation-rotation cost preview
 # (a single target chat completion across the panel's tier; order-of-magnitude,
 # used only for the --dry-run upper-bound, never for accounting).
 _TARGET_COST_ESTIMATE_PER_CALL_USD = 0.01
+
+
+def _estimate_judge_call_cost(judge_model: str, rendered: object, response: object) -> float:
+    """Real, model-aware per-judge-call cost estimate for `est_cost` accounting.
+
+    Prices the judge with `adapters.model_specs` (crawl-verified 2026-07-10) × token counts
+    approximated from the judge's ACTUAL inputs (rubric preamble ≈ 450 tok + the payload excerpt it
+    shows + the response) rather than a flat Sonnet-era constant. Payload + response are capped to
+    mirror the judge's own excerpting, so a giant many-shot payload doesn't inflate the estimate.
+    An unpriced judge (Featherless flat-sub, unknown model) falls back to the flat constant so an
+    estimate is never silently zero.
+    """
+    from rogue.adapters import model_specs  # noqa: PLC0415
+
+    msgs = getattr(rendered, "messages", None) or []
+    user_text = " ".join(m.get("content", "") for m in msgs if m.get("role") == "user")
+    resp_text = getattr(response, "content", "") or ""
+    tokens_in = 450 + (min(len(user_text), 6000) + min(len(resp_text), 8000)) // 4
+    tokens_out = 60  # one-line JSON verdict
+    cost = model_specs.estimate_cost(judge_model, tokens_in, tokens_out)
+    return cost if cost > 0 else _JUDGE_COST_ESTIMATE_PER_CALL_USD
 
 
 @dataclass
@@ -504,6 +527,11 @@ async def _run_judge_batch_phase(
                 stats.target_call_errors += 1
             elif vr.verdict is JudgeVerdict.ERROR:
                 stats.judge_call_errors += 1
+            else:
+                # Batch judge ran → add its real, model-aware cost at the 50%-off batch rate.
+                stats.estimated_cost_usd += 0.5 * _estimate_judge_call_cost(
+                    getattr(judge, "model", ""), rendered, resp
+                )
 
     persisted, persist_errors = persist_breach_rows(database_url, rows)
     stats.breach_results_persisted = persisted
@@ -536,15 +564,15 @@ def _build_pair_breach_result_orm(
         deployment_config_id=config_id,
         trial_index=0,  # one PAIR row per cell — trial index is informational
         temperature=0.7,
-        rendered_payload=pair_result.final_rendered_payload[:50_000],
-        model_response=pair_result.final_model_response[:50_000],
+        rendered_payload=nul_strip(pair_result.final_rendered_payload[:50_000]),
+        model_response=nul_strip(pair_result.final_model_response[:50_000]),
         verdict=pair_result.final_verdict.value,
-        judge_rationale=(
+        judge_rationale=nul_strip((
             f"§10.7 PAIR final iter (iters_to_breach="
             f"{pair_result.pair_iters_to_breach}, "
             f"steps={len(pair_result.steps)}, "
             f"aborted={pair_result.aborted_reason or 'no'})"
-        )[:2_000],
+        )[:2_000]),
         judge_confidence=judge_confidence,
         latency_ms=0,
         tokens_in=0,
@@ -593,6 +621,7 @@ async def run_reproduction(
     domain_jargon_max_pairs: int = 8,
     survival_skip: bool = False,
     prefire_skip: bool = False,
+    acquisition_budget: int | None = None,
     m2s_consolidate: bool = False,
     multilingual: bool = False,
     multilingual_translator: object | None = None,
@@ -667,7 +696,16 @@ async def run_reproduction(
 
     # pool_pre_ping: detect + replace a connection Neon dropped during a long
     # phase (idle SSL timeout) instead of erroring on the next statement.
-    engine = create_engine(database_url, pool_pre_ping=True)
+    # idle_in_transaction_session_timeout=0: pool_pre_ping only pings on CHECKOUT —
+    # it does NOT stop Neon killing a connection whose transaction sits idle during
+    # the long panel fan-out (esp. under parallel contention). Disabling that
+    # per-connection GUC prevents the IdleInTransactionSessionTimeout crash that
+    # took down the reproduce/factorial arms in the 2026-07-10 paid session.
+    engine = create_engine(
+        database_url,
+        pool_pre_ping=True,
+        connect_args={"options": "-c idle_in_transaction_session_timeout=0"},
+    )
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
     stats = ReproductionRunStats(trials_per_pair=n_trials)
@@ -904,7 +942,7 @@ async def run_reproduction(
             # predicted survivors fire first. ORDERING-ONLY by default: if a budget / primitive_limit
             # cutoff or an interruption ends the sweep early, the survivors are already measured; NO
             # cell is dropped, so the breach matrix + the predictor's own training labels stay complete.
-            # ``survival_skip`` (explicit opt-in, for an Arm-13-style A/B) additionally drops the
+            # ``survival_skip`` (explicit opt-in, for a survival-ordering A/B) additionally drops the
             # predicted-dead tail below ROGUE_SURVIVAL_SKIP_THRESHOLD — never the sweep's default. Off
             # unless ROGUE_SURVIVAL_ORDER=on + a model artifact exists → today's pair order is identical.
             from rogue.reproduce.survival.gate import apply_survival_order_pairs  # noqa: PLC0415
@@ -941,6 +979,18 @@ async def run_reproduction(
                     len(_acq_ordered),
                 )
                 _ordered_pairs = _acq_ordered
+
+            # Q18 ACQUISITION BUDGET (--acquisition-budget K): fire only the top-K pairs AFTER ordering
+            # (acquisition-reordered or the default reproducibility-score order). This is what makes the
+            # ordering A/B valid — --primitive-limit caps by reproducibility_score BEFORE the reorder, so
+            # without it both arms fire the SAME set (order-invariant); the budget must truncate AFTER
+            # the order so the ordering decides WHICH K cells are fired within budget.
+            if acquisition_budget and 0 < acquisition_budget < len(_ordered_pairs):
+                logger.info(
+                    "acquisition-budget: firing top-%d of %d ordered (primitive × config) pairs (order=%s)",
+                    acquisition_budget, len(_ordered_pairs), "acquisition" if _acq_on else "reproducibility",
+                )
+                _ordered_pairs = _ordered_pairs[:acquisition_budget]
 
             # Q7 PRE-FIRE SKIP (opt-in, env-gated) — additionally drop the (primitive × config) pairs
             # whose calibrated P(breach) is below the threshold, before spending target+judge calls.
@@ -1062,9 +1112,10 @@ async def run_reproduction(
                         elif verdict_result.verdict is JudgeVerdict.ERROR:
                             stats.judge_call_errors += 1
                         else:
-                            # Only count judge cost when the judge actually ran.
-                            stats.estimated_cost_usd += (
-                                _JUDGE_COST_ESTIMATE_PER_CALL_USD
+                            # Only count judge cost when the judge actually ran — priced by the
+                            # REAL judge model (not the flat Sonnet-era constant).
+                            stats.estimated_cost_usd += _estimate_judge_call_cost(
+                                getattr(judge, "model", ""), rendered, response
                             )
                         if verdict_result.verdict in (
                             JudgeVerdict.PARTIAL_BREACH, JudgeVerdict.FULL_BREACH,
@@ -1660,7 +1711,7 @@ def main(argv: list[str] | None = None) -> int:
             "Q11: with ROGUE_SURVIVAL_ORDER=on, DROP the predicted-dead tail (pairs below "
             "ROGUE_SURVIVAL_SKIP_THRESHOLD) instead of only reordering. Off by default — the sweep "
             "reorders survivors-first but never drops a cell, keeping the matrix + training labels "
-            "complete. Use only for a deliberate Arm-13 budget-saved A/B, not a normal measurement run."
+            "complete. Use only for a deliberate survival-ordering budget-saved A/B, not a normal measurement run."
         ),
     )
     parser.add_argument(
@@ -1671,6 +1722,18 @@ def main(argv: list[str] | None = None) -> int:
             "P(breach) is below the threshold before spending target+judge calls. Off by default — "
             "dropping cells corrupts the matrix + the predictor's own training labels. Use only for a "
             "deliberate budget-saved A/B, not a normal measurement run."
+        ),
+    )
+    parser.add_argument(
+        "--acquisition-budget",
+        type=int,
+        default=None,
+        help=(
+            "Q18: after ordering, fire only the top-K (primitive × config) pairs. The budget cap the "
+            "acquisition-ordering A/B needs — --primitive-limit caps BEFORE the reorder, so without "
+            "this both arms fire the same set (order-invariant). Use --primitive-limit N (candidate "
+            "pool) + --acquisition-budget K (fire top-K), toggling ROGUE_ACQUISITION_ORDER to compare "
+            "breaches-within-budget."
         ),
     )
     parser.add_argument(
@@ -1764,6 +1827,7 @@ def main(argv: list[str] | None = None) -> int:
             domain_jargon=getattr(args, "domain_jargon", False),
             survival_skip=getattr(args, "survival_skip", False),
             prefire_skip=getattr(args, "prefire_skip", False),
+            acquisition_budget=getattr(args, "acquisition_budget", None),
             m2s_consolidate=getattr(args, "m2s_consolidate", False),
             multilingual=getattr(args, "multilingual", False),
         )
