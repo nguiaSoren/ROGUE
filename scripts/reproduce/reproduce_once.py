@@ -635,6 +635,7 @@ async def run_reproduction(
     m2s_consolidate: bool = False,
     multilingual: bool = False,
     multilingual_translator: object | None = None,
+    max_output_tokens: int | None = None,
 ) -> ReproductionRunStats:
     """End-to-end Day-2 reproduction sweep. Returns per-run counters.
 
@@ -653,7 +654,7 @@ async def run_reproduction(
     _assert_schema_present(database_url)
 
     if panel is None:
-        panel = TargetPanel()
+        panel = TargetPanel(max_output_tokens=max_output_tokens)
     _cascade_judge = None  # set below when we build a cascade-wrapped judge, so its saved-% surfaces in stats
     if judge is None:
         judge = JudgeAgent()
@@ -1746,6 +1747,18 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--max-output-tokens",
+        type=int,
+        default=None,
+        help=(
+            "Cap the TARGET model's generation length (tokens) for every trial. Omit → each adapter's "
+            "own default (OpenAI: provider default; Featherless & Fireworks: 2048). Set it low (e.g. "
+            "512) to make a reasoning-model open-weight sweep FAST — a breach shows in the opening "
+            "tokens, so the judge's verdict is unaffected while a rambling ~60s/cell generation is "
+            "avoided. This is the knob for a powered open-weight run on the Fireworks lane."
+        ),
+    )
+    parser.add_argument(
         "--acquisition-budget",
         type=int,
         default=None,
@@ -1849,6 +1862,7 @@ def main(argv: list[str] | None = None) -> int:
             survival_skip=getattr(args, "survival_skip", False),
             prefire_skip=getattr(args, "prefire_skip", False),
             acquisition_budget=getattr(args, "acquisition_budget", None),
+            max_output_tokens=getattr(args, "max_output_tokens", None),
             m2s_consolidate=getattr(args, "m2s_consolidate", False),
             multilingual=getattr(args, "multilingual", False),
         )

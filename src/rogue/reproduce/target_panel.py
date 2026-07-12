@@ -90,6 +90,10 @@ _PROVIDER_ROUTES: tuple[tuple[str, str], ...] = (
     ("zai-org/", "featherless"),
     ("huihui-ai/", "featherless"),
     ("MiniMaxAI/", "featherless"),
+    # Fireworks dedicated-serving lane for open-weight models — much faster than the flat-fee
+    # Featherless plan, so the preferred lane for a powered open-weight / permissive-target run.
+    # Fireworks model ids are always ``accounts/fireworks/models/<model>``.
+    ("accounts/fireworks/", "fireworks"),
     ("mistralai/", "openrouter"),
     ("google/", "openrouter"),
     ("meta-llama/", "openrouter"),
@@ -144,12 +148,22 @@ class TargetPanel:
     so importing this module never requires API keys.
     """
 
-    def __init__(self, *, adapter_extra: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        adapter_extra: dict[str, Any] | None = None,
+        max_output_tokens: int | None = None,
+    ) -> None:
         # Cache one adapter per (provider, model_id). The adapter owns its provider client + retry.
         self._adapters: dict[tuple[str, str], Any] = {}
         # Extra config merged into every AdapterConfig.extra — a DI seam for tests (e.g. inject a
         # mocked provider client via {"client": ...}); empty in production.
         self._adapter_extra: dict[str, Any] = dict(adapter_extra or {})
+        # Optional per-scan output cap applied to every target invoke. None → each adapter's own
+        # default (OpenAI: provider default; Featherless & Fireworks: 2048). Set it low (e.g. 512) to
+        # make a reasoning-model open-weight sweep fast — a breach shows in the opening tokens, so the
+        # judge's verdict is unaffected while a rambling 2048-token generation (~60s/cell) is avoided.
+        self._max_output_tokens: int | None = max_output_tokens
 
     async def aclose(self) -> None:
         """Release every cached adapter (and its provider client). Idempotent.
@@ -349,7 +363,9 @@ class TargetPanel:
 
         t0 = time.perf_counter()
         try:
-            result = await adapter.invoke(messages, temperature=temperature)
+            result = await adapter.invoke(
+                messages, temperature=temperature, max_output_tokens=self._max_output_tokens
+            )
         except RateLimitError as e:
             return self._error_response("rate_limit_exhausted", e, trial_index, temperature, t0)
         except ContentPolicyError as e:  # subclass of ProviderError — must precede it
@@ -419,7 +435,9 @@ class TargetPanel:
 
             t0 = time.perf_counter()
             try:
-                result = await adapter.invoke(history, temperature=temperature)
+                result = await adapter.invoke(
+                    history, temperature=temperature, max_output_tokens=self._max_output_tokens
+                )
             except RateLimitError as e:
                 return self._error_response(
                     "rate_limit_exhausted", e, trial_index, temperature, t0

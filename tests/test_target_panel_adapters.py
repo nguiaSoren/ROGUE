@@ -92,6 +92,13 @@ def test_resolve_provider_routes():
     assert _resolve_provider("google/gemini-3.1-flash-lite") == "openrouter"
     assert _resolve_provider("meta-llama/llama-3.1-8b-instruct") == "openrouter"
     assert _resolve_provider("groq/llama-3.1-8b-instant") == "groq"
+    # open-weight lanes: Featherless (flat-fee) by bare vendor prefix; Fireworks (fast) by its
+    # always-prefixed `accounts/fireworks/models/...` id.
+    assert _resolve_provider("Qwen/Qwen3-32B") == "featherless"
+    assert _resolve_provider("deepseek-ai/DeepSeek-V3.1") == "featherless"
+    assert _resolve_provider("zai-org/GLM-4-9B-0414") == "featherless"
+    assert _resolve_provider("accounts/fireworks/models/glm-5p1") == "fireworks"
+    assert _resolve_provider("accounts/fireworks/models/kimi-k2p6") == "fireworks"
 
 
 def test_resolve_provider_unrouted_raises():

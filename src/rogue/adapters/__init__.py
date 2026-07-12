@@ -11,6 +11,7 @@ from .anthropic import AnthropicAdapter
 from .base import AdapterConfig, TargetAdapter
 from .custom import CustomHTTPAdapter
 from .featherless import FeatherlessAdapter
+from .fireworks import FireworksAdapter
 from .gemini import GeminiAdapter
 from .mock import MockAdapter
 from .openai import GroqAdapter, OpenAIAdapter
@@ -25,6 +26,7 @@ registry.register("anthropic", AnthropicAdapter, overwrite=True)
 registry.register("gemini", GeminiAdapter, overwrite=True)
 registry.register("custom", CustomHTTPAdapter, overwrite=True)
 registry.register("featherless", FeatherlessAdapter, overwrite=True)
+registry.register("fireworks", FireworksAdapter, overwrite=True)
 
 __all__ = [
     "TargetAdapter",
@@ -37,5 +39,6 @@ __all__ = [
     "GeminiAdapter",
     "CustomHTTPAdapter",
     "FeatherlessAdapter",
+    "FireworksAdapter",
     "registry",
 ]
