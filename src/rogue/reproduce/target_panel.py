@@ -153,6 +153,7 @@ class TargetPanel:
         *,
         adapter_extra: dict[str, Any] | None = None,
         max_output_tokens: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         # Cache one adapter per (provider, model_id). The adapter owns its provider client + retry.
         self._adapters: dict[tuple[str, str], Any] = {}
@@ -164,6 +165,11 @@ class TargetPanel:
         # make a reasoning-model open-weight sweep fast — a breach shows in the opening tokens, so the
         # judge's verdict is unaffected while a rambling 2048-token generation (~60s/cell) is avoided.
         self._max_output_tokens: int | None = max_output_tokens
+        # Optional reasoning-effort control passed to every target invoke. On a reasoning model the
+        # thinking trace IS the latency, so ``"none"`` disables it (Fireworks GLM-5: 11s→0.8s) — the
+        # real speed lever for a powered open-weight run. None → the model's default reasoning. Values
+        # are provider-specific; a target that rejects the value fails soft in the adapter.
+        self._reasoning_effort: str | None = reasoning_effort
 
     async def aclose(self) -> None:
         """Release every cached adapter (and its provider client). Idempotent.
@@ -364,7 +370,10 @@ class TargetPanel:
         t0 = time.perf_counter()
         try:
             result = await adapter.invoke(
-                messages, temperature=temperature, max_output_tokens=self._max_output_tokens
+                messages,
+                temperature=temperature,
+                max_output_tokens=self._max_output_tokens,
+                reasoning_effort=self._reasoning_effort,
             )
         except RateLimitError as e:
             return self._error_response("rate_limit_exhausted", e, trial_index, temperature, t0)
@@ -436,7 +445,10 @@ class TargetPanel:
             t0 = time.perf_counter()
             try:
                 result = await adapter.invoke(
-                    history, temperature=temperature, max_output_tokens=self._max_output_tokens
+                    history,
+                    temperature=temperature,
+                    max_output_tokens=self._max_output_tokens,
+                    reasoning_effort=self._reasoning_effort,
                 )
             except RateLimitError as e:
                 return self._error_response(

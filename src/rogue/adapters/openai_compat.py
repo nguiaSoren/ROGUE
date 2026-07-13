@@ -258,6 +258,7 @@ class OpenAICompatAdapter(TargetAdapter):
         max_output_tokens: int | None = None,
         tools: list[AgentToolSpec] | None = None,
         tool_choice: str | None = None,
+        reasoning_effort: str | None = None,
         **kwargs,
     ) -> InvocationResult:
         client = self._client()
@@ -278,13 +279,26 @@ class OpenAICompatAdapter(TargetAdapter):
             # provider-specific (OpenAI gpt-5.x wants max_completion_tokens; see _max_tokens_param).
             if max_output_tokens:
                 create_kwargs[self._max_tokens_param] = max_output_tokens
+            # Reasoning control (opt-in). On a reasoning model the thinking trace is the latency —
+            # e.g. Fireworks GLM-5 drops 11s→0.8s with ``reasoning_effort="none"``. Values are
+            # provider-specific (Fireworks: none/low/…; OpenAI gpt-5.x: minimal/low/medium/high), so a
+            # target that rejects the value 400s → fail soft below and retry without it, keeping a
+            # mixed panel working (only the reasoning targets honour the control).
+            if reasoning_effort:
+                create_kwargs["reasoning_effort"] = reasoning_effort
             if wire_tools:
                 create_kwargs["tools"] = wire_tools
                 # OpenAI accepts "auto"/"none"/"required" (or a specific function); pass through
                 # only when the caller set it AND we are actually sending tools.
                 if tool_choice is not None:
                     create_kwargs["tool_choice"] = tool_choice
-            return await client.chat.completions.create(**create_kwargs)
+            try:
+                return await client.chat.completions.create(**create_kwargs)
+            except Exception as e:  # noqa: BLE001 — narrow to a 400 on the reasoning param, else re-raise
+                if reasoning_effort and getattr(e, "status_code", None) == 400:
+                    create_kwargs.pop("reasoning_effort", None)
+                    return await client.chat.completions.create(**create_kwargs)
+                raise
 
         t0 = time.perf_counter()
         try:
