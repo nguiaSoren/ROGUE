@@ -65,6 +65,12 @@ def is_retryable_exception(exc: BaseException) -> bool:
     """
     if isinstance(exc, _TRANSIENT_ERRORS):
         return True
+    import json as _json  # noqa: PLC0415
+
+    # A gateway (502/Cloudflare) can return an HTML error page instead of JSON; the SDK raises
+    # JSONDecodeError parsing it. Transient → retry rather than fail the trial (2026-07-10 fix).
+    if isinstance(exc, _json.JSONDecodeError):
+        return True
     classes = _provider_exc_classes()
     if classes["rate"] and isinstance(exc, classes["rate"]):
         return True

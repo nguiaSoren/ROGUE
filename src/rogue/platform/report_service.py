@@ -21,6 +21,7 @@ from rogue.report import (
     humanize_technique,
     remediation_section,
     technique_label,
+    vector_slug,
 )
 
 from . import scoring
@@ -201,18 +202,37 @@ class DefaultReportService(ReportService):
 
         Additive over `ScanReport.to_dict()` (which already carries per-finding `remediation` and `explanation`): we layer the platform `score`/`risk_level`/`score_methodology` headline, a `coverage` block (n_tests, n_breaches, breach_rate, and the distinct human attack-families exercised), and a top-level `executive_summary` (the markdown narrative from `build_executive_summary`) so the dashboard renders the CISO summary without a second call. Each finding is also guaranteed a non-empty `explanation` — backfilled defensively here if `to_dict()` didn't already emit one — so a programmatic consumer never sees a finding without a plain-language meaning. The underlying SDK shape is untouched (additive only).
         """
+        from rogue.taxonomy.crosswalk import (  # noqa: PLC0415 — pure lookup, lazy to keep import light
+            crosswalk_for_family,
+            format_frameworks_line,
+            frameworks_to_dict,
+        )
+
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
         out = report.to_dict(mitigations=mitigations)
         out["score"] = score
         out["risk_level"] = scoring.risk_level(score)
         out["score_methodology"] = SCORE_METHODOLOGY
-        out["coverage"] = {
+        # Graded scorecard: per-family ASR → letter grade with a worst-category-dominates headline
+        # (Wave-D frontend binds to `scorecard`). Rates + Wilson CIs stay the substance.
+        out["scorecard"] = scoring.build_scorecard(report.findings)
+        # Coverage: keep the existing keys (n_tests/n_breaches/breach_rate/families_tested) and layer
+        # in the probe-coverage matrix (probed vs never-probed across the 15 frozen families).
+        coverage = {
             "n_tests": report.n_tests,
             "n_breaches": report.n_breaches,
             "breach_rate": round(report.breach_rate, 4),
             "families_tested": report.families_covered(),
         }
+        coverage.update(scoring.build_coverage(report.findings))
+        out["coverage"] = coverage
+        # Per-finding framework tags (OWASP 2025 / MITRE ATLAS / NIST AI RMF) from the pure crosswalk —
+        # additive keys on each finding so an enterprise consumer sees the standard identifiers.
+        for f_dict, f in zip(out.get("findings", []), report.findings, strict=False):
+            mapping = crosswalk_for_family(f.family, vector_slug(f.vector))
+            f_dict["frameworks"] = frameworks_to_dict(mapping)
+            f_dict["frameworks_line"] = format_frameworks_line(mapping)
         # Guarantee every finding carries a plain-language `explanation`. `to_dict()` emits one
         # (`explain_family`); where it doesn't (an older `rogue.report`), backfill so the dashboard's
         # per-finding "what this means" never renders blank. `findings`/`report.findings` are positionally aligned.
@@ -439,9 +459,17 @@ class DefaultReportService(ReportService):
         report = await self._load_report(scan_id)
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
+        scorecard = scoring.build_scorecard(report.findings)
+        coverage = scoring.build_coverage(report.findings)
 
         try:
-            return report.to_html(score=score, risk_level=level, mitigations=mitigations)
+            return report.to_html(
+                score=score,
+                risk_level=level,
+                mitigations=mitigations,
+                scorecard=scorecard,
+                coverage=coverage,
+            )
         except TypeError:
             # Defensive: only reached against an older `to_html` that predates the score/risk_level
             # params. Splice a Risk-score KPI in front of the existing KPI row so the headline number
@@ -489,10 +517,17 @@ class DefaultReportService(ReportService):
 
         import io  # noqa: PLC0415
 
+        from rogue.taxonomy.crosswalk import (  # noqa: PLC0415
+            crosswalk_for_family,
+            format_frameworks_line,
+        )
+
         report = await self._load_report(scan_id)
         muts = mitigations or {}
         score = scoring.score_for(report)
         level = scoring.risk_level(score)
+        scorecard = scoring.build_scorecard(report.findings)
+        coverage = scoring.build_coverage(report.findings)
         styles = getSampleStyleSheet()
         body = styles["BodyText"]
 
@@ -508,6 +543,11 @@ class DefaultReportService(ReportService):
             Paragraph(f"Target: {_html.escape(report.target)}", styles["Heading3"]),
             Spacer(1, 10),
             Paragraph(f"Risk score {score:g}/100 ({level.upper()})", styles["Heading2"]),
+            Paragraph(
+                f"Overall grade {_html.escape(str(scorecard['grade']))} "
+                "(worst attack family dominates)",
+                styles["Heading2"],
+            ),
             Paragraph(_html.escape(SCORE_METHODOLOGY), styles["BodyText"]),
             Spacer(1, 12),
         ]
@@ -539,7 +579,50 @@ class DefaultReportService(ReportService):
                 body,
             )
         )
+        # Honest test-completeness: which of the 15 frozen families were probed vs never fired.
+        n_probed = int(coverage["n_families_probed"])
+        n_total = int(coverage["n_families_total"])
+        story.append(
+            Paragraph(
+                f"Coverage: {n_probed} of {n_total} attack families were probed in this run; "
+                f"{n_total - n_probed} were not exercised (see the coverage matrix in the JSON report).",
+                body,
+            )
+        )
         story.append(Spacer(1, 14))
+
+        # --- Family scorecard (graded ASR rollup) -----------------------------------------------
+        scored = scorecard.get("families") or []
+        if scored:
+            story.append(Paragraph("Family scorecard", styles["Heading2"]))
+            sc_data = [["Grade", "Family", "ASR", "95% CI", "Trials"]]
+            for fam in scored:
+                asr = round(float(fam["asr"]) * 100)
+                lo = round(float(fam["ci_low"]) * 100)
+                hi = round(float(fam["ci_high"]) * 100)
+                sc_data.append(
+                    [
+                        _html.escape(str(fam["grade"])),
+                        Paragraph(_html.escape(str(fam["label"])), body),
+                        f"{asr}%",
+                        f"{lo}–{hi}%",
+                        f"{fam['n_breach']}/{fam['n_trials']}",
+                    ]
+                )
+            sc_table = Table(sc_data, repeatRows=1, colWidths=[45, 200, 50, 90, 55])
+            sc_table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#222222")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTSIZE", (0, 0), (-1, -1), 9),
+                        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dddddd")),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ]
+                )
+            )
+            story.append(sc_table)
+            story.append(Spacer(1, 14))
 
         # --- Findings table (severity-grouped) --------------------------------------------------
         story.append(Paragraph("Findings", styles["Heading2"]))
@@ -552,9 +635,18 @@ class DefaultReportService(ReportService):
         data = [["Severity", "Success", "Technique", "Finding & what it means", "Remediation"]]
         for _sev, members in report.findings_by_severity():
             for f in members:
+                fw_line = format_frameworks_line(
+                    crosswalk_for_family(f.family, vector_slug(f.vector))
+                )
+                fw_html = (
+                    f"<br/><font size=7 color='#666666'>{_html.escape(fw_line)}</font>"
+                    if fw_line
+                    else ""
+                )
                 finding_cell = (
                     f"<b>{_html.escape(f.title)}</b><br/>"
                     f"{_html.escape(_explanation_for(f))}"
+                    f"{fw_html}"
                 )
                 data.append(
                     [

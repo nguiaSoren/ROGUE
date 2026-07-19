@@ -22,6 +22,7 @@ from rogue.api.v1.deps import (
     require_principal,
 )
 from rogue.platform.schemas import ScanRecord, ScanSpec, ScanStatus, TargetSpec
+from rogue.schemas.agent_tool import LiveToolTarget
 
 if TYPE_CHECKING:
     from rogue.platform.interfaces import ReportService, ScanService
@@ -59,6 +60,10 @@ class CreateScanRequest(BaseModel):
     n_trials: int = Field(default=1, ge=1, le=10)
     budget: float | None = Field(default=None, ge=0)
     system_prompt: str = ""
+    # Level 2 on-ramp: point ROGUE at the customer's OWN authorized MCP tool server (their real
+    # agent surface). The MCP tool-poisoning / rug-pull / IPI carriers fire against it. Requires
+    # live_tool_target.authorized=True or the backend refuses to connect. None = simulated tools.
+    live_tool_target: LiveToolTarget | None = Field(default=None, repr=False)
 
     def to_spec(self) -> ScanSpec:
         """Build the canonical `ScanSpec`. `TargetSpec`'s validator enforces endpoint-or-provider."""
@@ -68,6 +73,7 @@ class CreateScanRequest(BaseModel):
             model=self.model,
             api_key=self.api_key,
             system_prompt=self.system_prompt,
+            live_tool_target=self.live_tool_target,
         )
         return ScanSpec(
             target=target,

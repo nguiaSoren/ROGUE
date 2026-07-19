@@ -73,6 +73,19 @@ inputs:
     description: "Optional float 0-1; also fail when the overall breach rate exceeds it (e.g. 0.2 = 20%)."
     required: false
     default: ""
+  # --- baseline-regression gate (continuous measurement) ----------------------------------------
+  baseline:
+    description: "Path to a committed baseline snapshot JSON; fail the PR if a family regressed vs it (a re-opened / worsened bypass)."
+    required: false
+    default: ""
+  max-regression:
+    description: "Allowed per-family breach-rate increase (0-1) before it fails the gate (default 0.0 = any re-opened bypass fails)."
+    required: false
+    default: "0.0"
+  baseline-save:
+    description: "Path to write THIS scan's baseline snapshot (run on main to record the golden state, then commit it)."
+    required: false
+    default: ""
   # --- runner -----------------------------------------------------------------------------------
   python-version:
     description: "Python used to install and run the gate."
@@ -93,6 +106,9 @@ outputs:
   failed:
     description: "'true' if the gate failed, else 'false'."
     value: ${{ steps.gate.outputs.failed }}
+  regressed:
+    description: "'true' if a family regressed vs the baseline, else 'false'."
+    value: ${{ steps.gate.outputs.regressed }}
   card:
     description: "Path to the breach-card artifact (PNG, or SVG fallback)."
     value: ${{ steps.gate.outputs.card }}
@@ -138,6 +154,9 @@ runs:
         [ -n "${{ inputs.system-prompt-file }}" ]  && args+=( --system-prompt-file "${{ inputs.system-prompt-file }}" )
         [ -n "${{ inputs.budget }}" ]              && args+=( --budget "${{ inputs.budget }}" )
         [ -n "${{ inputs.max-breach-rate }}" ]     && args+=( --max-breach-rate "${{ inputs.max-breach-rate }}" )
+        [ -n "${{ inputs.baseline }}" ]            && args+=( --baseline "${{ inputs.baseline }}" )
+        [ -n "${{ inputs.max-regression }}" ]      && args+=( --max-regression "${{ inputs.max-regression }}" )
+        [ -n "${{ inputs.baseline-save }}" ]       && args+=( --baseline-save "${{ inputs.baseline-save }}" )
         python "${args[@]}"
 
     - name: Upload breach card

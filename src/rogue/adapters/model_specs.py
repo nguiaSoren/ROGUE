@@ -37,11 +37,21 @@ class ModelSpec:
 
 # Keyed by full "provider/model" id. Pricing tuple = (input $/M, output $/M).
 _SPECS: dict[str, ModelSpec] = {
+    # Prices crawl-verified against the live provider pricing pages 2026-07-10 (crawl4ai).
     "openai/gpt-5.4-nano": ModelSpec(
         "openai/gpt-5.4-nano", 0.20, 1.25, supports_image=True, supports_tools=True
     ),
+    "openai/gpt-5.4-mini": ModelSpec(
+        "openai/gpt-5.4-mini", 0.75, 4.50, supports_image=True, supports_tools=True
+    ),
     "openai/gpt-5.4": ModelSpec(
         "openai/gpt-5.4", 2.50, 15.00, supports_image=True, supports_tools=True
+    ),
+    # gpt-4o-mini is legacy (off OpenAI's current table) but still served + the default cheap JUDGE
+    # model — its stable published rate is $0.15/$0.60. Absent here it fell back to a flat $0.0225/call
+    # judge estimate (Sonnet-era), which inflated reproduce_once est_cost ~40× (2026-07-10 fix).
+    "openai/gpt-4o-mini": ModelSpec(
+        "openai/gpt-4o-mini", 0.15, 0.60, supports_image=True, supports_tools=True
     ),
     "openai/gpt-audio-mini": ModelSpec(
         "openai/gpt-audio-mini", 0.60, 2.40, supports_audio=True, supports_tools=True
@@ -55,7 +65,9 @@ _SPECS: dict[str, ModelSpec] = {
         max_output_tokens=_ANTHROPIC_MAX_OUTPUT, max_temperature=_ANTHROPIC_MAX_TEMP,
     ),
     "anthropic/claude-opus-4-8": ModelSpec(
-        "anthropic/claude-opus-4-8", 15.00, 75.00, supports_tools=True,
+        # crawl-verified 2026-07-10: Opus 4.8 standard = $5/$25 (the old 15/75 was the retired
+        # Opus-4.1 rate). Long-context >200K tier is $10/$50 — not modelled (we don't run >200K on Opus).
+        "anthropic/claude-opus-4-8", 5.00, 25.00, supports_tools=True,
         max_output_tokens=_ANTHROPIC_MAX_OUTPUT, max_temperature=_ANTHROPIC_MAX_TEMP,
     ),
     "groq/llama-3.1-8b-instant": ModelSpec("groq/llama-3.1-8b-instant", 0.05, 0.08),

@@ -22,6 +22,7 @@ Audio is a misroute (Anthropic takes no audio input): an :class:`AudioBlock` rai
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +41,7 @@ from ..core import (
 )
 from ..core.capabilities import TargetCapabilities
 from ..core.errors import ValidationError
+from ..core.prefill import split_trailing_prefill
 from . import model_specs
 from ._provider_errors import map_provider_exception, with_provider_retry
 from .base import AdapterConfig, TargetAdapter
@@ -53,6 +55,11 @@ _MAX_TEMP = 1.0  # the SDK rejects higher temps on some Claude lines (panel clam
 
 class AnthropicAdapter(TargetAdapter):
     """Native Anthropic Messages-API adapter. ``provider`` is ``anthropic``."""
+
+    # Anthropic honors a trailing assistant turn as a NATIVE response-prefill: the reply continues
+    # from it. So a planted seed passes through as-is (no in-band fold); we stitch it back onto the
+    # returned continuation below so the caller sees the full ``prefix + continuation`` answer.
+    supports_native_prefill: bool = True
 
     def __init__(self, config: AdapterConfig):
         super().__init__(config)
@@ -209,6 +216,14 @@ class AnthropicAdapter(TargetAdapter):
         tool_choice: str | None = None,
         **kwargs,
     ) -> InvocationResult:
+        # Response-prefill: a trailing text-only assistant turn is passed NATIVELY (it flows through
+        # _split_messages as the final assistant chat turn) — Anthropic continues from it. We capture
+        # the seed text (detection only; the turn is NOT stripped) to stitch back onto the returned
+        # continuation, so the caller/judge sees prefix+continuation as one answer. Skipped when tools
+        # are offered (agent tool loop territory, not a prefill seed).
+        prefill_seed: str | None = None
+        if not tools:
+            _, prefill_seed = split_trailing_prefill(messages)
         system_prompt, chat_messages = self._split_messages(messages)
         anthropic_temp = min(temperature, _MAX_TEMP)
         client = self._client()
@@ -270,6 +285,14 @@ class AnthropicAdapter(TargetAdapter):
                 )
         stop_reason = StopReason.from_provider(getattr(response, "stop_reason", None))
 
+        # Native prefill: Anthropic returns only the continuation, so prepend the seed onto the first
+        # text block (or insert one) — the caller sees the full ``prefix + continuation`` reply.
+        if prefill_seed:
+            if content_blocks and isinstance(content_blocks[0], TextBlock):
+                content_blocks[0] = TextBlock(text=prefill_seed + content_blocks[0].text)
+            else:
+                content_blocks.insert(0, TextBlock(text=prefill_seed))
+
         dump = getattr(response, "model_dump", None)
         raw_response = dump() if callable(dump) else {}
 
@@ -290,9 +313,10 @@ class AnthropicAdapter(TargetAdapter):
         # supports_tools is NOT hardcoded — it delegates to the model spec so a Claude line that
         # doesn't honor tool calling is never over-claimed (contract §4).
         tools_ok = model_specs.supports_tools(self._price_key)
-        return model_specs.capabilities_for(
+        caps = model_specs.capabilities_for(
             self._price_key, supports_tools=tools_ok, supports_function_calling=tools_ok
         )
+        return replace(caps, supports_native_prefill=self.supports_native_prefill)
 
     async def healthcheck(self) -> bool:
         """Best-effort: True iff an API key is resolvable. Anthropic has no cheap list endpoint."""

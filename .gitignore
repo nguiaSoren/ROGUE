@@ -275,3 +275,12 @@ docs/research/publishing/arxiv_bundles/
 # Internal LinkedIn post drafts (marketing working file)
 LINKEDIN.md
 docs/research/pii_leakage_axis.md
+
+# Safeguard (over-refusal / FRR) board — pending board.json + vendored public benign denominators.
+!data/safeguard/
+data/safeguard/*
+!data/safeguard/board.json
+!data/safeguard/benign/
+data/safeguard/benign/*
+!data/safeguard/benign/xstest_safe.jsonl
+!data/safeguard/benign/jbb_benign.jsonl

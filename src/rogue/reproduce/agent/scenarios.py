@@ -87,4 +87,23 @@ def build_scenario(
     return BENIGN_CARRIER_TASK, [inj]
 
 
-__all__ = ["BENIGN_CARRIER_TASK", "extract_endpoint", "render_primitive", "build_scenario"]
+def build_matrix_scenario(cell) -> tuple[str, list[InjectionPayload]]:
+    """Turn one :class:`~rogue.reproduce.agent.injection_bank.IPICell` into a harness scenario.
+
+    The dual of :func:`build_scenario` for the Wave-④ template×carrier×concealment bank: the cell
+    already owns its fingerprinted :class:`InjectionPayload` (with the right ``placement`` for the
+    carrier), so this just pairs it with the benign cover task. Schema-carrier cells additionally
+    expose ``cell.poisoned_description`` — the caller presents it as a ``provided`` tool spec (or the
+    live backend poisons the description itself). Kept out of :func:`build_scenario` so the legacy
+    single-carrier path stays byte-identical.
+    """
+    return cell.user_prompt, [cell.injection]
+
+
+__all__ = [
+    "BENIGN_CARRIER_TASK",
+    "extract_endpoint",
+    "render_primitive",
+    "build_scenario",
+    "build_matrix_scenario",
+]

@@ -4,6 +4,8 @@ import {
   platformApi,
   type ScanReportJson,
   type Finding,
+  type FamilyScore,
+  type CoverageRow,
 } from "@/lib/platform-api";
 import { getApiKey } from "@/lib/session";
 import { ReportSummaryMarkdown } from "@/components/report-summary-markdown";
@@ -188,6 +190,14 @@ function ReportBody({ report }: { report: ScanReportJson }) {
         </Kpi>
       </div>
 
+      {/* Graded scorecard — worst-category-dominates letter grade + per-family ASR/CI table.
+          Degrades out entirely on older reports that predate the scorecard block. */}
+      <ScorecardSection report={report} />
+
+      {/* Coverage matrix — which of the 15 frozen attack families were probed vs never fired.
+          Degrades out on older reports without the coverage matrix. */}
+      <CoverageSection report={report} />
+
       {/* Findings */}
       {breached.length === 0 ? (
         <div className="rounded-lg border border-rogue-green/40 bg-rogue-green/10 p-6 text-center font-mono text-sm text-rogue-green">
@@ -334,6 +344,10 @@ function FindingCard({ f, rank }: { f: Finding; rank: number }) {
         {f.family} · {f.technique}
       </p>
 
+      {/* Framework crosswalk tags (OWASP 2025 / MITRE ATLAS / NIST AI RMF).
+          Degrades out on older reports without the `frameworks` block. */}
+      <FrameworkTags f={f} />
+
       {/* What this is, plain-language framing so a non-expert grasps the risk,
           shown above the fix and the evidence. */}
       {f.explanation && (
@@ -419,6 +433,180 @@ function FindingEvidence({ f }: { f: Finding }) {
         )}
       </div>
     </details>
+  );
+}
+
+/** Letter-grade text tint (A/B green → C yellow → D orange → F red). Keyed off the
+ *  first char so a "+/-"-suffixed grade still maps. */
+function gradeTint(grade: string): string {
+  const g = (grade || "").trim().charAt(0).toUpperCase();
+  if (g === "A" || g === "B") return "text-rogue-green";
+  if (g === "C") return "text-yellow-300";
+  if (g === "D") return "text-orange-300";
+  return "text-rogue-red"; // F (or unknown) = worst
+}
+
+/** Graded scorecard: a big worst-category-dominates letter grade KPI + the per-family
+ *  ASR/CI table (worst-first). Renders nothing on older reports without `scorecard`. */
+function ScorecardSection({ report }: { report: ScanReportJson }) {
+  const sc = report.scorecard;
+  if (!sc || !sc.families || sc.families.length === 0) return null;
+  const tint = gradeTint(sc.grade);
+  return (
+    <section className="rogue-card p-6 sm:p-7 space-y-5 animate-rogue-fade-up">
+      <div className="flex items-end gap-5 flex-wrap">
+        <div className="flex items-baseline gap-2">
+          <span className={`text-6xl font-bold tabular-nums leading-none ${tint}`}>{sc.grade}</span>
+        </div>
+        <div className="space-y-1.5">
+          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            Overall grade
+          </p>
+          <p className="font-mono text-xs text-muted-foreground">
+            worst of {sc.n_families_scored} scored famil{sc.n_families_scored === 1 ? "y" : "ies"}
+          </p>
+        </div>
+      </div>
+      {sc.grade_methodology && (
+        <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-3">
+          {sc.grade_methodology}
+        </p>
+      )}
+      {/* Per-family table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              <th className="text-left font-normal py-2 pr-3">Family</th>
+              <th className="text-center font-normal py-2 px-2">Grade</th>
+              <th className="text-right font-normal py-2 px-2">ASR</th>
+              <th className="text-right font-normal py-2 pl-2 hidden sm:table-cell">95% CI</th>
+              <th className="text-right font-normal py-2 pl-2">Breached</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sc.families.map((fam: FamilyScore) => (
+              <tr key={fam.family} className="border-t border-border/50">
+                <td className="py-2 pr-3">
+                  <span className="font-medium text-foreground break-words">{fam.label}</span>
+                  <span className="block font-mono text-[10px] text-muted-foreground">{fam.family}</span>
+                </td>
+                <td className="py-2 px-2 text-center">
+                  <span className={`font-mono font-bold tabular-nums ${gradeTint(fam.grade)}`}>
+                    {fam.grade}
+                  </span>
+                </td>
+                <td className="py-2 px-2 text-right font-mono tabular-nums text-foreground">
+                  {Math.round(fam.asr * 100)}%
+                </td>
+                <td className="py-2 pl-2 text-right font-mono text-[11px] tabular-nums text-muted-foreground hidden sm:table-cell">
+                  {Math.round(fam.ci_low * 100)}–{Math.round(fam.ci_high * 100)}%
+                </td>
+                <td className="py-2 pl-2 text-right font-mono tabular-nums text-muted-foreground">
+                  {fam.n_breach}/{fam.n_trials}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/** Coverage matrix: probed vs never-probed across the 15 frozen attack families, so an
+ *  un-exercised family reads as an honest gap. Renders nothing without `coverage.matrix`. */
+function CoverageSection({ report }: { report: ScanReportJson }) {
+  const cov = report.coverage;
+  if (!cov || !cov.matrix || cov.matrix.length === 0) return null;
+  const probed = cov.n_families_probed ?? cov.matrix.filter((r) => r.probed).length;
+  const total = cov.n_families_total ?? cov.matrix.length;
+  const pctVal =
+    typeof cov.coverage_pct === "number"
+      ? Math.round(cov.coverage_pct * 100)
+      : Math.round((probed / Math.max(total, 1)) * 100);
+  return (
+    <section className="rounded-lg border border-border bg-card/30 p-5 sm:p-6 space-y-4 animate-rogue-fade-up">
+      <div className="flex items-baseline justify-between gap-4 flex-wrap">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Coverage matrix
+        </h2>
+        <p className="font-mono text-xs text-muted-foreground tabular-nums">
+          <span className="text-foreground font-bold">{probed}</span>/{total} families probed ·{" "}
+          <span className="text-foreground">{pctVal}%</span>
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {cov.matrix.map((r: CoverageRow) => (
+          <CoverageChip key={r.family} row={r} />
+        ))}
+      </div>
+      <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
+        {"// probed = the family was exercised this scan; a never-probed family is an honest gap, not a pass"}
+      </p>
+    </section>
+  );
+}
+
+function CoverageChip({ row }: { row: CoverageRow }) {
+  // Three states: breached (red) · probed-clean (green) · never-probed (muted, dashed).
+  const cls = !row.probed
+    ? "border-dashed border-border/60 bg-background/20 text-muted-foreground"
+    : row.breached
+      ? "border-rogue-red/40 bg-rogue-red/10 text-rogue-red"
+      : "border-rogue-green/40 bg-rogue-green/10 text-rogue-green";
+  return (
+    <div className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 ${cls}`}>
+      <span className="min-w-0 truncate text-xs font-medium" title={row.family}>
+        {row.label}
+      </span>
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider">
+        {!row.probed ? "not probed" : row.breached ? `${row.n_breach}/${row.n_trials}` : "clean"}
+      </span>
+    </div>
+  );
+}
+
+/** OWASP 2025 / MITRE ATLAS / NIST AI RMF crosswalk tags for one finding. Renders nothing
+ *  when the finding has no `frameworks` block (older reports). */
+function FrameworkTags({ f }: { f: Finding }) {
+  const fw = f.frameworks;
+  const owasp = fw?.owasp ?? [];
+  const atlas = fw?.atlas ?? [];
+  const nist = fw?.nist?.trim() || null;
+  if (owasp.length === 0 && atlas.length === 0 && !nist) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {owasp.map((t) => (
+        <span
+          key={`owasp-${t.id}`}
+          title={t.title}
+          className="inline-flex items-center rounded border border-border/60 bg-background/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+        >
+          <span className="text-rogue-green mr-1">OWASP</span>
+          {t.id}
+        </span>
+      ))}
+      {atlas.map((t) => (
+        <span
+          key={`atlas-${t.id}`}
+          title={t.title}
+          className="inline-flex items-center rounded border border-border/60 bg-background/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+        >
+          <span className="text-orange-300 mr-1">ATLAS</span>
+          {t.id}
+        </span>
+      ))}
+      {nist && (
+        <span
+          className="inline-flex items-center rounded border border-border/60 bg-background/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+          title="NIST AI RMF"
+        >
+          <span className="text-blue-300 mr-1">NIST</span>
+          {nist}
+        </span>
+      )}
+    </div>
   );
 }
 

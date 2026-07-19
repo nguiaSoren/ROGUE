@@ -455,6 +455,12 @@ class LadderResult:
     attempts: list[tuple[str, str]]  # (strategy, outcome) in the order tried
     child_orm: AttackPrimitiveORM | None  # winning child to persist, or None
     spend_usd: float = 0.0  # estimated LLM spend across all attempts (budget signal)
+    # ⑥ distill-from-failure — {label: target refusal text} for LOSING (no_breach)
+    # attempts. The capture hook (apply_ladder_outcome → capture_ladder_refusals) reads
+    # this to distill avoid-rules for the harvested losers. Empty by default and only
+    # populated when a losing attempt had a non-empty target response, so a run that
+    # never captures behaves byte-identically.
+    refusal_texts: dict[str, str] = field(default_factory=dict)
 
 
 async def _strategy_breaches(
@@ -465,17 +471,23 @@ async def _strategy_breaches(
     configs: list,
     temperature: float,
     n_trials: int,
-) -> tuple[str | None, float]:
-    """Reproduce+judge ``child`` across configs; return (first breaching model id
-    or None, estimated spend in USD).
+) -> tuple[str | None, float, str | None]:
+    """Reproduce+judge ``child`` across configs; return ``(first breaching model id
+    or None, estimated spend in USD, representative losing target response or None)``.
 
     Short-circuits at the first PARTIAL/FULL breach across (config × trial) — the
     ladder only needs to know the escalation worked, not the full matrix. Judge
     hiccups and target errors count as no-breach for that trial. ``spend`` sums the
     panel call cost (``ModelResponse.cost_usd``) plus a flat judge estimate per
     judge call — the budget signal the inline escalation cap reads (§10.8).
+
+    The third element is the first non-empty judged NON-breaching response — the ⑥
+    distill-from-failure signal the caller stores under the attempt's label so a
+    losing harvested attempt can be distilled into an avoid-rule. ``None`` on a
+    breach (a win carries no refusal signal) or when no target text was produced.
     """
     spend = 0.0
+    refusal_text: str | None = None
     for config in configs:
         rendered = render(child, config)
         responses = await panel.run_attack(
@@ -493,8 +505,11 @@ async def _strategy_breaches(
                 continue
             spend += _JUDGE_COST_ESTIMATE_USD
             if jr.verdict in _BREACH_VERDICTS:
-                return config.target_model, spend
-    return None, spend
+                return config.target_model, spend, None
+            # Remember the first non-empty losing response as the refusal signal.
+            if refusal_text is None and (r.content or "").strip():
+                refusal_text = r.content
+    return None, spend, refusal_text
 
 
 @dataclass
@@ -525,6 +540,40 @@ class EscalationContext:
     # ``None`` for every other mode ⇒ the ladder runs its fixed tier1→tier5 sequence,
     # byte-for-byte unchanged (Run #0 reproducibility). See ``run_escalation_ladder_one``.
     cross_tier_order: tuple[str, ...] | None = None
+
+
+def _avoid_rules_for_configs(session, configs: list, *, k: int = 4) -> list[str]:
+    """⑥ distill-from-failure — retrieve the top-``k`` negative-memory avoid-rule reason
+    strings for the panel's target context, to inject into the escalation planner.
+
+    Gated by the caller on ``distill_failure_enabled()`` so a flag-off run never touches
+    the DB. Derives ``(vendor, family)`` from a SINGLE-config panel (the per-target case);
+    a multi-model panel keys globally (``None`` context) — the honest fallback, mirroring
+    ``refusal_distill._derive_target_context``. Returns ``[]`` on any derivation error or
+    when the table is absent (``top_avoid_rules`` degrades gracefully pre-migration).
+    """
+    from rogue.reproduce.refusal_distill import top_avoid_rules  # noqa: PLC0415
+
+    vendor = family = size = None
+    if configs and len(configs) == 1:
+        try:
+            from rogue.adapters.model_specs import (  # noqa: PLC0415
+                extract_model_family,
+                extract_vendor,
+            )
+            from rogue.reproduce.config_features import (  # noqa: PLC0415
+                derive_config_features,
+            )
+
+            model = configs[0].target_model
+            vendor = extract_vendor(model)
+            family = extract_model_family(model)
+            size = derive_config_features(
+                model, base_url=getattr(configs[0], "base_url", None)
+            ).sibling_key
+        except Exception:  # noqa: BLE001 — context is best-effort; global on any error
+            vendor = family = size = None
+    return top_avoid_rules(session, vendor=vendor, family=family, size_class=size, k=k)
 
 
 def build_escalation_context(
@@ -614,6 +663,19 @@ def build_escalation_context(
         mode, image_renderers_tier, coj_tier, structured_tier, audio_styles_tier,
     )
 
+    # ⑥ distill-from-failure — retrieve negative-memory avoid-rules for this target and
+    # thread them into the planner. Gated on the Arm flag so a flag-off run skips the DB
+    # read entirely and the planner prompt is byte-identical (the AVOID-block injection in
+    # _build_planner_messages is itself flag-gated, so passing rules to a flag-off run
+    # would still be inert — but skipping the read is cleaner + cheaper).
+    from rogue.reproduce.refusal_distill import distill_failure_enabled  # noqa: PLC0415
+
+    avoid_rules: list[str] = (
+        _avoid_rules_for_configs(session, configs)
+        if distill_failure_enabled()
+        else []
+    )
+
     # §10.9 Phase 4 — seed the planner with the harvested strategy library, then
     # assemble the rotation + cost plan.
     scope, cap = ladder_config_from_env()
@@ -622,8 +684,13 @@ def build_escalation_context(
             extra_strategies=load_strategy_library(session),
             use_templates=use_templates,
             slot_fill=slot_fill,
+            avoid_rules=avoid_rules,
             **({"model": planner_model} if planner_model else {}),
         )
+    elif avoid_rules:
+        # Injected planner (tests / caller-supplied): thread the retrieved rules onto it so
+        # the AVOID block still injects when the Arm is on. Only when we actually have rules.
+        planner._avoid_rules = list(avoid_rules)
     plan = build_rotation_plan(
         session,
         base_ladder=ESCALATION_LADDER,
@@ -787,6 +854,10 @@ async def run_escalation_ladder_one(
     budget semantics are identical to the tier path; only the visiting order differs.
     """
     attempts: list[tuple[str, str]] = []
+    # ⑥ distill-from-failure — {label: target refusal text} for LOSING attempts, carried
+    # onto the LadderResult for the capture hook. Stays empty (byte-identical) unless a
+    # losing attempt produced a non-empty target response.
+    refusal_texts: dict[str, str] = {}
     spend = 0.0
 
     def _over_budget() -> bool:
@@ -829,10 +900,12 @@ async def run_escalation_ladder_one(
             if probe_first is not None:
                 w_label, w_on, w_child = probe_first
                 return LadderResult(
-                    parent.primitive_id, w_label, w_on, attempts, w_child, spend_usd=spend
+                    parent.primitive_id, w_label, w_on, attempts, w_child,
+                    spend_usd=spend, refusal_texts=refusal_texts,
                 )
             return LadderResult(
-                parent.primitive_id, label, breached_on, attempts, child, spend_usd=spend
+                parent.primitive_id, label, breached_on, attempts, child,
+                spend_usd=spend, refusal_texts=refusal_texts,
             )
         if probe_first is None:
             probe_first = (label, breached_on, child)
@@ -875,7 +948,7 @@ async def run_escalation_ladder_one(
                 )
                 child_pyd = _orm_to_pydantic_primitive(child_orm)
                 try:
-                    breached_on, s = await _strategy_breaches(
+                    breached_on, s, rtext = await _strategy_breaches(
                         child_pyd, panel=panel, judge=judge, configs=configs,
                         temperature=temperature, n_trials=n_trials,
                     )
@@ -893,6 +966,8 @@ async def run_escalation_ladder_one(
                     probe_attempted.add(strat)
                 if breached_on is not None:
                     return _breach_or_continue(strat, breached_on, child_orm)
+                if rtext:
+                    refusal_texts[strat] = rtext
                 attempts.append((strat, "no_breach"))
                 return None
 
@@ -919,7 +994,7 @@ async def run_escalation_ladder_one(
                     return None  # no audio config ⇒ tier ineligible (no attempt)
 
             try:
-                breached_on, s = await _strategy_breaches(
+                breached_on, s, rtext = await _strategy_breaches(
                     variant, panel=panel, judge=judge, configs=unit_configs,
                     temperature=temperature, n_trials=n_trials,
                 )
@@ -931,6 +1006,8 @@ async def run_escalation_ladder_one(
             spend += s
             if breached_on is not None:
                 return _breach_or_continue(label, breached_on, child_orm)
+            if rtext:
+                refusal_texts[label] = rtext
             attempts.append((label, "no_breach"))
             return None
 
@@ -938,7 +1015,8 @@ async def run_escalation_ladder_one(
             if _over_budget():
                 attempts.append(("budget", "stopped"))
                 return LadderResult(
-                    parent.primitive_id, None, None, attempts, None, spend_usd=spend
+                    parent.primitive_id, None, None, attempts, None,
+                    spend_usd=spend, refusal_texts=refusal_texts,
                 )
             # Quota mode: stop once the candidate-attempt quota is satisfied (quota=0
             # is unaffected — _breach_or_continue early-returns on the first breach).
@@ -951,9 +1029,13 @@ async def run_escalation_ladder_one(
         if candidate_attempt_quota > 0 and probe_first is not None:
             w_label, w_on, w_child = probe_first
             return LadderResult(
-                parent.primitive_id, w_label, w_on, attempts, w_child, spend_usd=spend
+                parent.primitive_id, w_label, w_on, attempts, w_child,
+                spend_usd=spend, refusal_texts=refusal_texts,
             )
-        return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
+        return LadderResult(
+            parent.primitive_id, None, None, attempts, None,
+            spend_usd=spend, refusal_texts=refusal_texts,
+        )
 
     # ---- Tier 1: the refused payload AS AN IMAGE (no planner needed) ----
     if image_renderers and not _over_budget():
@@ -962,7 +1044,7 @@ async def run_escalation_ladder_one(
             variant = _image_variant(parent, renderer)
             label = f"image:{renderer}"
             try:
-                breached_on, s = await _strategy_breaches(
+                breached_on, s, rtext = await _strategy_breaches(
                     variant, panel=panel, judge=judge, configs=vision_configs,
                     temperature=temperature, n_trials=n_trials,
                 )
@@ -977,6 +1059,8 @@ async def run_escalation_ladder_one(
                 if _res is not None:
                     return _res
             else:
+                if rtext:
+                    refusal_texts[label] = rtext
                 attempts.append((label, "no_breach"))
 
     # ---- Tier 2: Chain-of-Jailbreak edit-step decomposition (NO planner) ----
@@ -986,7 +1070,7 @@ async def run_escalation_ladder_one(
             child_orm = _build_coj_primitive(parent, op)
             child_pyd = _orm_to_pydantic_primitive(child_orm)
             try:
-                breached_on, s = await _strategy_breaches(
+                breached_on, s, rtext = await _strategy_breaches(
                     child_pyd, panel=panel, judge=judge, configs=configs,
                     temperature=temperature, n_trials=n_trials,
                 )
@@ -1001,6 +1085,8 @@ async def run_escalation_ladder_one(
                 if _res is not None:
                     return _res
             else:
+                if rtext:
+                    refusal_texts[label] = rtext
                 attempts.append((label, "no_breach"))
 
     # ---- Tier 3: structured-data injection (#12, text, NO planner) ----
@@ -1009,7 +1095,7 @@ async def run_escalation_ladder_one(
             variant = _structured_variant(parent, fmt)
             label = f"structured:{fmt}"
             try:
-                breached_on, s = await _strategy_breaches(
+                breached_on, s, rtext = await _strategy_breaches(
                     variant, panel=panel, judge=judge, configs=configs,
                     temperature=temperature, n_trials=n_trials,
                 )
@@ -1024,6 +1110,8 @@ async def run_escalation_ladder_one(
                 if _res is not None:
                     return _res
             else:
+                if rtext:
+                    refusal_texts[label] = rtext
                 attempts.append((label, "no_breach"))
 
     # ---- Tier 4: audio acoustic styles (#6, NO planner) ----
@@ -1033,7 +1121,7 @@ async def run_escalation_ladder_one(
             variant = _audio_variant(parent, style)
             label = f"audio:{style}"
             try:
-                breached_on, s = await _strategy_breaches(
+                breached_on, s, rtext = await _strategy_breaches(
                     variant, panel=panel, judge=judge, configs=audio_configs,
                     temperature=temperature, n_trials=n_trials,
                 )
@@ -1048,12 +1136,85 @@ async def run_escalation_ladder_one(
                 if _res is not None:
                     return _res
             else:
+                if rtext:
+                    refusal_texts[label] = rtext
                 attempts.append((label, "no_breach"))
 
     # ---- Tier 5: multi-turn escalation (planner-driven) ----
     if _over_budget():
         attempts.append(("budget", "stopped"))
-        return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
+        return LadderResult(
+            parent.primitive_id, None, None, attempts, None,
+            spend_usd=spend, refusal_texts=refusal_texts,
+        )
+
+    # ② adaptive multi-turn — when the ``ROGUE_ADAPTIVE_MULTITURN`` Arm is ON, drive the
+    # objective through the judge-in-the-loop Crescendomation loop over a LIVE thread
+    # (per config, first-breach-wins) INSTEAD of the static one-shot plan below. The
+    # attacker brain reuses the escalation-planner's permissive backbone
+    # (``PlannerAttackerBrain``) and grading reuses this ladder's own ``judge``
+    # (``make_judge_grade``), so no new model config is introduced. OFF (default) ⇒ this
+    # branch is skipped entirely and the static ``for strat in strategies`` path below
+    # runs byte-for-byte unchanged.
+    from rogue.reproduce.adaptive_multiturn import (  # noqa: PLC0415
+        adaptive_multiturn_enabled,
+    )
+
+    if adaptive_multiturn_enabled():
+        from rogue.reproduce.adaptive_multiturn import (  # noqa: PLC0415
+            PlannerAttackerBrain,
+            crescendo_attack,
+            make_judge_grade,
+        )
+
+        objective = parent.title.strip() or parent.short_description.strip()[:200]
+        brain = PlannerAttackerBrain()
+        try:
+            for config in configs:
+                if _over_budget():
+                    attempts.append(("budget", "stopped"))
+                    break
+                grade = make_judge_grade(judge, parent, config)
+                result = await crescendo_attack(
+                    objective, panel, config, grade, brain,
+                    # Match the ladder's breach definition (PARTIAL or FULL both count),
+                    # not crescendo's stricter FULL-only default.
+                    success_verdicts=frozenset(_BREACH_VERDICTS),
+                    target_system=(config.system_prompt or None),
+                )
+                # Estimate spend from the per-turn model responses + a flat judge estimate
+                # per graded turn — the same budget signal the static tiers accrue.
+                for r in result.responses:
+                    spend += float(getattr(r, "cost_usd", 0.0) or 0.0)
+                spend += result.turns * _JUDGE_COST_ESTIMATE_USD
+                if result.breached:
+                    _res = _breach_or_continue("crescendo", config.target_model, None)
+                    if _res is not None:
+                        return _res
+                else:
+                    _last = next(
+                        (
+                            r.content for r in reversed(result.responses)
+                            if getattr(r, "content", None) and not getattr(r, "error", None)
+                        ),
+                        "",
+                    )
+                    if _last:
+                        refusal_texts["crescendo"] = _last
+                    attempts.append(("crescendo", "no_breach"))
+        finally:
+            await brain.aclose()
+        if candidate_attempt_quota > 0 and probe_first is not None:
+            w_label, w_on, w_child = probe_first
+            return LadderResult(
+                parent.primitive_id, w_label, w_on, attempts, w_child,
+                spend_usd=spend, refusal_texts=refusal_texts,
+            )
+        return LadderResult(
+            parent.primitive_id, None, None, attempts, None,
+            spend_usd=spend, refusal_texts=refusal_texts,
+        )
+
     for strat in strategies:
         # Quota mode: stop once the candidate-attempt quota is satisfied, or the
         # budget is hit (quota=0 is unaffected — it early-returns on breach).
@@ -1071,7 +1232,7 @@ async def run_escalation_ladder_one(
         )
         child_pyd = _orm_to_pydantic_primitive(child_orm)
         try:
-            breached_on, s = await _strategy_breaches(
+            breached_on, s, rtext = await _strategy_breaches(
                 child_pyd, panel=panel, judge=judge, configs=configs,
                 temperature=temperature, n_trials=n_trials,
             )
@@ -1095,14 +1256,20 @@ async def run_escalation_ladder_one(
             if _res is not None:
                 return _res
         else:
+            if rtext:
+                refusal_texts[strat] = rtext
             attempts.append((strat, "no_breach"))
     # Quota mode preserved the first breach (if any) as the winner for stats.
     if candidate_attempt_quota > 0 and probe_first is not None:
         label, breached_on, child = probe_first
         return LadderResult(
-            parent.primitive_id, label, breached_on, attempts, child, spend_usd=spend
+            parent.primitive_id, label, breached_on, attempts, child,
+            spend_usd=spend, refusal_texts=refusal_texts,
         )
-    return LadderResult(parent.primitive_id, None, None, attempts, None, spend_usd=spend)
+    return LadderResult(
+        parent.primitive_id, None, None, attempts, None,
+        spend_usd=spend, refusal_texts=refusal_texts,
+    )
 
 
 @dataclass

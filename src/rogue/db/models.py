@@ -794,6 +794,73 @@ class LadderRotationMembership(Base):
     )
 
 
+class StrategyAvoidRule(Base):
+    """Distill-from-failure — negative cross-run memory (audit 5, rec #1).
+
+    The loser-side twin of the ``attack_strategies`` winner lifecycle: where a win
+    graduates a technique, a *refusal* is distilled into an **avoid-rule** here — the
+    heuristic reason a target gave for refusing (``$0``, no LLM call — see
+    ``reproduce/refusal_distill.extract_refusal_reason``). Retrieval injects the
+    top-k relevant rules into the escalation-planner / iterative-attacker prompts as
+    an ``AVOID`` block ("these already made THIS target refuse — steer away"), turning
+    every daily-run refusal into compounding signal instead of discarding it.
+
+    Keyed by ``(technique_id, target-context, category)`` — the target context
+    (vendor / family / size_class) mirrors ``ladder_attempts`` and is only set for a
+    single-config panel; a multi-model sweep stores the rule globally (all three
+    NULL). Recurring refusals bump ``hit_count`` rather than duplicating. Written
+    ONLY under the ``ROGUE_DISTILL_FAILURE`` Arm flag; append/upsert analytics — no
+    hard FK (soft ref to ``attack_strategies.technique_id``, like ``ladder_attempts``).
+    """
+
+    __tablename__ = "strategy_avoid_rules"
+
+    # BIGINT on Postgres (matches the other analytics tables); the sqlite variant
+    # renders literal INTEGER so it aliases rowid and autoincrements under the
+    # in-memory-SQLite unit tests (a plain BIGINT PK never auto-populates on SQLite).
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    # Soft reference to attack_strategies.technique_id (no hard FK — analytics log).
+    technique_id: Mapped[str] = mapped_column(String(40), index=True)
+    # Target context of the refusal (NULL ⇒ global, the multi-config fallback).
+    target_vendor: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    target_family: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    target_size_class: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Heuristic classification + the short canonical reason string injected verbatim.
+    reason_category: Mapped[str] = mapped_column(String(40), index=True)
+    reason_text: Mapped[str] = mapped_column(Text)
+    # How many times this (technique × context × category) refusal recurred.
+    hit_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "technique_id",
+            "target_vendor",
+            "target_family",
+            "target_size_class",
+            "reason_category",
+            name="uq_strategy_avoid_rule_key",
+        ),
+        Index(
+            "ix_strategy_avoid_rules_lookup",
+            "technique_id",
+            "target_vendor",
+            "target_family",
+        ),
+    )
+
+
 class BenchmarkRun(Base):
     """One run of the external benchmark (AdvBench/JBB) against a target, stored
     durably on Neon so the coverage-over-time series survives any single machine.

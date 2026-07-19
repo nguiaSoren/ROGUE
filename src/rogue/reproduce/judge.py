@@ -123,6 +123,10 @@ _TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (
     ConnectionError,
     TimeoutError,
     JudgeOutputError,
+    # A gateway (OpenRouter/OpenAI 502/Cloudflare) sometimes returns an HTML error page
+    # instead of JSON; the SDK raises JSONDecodeError parsing it. It's transient → retry
+    # rather than crash the whole reproduce cell (2026-07-10 paid-session fix).
+    json.JSONDecodeError,
 )
 
 
@@ -637,6 +641,7 @@ class JudgeAgent:
         self._anthropic_client: Any | None = None
         self._openai_client: Any | None = None
         self._openrouter_client: Any | None = None
+        self._custom_client: Any | None = None
 
     # ----- Public API -----
 
@@ -700,6 +705,13 @@ class JudgeAgent:
             # that doesn't hit Anthropic's refusal). The id after the prefix is
             # the OpenRouter model id, used verbatim.
             data = await self._grade_via_openrouter(
+                user_message, self.model.split("/", 1)[1]
+            )
+        elif self.model.startswith("custom/"):
+            # Custom OpenAI-compatible judge endpoint (Featherless / Fireworks /
+            # any host). The id after the prefix is the wire model, used
+            # verbatim; JUDGE_BASE_URL + JUDGE_API_KEY supply the endpoint + key.
+            data = await self._grade_via_custom(
                 user_message, self.model.split("/", 1)[1]
             )
         else:
@@ -1040,6 +1052,72 @@ class JudgeAgent:
         if data is None:
             raise JudgeOutputError(
                 "openrouter judge produced no parseable verdict "
+                f"(model={model_id}, text excerpt: {text[:200]!r})"
+            )
+        return data
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(_TRANSIENT_ERRORS),
+        reraise=True,
+    )
+    async def _grade_via_custom(
+        self, user_message: str, model_id: str
+    ) -> dict[str, Any]:
+        """Grade with a custom OpenAI-compatible judge endpoint.
+
+        Selected by ``JUDGE_MODEL=custom/<wire_model>``; ``JUDGE_BASE_URL`` gives
+        the endpoint (e.g. ``https://api.featherless.ai/v1`` or
+        ``https://api.fireworks.ai/inference/v1``) and ``JUDGE_API_KEY`` the key.
+        Same permissive open-model path as the OpenRouter judge — a plain chat
+        completion parsed leniently (open models don't reliably do tool-use) —
+        minus OpenRouter's provider-routing pins, which don't apply to a
+        single-host endpoint. This is the free-Featherless / cheap-Fireworks
+        judge lane; it changes no existing route.
+        """
+        from openai import AsyncOpenAI
+
+        if self._custom_client is None:
+            base_url = os.environ.get("JUDGE_BASE_URL", "").strip()
+            if not base_url:
+                raise JudgeOutputError(
+                    "JUDGE_MODEL is 'custom/...' but JUDGE_BASE_URL is unset — "
+                    "no endpoint to send the judge call to."
+                )
+            self._custom_client = AsyncOpenAI(
+                base_url=base_url,
+                api_key=(
+                    os.environ.get("JUDGE_API_KEY")
+                    or os.environ.get("CUSTOM_API_KEY")
+                    or "not-needed"
+                ),
+                timeout=_REQUEST_TIMEOUT_S,
+                max_retries=_MAX_RETRIES,
+            )
+
+        completion = await self._custom_client.chat.completions.create(
+            model=model_id,
+            max_tokens=1024,
+            messages=[
+                {"role": "system", "content": self.prompt},
+                {
+                    "role": "user",
+                    "content": user_message + _SECONDARY_JUDGE_INSTRUCTION,
+                },
+            ],
+        )
+        self._last_resolved_model = getattr(completion, "model", None)
+        choices = getattr(completion, "choices", None)
+        if not choices:
+            raise JudgeOutputError(
+                f"custom judge returned no choices (model={model_id})"
+            )
+        text = choices[0].message.content or ""
+        data = _parse_verdict_text(text)
+        if data is None:
+            raise JudgeOutputError(
+                "custom judge produced no parseable verdict "
                 f"(model={model_id}, text excerpt: {text[:200]!r})"
             )
         return data

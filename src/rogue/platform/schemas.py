@@ -13,6 +13,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from rogue.schemas.agent_tool import LiveToolTarget
 from rogue.schemas.governance import ClientPolicy
 
 
@@ -43,6 +44,11 @@ class TargetSpec(BaseModel):
     # swaps the raw `api_key` for this before persist/enqueue; the worker resolves it just-in-time.
     api_key_ref: str | None = None
     system_prompt: str = ""
+    # Level 2 (bring-your-own execution target): point ROGUE's agent-exec harness at the customer's
+    # OWN authorized MCP server so their real tool surface is tested (see LiveToolTarget). The `model`
+    # still drives the agent; this only supplies the TOOLS. Requires live_tool_target.authorized=True.
+    # It carries auth headers (secrets), so — like api_key — it is never emitted in a serialized record.
+    live_tool_target: LiveToolTarget | None = Field(default=None, repr=False)
 
     @model_validator(mode="after")
     def _require_target(self) -> TargetSpec:
@@ -51,13 +57,16 @@ class TargetSpec(BaseModel):
         return self
 
     def redacted(self) -> dict:
-        """A persist/log-safe snapshot (no raw secret)."""
+        """A persist/log-safe snapshot (no raw secret — never the MCP auth headers)."""
         return {
             "endpoint": self.endpoint,
             "provider": self.provider,
             "model": self.model,
             "system_prompt_len": len(self.system_prompt),
             "has_api_key": self.api_key is not None or self.api_key_ref is not None,
+            "has_live_tool_target": self.live_tool_target is not None,
+            "live_tool_transport": self.live_tool_target.transport if self.live_tool_target else None,
+            "live_tool_authorized": self.live_tool_target.authorized if self.live_tool_target else None,
         }
 
 

@@ -51,6 +51,16 @@ jobs:
           fail-on: high               # fail on any HIGH or CRITICAL breach (high|critical|medium|low|none)
           #   max-breach-rate: "0.2"  # also fail if overall breach rate > 20%
 
+          # --- Baseline-regression gate (continuous measurement) ----------------------------------
+          # Commit a baseline snapshot (produced by a run with `baseline-save`) and point at it here.
+          # The PR then FAILS if a model/prompt change re-opens a family that was clean in the baseline
+          # (or worsens one beyond the tolerance) — catching silent regressions a one-shot scan can't.
+          #   baseline: .rogue/baseline.json     # committed golden state
+          #   max-regression: "0.05"             # allow up to +5pp per family before failing (default 0.0)
+          #
+          # To (re)record the golden state, run once on `main` with:
+          #   baseline-save: .rogue/baseline.json   # then commit the written file
+
           # --- Secrets (from repo secrets; NEVER inline a key) ------------------------------------
           api-key: ${{ secrets.ROGUE_TARGET_KEY }}
           #   judge-key: ${{ secrets.ROGUE_JUDGE_KEY }}   # only with judge: calibrated

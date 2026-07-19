@@ -26,6 +26,21 @@ class InjectionPayload:
     Populated before the run from an ``AttackVector.TOOL_OUTPUT`` primitive (Phase 6
     corpus). ``goal`` is the machine-checkable success condition the trace judge (Phase 4)
     evaluates; ``payload_text`` is the attacker-authored bytes spliced into the return.
+
+    ``placement`` selects the DELIVERY CHANNEL (Wave-④ MCP-native carriers). The default
+    ``"return"`` is byte-identical to the original behaviour (splice into the tool RETURN):
+
+    - ``"return"``        — payload lives in the carrier tool's RETURN (the historical path).
+    - ``"schema"``        — payload lives in the carrier tool's DESCRIPTION/schema (MCP
+      tool-poisoning / "line jumping"): the backend splices it into the spec the model reads,
+      and ARMS the ``goal`` on the tool's first return so signal (c) can attribute a downstream
+      call. No payload text is duplicated into the return.
+    - ``"schema_rugpull"`` — description is benign at ``list_tools`` time; the malicious payload
+      appears in the RETURN only on/after the SECOND use (mutate-after-inspection). ``times_armed``
+      tracks the per-injection call count the backend increments.
+
+    ``rag_planted_answer`` (PoisonedRAG) is the unguessable answer token seeded into a
+    ``retrieve_documents`` poison passage; the adoption grader reads it back out of the transcript.
     """
 
     injection_id: str
@@ -34,6 +49,9 @@ class InjectionPayload:
     goal: InjectionGoal
     fire_on_turn: Optional[int] = None  # only inject at/after this turn (None = any)
     fired: bool = False
+    placement: str = "return"  # "return" | "schema" | "schema_rugpull" (see class docstring)
+    rag_planted_answer: Optional[str] = None  # PoisonedRAG planted answer token (adoption grader)
+    times_armed: int = 0  # rug-pull: count of times the carrier tool has been called this run
 
 
 @dataclass

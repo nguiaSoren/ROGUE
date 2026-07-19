@@ -14,6 +14,8 @@ import {
   type PiiLeakModel,
 } from "@/lib/leaderboard-data";
 import RobustnessBoard from "./RobustnessBoardClient";
+import SafeguardBoard from "./SafeguardBoardClient";
+import InjectionBoard from "./InjectionBoardClient";
 
 /**
  * /leaderboard, the public model-resistance board (VIRAL_LAUNCH_SPEC Decision #4).
@@ -45,7 +47,7 @@ export const revalidate = 86400;
 export const metadata: Metadata = {
   title: "Leaderboard, ROGUE — models ranked by jailbreak resistance",
   description:
-    "Every model ROGUE red-teams, ranked by resistance — a periodic measured snapshot (as of 2026-06-07), not a live-updating feed. Lower breach rate = higher rank, measured against ROGUE's open-web attack corpus and scored by a calibrated judge ([withheld — under anonymized review]). Reproducible and signed.",
+    "Every model ROGUE red-teams, ranked by resistance — a periodic measured snapshot (as of 2026-06-07), not a live-updating feed. Lower breach rate = higher rank, measured against ROGUE's open-web attack corpus and scored by a calibrated judge (89.3% human agreement). Reproducible and signed.",
   openGraph: {
     title: "ROGUE Leaderboard — models ranked by jailbreak resistance",
     description:
@@ -235,8 +237,8 @@ function Board() {
               blurb={
                 <>
                   {tested} hosted models · deep escalation + PAIR pipeline · graded by the{" "}
-                  <span className="text-rogue-green">calibrated v3 judge</span> ([withheld — under
-                  anonymized review]). Snapshot as of 2026-06-07.
+                  <span className="text-rogue-green">calibrated v3 judge</span> (89.3% human
+                  agreement). Snapshot as of 2026-06-07.
                 </>
               }
               rows={rows}
@@ -265,9 +267,9 @@ function Board() {
           style={{ animationDelay: "0.3s" }}
         >
           <p>{"// rank = mean any-breach rate across attack families (lower = more resistant), WITHIN each board"}</p>
-          <p>{`// production: ROGUE all-time corpus, ${totalTrials.toLocaleString()} deep-pipeline trials, calibrated v3 judge ([withheld — under anonymized review]) — the same numbers \`rogue try\` prints`}</p>
+          <p>{`// production: ROGUE all-time corpus, ${totalTrials.toLocaleString()} deep-pipeline trials, calibrated v3 judge (89.3% human agreement) — the same numbers \`rogue try\` prints`}</p>
           <p>{`// open-source: curated single-shot aggressive jailbreak pack (~40 trials each), primitive-level any-breach, measured ${LEADERBOARD_OSS_MEASURED}`}</p>
-          <p>{"// the three facets (production, open-source, PII context-leak) are NOT directly comparable (different attacks/metrics) and are ranked independently"}</p>
+          <p>{"// each facet (production, open-source, PII context-leak, long-context robustness, safeguard over-refusal, agentic IPI) measures a DIFFERENT attack/metric — NOT directly comparable, each ranked independently"}</p>
           <p>
             {"// periodic measured snapshot, not a live feed — for the live per-family × config breakdown, see the "}
             <Link href="/matrix" className="text-rogue-green hover:underline">
@@ -281,6 +283,12 @@ function Board() {
 
         {/* Fourth facet — long-context robustness ("breaks at N tokens"; a DIFFERENT attack + metric). */}
         <RobustnessBoard />
+
+        {/* Fifth facet — safeguard / over-refusal (FRR; the helpfulness-cost companion). Ships pending. */}
+        <SafeguardBoard />
+
+        {/* Sixth facet — agentic indirect-prompt-injection robustness (per-config IPI ASR). Ships pending. */}
+        <InjectionBoard />
 
         {/* The whole board in one shareable image (both panels, honestly separated). */}
         <ShareCard />

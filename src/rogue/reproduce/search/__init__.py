@@ -17,11 +17,12 @@ from .live import make_embed_fn, make_refine_action, make_rollout, make_seed_pri
 from .pruning import PromptPruner, resolve_pruner
 from .run import harden_from_remediation, search_escalate
 from .searcher import Action, Budget, RolloutOutcome, SearchResult, default_reward
+from .siege import SiegeSearcher, siege_attack
 
 __all__ = [
     "compliance_score", "COMPLIANCE_ANCHORS",
     "Action", "Budget", "RolloutOutcome", "SearchResult", "default_reward",
-    "MCTSSearcher", "BanditSearcher",
+    "MCTSSearcher", "BanditSearcher", "SiegeSearcher", "siege_attack",
     "cheap_mutation_actions", "framing_mutation_actions", "refine_action", "default_actions",
     "NoveltyReward",
     "PromptPruner", "resolve_pruner",

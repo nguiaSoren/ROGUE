@@ -189,6 +189,13 @@ class RenderedAttack(BaseModel):
       audio_format: container/codec for ``audio_b64`` (e.g. "wav", "mp3") —
         the ``format`` field of the ``input_audio`` block. Ignored when
         ``audio_b64`` is None.
+      seed_reply: the fabricated **assistant response-prefill** seed (Response
+        Attack / "Sure, here is step 1:"), or None for an unprimed render. When
+        set, the LAST message in ``messages`` is a trailing
+        ``{"role": "assistant", "content": seed_reply}`` turn; the dispatch layer
+        routes it per protocol (native prefill on Anthropic, in-band
+        "Begin your reply with…" fold on OpenAI-style). None ⇒ ``messages`` carries
+        no assistant turn (byte-identical to the pre-prefill behavior).
     """
 
     messages: list[dict[str, str]]
@@ -201,6 +208,7 @@ class RenderedAttack(BaseModel):
     image_media_type: str = "image/png"
     audio_b64: str | None = None
     audio_format: str = "wav"
+    seed_reply: str | None = None
 
     model_config = {"frozen": True}
 
@@ -641,6 +649,8 @@ def render(
     primitive: AttackPrimitive,
     config: DeploymentConfig,
     customer_slot_overrides: dict[str, str] | None = None,
+    *,
+    seed_reply: str | None = None,
 ) -> RenderedAttack:
     """Render an AttackPrimitive against a DeploymentConfig into a chat-message list.
 
@@ -676,6 +686,14 @@ def render(
     data-processing document with the payload embedded as a directive field amid
     benign decoy rows (``structured_data.wrap_structured_data``). It is skipped if
     an image/audio render already owns the turn.
+
+    Assistant response-prefill (Response Attack / "Sure, here is step 1:"): pass
+    ``seed_reply`` (or set ``payload_slots["seed_reply"]``) to append a fabricated
+    trailing ``assistant`` turn seeding the start of the target's own reply. The
+    explicit ``seed_reply`` argument wins over the slot; the seed is slot-substituted
+    like any template. The dispatch layer routes it per protocol (native prefill on
+    Anthropic, in-band "Begin your reply with…" fold on OpenAI-style). Default (no
+    seed) leaves ``messages`` free of any assistant turn — byte-identical to before.
     """
     resolved_slots = _resolve_slots(primitive, config, customer_slot_overrides)
     messages, is_multi_turn = _build_messages(primitive, config, resolved_slots)
@@ -765,6 +783,15 @@ def render(
     if structured_fmt and image_b64 is None and audio_b64 is None:
         messages = _render_structured_data_payload(messages, structured_fmt)
 
+    # Assistant response-prefill (opt-in). Explicit arg wins over the slot; the seed is
+    # slot-substituted like any template, then appended as a trailing assistant turn. Appended
+    # LAST so it never disturbs the "last user turn" the image/audio/structured transforms own.
+    raw_seed = seed_reply if seed_reply is not None else primitive.payload_slots.get("seed_reply")
+    resolved_seed: str | None = None
+    if raw_seed:
+        resolved_seed = _apply_substitutions(str(raw_seed), resolved_slots)
+        messages = [*messages, {"role": "assistant", "content": resolved_seed}]
+
     return RenderedAttack(
         messages=messages,
         is_multi_turn=is_multi_turn,
@@ -774,4 +801,5 @@ def render(
         image_b64=image_b64,
         image_media_type=image_media_type,
         audio_b64=audio_b64,
+        seed_reply=resolved_seed,
     )

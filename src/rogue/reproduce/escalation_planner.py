@@ -294,6 +294,7 @@ def _build_planner_messages(
     arms_strategy: str | None = None,
     *,
     strategies: dict[str, StrategyView] | None = None,
+    avoid_rules: "list[str] | None" = None,
 ) -> tuple[str, str]:
     """Return ``(system_prompt, user_prompt)`` for the planner call.
 
@@ -302,6 +303,12 @@ def _build_planner_messages(
     OR a harvested text/multi_turn technique id (§10.9 Phase 3a). The default
     ``None`` keeps the built-in Crescendo framing. ``strategies`` is the resolved
     library (ARMS ∪ harvested); defaults to the ARMS seeds for back-compat.
+
+    ``avoid_rules`` (⑥ distill-from-failure) are negative-memory reason strings that
+    ALREADY made this target refuse; when the ``ROGUE_DISTILL_FAILURE`` Arm flag is
+    ON they are appended to the system prompt as an ``AVOID`` block so the planner
+    steers away from them. Flag-off (or empty) ⇒ nothing is appended and the prompt
+    is byte-identical to before.
     """
     strategies = strategies if strategies is not None else arms_views()
     objective = (
@@ -324,6 +331,10 @@ def _build_planner_messages(
             "Keep the same N-turn JSON output shape; the final turn must still "
             "land the exact original objective."
         )
+    # ⑥ distill-from-failure — inject the negative-memory AVOID block (flag-gated).
+    from rogue.reproduce.refusal_distill import avoid_block_for  # noqa: PLC0415
+
+    system += avoid_block_for(avoid_rules)
     user = _PLANNER_USER_PROMPT_TEMPLATE.format(
         objective=objective,
         payload=primitive.payload_template[:4_000],
@@ -429,6 +440,7 @@ class EscalationPlanner:
         use_templates: bool = True,
         slot_fill: bool | None = None,
         slot_fill_model: str | None = None,
+        avoid_rules: list[str] | None = None,
     ) -> None:
         # Resolve at construction (after dotenv): explicit arg > ROGUE_ESCALATION_PLANNER
         # env > the permissive Mistral default. Reading env here (not at import) means
@@ -471,6 +483,11 @@ class EscalationPlanner:
             **arms_views(),
             **(extra_strategies or {}),
         }
+        # ⑥ distill-from-failure — negative-memory reason strings retrieved by the
+        # caller (who owns the DB session) via refusal_distill.top_avoid_rules for
+        # this target/family. Rendered into the planner system prompt only when the
+        # ROGUE_DISTILL_FAILURE Arm flag is ON (see _build_planner_messages).
+        self._avoid_rules: list[str] = list(avoid_rules or [])
         cache_dir.mkdir(parents=True, exist_ok=True)
 
     @classmethod
@@ -800,6 +817,7 @@ class EscalationPlanner:
 
         system_prompt, user_prompt = _build_planner_messages(
             primitive, n_turns, arms_strategy, strategies=self._strategies,
+            avoid_rules=self._avoid_rules,
         )
         try:
             response = await client.messages.create(
@@ -865,6 +883,7 @@ class EscalationPlanner:
 
         system_prompt, user_prompt = _build_planner_messages(
             primitive, n_turns, arms_strategy, strategies=self._strategies,
+            avoid_rules=self._avoid_rules,
         )
         try:
             response = await client.chat.completions.create(

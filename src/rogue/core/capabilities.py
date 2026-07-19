@@ -34,6 +34,11 @@ class TargetCapabilities:
     supports_json_mode: bool = False
     supports_streaming: bool = False
     supports_function_calling: bool = False
+    # Whether a trailing ``assistant`` turn is honored as a NATIVE response-prefill (the model
+    # continues from it). True on Anthropic-protocol targets; False on OpenAI-style ones, which need
+    # the seed folded in-band ("Begin your reply with…"). Drives adapter prefill routing — see
+    # ``rogue.core.prefill`` and each adapter's ``supports_native_prefill`` attribute.
+    supports_native_prefill: bool = False
     max_context_tokens: int | None = None
     # Extensions beyond the base ten — real ROGUE constraints that drive dispatch today:
     max_output_tokens: int | None = None

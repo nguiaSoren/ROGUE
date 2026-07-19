@@ -31,6 +31,11 @@ from pathlib import Path
 # a finding fails the gate when its rank is >= the rank of the configured `--fail-on` floor.
 _SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
+# Snapshot schema version — MUST match rogue.platform.baseline.BASELINE_VERSION so a baseline written
+# by the platform CLI (`python -m rogue.platform.baseline save`) and one written by this gate are
+# interchangeable. A format-parity test asserts the two stay in lock-step.
+_BASELINE_VERSION = 1
+
 
 def _log(msg: str) -> None:
     """Print a gate diagnostic to stdout (never includes secrets)."""
@@ -102,6 +107,15 @@ def build_parser() -> argparse.ArgumentParser:
                         "'none' disables the severity gate.")
     p.add_argument("--max-breach-rate", default="",
                    help="Optional float 0-1; also fail when the overall breach rate exceeds it.")
+    # Baseline-regression gate (continuous measurement): catch a model/prompt update re-opening a
+    # previously-closed bypass. `--baseline-save` snapshots THIS scan (commit it on main);
+    # `--baseline` + `--max-regression` fail the gate when a family regressed vs that snapshot.
+    p.add_argument("--baseline", default="",
+                   help="Path to a baseline snapshot JSON to compare this scan against.")
+    p.add_argument("--max-regression", default="0.0",
+                   help="Allowed per-family breach-rate increase (0-1) before it fails the gate (default 0.0).")
+    p.add_argument("--baseline-save", default="",
+                   help="Path to write THIS scan's baseline snapshot (for the 'record the golden state' flow).")
     # Artifact.
     p.add_argument("--card-dir", default="rogue-scan", help="Directory for the breach-card artifact.")
     return p
@@ -215,6 +229,75 @@ def evaluate_gate(report, *, fail_on: str, max_breach_rate: float | None) -> tup
     return (bool(reasons), reasons)
 
 
+# --- baseline-regression gate ------------------------------------------------------------------
+#
+# The gate's memory of a prior run. Kept stdlib-only (operating on the SDK `ScanReport` + JSON) so it
+# works in a consumer's CI where only `rogue-live-redteam` is installed — `rogue.platform.baseline` is
+# the canonical, richer twin used product-side, and the two share this exact snapshot format.
+
+
+def snapshot_report(report) -> dict:
+    """Freeze a scan's per-(config, family) breach state into a baseline snapshot dict.
+
+    Aggregates findings by family (n_breach / n_trials summed) — the same rollup the graded scorecard
+    uses — so a re-run can be diffed family-by-family against it.
+    """
+    from rogue.report import technique_label  # SDK-available; humanizes the family slug
+
+    agg: dict[str, list[int]] = {}
+    for f in report.findings:
+        row = agg.setdefault(f.family, [0, 0])
+        row[0] += f.n_breach
+        row[1] += f.n_trials
+    families: dict[str, dict] = {}
+    for slug, (n_breach, n_trials) in agg.items():
+        rate = n_breach / n_trials if n_trials else 0.0
+        families[slug] = {
+            "label": technique_label(slug),
+            "n_breach": n_breach,
+            "n_trials": n_trials,
+            "breach_rate": round(rate, 4),
+            "breached": n_breach > 0,
+        }
+    return {
+        "baseline_version": _BASELINE_VERSION,
+        "target": report.target,
+        "n_tests": report.n_tests,
+        "n_breaches": report.n_breaches,
+        "breach_rate": round(report.breach_rate, 4),
+        "families": families,
+    }
+
+
+def evaluate_baseline(baseline: dict, report, *, max_regression: float) -> tuple[bool, list[str]]:
+    """Diff the current scan against ``baseline``; return ``(regressed, reasons)``.
+
+    A family regresses when it *re-opens* (0-breach in the baseline, now breaching beyond
+    ``max_regression``) or *worsens* (already breaching, rate up by more than ``max_regression``).
+    ``max_regression`` is an absolute breach-rate delta in [0,1].
+    """
+    current = snapshot_report(report)
+    base_fams: dict[str, dict] = baseline.get("families", {}) or {}
+    reasons: list[str] = []
+    for slug, cur in current["families"].items():
+        base = base_fams.get(slug)
+        if base is None:
+            continue  # newly-probed family — no prior state to regress against
+        base_rate = float(base.get("breach_rate", 0.0))
+        cur_rate = float(cur["breach_rate"])
+        label = cur["label"]
+        if base_rate == 0.0 and cur_rate > max_regression:
+            reasons.append(
+                f"{label}: closed bypass RE-OPENED — {round(cur_rate * 100)}% (was 0%)"
+            )
+        elif base_rate > 0.0 and (cur_rate - base_rate) > max_regression:
+            reasons.append(
+                f"{label}: breach rate WORSENED {round(base_rate * 100)}% → "
+                f"{round(cur_rate * 100)}%"
+            )
+    return (bool(reasons), reasons)
+
+
 def _markdown_summary(report, *, failed: bool, reasons: list[str], card_path: str | None) -> str:
     status = "❌ **FAILED**" if failed else "✅ **PASSED**"
     lines = [
@@ -264,6 +347,12 @@ def main(argv: list[str] | None = None) -> int:
             budget = float(args.budget)
         except ValueError:
             return _fail(f"--budget must be a USD float (got {args.budget!r}).")
+    try:
+        max_regression = float(args.max_regression)
+    except ValueError:
+        return _fail(f"--max-regression must be a float 0-1 (got {args.max_regression!r}).")
+    if not 0.0 <= max_regression <= 1.0:
+        return _fail("--max-regression must be between 0 and 1.")
 
     # Build the client (catches missing package / bad target / missing judge key).
     try:
@@ -286,12 +375,40 @@ def main(argv: list[str] | None = None) -> int:
     _log(f"scan complete: {report.n_breaches}/{report.n_tests} breached ({report.breach_pct}).")
 
     failed, reasons = evaluate_gate(report, fail_on=args.fail_on, max_breach_rate=max_breach_rate)
+
+    # Baseline-regression gate — snapshot THIS scan and/or compare it to a stored baseline. A
+    # regression (a re-opened / worsened family beyond --max-regression) is OR'd into the gate result.
+    import json as _json  # local: keep module import side-effect-free
+
+    if args.baseline_save:
+        try:
+            with open(args.baseline_save, "w", encoding="utf-8") as fh:
+                _json.dump(snapshot_report(report), fh, indent=2)
+            _log(f"baseline snapshot written to {args.baseline_save}")
+        except OSError as exc:
+            _log(f"could not write baseline snapshot: {exc}")
+
+    regressed = False
+    if args.baseline:
+        try:
+            with open(args.baseline, encoding="utf-8") as fh:
+                baseline = _json.load(fh)
+        except (OSError, ValueError) as exc:
+            return _fail(f"could not read --baseline {args.baseline!r}: {type(exc).__name__}.")
+        regressed, regress_reasons = evaluate_baseline(
+            baseline, report, max_regression=max_regression
+        )
+        if regressed:
+            failed = True
+            reasons = reasons + [f"regression vs baseline: {r}" for r in regress_reasons]
+
     card_path = _render_card(report, args.card_dir, calibrated=args.judge == "calibrated")
 
     _write_summary(_markdown_summary(report, failed=failed, reasons=reasons, card_path=card_path))
     _set_output("breaches", str(report.n_breaches))
     _set_output("breach_rate", str(round(report.breach_rate, 4)))
     _set_output("failed", "true" if failed else "false")
+    _set_output("regressed", "true" if regressed else "false")
     if card_path:
         _set_output("card", card_path)
 

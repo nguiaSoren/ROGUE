@@ -38,8 +38,11 @@ returns ``False`` and the registry will not route here.
 
 from __future__ import annotations
 
+import asyncio
+import glob
 import importlib.util
 import logging
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -53,6 +56,23 @@ from .capabilities import Capability
 __all__ = ["Crawl4AIFetcher"]
 
 logger = logging.getLogger("rogue.harvest.fetchers.crawl4ai")
+
+
+def _chromium_binary_on_disk() -> bool:
+    """True iff a Playwright Chromium browser is installed on disk — a loop-safe alternative to the
+    ``sync_playwright()`` probe (which raises inside an asyncio loop). Checks ``PLAYWRIGHT_BROWSERS_PATH``
+    then the per-OS default browser cache for a ``chromium*`` install."""
+    roots: list[str] = []
+    env_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
+    if env_path:
+        roots.append(env_path)
+    home = os.path.expanduser("~")
+    roots += [
+        os.path.join(home, "Library", "Caches", "ms-playwright"),          # macOS
+        os.path.join(home, ".cache", "ms-playwright"),                     # Linux
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright"),  # Windows
+    ]
+    return any(root and glob.glob(os.path.join(root, "chromium*")) for root in roots)
 
 
 def _crawler_kwargs() -> dict[str, Any]:
@@ -112,21 +132,33 @@ class Crawl4AIFetcher(Fetcher):
 
         Import failures and missing-browser errors are both caught; the method
         never raises.
+
+        CRITICAL: ``sync_playwright()`` **raises inside a running asyncio loop** ("Sync API inside
+        asyncio"), which is exactly the harvest's context — so the sync probe would falsely report
+        crawl4ai UNAVAILABLE during every async harvest, silently forcing the rate-limited keyless-
+        Firecrawl path (2026-07-10 fix). When called from within an event loop we therefore skip the
+        sync probe and check the Playwright browser cache on disk instead (equally authoritative:
+        registration only needs to know the binary exists, not launch it).
         """
         if importlib.util.find_spec("crawl4ai") is None:
             return False
-        # crawl4ai uses playwright internally — verify the browser binary exists
-        # using the same sync_playwright probe the playwright backend uses.
         if importlib.util.find_spec("playwright") is None:
             return False
+        try:
+            asyncio.get_running_loop()
+            in_async_loop = True
+        except RuntimeError:
+            in_async_loop = False
+        if in_async_loop:
+            return _chromium_binary_on_disk()
         try:
             from playwright.sync_api import sync_playwright  # type: ignore[import-not-found]
 
             with sync_playwright() as pw:
                 _ = pw.chromium.executable_path
             return True
-        except Exception:  # noqa: BLE001
-            return False
+        except Exception:  # noqa: BLE001 — sync API in a loop, or a genuinely missing browser
+            return _chromium_binary_on_disk()
 
     # ------------------------------------------------------------------
     # UNLOCK — anti-bot single-page fetch

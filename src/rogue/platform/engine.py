@@ -120,28 +120,35 @@ class DefaultScanEngine(ScanEngine):
 
         target = spec.target
         if target.endpoint:
-            return make_endpoint_config(
+            config = make_endpoint_config(
                 target.endpoint,
                 target.model or "default",
                 system_prompt=target.system_prompt,
             )
-
-        # provider-mode: normalise the model id exactly as rogue.client.Client does.
-        if target.model and "/" in target.model:
-            target_model = target.model
-        elif target.model:
-            target_model = f"{target.provider}/{target.model}"
         else:
-            target_model = _default_model(target.provider)
+            # provider-mode: normalise the model id exactly as rogue.client.Client does.
+            if target.model and "/" in target.model:
+                target_model = target.model
+            elif target.model:
+                target_model = f"{target.provider}/{target.model}"
+            else:
+                target_model = _default_model(target.provider)
 
-        return DeploymentConfig(
-            config_id="plat-scan-0001",
-            customer_id="platform",
-            name=target_model,
-            target_model=target_model,
-            system_prompt=target.system_prompt,
-            base_url=None,
-        )
+            config = DeploymentConfig(
+                config_id="plat-scan-0001",
+                customer_id="platform",
+                name=target_model,
+                target_model=target_model,
+                system_prompt=target.system_prompt,
+                base_url=None,
+            )
+
+        # Level 2 on-ramp: attach the customer's authorized MCP tool surface so the agent-exec tier
+        # routes tool calls to their real server. Ephemeral (carries auth headers) — like base_url it
+        # is never persisted (DeploymentConfig ORM excludes it); it only rides the in-memory config.
+        if target.live_tool_target is not None:
+            config = config.model_copy(update={"live_tool_target": target.live_tool_target})
+        return config
 
     def _adapter_extra(self, spec: ScanSpec) -> dict[str, Any]:
         return {"api_key": spec.target.api_key} if spec.target.api_key else {}

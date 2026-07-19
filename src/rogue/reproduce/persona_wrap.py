@@ -230,9 +230,15 @@ class PersonaWrapper:
         taxonomy_path: Path = DEFAULT_TAXONOMY_PATH,
         rng_seed: int | None = None,
     ) -> None:
-        self.model = model
+        self.model = os.environ.get("ROGUE_PERSONA_MODEL") or model
         self.cache_dir = cache_dir
+        # Custom OpenAI-compatible wrapper endpoint (free Featherless / funded host). When set,
+        # the persona wrap routes THERE instead of direct Anthropic (out of credit). Same shape as
+        # the judge/translator custom routes. Unset → the original Anthropic path is byte-identical.
+        self.base_url = os.environ.get("ROGUE_PERSONA_BASE_URL") or None
+        self.api_key = os.environ.get("ROGUE_PERSONA_API_KEY") or None
         self._anthropic_client: Any | None = None
+        self._compat_client: Any | None = None
         self._taxonomy = load_taxonomy(taxonomy_path)
         self._by_name = {t.name.lower(): t for t in self._taxonomy}
         # Deterministic RNG for "random" technique selection so a sweep with
@@ -387,13 +393,15 @@ class PersonaWrapper:
         """Call Anthropic to wrap ``payload`` with ``technique``. Returns
         ``(wrapped_or_original, refused)``. On refusal / short response, falls
         back to the original payload."""
+        prompt = _build_wrap_prompt(payload, technique)
+        if self.base_url:  # OpenAI-compatible wrapper endpoint — the free/funded persona lane
+            return await self._wrap_via_openai_compat(prompt, payload, technique)
         from anthropic import APIStatusError, BadRequestError  # noqa: PLC0415
         from anthropic import AsyncAnthropic  # noqa: PLC0415
 
         if self._anthropic_client is None:
             self._anthropic_client = AsyncAnthropic()
 
-        prompt = _build_wrap_prompt(payload, technique)
         try:
             response = await self._anthropic_client.messages.create(
                 model=self.model,
@@ -441,6 +449,34 @@ class PersonaWrapper:
             )
             return payload, True
 
+        return wrapped, False
+
+    async def _wrap_via_openai_compat(
+        self, prompt: str, payload: str, technique: Any
+    ) -> tuple[str, bool]:
+        """Wrap via an OpenAI-compatible endpoint (``self.base_url``) — the free-Featherless /
+        funded persona lane. Same contract as the Anthropic path: refusal/short → (payload, True)."""
+        from openai import AsyncOpenAI  # noqa: PLC0415
+
+        if self._compat_client is None:
+            self._compat_client = AsyncOpenAI(
+                base_url=self.base_url, api_key=self.api_key or "not-needed"
+            )
+        wire_model = self.model.split("/", 1)[1] if self.model.startswith("custom/") else self.model
+        try:
+            resp = await self._compat_client.chat.completions.create(
+                model=wire_model, max_tokens=_WRAP_MAX_TOKENS, temperature=1.0,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception as exc:  # noqa: BLE001 — provider error → fall back to original for the A/B
+            _log.warning("persona wrap refused/failed (technique=%s): %s", technique.name, exc)
+            return payload, True
+        choices = getattr(resp, "choices", None)
+        wrapped = (choices[0].message.content or "").strip() if choices else ""
+        if wrapped.startswith("<think>") and "</think>" in wrapped:  # reasoning models
+            wrapped = wrapped.split("</think>", 1)[1].strip()
+        if len(wrapped) < _MIN_USEFUL_WRAP_CHARS:
+            return payload, True
         return wrapped, False
 
 

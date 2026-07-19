@@ -29,6 +29,7 @@ import binascii
 import re
 import unicodedata
 
+from rogue.obfuscation.operators import try_decode_wrap
 from rogue.obfuscation.tables import (
     COMBINING_MARK_RANGES,
     DIRECTION_CONTROL_CHARS,
@@ -188,6 +189,9 @@ def canonicalize(text: str, *, decode_transport: bool = False) -> str:
 
     Pipeline (each step is meaning-preserving for the underlying technique):
 
+      0. (opt-in) decode an extended WRAP skin whose self-decode directive we
+         emitted (FlipAttack reversal, base32/binary/octal/decimal/url transport,
+         payload_split, bijection) back to plaintext BEFORE the folds below.
       1. NFKC — fullwidth ``ＳＹＳＴＥＭ`` and math-alphanumerics ``𝓲𝓰𝓷𝓸𝓻𝓮``
          collapse to ASCII.
       2. Strip invisible (zero-width / BOM / word-joiner), direction-override,
@@ -206,6 +210,16 @@ def canonicalize(text: str, *, decode_transport: bool = False) -> str:
     """
     if not text:
         return text
+
+    # (opt-in) An extended WRAP skin (FlipAttack reversal, base32/binary/octal/
+    # decimal/url transport, payload_split, bijection) is decoded FIRST — before the
+    # folds below — because those folds (NFKD, leet) would corrupt the still-encoded
+    # payload. ``try_decode_wrap`` only fires on our own marked directives, so plain
+    # text is untouched; the recovered plaintext then flows through the normal folds.
+    if decode_transport:
+        recovered = try_decode_wrap(text)
+        if recovered is not None:
+            text = recovered
 
     # NFKD (decompose) — not NFKC: decomposition splits precomposed accented
     # letters (í → i + combining acute) so the combining-mark strip below can

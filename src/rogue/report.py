@@ -360,6 +360,23 @@ def vector_label(vector: str) -> str:
     return _VECTOR_DISPLAY.get(vector, vector.replace("_", " ").title())
 
 
+# Reverse of `_VECTOR_DISPLAY` so a *rendered* vector label (as persisted by `to_dict`) can be mapped
+# back to its slug — needed by the framework crosswalk, whose vector-based OWASP augmentation keys on
+# the raw slug (rag_document / tool_output → +LLM01), not the display label.
+_VECTOR_SLUG_BY_LABEL: dict[str, str] = {label: slug for slug, label in _VECTOR_DISPLAY.items()}
+
+
+def vector_slug(vector: str) -> str:
+    """Normalize a vector value to its slug: pass a known slug through, reverse-map a display label,
+    else best-effort lowercase-underscore. Lets the crosswalk resolve a vector regardless of whether
+    the finding carries a raw slug (fresh SDK report) or a humanized label (reconstructed platform report)."""
+    if vector in _VECTOR_DISPLAY:  # already a slug
+        return vector
+    if vector in _VECTOR_SLUG_BY_LABEL:  # a display label → slug
+        return _VECTOR_SLUG_BY_LABEL[vector]
+    return vector.strip().lower().replace(" ", "_")
+
+
 def humanize_technique(code: str) -> str:
     """Map a raw escalation-ladder ``winning_strategy`` code to a human display label.
 
@@ -668,6 +685,8 @@ class ScanReport:
         score: float | None = None,
         risk_level: str | None = None,
         mitigations: "dict[str, RemediationResult] | None" = None,
+        scorecard: dict | None = None,
+        coverage: dict | None = None,
     ) -> str:
         """A standalone HTML report — the artifact for a sales demo / email attachment.
 
@@ -676,9 +695,25 @@ class ScanReport:
         The SDK path has no platform score and omits both, so the headline score KPI is suppressed
         gracefully. ``mitigations`` (keyed by attack-family slug) optionally routes each finding's
         Remediation line through a PROVEN `RemediationResult`; with the default ``None`` the page is
-        byte-identical to today. Self-contained: inline CSS, no external assets, valid standalone HTML.
+        byte-identical to today.
+
+        ``scorecard`` / ``coverage`` are the pre-computed graded-scorecard and coverage-matrix blocks
+        (``rogue.platform.scoring.build_scorecard`` / ``build_coverage``), passed in by the platform
+        layer for the same reason as ``score`` — so this module carries no platform dependency. When
+        supplied, a worst-category-dominates **grade** KPI leads the page and a per-family grade table
+        + probe-coverage matrix render below the findings; when ``None`` (bare SDK) both are omitted.
+        Per-finding OWASP/ATLAS/NIST framework tags are always rendered (via the pure
+        ``rogue.taxonomy.crosswalk`` lookup). Self-contained: inline CSS, no external assets.
         """
         muts = mitigations or {}
+        # Per-finding framework tags come from the pure taxonomy crosswalk (OWASP 2025 / MITRE ATLAS /
+        # NIST AI RMF). Lazy-imported so the hot report path stays light; the crosswalk carries no
+        # platform dependency, so this keeps `report.py` importable stand-alone.
+        from rogue.taxonomy.crosswalk import (  # noqa: PLC0415
+            crosswalk_for_family,
+            format_frameworks_line,
+        )
+
         # Severity-grouped finding rows: critical→high→medium→low, breached-first within each group,
         # each group introduced by a labelled header row carrying its count.
         rows: list[str] = []
@@ -723,6 +758,16 @@ class ScanReport:
                     f'<td colspan="4"><b>Remediation:</b> '
                     f"{_html.escape(remediation_section(f.family, muts.get(f.family)))}</td></tr>"
                 )
+                # Framework tags (OWASP LLM Top 10 2025 · MITRE ATLAS · NIST AI RMF) so an
+                # enterprise reader sees the standard identifiers next to ROGUE's own labels.
+                fw_line = format_frameworks_line(
+                    crosswalk_for_family(f.family, vector_slug(f.vector))
+                )
+                if fw_line:
+                    rows.append(
+                        '<tr class="frameworks"><td></td>'
+                        f'<td colspan="4"><b>Frameworks:</b> {_html.escape(fw_line)}</td></tr>'
+                    )
         rate_color = "#d33" if self.breach_rate > 0 else "#2a2"
 
         # Headline score KPI — only when the platform supplied a number.
@@ -733,6 +778,18 @@ class ScanReport:
                 '<div class="kpi score">Risk score<b>'
                 f"{round(score)}/100{level}</b></div>"
             )
+
+        # Headline GRADE KPI — the worst-category-dominates letter grade (only when supplied).
+        grade_kpi = ""
+        if scorecard and scorecard.get("grade"):
+            grade_kpi = (
+                '<div class="kpi grade">Grade<b class="grade-'
+                f'{_html.escape(str(scorecard["grade"]))}">{_html.escape(str(scorecard["grade"]))}</b></div>'
+            )
+
+        # Optional scorecard + coverage tables (below the findings), pre-computed by the platform layer.
+        scorecard_html = self._scorecard_html(scorecard)
+        coverage_html = self._coverage_html(coverage)
 
         families = self.families_covered()
         intro = (
@@ -749,16 +806,23 @@ class ScanReport:
  .kpis{{display:flex;gap:2rem;margin:1.5rem 0;flex-wrap:wrap}}
  .kpi{{font-size:.85rem;color:#666}} .kpi b{{display:block;font-size:1.6rem;color:#111}}
  .kpi.score b{{font-size:2rem;color:#d33}}
+ .kpi.grade b{{font-size:2rem}}
+ .grade-A{{color:#1a7a3a}} .grade-B{{color:#4a8a1a}} .grade-C{{color:#b8860b}}
+ .grade-D{{color:#b85c00}} .grade-F{{color:#a01818}}
  table{{border-collapse:collapse;width:100%;font-size:.9rem}}
  th,td{{text-align:left;padding:.5rem .6rem;border-bottom:1px solid #eee}} th{{color:#888;font-weight:600}}
  .rate{{color:{rate_color}}}
  .methodology{{font-size:.8rem;color:#888;margin:.3rem 0 1.5rem}}
+ h2.section{{font-size:1.05rem;margin:1.8rem 0 .3rem}}
+ .cov-probed{{color:#1a7a3a;font-weight:600}} .cov-gap{{color:#999}}
  tr.sevhead td{{background:#f6f6f6;font-weight:600;color:#333;border-bottom:2px solid #ddd}}
  tr.sev-critical td{{color:#a01818}} tr.sev-high td{{color:#b85c00}}
  tr.explanation td{{border-bottom:0;color:#444;font-size:.84rem;padding-bottom:.1rem}}
  tr.explanation b{{color:#333}}
- tr.remediation td{{border-bottom:1px solid #eee;color:#555;font-size:.84rem;padding-top:0}}
+ tr.remediation td{{border-bottom:0;color:#555;font-size:.84rem;padding-top:0}}
  tr.remediation b{{color:#333}}
+ tr.frameworks td{{border-bottom:1px solid #eee;color:#666;font-size:.8rem;padding-top:0}}
+ tr.frameworks b{{color:#333}}
  tr.evidence td{{border-bottom:0;padding-bottom:.2rem}}
  .ev{{margin:.2rem 0;font-size:.82rem}} .ev .lbl{{color:#888;font-weight:600}}
  .ev .breached{{margin-left:.5rem;color:#a01818;font-weight:700;font-size:.78rem}}
@@ -773,6 +837,7 @@ class ScanReport:
  {_fmt_usd(self.cost_usd)}</p>
 <div class="kpis">
  {score_kpi}
+ {grade_kpi}
  <div class="kpi">Tests<b>{self.n_tests}</b></div>
  <div class="kpi">Breaches<b>{self.n_breaches}</b></div>
  <div class="kpi">Breach rate<b class="rate">{self.breach_pct}</b></div>
@@ -782,10 +847,72 @@ class ScanReport:
 <p class="methodology">{_html.escape(SCORE_METHODOLOGY)}</p>
 <table><thead><tr><th></th><th>Severity</th><th>Hit rate</th><th>Technique</th><th>Finding</th></tr></thead>
 <tbody>{''.join(rows) or '<tr><td colspan=5>No findings.</td></tr>'}</tbody></table>
+{scorecard_html}
+{coverage_html}
 </body></html>"""
         if path is not None:
             Path(path).write_text(body, encoding="utf-8")
         return body
+
+    @staticmethod
+    def _scorecard_html(scorecard: dict | None) -> str:
+        """Render the graded scorecard as a "Family scorecard" table (empty string when not supplied).
+
+        Leads with the worst-category-dominates overall grade, then one row per probed family with its
+        letter grade, ASR, and Wilson 95% CI — the CI kept visible so the grade never hides the rate."""
+        if not scorecard or not scorecard.get("families"):
+            return ""
+        overall = _html.escape(str(scorecard.get("grade", "")))
+        head = (
+            f'<h2 class="section">Family scorecard — overall grade '
+            f'<span class="grade-{overall}">{overall}</span></h2>'
+        )
+        rows = [
+            "<tr><th>Grade</th><th>Family</th><th>ASR</th><th>95% CI</th><th>Trials</th></tr>"
+        ]
+        for fam in scorecard["families"]:
+            g = _html.escape(str(fam.get("grade", "")))
+            asr = round(float(fam.get("asr", 0.0)) * 100)
+            lo = round(float(fam.get("ci_low", 0.0)) * 100)
+            hi = round(float(fam.get("ci_high", 0.0)) * 100)
+            rows.append(
+                f'<tr><td><b class="grade-{g}">{g}</b></td>'
+                f'<td>{_html.escape(str(fam.get("label", fam.get("family", ""))))}</td>'
+                f"<td>{asr}%</td><td>{lo}–{hi}%</td>"
+                f'<td>{int(fam.get("n_breach", 0))}/{int(fam.get("n_trials", 0))}</td></tr>'
+            )
+        methodology = _html.escape(str(scorecard.get("grade_methodology", "")))
+        return (
+            f"{head}<table>{''.join(rows)}</table>"
+            f'<p class="methodology">{methodology}</p>'
+        )
+
+    @staticmethod
+    def _coverage_html(coverage: dict | None) -> str:
+        """Render the coverage matrix (15 families × probed/never-probed) as a table (empty when absent).
+
+        Turns "found N things" into "probed X of 15 families" — the honest test-completeness view."""
+        if not coverage or not coverage.get("matrix"):
+            return ""
+        n_probed = int(coverage.get("n_families_probed", 0))
+        n_total = int(coverage.get("n_families_total", 0))
+        head = (
+            f'<h2 class="section">Coverage — probed {n_probed} of {n_total} attack families</h2>'
+        )
+        rows = ["<tr><th>Family</th><th>Probed</th><th>Trials</th><th>Result</th></tr>"]
+        for fam in coverage["matrix"]:
+            probed = bool(fam.get("probed"))
+            mark = (
+                '<span class="cov-probed">✓ probed</span>'
+                if probed
+                else '<span class="cov-gap">— not probed</span>'
+            )
+            result = "🔴 breached" if fam.get("breached") else ("🟢 held" if probed else "—")
+            rows.append(
+                f'<tr><td>{_html.escape(str(fam.get("label", fam.get("family", ""))))}</td>'
+                f"<td>{mark}</td><td>{int(fam.get('n_trials', 0))}</td><td>{result}</td></tr>"
+            )
+        return f"{head}<table>{''.join(rows)}</table>"
 
     @staticmethod
     def _evidence_html(f: Finding) -> str:

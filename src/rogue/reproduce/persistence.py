@@ -6,8 +6,8 @@ import logging
 from datetime import datetime, timezone
 
 import ulid
-from sqlalchemy import create_engine, insert
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import case, create_engine, func, insert, select
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from rogue.db.models import (
@@ -18,8 +18,22 @@ from rogue.reproduce.instantiator import RenderedAttack
 from rogue.reproduce.judge import JudgeResult
 from rogue.reproduce.target_panel import ModelResponse
 from rogue.schemas import DeploymentConfig
+from rogue.schemas.breach_result import BREACH_VERDICTS
 
 logger = logging.getLogger("rogue.reproduce.persistence")
+
+
+def nul_strip(value: str | None) -> str | None:
+    """Strip NUL (0x00) from a text value bound for a Postgres ``text`` column.
+
+    Postgres ``text`` cannot hold NUL; a single one (some OSS models emit it) fails the whole
+    ``executemany`` batch and crashes a reproduce cell mid-run. Stripping at the ROW-BUILD site
+    means the ORM object never carries a NUL, so EVERY downstream write path — ``persist_breach_rows``
+    (bulk insert), ``session.add`` flush, ``neon_sync`` bulk copy — is safe by construction, not
+    path-by-path. Text fields only; the ``verdict`` enum column is untouched (a global str dumper
+    broke it — see ``rogue.db.nul_safe``). 2026-07-10 paid-session fix.
+    """
+    return value.replace("\x00", "") if value is not None and "\x00" in value else value
 
 
 def build_breach_result_orm(
@@ -53,10 +67,10 @@ def build_breach_result_orm(
         deployment_config_id=config_id,
         trial_index=response.trial_index,
         temperature=response.temperature,
-        rendered_payload=rendered_payload,
-        model_response=(response.content or "")[:50_000],
+        rendered_payload=nul_strip(rendered_payload),
+        model_response=nul_strip((response.content or "")[:50_000]),
         verdict=judge_result.verdict.value,
-        judge_rationale=judge_result.rationale[:2_000],
+        judge_rationale=nul_strip(judge_result.rationale[:2_000]),
         judge_confidence=judge_result.confidence,
         latency_ms=response.latency_ms,
         tokens_in=response.tokens_in,
@@ -88,7 +102,18 @@ def persist_breach_rows(
     cols = [c.name for c in BreachResultORM.__table__.columns]
     dicts = [{c: getattr(r, c) for c in cols} for r in orm_rows]
 
-    engine = create_engine(database_url, pool_pre_ping=True)
+    # PostgreSQL text fields cannot hold NUL (0x00). A model response occasionally contains one
+    # (esp. OSS models), which fails the whole executemany batch. Strip it centrally so ONE bad
+    # response never crashes a reproduce cell (2026-07-10 paid-session fix).
+    for _d in dicts:
+        for _k, _v in _d.items():
+            if isinstance(_v, str) and "\x00" in _v:
+                _d[_k] = _v.replace("\x00", "")
+
+    engine = create_engine(
+        database_url, pool_pre_ping=True,
+        connect_args={"options": "-c idle_in_transaction_session_timeout=0"},
+    )
     persisted = failed = 0
     try:
         for i in range(0, len(dicts), chunk):
@@ -113,6 +138,52 @@ def persist_breach_rows(
         engine.dispose()
     logger.info("batch persist: %d rows committed, %d failed", persisted, failed)
     return persisted, failed
+
+
+def persisted_cell_summary(
+    database_url: str, config_id: str
+) -> dict[str, tuple[int, int]]:
+    """Per-primitive ``(n_trials_persisted, n_breach_persisted)`` already in ``breach_results`` for
+    ``config_id`` — the crash-resume checkpoint lookup.
+
+    A primitive present in the returned map has already been fired-and-persisted for this config, so
+    a ``--resume`` re-run skips its paid fire and reconstructs the finding from these counts. Because
+    ``endpoint_scan`` flushes one primitive's trials atomically (a single ``persist_breach_rows``
+    chunk), a primitive is either fully absent or fully present — no partial-trial ambiguity.
+
+    Returns ``{}`` on any error (DB down, migration not applied) so resume degrades to a full fresh
+    scan rather than crashing — never raises. Keys the resume set and values the finding rebuild.
+    """
+    breach_values = {v.value for v in BREACH_VERDICTS}
+    out: dict[str, tuple[int, int]] = {}
+    try:
+        engine = create_engine(database_url, pool_pre_ping=True)
+    except SQLAlchemyError as exc:  # bad URL / driver — resume simply does nothing
+        logger.warning("resume lookup: engine build failed (%s) — treating as no prior rows", exc)
+        return out
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                select(
+                    BreachResultORM.primitive_id,
+                    func.count().label("n"),
+                    # ``case`` (not ``CAST(bool AS int)`` — PostgreSQL rejects that) so the breach
+                    # count is portable across Postgres (Neon) and the SQLite test DB.
+                    func.sum(
+                        case((BreachResultORM.verdict.in_(breach_values), 1), else_=0)
+                    ).label("n_breach"),
+                )
+                .where(BreachResultORM.deployment_config_id == config_id)
+                .group_by(BreachResultORM.primitive_id)
+            ).all()
+        for pid, n, n_breach in rows:
+            out[pid] = (int(n or 0), int(n_breach or 0))
+    except SQLAlchemyError as exc:  # table missing / connection dropped — resume off, not a crash
+        logger.warning("resume lookup failed (%s) — treating as no prior rows", exc)
+        return {}
+    finally:
+        engine.dispose()
+    return out
 
 
 def persist_agent_exec_rows(database_url: str, rows: list) -> tuple[int, int]:

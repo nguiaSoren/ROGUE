@@ -558,6 +558,8 @@ def apply_ladder_outcome(
     harvested_ids: set[str],
     config_id: Optional[str],
     now: datetime,
+    refusal_texts: "dict[str, str] | None" = None,
+    configs: "list | None" = None,
 ) -> None:
     """Feed one parent's ladder result back into the harvested strategies' lifecycle.
 
@@ -577,6 +579,15 @@ def apply_ladder_outcome(
     Then soft retirement is evaluated. ARMS base-ladder ids are skipped. Commits once.
     Note: the per-sweep graduation ceiling is the candidate *selection* cap K (see
     ``select_candidates``), NOT this attribution rule.
+
+    **⑥ distill-from-failure (audit 5, rec #1).** When ``refusal_texts`` (a
+    ``{strategy_id: target_response_text}`` map for losing attempts) is supplied AND
+    the ``ROGUE_DISTILL_FAILURE`` Arm flag is set, every LOSING harvested attempt's
+    refusal reason is heuristically distilled ($0, no LLM) into an avoid-rule keyed by
+    ``(technique_id, target-context)`` — the loser-side twin of graduation. This runs
+    *after* the lifecycle commit, in its own transaction, so a capture DB error (e.g.
+    the table absent pre-migration) can never roll back graduation/retirement. Both
+    params default ``None`` → capture is skipped and behavior is byte-identical.
     """
     from rogue.db.models import AttackStrategy
 
@@ -603,3 +614,19 @@ def apply_ladder_outcome(
         touched = True
     if touched:
         session.commit()
+
+    # ⑥ Negative cross-run memory — distill the losers. Deliberately AFTER the
+    # lifecycle commit + guarded internally, so it is strictly additive: off unless
+    # the Arm flag is set + refusal_texts provided, and never endangers the
+    # graduation/retirement transaction above.
+    if refusal_texts:
+        from .refusal_distill import capture_ladder_refusals  # noqa: PLC0415
+
+        capture_ladder_refusals(
+            session,
+            attempts=attempts,
+            refusal_texts=refusal_texts,
+            harvested_ids=harvested_ids,
+            configs=configs,
+            now=now,
+        )

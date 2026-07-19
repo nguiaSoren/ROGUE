@@ -66,10 +66,10 @@ export default function ResearchPage() {
           </p>
           <div className="space-y-3 max-w-3xl">
             <PaperLink
-              title="[withheld — under anonymized review] Don't Reproduce in Deployment: A Provenance-Stratified Audit Against a Patch-Immune Anchor"
+              title="Open-Web Jailbreaks Mostly Don't Reproduce in Deployment: A Provenance-Stratified Audit Against a Patch-Immune Anchor"
               venue="NDSS · planned Aug 2026"
               finding="finding 01"
-              doi="[withheld]"
+              doi="10.5281/zenodo.21016390"
             />
             <PaperLink
               title="Allocation Is a Capability-Growth Mechanism: Telemetry and Scheduling in a Self-Growing LLM Red-Team"
@@ -78,16 +78,16 @@ export default function ResearchPage() {
               doi="10.5281/zenodo.21016849"
             />
             <PaperLink
-              title="[withheld — under anonymized review]: A Per-Type Consummation Gate and an Independence Discipline for Operator-Labeled Ground Truth"
+              title="Calibrating LLM-as-Judge Breach Detectors: A Per-Type Consummation Gate and an Independence Discipline for Operator-Labeled Ground Truth"
               venue="Under review · TMLR 2026"
               finding="finding 03"
-              doi="[withheld]"
+              doi="10.5281/zenodo.21016697"
             />
             <PaperLink
-              title="[withheld — under anonymized review]: [withheld] from Shared Agent Skill Pools"
+              title="A Dead Call Cannot Leak: Liveness-Guarded Measurement of Canary Leakage from Shared Agent Skill Pools"
               venue="NDSS · planned Aug 2026"
               finding="finding 06"
-              doi="[withheld]"
+              doi="10.5281/zenodo.21016278"
             />
             <PaperLink
               title="Measuring Verifier Leakage for LLM Judges: Strict Breach Rates Are a Lower Bound on Payment Errors"

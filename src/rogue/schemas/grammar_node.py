@@ -98,6 +98,11 @@ class GrammarNode(str, Enum):
     ENCODING_OBFUSCATION = "encoding_obfuscation"
     """Payload applies a character- or token-level encoding transformation."""
 
+    FORMAL_ENCODING = "formal_encoding"
+    """Payload re-expresses the ask as a formal problem — set-theoretic / symbolic-logic
+    (MathPrompt) or first-order-logic (LogiBreak) — to be 'solved'. A distinct axis from
+    ENCODING_OBFUSCATION: it re-frames the intent as mathematics/logic, not the surface bytes."""
+
     STRUCTURED_OUTPUT = "structured_output"
     """Payload demands a specific output format to bypass safety constraints."""
 
@@ -282,6 +287,20 @@ GRAMMAR_NODE_META: dict[GrammarNode, dict[str, str]] = {
         "derivation": (
             "payload_slots has 'encoding_scheme' (n=34) non-empty; "
             "OR family == 'obfuscation_encoding' OR 'obfuscation_encoding' in secondary_families."
+        ),
+    },
+    GrammarNode.FORMAL_ENCODING: {
+        "description": (
+            "Payload re-expresses the harmful intent as a formal problem to be 'solved' — "
+            "set-theoretic / symbolic-logic (MathPrompt) or first-order-logic (LogiBreak) — "
+            "then demands the solution enumerated with concrete real-world values. Distinct "
+            "from ENCODING_OBFUSCATION (surface-byte transforms): it re-frames the intent "
+            "into mathematics/logic, exploiting the model's formal-reasoning compliance mode."
+        ),
+        "derivation": (
+            "Realized by the ``math_encode`` / ``logic_encode`` strategy grammars "
+            "(rogue.reproduce.strategy_templates); no payload_slots key — assigned by the "
+            "strategy that produced the primitive, not by a corpus field."
         ),
     },
     GrammarNode.STRUCTURED_OUTPUT: {

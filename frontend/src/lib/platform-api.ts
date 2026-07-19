@@ -239,6 +239,58 @@ export type Finding = {
   explanation?: string | null;
   /** Render-time concern surfaced by the report route; absent on older runs. */
   remediation?: string | null;
+  /** Per-finding OWASP 2025 / MITRE ATLAS / NIST AI RMF crosswalk tags
+   *  (`report_service.build_json` → `frameworks_to_dict`); absent on older runs. */
+  frameworks?: FrameworkCoverage | null;
+  /** Ready-made compact one-line framework summary; absent on older runs. */
+  frameworks_line?: string | null;
+};
+
+/** One graded attack-family row, mirrors `scoring.FamilyScore.to_dict()`
+ *  (src/rogue/platform/scoring.py). */
+export type FamilyScore = {
+  family: string;
+  label: string;
+  grade: string; // A–F
+  asr: number;
+  n_breach: number;
+  n_trials: number;
+  ci_low: number;
+  ci_high: number;
+};
+
+/** The graded scorecard block, mirrors `scoring.build_scorecard`
+ *  (worst-category-dominates headline grade + per-family breakdown). */
+export type Scorecard = {
+  grade: string; // A–F, worst-family-dominates
+  grade_methodology: string;
+  n_families_scored: number;
+  families: FamilyScore[];
+};
+
+/** One row of the probe-coverage matrix, mirrors `scoring.build_coverage` matrix rows. */
+export type CoverageRow = {
+  family: string;
+  label: string;
+  probed: boolean;
+  n_trials: number;
+  n_breach: number;
+  breached: boolean;
+};
+
+/** The coverage block, mirrors `report_service.build_json`'s `coverage`
+ *  (legacy keys + the frozen-family probe matrix from `scoring.build_coverage`). */
+export type Coverage = {
+  // legacy keys (always present)
+  n_tests?: number;
+  n_breaches?: number;
+  breach_rate?: number;
+  families_tested?: string[];
+  // probe matrix (added by scoring.build_coverage)
+  n_families_probed?: number;
+  n_families_total?: number;
+  coverage_pct?: number;
+  matrix?: CoverageRow[];
 };
 
 /** Mirrors `ScanReport.to_dict()` (src/rogue/report.py:130) PLUS the platform `score`
@@ -263,6 +315,12 @@ export type ScanReportJson = {
   score_methodology?: string | null;
   /** Report-level "what to do next"; absent on older runs (panel degrades). */
   recommendations?: string[] | null;
+  /** Graded per-family scorecard + worst-category-dominates headline grade
+   *  (`report_service.build_json` → `scoring.build_scorecard`); absent on older runs. */
+  scorecard?: Scorecard | null;
+  /** Probe-coverage block: which of the 15 frozen families were exercised vs never
+   *  probed (`scoring.build_coverage`); absent on older runs. */
+  coverage?: Coverage | null;
 };
 
 export type ReportFormat = "json" | "html" | "pdf";

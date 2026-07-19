@@ -29,7 +29,7 @@ export const JUDGE_V3 = {
   humanAgreement: 89.3, // README.md:236, JailbreakBench, v3 recalibrated
   precision: 79.5, // README.md:236, up from 55% (v1)
   recall: 95.5, // README.md:236
-  rankOf: 5, // [withheld]
+  rankOf: 5, // 3rd of 5 field classifiers
   rank: 3,
 } as const
 

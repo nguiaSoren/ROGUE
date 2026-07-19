@@ -29,8 +29,10 @@ cheap. Per-link failures are isolated; the phase never raises.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -124,10 +126,13 @@ async def run_link_follow_phase(
     docs: list[RawDocument] = []
     errors: list[str] = []
     cost = 0.0
-    followed = 0
 
+    # PHASE 1 — collect the final URLs to fetch (dedup + shortener-resolve), capped at max_total.
+    # This part is cheap (resolve_redirect only fires for the rare t.co-style shortener) so it stays
+    # sequential; the expensive part is the unlock() fetch below, which we parallelize.
+    targets: list[tuple[str, "RawDocument"]] = []
     for source_doc in source_docs:
-        if followed >= max_total:
+        if len(targets) >= max_total:
             break
         if follow_set is not None and str(source_doc.source_type) not in follow_set:
             continue
@@ -142,7 +147,7 @@ async def run_link_follow_phase(
             continue
 
         for raw_url in outbound:
-            if followed >= max_total:
+            if len(targets) >= max_total:
                 break
             if raw_url in seen:
                 continue
@@ -167,25 +172,43 @@ async def run_link_follow_phase(
                     continue
                 seen.add(final_url)
 
+            targets.append((final_url, source_doc))
+
+    # PHASE 2 — fetch every target CONCURRENTLY (bounded). crawl4ai spawns a browser per unlock, so
+    # the semaphore caps how many run at once. Default 12 (was effectively 1 — this loop used to
+    # `await` each fetch serially); tune with HARVEST_FETCH_CONCURRENCY. Each fetch is fail-soft.
+    concurrency = max(1, int(os.environ.get("HARVEST_FETCH_CONCURRENCY", "12")))
+    sem = asyncio.Semaphore(concurrency)
+
+    async def _fetch_one(final_url: str, source_doc: "RawDocument"):
+        async with sem:
             try:
                 page = await fetcher.unlock(final_url, format="markdown")
             except Exception as exc:  # noqa: BLE001 — one bad link must not sink the phase
-                errors.append(f"fetch_failed {final_url}: {type(exc).__name__}: {exc}")
-                continue
+                return None, f"fetch_failed {final_url}: {type(exc).__name__}: {exc}"
+        try:
+            doc = _page_to_raw_document(page=page, url=final_url, source_post_url=str(source_doc.url))
+            return doc, None
+        except Exception as exc:  # noqa: BLE001
+            return None, f"raw_doc_build_failed {final_url}: {type(exc).__name__}: {exc}"
+
+    results = await asyncio.gather(*(_fetch_one(u, d) for u, d in targets))
+    for doc, err in results:
+        if doc is not None:
+            docs.append(doc)
             cost += _UNLOCKER_COST_PER_PAGE
-            try:
-                docs.append(_page_to_raw_document(page=page, url=final_url, source_post_url=str(source_doc.url)))
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"raw_doc_build_failed {final_url}: {type(exc).__name__}: {exc}")
-                continue
-            followed += 1
+        if err is not None:
+            errors.append(err)
+    followed = len(docs)
 
     logger.info(
-        "link_follow_phase: followed %d links from %d source docs, $%.4f spend, %d errors",
+        "link_follow_phase: followed %d links from %d source docs, $%.4f spend, %d errors "
+        "(fetch concurrency=%d)",
         followed,
         len(source_docs),
         cost,
         len(errors),
+        concurrency,
     )
     return LinkFollowPhaseResult(docs=docs, followed=followed, cost_usd=cost, errors=errors)
 

@@ -28,6 +28,8 @@ import json
 import time
 from typing import TYPE_CHECKING, Any
 
+from dataclasses import replace
+
 from ..core import (
     AudioBlock,
     CanonicalMessage,
@@ -41,6 +43,7 @@ from ..core import (
     UsageMetrics,
 )
 from ..core.capabilities import TargetCapabilities
+from ..core.prefill import fold_prefill_inband, split_trailing_prefill
 from . import model_specs
 from ._provider_errors import map_provider_exception, with_provider_retry
 from .base import AdapterConfig, TargetAdapter
@@ -68,6 +71,11 @@ class OpenAICompatAdapter(TargetAdapter):
     # and requires ``max_completion_tokens``; OpenRouter/Groq/most compat endpoints still take
     # ``max_tokens``. The OpenAI adapter overrides this; everyone else keeps the default.
     _max_tokens_param: str = "max_tokens"
+
+    # OpenAI-style chat-completions endpoints do NOT honor a trailing assistant turn as a response
+    # prefill (most drop or reject it), so a planted seed is folded in-band into the last user turn.
+    # No OpenAI-compatible endpoint supports native prefill, so this is False for every subclass.
+    supports_native_prefill: bool = False
 
     def __init__(self, config: AdapterConfig):
         super().__init__(config)
@@ -262,6 +270,14 @@ class OpenAICompatAdapter(TargetAdapter):
         **kwargs,
     ) -> InvocationResult:
         client = self._client()
+        # Response-prefill routing: when the thread ends in a text-only assistant seed AND this
+        # endpoint has no native prefill, fold the seed in-band into the last user turn ("Begin your
+        # reply with…") so the model emits it itself. Skipped when tools are offered — a trailing
+        # assistant turn there is the agent tool loop (harness), never a prefill seed.
+        if not tools and not self.supports_native_prefill:
+            base, prefill = split_trailing_prefill(messages)
+            if prefill is not None:
+                messages = fold_prefill_inband(base, prefill)
         msgs = self._to_openai_messages(messages)
         wire_model = self._wire_model
         # Only build the tools payload when tools are actually offered — an empty/None list must
@@ -363,12 +379,13 @@ class OpenAICompatAdapter(TargetAdapter):
         # Tool support is a per-model fact, not a blanket provider claim — delegate to the spec
         # table so unknown models correctly report False (fixes the old hardcoded over-claim).
         tools_ok = model_specs.supports_tools(self.model)
-        return model_specs.capabilities_for(
+        caps = model_specs.capabilities_for(
             self._price_key,
             supports_tools=tools_ok,
             supports_json_mode=True,
             supports_function_calling=tools_ok,
         )
+        return replace(caps, supports_native_prefill=self.supports_native_prefill)
 
     async def healthcheck(self) -> bool:
         try:

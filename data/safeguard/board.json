@@ -1,0 +1,14 @@
+{
+  "facet": "safeguard",
+  "metric": "false_refusal_rate",
+  "status": "pending",
+  "measured_at": null,
+  "panel": null,
+  "detector": null,
+  "benign_sets": [
+    "jbb_benign",
+    "xstest"
+  ],
+  "note": "Measurement pending \u2014 no approved paid run has populated this board yet. Run scripts/sweep/run_over_refusal_sweep.py --go to measure.",
+  "board": {}
+}

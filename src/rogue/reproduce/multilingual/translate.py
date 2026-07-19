@@ -109,9 +109,22 @@ class LLMTranslator:
     name = "llm"
     _MAX_TOKENS = 2000
 
-    def __init__(self, model: str = "claude-haiku-4-5", temperature: float = 0.0) -> None:
-        self.model = model
+    def __init__(self, model: str | None = None, temperature: float = 0.0,
+                 base_url: str | None = None, api_key: str | None = None) -> None:
+        import os  # noqa: PLC0415
+
         self.temperature = temperature
+        # Custom OpenAI-compatible endpoint (free Featherless / funded Alibaba qwen-mt / any host).
+        # When set, translation routes THERE instead of direct Anthropic — the sweep's free/funded
+        # translator lane, since Anthropic is often out of credit. Same shape as the judge's custom/
+        # route. Unset → the original direct-Anthropic path is byte-identical.
+        self.base_url = base_url or os.environ.get("ROGUE_MULTILINGUAL_BASE_URL") or None
+        self.api_key = api_key or os.environ.get("ROGUE_MULTILINGUAL_API_KEY") or None
+        # Model resolves: explicit arg → ROGUE_MULTILINGUAL_MODEL → Anthropic default. CRITICAL for the
+        # custom lane: a base_url pointed at OpenAI needs an OpenAI model, not the Claude default (else
+        # it 404s "claude-haiku-4-5 does not exist"). Reading the env HERE (not just in the factory) so
+        # a direct LLMTranslator() on the custom lane also works.
+        self.model = model or os.environ.get("ROGUE_MULTILINGUAL_MODEL") or "claude-haiku-4-5"
         self._client = None
         self._cache: dict[tuple[str, str], str] = {}
 
@@ -121,15 +134,19 @@ class LLMTranslator:
         key = (text, target.code)
         if key in self._cache:
             return self._cache[key]
-        from anthropic import APIStatusError, AsyncAnthropic, BadRequestError  # noqa: PLC0415
-
-        if self._client is None:
-            self._client = AsyncAnthropic()
         instruction = (
             f"Translate the following text into {target.name}. Preserve meaning, tone, and any "
             f"{{placeholder}} tokens EXACTLY (do not translate text inside curly braces). Output ONLY "
             f"the translation, no preamble.\n\n---\n{text}"
         )
+        if self.base_url:  # OpenAI-compatible endpoint — the custom/free/funded translator lane
+            out = await self._translate_via_openai_compat(instruction, target)
+            self._cache[key] = out
+            return out
+        from anthropic import APIStatusError, AsyncAnthropic, BadRequestError  # noqa: PLC0415
+
+        if self._client is None:
+            self._client = AsyncAnthropic()
         try:
             resp = await self._client.messages.create(
                 model=self.model,
@@ -157,6 +174,40 @@ class LLMTranslator:
         except Exception:  # noqa: BLE001 — accounting must never crash a run
             pass
         self._cache[key] = out
+        return out
+
+    async def _translate_via_openai_compat(self, instruction: str, target: Language) -> str:
+        """Translate via an OpenAI-compatible endpoint (``self.base_url``). Model id is used
+        verbatim (strip any ``custom/`` prefix). Same fail-safe contract as the Anthropic path:
+        an error/short reply returns ``""`` so the caller routes the variant to ``invalid``."""
+        from openai import AsyncOpenAI  # noqa: PLC0415
+
+        if self._client is None:
+            self._client = AsyncOpenAI(base_url=self.base_url, api_key=self.api_key or "not-needed")
+        wire_model = self.model.split("/", 1)[1] if self.model.startswith("custom/") else self.model
+        try:
+            resp = await self._client.chat.completions.create(
+                model=wire_model,
+                max_tokens=self._MAX_TOKENS,
+                temperature=self.temperature,
+                messages=[{"role": "user", "content": instruction}],
+            )
+        except Exception as exc:  # noqa: BLE001 — provider error → invalid variant, never a false breach
+            _log.warning("translation refused/failed (%s→%s): %s", self.model, target.code, exc)
+            return ""
+        choices = getattr(resp, "choices", None)
+        out = (choices[0].message.content or "").strip() if choices else ""
+        # Reasoning models (qwen3-*, gpt-oss) wrap output in <think>…</think>; keep only the answer.
+        out = re.sub(r"(?s)^\s*<think>.*?</think>\s*", "", out).strip()
+        try:
+            from rogue.reproduce.llm_cost_log import log_openai_response  # noqa: PLC0415
+
+            log_openai_response(
+                resp, module="multilingual", operation="translate", model=self.model,
+                subject_id=target.code, refused=(len(out) < MIN_TRANSLATION_CHARS),
+            )
+        except Exception:  # noqa: BLE001 — accounting must never crash a run
+            pass
         return out
 
 

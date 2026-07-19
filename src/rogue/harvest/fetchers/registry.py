@@ -28,28 +28,32 @@ logger = logging.getLogger("rogue.harvest.fetchers.registry")
 __all__ = ["FetcherRegistry", "DEFAULT_PREFERENCE_ORDER", "build_default_registry"]
 
 
-# Default backend preference order — BD FIRST (pre-loaded / first entry). When BD is absent, the
-# robust free scrapers (crawl4ai, firecrawl) outrank the plain httpx `direct` backend for UNLOCK and
-# the bare `playwright` backend for BROWSER — they handle JS/anti-bot that `direct` can't — so they
-# win when installed/configured, falling back to direct/playwright otherwise. (Each only registers if
-# its own is_available() says so, so listing it here is harmless when absent.)
-# `searxng` (self-hosted metasearch) is the preferred SERP/SERP_IMAGE backend when configured — free,
-# unlimited, ahead of BD's paid SERP and Firecrawl/ddg. `local_pdf` is the preferred PDF parser
-# (always on: pypdf core floor + pymupdf4llm upgrade) — it's pdf_only, so it never serves general
-# UNLOCK; the PDF guard reaches it for PDF URLs ahead of Firecrawl. Both lead only for the
-# capabilities they serve, so they never disturb UNLOCK/BROWSER.
+# Default backend preference order — FREE-FIRST. ROGUE runs keyless: no Bright Data required.
+#   • SERP / SERP_IMAGE  → `searxng` (self-hosted metasearch, free + unlimited, aggregates Google/
+#     Bing/DDG/70+ engines) is the PREFERRED search backend. Set `SEARXNG_URL` to enable it (e.g.
+#     a local docker `searxng/searxng` on :8888 with JSON output on). It is DELIBERATELY ahead of
+#     everything for search. `ddg` is only a thin fallback — the SERP bandit skips it (it 202-blocks
+#     under bulk load), so without searxng, search discovery is degraded.
+#   • UNLOCK / BROWSER   → `crawl4ai` (free, local, JS/anti-bot capable) is the PREFERRED crawler,
+#     then `firecrawl`, then plain `direct` httpx.
+#   • PDF                → `local_pdf` (always on: pypdf floor + pymupdf4llm upgrade), pdf_only.
+#   • `brightdata`       → an OPTIONAL PAID fallback, intentionally DEMOTED to the bottom and
+#     DISABLED BY DEFAULT (its keys are commented out in `.env`; is_available() is False without
+#     them, so it never registers). Keep it last so the free stack always wins even if keys return.
+# Each backend registers only if its own is_available() passes, so listing an absent one is harmless.
+# Override the whole order with the `ROGUE_FETCHER_ORDER` env var (csv of backend names).
 DEFAULT_PREFERENCE_ORDER: tuple[str, ...] = (
-    "searxng",
-    "local_pdf",
-    "brightdata",
-    "crawl4ai",
-    "firecrawl",
-    "direct",
-    "ddg",
+    "searxng",       # SERP — PREFERRED (free metasearch); needs SEARXNG_URL
+    "local_pdf",     # PDF   — always on
+    "crawl4ai",      # UNLOCK/BROWSER — PREFERRED free crawler
+    "firecrawl",     # UNLOCK fallback
+    "direct",        # UNLOCK fallback (plain httpx)
+    "ddg",           # SERP thin fallback (bandit skips it — searxng strongly preferred)
     "hf_api",
     "reddit_oauth",
     "playwright",
     "x_besteffort",
+    "brightdata",    # OPTIONAL PAID fallback — disabled by default (.env keys commented out)
 )
 
 

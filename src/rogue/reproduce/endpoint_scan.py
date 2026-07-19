@@ -237,6 +237,12 @@ async def scan_endpoint(
     database_url: str | None = None,
     config_id: str = "adhoc-endpoint-scan",
     config_name: str | None = None,
+    # --- opt-in crash-resume (purely additive; default off → today's accumulate-then-write-once path).
+    # When on (requires persist + database_url), breach rows are flushed per-primitive so a crash leaves
+    # a durable checkpoint, and a re-run SKIPS primitives already persisted for this config (no re-spend),
+    # reconstructing their findings from the stored rows. A fresh scan with no prior rows behaves exactly
+    # as a non-resume scan (same final row set), only flushed incrementally. ---
+    resume: bool = False,
     # --- opt-in Q11 survival ordering (purely additive; default off preserves today's fire order) ---
     survival_gate: object | None = None,
     survival_max_primitives: int | None = None,
@@ -303,6 +309,13 @@ async def scan_endpoint(
 
     The returned ``EndpointScanReport`` is identical whether or not ``persist`` is set — persistence
     is a pure side-effect.
+
+    ``resume=True`` (opt-in; requires ``persist`` + ``database_url``) turns a paid scan crash-safe:
+    each primitive's judged rows are flushed as soon as it finishes (a durable per-primitive
+    checkpoint), and a re-run SKIPS every primitive already persisted for this ``config_id`` —
+    rebuilding its finding from the stored verdict counts instead of re-spending on the target/judge.
+    A fresh scan with no prior rows produces the same final DB state as a non-resume scan; only the
+    flush cadence differs. Default ``resume=False`` keeps the accumulate-then-write-once path exactly.
     """
     config = make_endpoint_config(
         base_url, model,
@@ -460,12 +473,54 @@ async def scan_endpoint(
             _sprt.p0, _sprt.p1, _sprt.alpha, _sprt.beta, _sprt.n_max, _sprt.batch,
         )
 
+    # CRASH-RESUME (opt-in): load the checkpoint of primitives already persisted for this config so
+    # their paid fire is skipped and their findings rebuilt from the stored rows. Requires a real
+    # persist target; otherwise resume is inert (nothing to checkpoint against). The config is upserted
+    # up-front here (not at end-of-scan) so the FK target exists for the per-primitive incremental
+    # flushes below. Byte-identical to a non-resume scan when there are no prior rows.
+    resume_active = bool(resume and persist and database_url)
+    resume_done: dict[str, tuple[int, int]] = {}
+    if resume_active:
+        from rogue.reproduce.persistence import (  # noqa: PLC0415
+            persisted_cell_summary,
+            upsert_deployment_config,
+        )
+
+        upsert_deployment_config(config, database_url)
+        resume_done = persisted_cell_summary(database_url, config.config_id)
+        if resume_done:
+            _log.info(
+                "resume: %d primitive(s) already persisted for config %r — skipping their re-fire",
+                len(resume_done), config.config_id,
+            )
+
     findings: list[EndpointFinding] = list(prefire_skipped_findings)  # pre-fire skips recorded, not dropped
     orm_rows: list = []  # BreachResultORM rows collected when persist=True
+    flush_from = 0  # resume-mode watermark: orm_rows[:flush_from] are already flushed to the DB
     sweep_results: list[SweepResult] = []  # robustness threshold curves (opt-in --robustness-sweep)
     sweep_note: str | None = None
     try:
         for primitive in primitives:
+            # Resume-skip: this primitive is already persisted → rebuild its finding from the stored
+            # verdict counts and skip the paid fire entirely (no target/judge calls, no new rows).
+            if resume_active and primitive.primitive_id in resume_done:
+                nt, nb = resume_done[primitive.primitive_id]
+                rate = nb / nt if nt else 0.0
+                findings.append(
+                    EndpointFinding(
+                        primitive_id=primitive.primitive_id,
+                        title=primitive.title,
+                        family=primitive.family.value,
+                        vector=primitive.vector.value,
+                        base_severity=primitive.base_severity.value,
+                        n_trials=nt,
+                        n_breach=nb,
+                        any_breach_rate=round(rate, 3),
+                        breached=rate >= breach_threshold,
+                    )
+                )
+                continue
+
             rendered = render(primitive, config)
 
             # Deep stage 1 — PERSONA: wrap the rendered attack in a PAP persuasion frame (text only;
@@ -591,6 +646,20 @@ async def scan_endpoint(
                 )
             )
 
+            # CRASH-RESUME incremental flush: persist THIS primitive's judged rows now (one atomic
+            # chunk) so a crash mid-scan leaves a durable checkpoint the next --resume run skips over.
+            # Only in resume mode; a non-resume persist run still batch-writes once at end (unchanged).
+            if resume_active and len(orm_rows) > flush_from:
+                from rogue.reproduce.persistence import persist_breach_rows  # noqa: PLC0415
+
+                part = orm_rows[flush_from:]
+                persisted, failed = persist_breach_rows(database_url, part)
+                flush_from = len(orm_rows)
+                _log.debug(
+                    "resume flush: primitive %s — %d row(s) committed, %d failed",
+                    primitive.primitive_id, persisted, failed,
+                )
+
         # Robustness sweep (opt-in): find the many-shot / long-context breaking THRESHOLD for this
         # endpoint. Runs inside the try so the still-open panel + judge grade it exactly like the
         # findings above. Bounded by robustness_sweep_max_spend; a sweep failure never aborts the scan.
@@ -652,6 +721,19 @@ async def scan_endpoint(
     if persist and orm_rows:
         if not database_url:
             _log.error("persist=True but database_url is None — skipping DB write")
+        elif resume_active:
+            # Resume mode already upserted the config up-front and flushed each primitive's rows as it
+            # finished; only the unflushed remainder (if any) is left to write here — never the whole set.
+            from rogue.reproduce.persistence import persist_breach_rows  # noqa: PLC0415
+
+            if len(orm_rows) > flush_from:
+                part = orm_rows[flush_from:]
+                persisted, failed = persist_breach_rows(database_url, part)
+                flush_from = len(orm_rows)
+                _log.info(
+                    "endpoint scan (resume) final flush: %d rows written, %d failed (config_id=%r)",
+                    persisted, failed, config.config_id,
+                )
         else:
             from rogue.reproduce.persistence import persist_breach_rows, upsert_deployment_config
 

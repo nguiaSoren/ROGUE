@@ -1,7 +1,7 @@
 {
-  "_comment": "REAL measured per-model breach rates from ROGUE's all-time matrix. Computed from tests/fixtures/demo_snapshot.json.gz (a redacted export of the live Neon matrix: real verdicts/rates, free-text redacted), using the SAME rollup as the live /leaderboard (frontend/src/app/leaderboard/page.tsx::buildRows): mean any-breach rate (partial_breach|full_breach) across attack families per deployment config. Every row graded by the calibrated v3 JudgeAgent ([withheld — under anonymized review]). Regenerate via the inline script in scripts/ops/seed_demo_data.py / the snapshot. NOT illustrative \u2014 real numbers.",
+  "_comment": "REAL measured per-model breach rates from ROGUE's all-time matrix. Computed from tests/fixtures/demo_snapshot.json.gz (a redacted export of the live Neon matrix: real verdicts/rates, free-text redacted), using the SAME rollup as the live /leaderboard (frontend/src/app/leaderboard/page.tsx::buildRows): mean any-breach rate (partial_breach|full_breach) across attack families per deployment config. Every row graded by the calibrated v3 JudgeAgent (89.3% human agreement). Regenerate via the inline script in scripts/ops/seed_demo_data.py / the snapshot. NOT illustrative \u2014 real numbers.",
   "source": "tests/fixtures/demo_snapshot.json.gz (redacted live matrix export)",
-  "judge": "calibrated v3 JudgeAgent ([withheld — under anonymized review] on JailbreakBench)",
+  "judge": "calibrated v3 JudgeAgent (89.3% human agreement on JailbreakBench)",
   "total_trials": 11973,
   "models": [
     {

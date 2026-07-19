@@ -15,7 +15,7 @@
  * every page load. The /leaderboard page labels them "measured as of 2026-06-07" accordingly.
  */
 export const LEADERBOARD_TOTAL_TRIALS = 11973;
-export const LEADERBOARD_JUDGE = "calibrated v3 judge · [withheld — under anonymized review] on JailbreakBench";
+export const LEADERBOARD_JUDGE = "calibrated v3 judge · 89.3% human agreement on JailbreakBench";
 
 export type LeaderboardModel = {
   model_label: string;
@@ -140,6 +140,138 @@ export type RobustnessModel = {
   by_level: RobustnessLevel[];
   /** A real attack captured at (or near) the breaking level — payload + response excerpts. */
   sample: RobustnessSample | null;
+};
+
+// --- Safeguard / over-refusal board (False Refusal Rate) ---------------------
+// The helpfulness-cost companion to the breach-rate robustness board: rather than
+// "does the model comply with harm?", it measures "does the model wrongly REFUSE a
+// benign look-alike?" — FRR = (benign prompts wrongly refused) / (benign prompts scored).
+// Lower is better. MIRROR of data/safeguard/board.json (the pipeline artifact; also
+// rendered as the pending share card /cards/safeguard-leaderboard.{png,svg}). It ships
+// STATUS "pending" today — the metric, panel and benign denominators are wired + gated,
+// but NO approved paid run has populated the board, so the facet renders an honest
+// "measurement pending" state, never fabricated zeros. When a run lands, regenerate
+// data/safeguard/board.json (scripts/sweep/run_over_refusal_sweep.py --go) and update
+// this mirror in the same stride (status→"measured", panel + board filled).
+export type SafeguardStatus = "pending" | "measured";
+
+/** Per-benign-set breakdown for one model (kept permissive — the exact by_set shape
+ *  is finalized by the run). */
+export type SafeguardBySet = {
+  n?: number;
+  n_refused?: number;
+  frr?: number | null;
+};
+
+/** One measured model row (present only when status === "measured"). `frr: null` = the
+ *  model errored on every benign prompt (no scorable denominator) → ranked LAST. */
+export type SafeguardModelRow = {
+  n: number;
+  n_fired: number;
+  n_errors: number;
+  n_refused: number;
+  frr: number | null;
+  wilson_ci: [number, number];
+  bootstrap_ci: [number, number];
+  by_set: Record<string, SafeguardBySet>;
+  /** A representative wrongly-refused benign prompt + the refusal (present when measured). */
+  sample: { prompt?: string; response?: string; benign_set?: string } | null;
+};
+
+export type SafeguardBoard = {
+  facet: "safeguard";
+  metric: string; // "false_refusal_rate"
+  status: SafeguardStatus;
+  measured_at: string | null;
+  /** The models scored (null until a run populates the board). */
+  panel: string[] | null;
+  /** The over-block detector label (null until a run). */
+  detector: string | null;
+  benign_sets: string[];
+  note: string | null;
+  /** model_label → measured row. Empty {} while pending. */
+  board: Record<string, SafeguardModelRow>;
+};
+
+/** Bundled mirror of data/safeguard/board.json (currently PENDING). */
+export const SAFEGUARD_BOARD: SafeguardBoard = {
+  facet: "safeguard",
+  metric: "false_refusal_rate",
+  status: "pending",
+  measured_at: null,
+  panel: null,
+  detector: null,
+  benign_sets: ["jbb_benign", "xstest"],
+  note: "Measurement pending — no approved paid run has populated this board yet. Run scripts/sweep/run_over_refusal_sweep.py --go to measure.",
+  board: {},
+};
+
+// --- Agentic indirect-prompt-injection (IPI) robustness board ----------------
+// A per-DeploymentConfig view of INDIRECT prompt injection: a malicious instruction is
+// smuggled into a tool result / retrieved document (not the user turn), and we measure
+// how often the agent follows it (IPI ASR), broken down by the three levers that move it —
+// the injection TEMPLATE, the CARRIER (which tool result carried it), and the CONCEALMENT
+// (how the instruction was hidden). Paired with a defense-stack fingerprint
+// (guardrail-fingerprint-v1) that probes whether a guard/filter is present and its posture.
+// Ships PENDING (n_cells 0) — no approved paid run has populated it — so the facet renders
+// an honest empty state describing the levers it will measure, never fabricated numbers.
+export type IpiStatus = "pending" | "measured";
+
+/** One IPI probe cell — a (template × carrier × concealment) attempt against the config. */
+export type IpiCell = {
+  template: string;
+  carrier: string;
+  concealment: string;
+  carrier_tool: string;
+  placement: string;
+  breached: boolean;
+  headline: string | null;
+  signals: string[];
+};
+
+/** guardrail-fingerprint-v1 — the defense-stack label attached to the board. */
+export type GuardrailFingerprint = {
+  defense_present: boolean;
+  posture: string;
+  guard_family: string | null;
+  confidence: number | null;
+  probe_results: Record<string, unknown> | null;
+  evidence: string[] | null;
+};
+
+export type InjectionBoard = {
+  schema_version: "ipi-matrix-v1";
+  status: IpiStatus;
+  /** The DeploymentConfig this board scores (null until a run targets one). */
+  config_label: string | null;
+  n_cells: number;
+  n_breaches: number;
+  /** Overall IPI attack-success rate; null while pending. */
+  ipi_asr: number | null;
+  /** Marginal ASR by each lever — key → rate. Empty {} while pending. */
+  by_template: Record<string, number>;
+  by_carrier: Record<string, number>;
+  by_concealment: Record<string, number>;
+  cells: IpiCell[];
+  /** The defense-stack fingerprint; null until a run probes it. */
+  defense: GuardrailFingerprint | null;
+  note: string | null;
+};
+
+/** Bundled PENDING stub for the injection-robustness facet (no paid run yet). */
+export const INJECTION_BOARD: InjectionBoard = {
+  schema_version: "ipi-matrix-v1",
+  status: "pending",
+  config_label: null,
+  n_cells: 0,
+  n_breaches: 0,
+  ipi_asr: null,
+  by_template: {},
+  by_carrier: {},
+  by_concealment: {},
+  cells: [],
+  defense: null,
+  note: "Measurement pending — no approved paid run has populated the IPI matrix yet. The template × carrier × concealment levers and the guardrail-fingerprint probe are wired and gated.",
 };
 
 export const LEADERBOARD_ROBUSTNESS_MODELS: RobustnessModel[] = [

@@ -34,6 +34,7 @@ import asyncio
 import base64
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel
@@ -48,12 +49,24 @@ from rogue.core.errors import (
     ProviderError,
     RateLimitError,
 )
+from rogue.reproduce.conversation import Conversation
 from rogue.reproduce.instantiator import RenderedAttack
+from rogue.reproduce.result_cache import ResultCache
 from rogue.schemas import DeploymentConfig
 
-__all__ = ["ModelResponse", "TargetPanel", "supports_audio", "supports_image"]
+__all__ = [
+    "ModelResponse",
+    "TargetPanel",
+    "ThreadResult",
+    "supports_audio",
+    "supports_image",
+]
 
 _log = logging.getLogger(__name__)
+
+# Sentinel: distinguishes "caller passed nothing" (→ pick up the env-gated cache) from "caller
+# explicitly disabled the cache with result_cache=None".
+_UNSET_CACHE: Any = object()
 
 
 # ---------- Multimodal capability gate (Step 0a/0b) ----------
@@ -137,6 +150,22 @@ class ModelResponse(BaseModel):
     model_config = {"frozen": True}
 
 
+@dataclass(frozen=True)
+class ThreadResult:
+    """The FULL outcome of a multi-turn exchange — every turn, not just the final reply.
+
+    Returned by :meth:`TargetPanel.run_conversation_full`. ``conversation`` is the threaded
+    :class:`~rogue.reproduce.conversation.Conversation` (all user turns + all interleaved target
+    replies); ``responses`` are the per-turn :class:`ModelResponse`s in order; ``final`` is the last
+    reply (the one a single-reply caller would have judged), or None if nothing was dispatched
+    (modality skip, or an error on the first turn).
+    """
+
+    conversation: Conversation
+    responses: list[ModelResponse]
+    final: ModelResponse | None
+
+
 # ---------- The panel ----------
 
 
@@ -154,6 +183,7 @@ class TargetPanel:
         adapter_extra: dict[str, Any] | None = None,
         max_output_tokens: int | None = None,
         reasoning_effort: str | None = None,
+        result_cache: ResultCache | None = _UNSET_CACHE,
     ) -> None:
         # Cache one adapter per (provider, model_id). The adapter owns its provider client + retry.
         self._adapters: dict[tuple[str, str], Any] = {}
@@ -170,6 +200,14 @@ class TargetPanel:
         # real speed lever for a powered open-weight run. None → the model's default reasoning. Values
         # are provider-specific; a target that rejects the value fails soft in the adapter.
         self._reasoning_effort: str | None = reasoning_effort
+        # Content-hash verdict cache (opt-in, Audit-5 rec #3). Default: pick up the env-gated cache
+        # (``ResultCache.from_env()`` → None unless ROGUE_VERDICT_CACHE is set), so a plain
+        # ``TargetPanel()`` is byte-identical to today. Pass ``result_cache=None`` to force it off, or
+        # an explicit ``ResultCache`` to inject one (tests / a shared cross-panel store). A HIT in
+        # ``run_attack`` returns the stored samples and skips the paid target fire.
+        if result_cache is _UNSET_CACHE:
+            result_cache = ResultCache.from_env()
+        self._result_cache: ResultCache | None = result_cache
 
     async def aclose(self) -> None:
         """Release every cached adapter (and its provider client). Idempotent.
@@ -222,8 +260,16 @@ class TargetPanel:
         config: DeploymentConfig,
         temperature: float = 0.7,
         n_trials: int = 5,
+        *,
+        seed_reply: str | None = None,
     ) -> list[ModelResponse]:
         """Fan out `n_trials` independent calls; return list ordered by trial_index.
+
+        Assistant response-prefill: pass ``seed_reply`` to plant a fabricated trailing assistant seed
+        at fire time (for a ``RenderedAttack`` that carries none). Routed per protocol by the adapter
+        — native on Anthropic, in-band "Begin your reply with…" fold on OpenAI-style. Ignored if the
+        render already ends in an assistant turn (``render(seed_reply=…)`` already materialized one).
+        Default None ⇒ byte-identical to the pre-prefill dispatch.
 
         Temperature is varied across trials as `temperature + 0.1 * i` capped at 1.5 (§10.3 wants
         i.i.d.-ish samples; a small monotonic walk guarantees variation without drifting far from the
@@ -246,15 +292,39 @@ class TargetPanel:
                 "skip: %s — modality_unsupported (not an error; no trials dispatched)", skip
             )
             return []
+
+        # Verdict-cache read-through (opt-in). A HIT returns the stored samples for a byte-identical
+        # request and skips the paid fire entirely; the key includes seed_reply + every transform +
+        # sampling knob, so a differing request can never false-hit. Off by default (cache is None).
+        cache = self._result_cache
+        cache_key: str | None = None
+        if cache is not None:
+            cache_key = cache.key_for(
+                rendered, config,
+                temperature=temperature, n_trials=n_trials, seed_reply=seed_reply,
+                max_output_tokens=self._max_output_tokens,
+                reasoning_effort=self._reasoning_effort,
+                provider_pin=self._adapter_extra.get("provider_pin"),
+            )
+            hit = cache.get(cache_key)
+            if hit is not None:
+                _log.debug("verdict cache HIT — skipping %d paid trial(s)", n_trials)
+                return hit
+
         temperatures = [min(temperature + 0.1 * i, 1.5) for i in range(n_trials)]
         coros = [
-            self._dispatch_one(rendered, config, trial_index=i, temperature=t)
+            self._dispatch_one(rendered, config, trial_index=i, temperature=t, seed_reply=seed_reply)
             for i, t in enumerate(temperatures)
         ]
         # Per-call concurrency stays bounded by n_trials; the OUTER fan-out over
         # (primitives × configs) in scripts/reproduce/reproduce_once.py owns the Semaphore (§11.3).
         responses = await asyncio.gather(*coros)
-        return sorted(responses, key=lambda r: r.trial_index)
+        responses = sorted(responses, key=lambda r: r.trial_index)
+        # Only store a clean run (put() itself no-ops if any trial errored) so a transient
+        # rate-limit/provider failure can never poison a later re-measurement.
+        if cache is not None and cache_key is not None:
+            cache.put(cache_key, responses)
+        return responses
 
     @staticmethod
     def user_turn_count(rendered: RenderedAttack) -> int:
@@ -323,16 +393,30 @@ class TargetPanel:
             self._adapters[key] = adapter
         return adapter
 
-    def _build_messages(self, rendered: RenderedAttack) -> list[CanonicalMessage]:
+    def _build_messages(
+        self, rendered: RenderedAttack, *, seed_reply: str | None = None
+    ) -> list[CanonicalMessage]:
         """Translate a RenderedAttack into provider-neutral CanonicalMessages.
 
         The legacy ``{role, content:str}`` turns become text messages; an out-of-band image/audio
         payload is attached to the LAST user turn as an ``ImageBlock``/``AudioBlock`` (the adapter
         renders the provider-specific wire format). System turns are never given media.
+
+        Assistant response-prefill: when ``seed_reply`` is set AND the render doesn't already end in
+        an assistant turn, a trailing ``assistant`` seed turn is appended (fire-time prefill). The
+        media attach runs first and scans for the last USER turn, so a trailing assistant seed never
+        steals the image/audio payload.
         """
         messages = from_legacy_messages(rendered.messages)
+        self._attach_media(messages, rendered)
+        if seed_reply and not (messages and messages[-1].role == MessageRole.ASSISTANT):
+            messages.append(CanonicalMessage.assistant(str(seed_reply)))
+        return messages
+
+    def _attach_media(self, messages: list[CanonicalMessage], rendered: RenderedAttack) -> None:
+        """Attach any out-of-band image/audio payload to the last user turn (in place)."""
         if rendered.image_b64 is None and rendered.audio_b64 is None:
-            return messages
+            return
         for i in range(len(messages) - 1, -1, -1):
             if messages[i].role != MessageRole.USER:
                 continue
@@ -351,7 +435,6 @@ class TargetPanel:
                     )
                 )
             break
-        return messages
 
     async def _dispatch_one(
         self,
@@ -359,13 +442,14 @@ class TargetPanel:
         config: DeploymentConfig,
         trial_index: int,
         temperature: float,
+        seed_reply: str | None = None,
     ) -> ModelResponse:
         """Route a single trial to the right adapter and project the result onto ModelResponse."""
         # A config carrying a base_url targets a custom OpenAI-compatible endpoint (the
         # CustomHTTPAdapter); otherwise route by the model-id prefix.
         provider = "custom" if config.base_url else _resolve_provider(config.target_model)
         adapter = self._adapter_for(provider, config.target_model, config.base_url)
-        messages = self._build_messages(rendered)
+        messages = self._build_messages(rendered, seed_reply=seed_reply)
 
         t0 = time.perf_counter()
         try:
@@ -480,6 +564,149 @@ class TargetPanel:
             tokens_in=total_tokens_in,
             tokens_out=total_tokens_out,
             cost_usd=total_cost,
+            error=None,
+            trial_index=trial_index,
+            temperature=temperature,
+        )
+
+    # ----- Adaptive multi-turn (Conversation-driven) -----
+
+    async def fire_next(
+        self,
+        convo: Conversation,
+        config: DeploymentConfig,
+        *,
+        temperature: float = 0.7,
+    ) -> ModelResponse:
+        """Fire the current thread ONCE and return the target's next reply — the adaptive primitive.
+
+        Sends ``convo.to_canonical()`` (which should end in a user turn, or a user+assistant-prefill
+        pair for response-priming — the adapter routes the seed per protocol) and returns the reply
+        as a :class:`ModelResponse` (carrying the reasoning trace when the target exposes one).
+
+        Deliberately does NOT mutate ``convo``: the caller grades the reply, then threads it
+        (``convo.add_assistant(resp.content); convo.record(score)``) — or ``convo.backtrack()`` if
+        the turn over-reached. That grade-then-thread-or-retreat control is the whole point of the
+        Conversation object, so this method leaves the decision to the caller.
+        """
+        provider = "custom" if config.base_url else _resolve_provider(config.target_model)
+        adapter = self._adapter_for(provider, config.target_model, config.base_url)
+        history = convo.to_canonical()
+        if not history:
+            raise ValueError("fire_next: conversation is empty (add a user turn first)")
+        return await self._invoke_once(
+            adapter, history, trial_index=0, temperature=min(temperature, 1.5)
+        )
+
+    async def run_conversation_full(
+        self,
+        rendered: RenderedAttack,
+        config: DeploymentConfig,
+        *,
+        temperature: float = 0.7,
+    ) -> ThreadResult:
+        """Drive a multi-turn attack and return the FULL thread — every turn, not just the final reply.
+
+        The multi-turn upgrade of :meth:`run_conversation` (which returns only the final reply per
+        trial): here a single thread is walked turn-by-turn, each target reply threaded back into a
+        :class:`~rogue.reproduce.conversation.Conversation`, and the whole thread + per-turn
+        :class:`ModelResponse`s + the final reply are returned as a :class:`ThreadResult`. Adds a new
+        surface; the existing ``run_attack`` / ``run_conversation`` contracts are untouched.
+
+        Single-thread (no ``n_trials`` fan-out — an adaptive thread is one live conversation). Honors
+        the same modality gate as ``run_attack`` (an image/audio attack vs an incapable target →
+        empty ``ThreadResult``). Prefill-aware: a trailing assistant seed after the last user turn is
+        carried into the final leg and routed by the adapter. An error on any turn stops the exchange
+        and is returned as that turn's response.
+        """
+        skip = self.modality_skip_reason(rendered, config)
+        if skip is not None:
+            _log.info(
+                "skip: %s — modality_unsupported (not an error; no trials dispatched)", skip
+            )
+            return ThreadResult(conversation=Conversation(), responses=[], final=None)
+
+        provider = "custom" if config.base_url else _resolve_provider(config.target_model)
+        adapter = self._adapter_for(provider, config.target_model, config.base_url)
+        temp = min(temperature, 1.5)
+        full = self._build_messages(rendered)
+        user_idxs = [i for i, m in enumerate(full) if m.role == MessageRole.USER]
+        convo = Conversation()
+        responses: list[ModelResponse] = []
+        if not user_idxs:
+            # No user turn — degrade to a single fire of whatever was built (defensive; render()
+            # guarantees at least one user turn per primitive).
+            resp = await self._invoke_once(adapter, full, trial_index=0, temperature=temp)
+            for m in full:
+                convo.messages.append(m)
+            responses.append(resp)
+            if resp.error is None:
+                convo.add_assistant(resp.content)
+            return ThreadResult(conversation=convo, responses=responses, final=resp)
+
+        history: list[CanonicalMessage] = []
+        prev_idx = 0
+        for turn_no, idx in enumerate(user_idxs):
+            # On the final leg, sweep in everything up to the end (incl. any trailing assistant-prefill
+            # seed after the last user turn); earlier legs stop at the user turn.
+            end = len(full) if turn_no == len(user_idxs) - 1 else idx + 1
+            segment = full[prev_idx:end]
+            prev_idx = end
+            history.extend(segment)
+            for m in segment:
+                convo.messages.append(m)
+
+            resp = await self._invoke_once(
+                adapter, history, trial_index=turn_no, temperature=temp
+            )
+            responses.append(resp)
+            if resp.error is not None:
+                break
+            reply = CanonicalMessage.assistant(resp.content)
+            history.append(reply)
+            convo.add_assistant(resp.content)
+
+        final = responses[-1] if responses else None
+        return ThreadResult(conversation=convo, responses=responses, final=final)
+
+    async def _invoke_once(
+        self,
+        adapter: Any,
+        messages: list[CanonicalMessage],
+        *,
+        trial_index: int,
+        temperature: float,
+    ) -> ModelResponse:
+        """One adapter invoke → ModelResponse, with the panel's standard error→legacy-tag projection.
+
+        Shared by :meth:`fire_next` / :meth:`run_conversation_full`; mirrors ``_dispatch_one``'s
+        error mapping exactly (rate-limit / content-policy / provider-error → the same tags).
+        """
+        t0 = time.perf_counter()
+        try:
+            result = await adapter.invoke(
+                messages,
+                temperature=temperature,
+                max_output_tokens=self._max_output_tokens,
+                reasoning_effort=self._reasoning_effort,
+            )
+        except RateLimitError as e:
+            return self._error_response("rate_limit_exhausted", e, trial_index, temperature, t0)
+        except ContentPolicyError as e:  # subclass of ProviderError — must precede it
+            return self._error_response(
+                "content_policy_or_bad_request", e, trial_index, temperature, t0
+            )
+        except (ProviderError, AuthenticationError) as e:
+            status = getattr(e, "status_code", None) or "unknown"
+            return self._error_response(f"http_status_{status}", e, trial_index, temperature, t0)
+
+        return ModelResponse(
+            content=result.text,
+            reasoning=getattr(result, "reasoning", "") or "",
+            latency_ms=result.latency_ms,
+            tokens_in=result.usage.input_tokens,
+            tokens_out=result.usage.output_tokens,
+            cost_usd=result.usage.estimated_cost_usd or 0.0,
             error=None,
             trial_index=trial_index,
             temperature=temperature,

@@ -270,7 +270,7 @@ export function PublicScan() {
           />
           <p className="text-xs text-muted-foreground leading-relaxed">
             Optional: an Anthropic/OpenAI key → graded by ROGUE&apos;s{" "}
-            <span className="text-rogue-green">calibrated v3 judge</span> ([withheld — under anonymized review]). Leave blank
+            <span className="text-rogue-green">calibrated v3 judge</span> (89.3% human agreement). Leave blank
             for the free keyless heuristic judge.
           </p>
         </div>
